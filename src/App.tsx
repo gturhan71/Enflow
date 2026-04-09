@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Settings } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
@@ -26,12 +26,49 @@ import ContractModule from './modules/ContractModule';
 import ProjectManagementModule from './modules/ProjectManagementModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
+import Login from './modules/Login';
 
-export default function App() {
+const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onLogout: () => void }) => {
+  const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
+    return localStorage.getItem(`enflow_company_logo_${tenantId}`);
+  });
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(MOCK_OPPORTUNITIES);
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS as Project[]);
-  const [contracts, setContracts] = useState<Contract[]>(MOCK_CONTRACTS);
+  
+  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
+    const saved = localStorage.getItem(`enflow_opps_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_OPPORTUNITIES;
+  });
+  
+  const [projects, setProjects] = useState<Project[]>(() => {
+    const saved = localStorage.getItem(`enflow_projects_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_PROJECTS;
+  });
+  
+  const [contracts, setContracts] = useState<Contract[]>(() => {
+    const saved = localStorage.getItem(`enflow_contracts_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_CONTRACTS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_opps_${tenantId}`, JSON.stringify(opportunities));
+  }, [opportunities, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_projects_${tenantId}`, JSON.stringify(projects));
+  }, [projects, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_contracts_${tenantId}`, JSON.stringify(contracts));
+  }, [contracts, tenantId]);
+
+  const setCompanyLogo = (logo: string | null) => {
+    setCompanyLogoState(logo);
+    if (logo) {
+      localStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
+    } else {
+      localStorage.removeItem(`enflow_company_logo_${tenantId}`);
+    }
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -45,7 +82,7 @@ export default function App() {
       case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} />;
       case 'todo': return <TodoModule />;
-      case 'settings': return <SettingsModule />;
+      case 'settings': return <SettingsModule companyLogo={companyLogo} setCompanyLogo={setCompanyLogo} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-full text-slate-400">
           <Settings size={48} className="mb-4 opacity-20" />
@@ -58,7 +95,7 @@ export default function App() {
 
   return (
     <div className="flex min-h-screen bg-[#f8f9fa]">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
       <main className="flex-1 flex flex-col min-w-0">
         <Header title={NAV_ITEMS.find(i => i.id === activeTab)?.label || 'Dashboard'} />
         <div className="flex-1 overflow-y-auto">
@@ -78,4 +115,15 @@ export default function App() {
       </main>
     </div>
   );
+};
+
+export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+
+  if (!isAuthenticated || !activeTenantId) {
+    return <Login onLogin={(tId) => { setIsAuthenticated(true); setActiveTenantId(tId); }} />;
+  }
+
+  return <TenantApp key={activeTenantId} tenantId={activeTenantId} onLogout={() => { setIsAuthenticated(false); setActiveTenantId(null); }} />;
 }

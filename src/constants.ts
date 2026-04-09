@@ -37,8 +37,17 @@ import {
   ProjectTask,
   TodoTask,
   Opportunity,
-  Project
+  Project,
+  Tenant
 } from './types';
+
+export const APP_VERSION = 'v1.2.0';
+
+export const MOCK_TENANTS: Tenant[] = [
+  { id: 'tenant-1', name: 'TechCorp A.Ş.' },
+  { id: 'tenant-2', name: 'Global Endüstri A.Ş.' },
+  { id: 'tenant-3', name: 'Enflow Demo' }
+];
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },

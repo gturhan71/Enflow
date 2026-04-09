@@ -93,7 +93,7 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab: (id: string) => void }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
   return (
     <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0">
       <div className="p-6 flex items-center gap-3 border-bottom border-slate-100">
@@ -142,7 +142,7 @@ const Sidebar = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTab:
             <p className="text-sm font-semibold text-slate-900 truncate">Gökhan Turhan</p>
             <p className="text-xs text-slate-500 truncate">Genel Müdür</p>
           </div>
-          <button className="text-slate-400 hover:text-slate-600">
+          <button onClick={onLogout} className="text-slate-400 hover:text-slate-600">
             <LogOut size={18} />
           </button>
         </div>

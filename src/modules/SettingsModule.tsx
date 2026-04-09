@@ -90,12 +90,22 @@ import {
 } from '../types';
 import { nextcloudService } from '../services/nextcloudService';
 import IntegrationWizard from './IntegrationWizard';
+import ProvisionWizard from './ProvisionWizard';
 import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const SettingsModule = () => {
-  const [activeSubTab, setActiveSubTab] = useState('units');
+interface SettingsModuleProps {
+  companyLogo: string | null;
+  setCompanyLogo: (logo: string | null) => void;
+}
+
+const SettingsModule = ({ companyLogo, setCompanyLogo }: SettingsModuleProps) => {
+  const [activeSubTab, setActiveSubTab] = useState('company');
+  const [showProvisionWizard, setShowProvisionWizard] = useState(false);
+  const [units, setUnits] = useState<Unit[]>(MOCK_UNITS);
+  const [users, setUsers] = useState<User[]>(MOCK_SYSTEM_USERS);
+  
   const [ncConfig, setNcConfig] = useState<NextcloudConfig>(nextcloudService.getConfig());
   const [exConfig, setExConfig] = useState<ExchangeConfig>(exchangeService.getConfig());
   const [waConfig, setWaConfig] = useState<WhatsAppConfig>(whatsappService.getConfig());
@@ -107,14 +117,24 @@ const SettingsModule = () => {
           <h3 className="text-2xl font-bold text-slate-900">Şirket Ayarları</h3>
           <p className="text-slate-500">Birim tanımlamaları, kullanıcı yönetimi ve yetkilendirme.</p>
         </div>
-        <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
-          <Plus size={20} />
-          {activeSubTab === 'units' ? 'Yeni Birim' : activeSubTab === 'users' ? 'Yeni Kullanıcı' : activeSubTab === 'integrations' ? 'Entegrasyon Ekle' : 'Yeni Yetki'}
-        </button>
+        <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setShowProvisionWizard(true)}
+            className="bg-white border border-slate-200 text-indigo-600 px-6 py-3 rounded-2xl font-bold shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2"
+          >
+            <Wand2 size={20} />
+            Hızlı Provizyon
+          </button>
+          <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+            <Plus size={20} />
+            {activeSubTab === 'units' ? 'Yeni Birim' : activeSubTab === 'users' ? 'Yeni Kullanıcı' : activeSubTab === 'integrations' ? 'Entegrasyon Ekle' : 'Yeni Yetki'}
+          </button>
+        </div>
       </div>
 
       <div className="flex items-center gap-2 border-b border-slate-200">
         {[
+          { id: 'company', label: 'Şirket Profili', icon: Settings },
           { id: 'units', label: 'Birimler', icon: LayoutDashboard },
           { id: 'users', label: 'Kullanıcılar', icon: Users },
           { id: 'permissions', label: 'Yetkiler', icon: ShieldCheck },
@@ -144,9 +164,63 @@ const SettingsModule = () => {
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
         >
+          {activeSubTab === 'company' && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-2xl">
+              <h4 className="text-lg font-bold text-slate-900 mb-6">Şirket Profili ve Logo</h4>
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Şirket Logosu</label>
+                  <div className="flex items-center gap-6">
+                    <div className="w-32 h-32 rounded-2xl border-2 border-dashed border-slate-300 flex items-center justify-center bg-slate-50 overflow-hidden relative group">
+                      {companyLogo ? (
+                        <>
+                          <img src={companyLogo} alt="Company Logo" className="w-full h-full object-contain p-2" />
+                          <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => setCompanyLogo(null)}
+                              className="text-white text-xs font-bold hover:underline"
+                            >
+                              Kaldır
+                            </button>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="text-center">
+                          <Settings size={24} className="mx-auto text-slate-400 mb-2" />
+                          <span className="text-xs text-slate-500 font-medium">Logo Yükle</span>
+                        </div>
+                      )}
+                      <input 
+                        type="file" 
+                        accept="image/*"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            const reader = new FileReader();
+                            reader.onloadend = () => {
+                              setCompanyLogo(reader.result as string);
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm text-slate-500 mb-2">
+                        Giriş ekranında ve raporlarda kullanılacak şirket logosunu yükleyin.
+                      </p>
+                      <p className="text-xs text-slate-400">Önerilen boyut: 256x256px. Maksimum 2MB (PNG, JPG).</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeSubTab === 'units' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {MOCK_UNITS.map((unit) => (
+              {units.map((unit) => (
                 <div key={unit.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
@@ -159,7 +233,7 @@ const SettingsModule = () => {
                   <h4 className="font-bold text-slate-900 mb-2">{unit.name}</h4>
                   <p className="text-sm text-slate-500 mb-6 leading-relaxed">{unit.description}</p>
                   <div className="flex items-center justify-between pt-4 border-t border-slate-50">
-                    <span className="text-xs font-bold text-slate-400">8 Kullanıcı</span>
+                    <span className="text-xs font-bold text-slate-400">{users.filter(u => u.unitId === unit.id).length} Kullanıcı</span>
                     <button className="text-xs font-bold text-indigo-600 hover:underline">Düzenle</button>
                   </div>
                 </div>
@@ -180,7 +254,7 @@ const SettingsModule = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-50">
-                  {MOCK_SYSTEM_USERS.map((user) => (
+                  {users.map((user) => (
                     <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                       <td className="py-6 px-6">
                         <div className="flex items-center gap-3">
@@ -195,7 +269,7 @@ const SettingsModule = () => {
                       </td>
                       <td className="py-6 px-6">
                         <span className="text-sm text-slate-600">
-                          {MOCK_UNITS.find(u => u.id === user.unitId)?.name || '-'}
+                          {units.find(u => u.id === user.unitId)?.name || '-'}
                         </span>
                       </td>
                       <td className="py-6 px-6">
@@ -268,6 +342,32 @@ const SettingsModule = () => {
           )}
         </motion.div>
       </AnimatePresence>
+      <ProvisionWizard 
+        isOpen={showProvisionWizard}
+        onClose={() => setShowProvisionWizard(false)}
+        onComplete={(newUnit, newUsers) => {
+          const unitId = `unit-${Date.now()}`;
+          const createdUnit: Unit = {
+            id: unitId,
+            name: newUnit.name || 'Yeni Birim',
+            description: newUnit.description
+          };
+          
+          const createdUsers: User[] = newUsers.map((u, i) => ({
+            id: `user-${Date.now()}-${i}`,
+            name: u.name || 'İsimsiz',
+            email: u.email || '',
+            role: u.role as any,
+            status: u.status as any,
+            unitId: unitId
+          }));
+
+          setUnits([...units, createdUnit]);
+          setUsers([...users, ...createdUsers]);
+          setShowProvisionWizard(false);
+          setActiveSubTab('units');
+        }}
+      />
     </div>
   );
 };

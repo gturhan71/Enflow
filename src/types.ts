@@ -95,6 +95,11 @@ export interface Project {
   procurementNotes?: { id: string; date: string; note: string; author: string }[];
 }
 
+export interface Tenant {
+  id: string;
+  name: string;
+}
+
 export interface CorporateDocument {
   id: string;
   name: string;
