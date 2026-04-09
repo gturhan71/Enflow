@@ -1,0 +1,516 @@
+import React, { useState } from 'react';
+import { 
+  LayoutDashboard, 
+  Users, 
+  FileSearch, 
+  FileText, 
+  ShoppingCart, 
+  Archive, 
+  Settings,
+  Bell,
+  Search,
+  Plus,
+  ArrowUpRight,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  FileCheck,
+  ChevronRight,
+  Menu,
+  X,
+  LogOut,
+  TrendingUp,
+  DollarSign,
+  Briefcase,
+  Truck,
+  Package,
+  History,
+  FileDown,
+  Calendar,
+  ShieldCheck,
+  MapPin,
+  UserCheck,
+  ExternalLink,
+  Download,
+  Filter,
+  MoreVertical,
+  BarChart3,
+  PieChart,
+  ArrowDownRight,
+  Target,
+  Percent,
+  FileSignature,
+  Gavel,
+  Kanban,
+  Wand2,
+  Puzzle,
+  Cpu,
+  Mail,
+  MessageSquare,
+  ListTodo,
+  UserPlus,
+  FileCheck2
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '@/src/lib/utils';
+import { 
+  NAV_ITEMS, 
+  MOCK_CUSTOMERS,
+  MOCK_PROJECTS, 
+  MOCK_DOCUMENTS, 
+  MOCK_WORK_EXPERIENCE, 
+  MOCK_CERTIFICATES,
+  MOCK_UNITS,
+  MOCK_PERMISSIONS,
+  MOCK_SYSTEM_USERS,
+  MOCK_BOM_ITEMS,
+  MOCK_COST_REQUIREMENTS,
+  MOCK_CONTRACTS,
+  MOCK_CONTRACT_DOCS,
+  MOCK_PROJECT_TASKS,
+  MOCK_TODO_TASKS,
+  MOCK_OPPORTUNITIES
+} from '../constants';
+import { 
+  CorporateDocument, 
+  Unit, 
+  User, 
+  Permission, 
+  BoMItem, 
+  CostRequirement,
+  Contract,
+  ContractDocumentRequirement,
+  ProjectTask,
+  TodoTask,
+  Opportunity,
+  Project,
+  NextcloudConfig,
+  ExchangeConfig,
+  WhatsAppConfig
+} from '../types';
+import { nextcloudService } from '../services/nextcloudService';
+import { exchangeService } from '../services/exchangeService';
+import { whatsappService } from '../services/whatsappService';
+
+
+const IntegrationWizard = ({ 
+  ncConfig, 
+  setNcConfig,
+  exConfig,
+  setExConfig,
+  waConfig,
+  setWaConfig
+}: { 
+  ncConfig: NextcloudConfig, 
+  setNcConfig: (c: NextcloudConfig) => void,
+  exConfig: ExchangeConfig,
+  setExConfig: (c: ExchangeConfig) => void,
+  waConfig: WhatsAppConfig,
+  setWaConfig: (c: WhatsAppConfig) => void
+}) => {
+  const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
+  const [wizardStep, setWizardStep] = useState(1);
+
+  const INTEGRATIONS = [
+    { id: 'nextcloud', name: 'Nextcloud DMS', description: 'Dosya yönetimi ve paylaşım sistemi.', icon: History, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { id: 'sap', name: 'SAP ERP', description: 'Kurumsal kaynak planlama entegrasyonu.', icon: Cpu, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { id: 'exchange', name: 'MS Exchange', description: 'E-posta ve takvim senkronizasyonu.', icon: Mail, color: 'text-red-600', bg: 'bg-red-50' },
+    { id: 'whatsapp', name: 'WhatsApp Business', description: 'Müşteri bildirimleri ve sohbet.', icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+  ];
+
+  if (!selectedIntegration) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {INTEGRATIONS.map((int) => (
+          <div 
+            key={int.id} 
+            onClick={() => setSelectedIntegration(int.id)}
+            className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group"
+          >
+            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform", int.bg, int.color)}>
+              <int.icon size={24} />
+            </div>
+            <h4 className="font-bold text-slate-900 mb-1">{int.name}</h4>
+            <p className="text-xs text-slate-500 leading-relaxed">{int.description}</p>
+            <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+              <span className="text-[10px] font-bold text-slate-400 uppercase">Kurulum Bekliyor</span>
+              <Plus size={16} className="text-indigo-600" />
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSelectedIntegration(null)} className="p-2 hover:bg-white rounded-xl transition-colors">
+              <ChevronRight size={20} className="rotate-180" />
+            </button>
+            <div>
+              <h4 className="font-bold text-slate-900">{INTEGRATIONS.find(i => i.id === selectedIntegration)?.name} Kurulum Sihirbazı</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Adım {wizardStep} / 3</p>
+            </div>
+          </div>
+          <div className="flex gap-1">
+            {[1, 2, 3].map(s => (
+              <div key={s} className={cn("h-1.5 w-8 rounded-full", wizardStep >= s ? "bg-indigo-600" : "bg-slate-200")} />
+            ))}
+          </div>
+        </div>
+
+        <div className="p-8">
+          <AnimatePresence mode="wait">
+            {selectedIntegration === 'nextcloud' && (
+              <motion.div
+                key={wizardStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {wizardStep === 1 && (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
+                      <div className="p-2 bg-blue-100 text-blue-600 rounded-xl"><History size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-blue-900">Sunucu Bağlantısı</h5>
+                        <p className="text-sm text-blue-700">Nextcloud sunucunuzun WebDAV ve OCS API adreslerini tanımlayın.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Sunucu URL</label>
+                        <input 
+                          type="text" 
+                          value={ncConfig.url}
+                          onChange={(e) => setNcConfig({...ncConfig, url: e.target.value})}
+                          placeholder="https://cloud.sirketiniz.com"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Kök Klasör (DMS)</label>
+                        <input 
+                          type="text" 
+                          value={ncConfig.basePath}
+                          onChange={(e) => setNcConfig({...ncConfig, basePath: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
+                      <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><ShieldCheck size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-amber-900">Kimlik Doğrulama</h5>
+                        <p className="text-sm text-amber-700">Yönetici yetkisine sahip bir kullanıcı hesabı girin.</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Admin Kullanıcı</label>
+                        <input 
+                          type="text" 
+                          value={ncConfig.adminUser}
+                          onChange={(e) => setNcConfig({...ncConfig, adminUser: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Admin Şifre</label>
+                        <input 
+                          type="password" 
+                          value={ncConfig.adminPass}
+                          onChange={(e) => setNcConfig({...ncConfig, adminPass: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><Wand2 size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-emerald-900">Tamamlanıyor</h5>
+                        <p className="text-sm text-emerald-700">Senkronizasyon ayarlarını onaylayın ve testi başlatın.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                        <span className="text-sm font-medium text-slate-600">Otomatik Kullanıcı Oluşturma</span>
+                        <div className="w-10 h-5 bg-emerald-500 rounded-full relative"><div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" /></div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                        <span className="text-sm font-medium text-slate-600">Tarih Bazlı Klasörleme</span>
+                        <div className="w-10 h-5 bg-emerald-500 rounded-full relative"><div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full" /></div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {selectedIntegration === 'exchange' && (
+              <motion.div
+                key={wizardStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {wizardStep === 1 && (
+                  <div className="space-y-6">
+                    <div className="bg-red-50 p-6 rounded-2xl border border-red-100 flex items-start gap-4">
+                      <div className="p-2 bg-red-100 text-red-600 rounded-xl"><Mail size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-red-900">Exchange Sunucu Bilgileri</h5>
+                        <p className="text-sm text-red-700">MS Exchange sunucu adresinizi ve domain bilgilerinizi girin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Sunucu Adresi (OWA/EWS)</label>
+                        <input 
+                          type="text" 
+                          value={exConfig.serverUrl}
+                          onChange={(e) => setExConfig({...exConfig, serverUrl: e.target.value})}
+                          placeholder="outlook.office365.com"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Domain</label>
+                        <input 
+                          type="text" 
+                          value={exConfig.domain}
+                          onChange={(e) => setExConfig({...exConfig, domain: e.target.value})}
+                          placeholder="sirketadi.local"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
+                      <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><ShieldCheck size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-amber-900">Yönetici Hesabı</h5>
+                        <p className="text-sm text-amber-700">Senkronizasyon için yetkili bir e-posta hesabı tanımlayın.</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Admin E-posta</label>
+                        <input 
+                          type="email" 
+                          value={exConfig.adminEmail}
+                          onChange={(e) => setExConfig({...exConfig, adminEmail: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Şifre / Uygulama Şifresi</label>
+                        <input 
+                          type="password" 
+                          value={exConfig.adminPass}
+                          onChange={(e) => setExConfig({...exConfig, adminPass: e.target.value})}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><Wand2 size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-emerald-900">Senkronizasyon Tercihleri</h5>
+                        <p className="text-sm text-emerald-700">Hangi verilerin senkronize edileceğini seçin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                        <span className="text-sm font-medium text-slate-600">E-posta Senkronizasyonu</span>
+                        <div 
+                          onClick={() => setExConfig({...exConfig, syncEmails: !exConfig.syncEmails})}
+                          className={cn("w-10 h-5 rounded-full relative cursor-pointer transition-colors", exConfig.syncEmails ? "bg-emerald-500" : "bg-slate-300")}
+                        >
+                          <div className={cn("absolute top-1 w-3 h-3 bg-white rounded-full transition-all", exConfig.syncEmails ? "right-1" : "left-1")} />
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl">
+                        <span className="text-sm font-medium text-slate-600">Takvim Senkronizasyonu</span>
+                        <div 
+                          onClick={() => setExConfig({...exConfig, syncCalendar: !exConfig.syncCalendar})}
+                          className={cn("w-10 h-5 rounded-full relative cursor-pointer transition-colors", exConfig.syncCalendar ? "bg-emerald-500" : "bg-slate-300")}
+                        >
+                          <div className={cn("absolute top-1 w-3 h-3 bg-white rounded-full transition-all", exConfig.syncCalendar ? "right-1" : "left-1")} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {selectedIntegration === 'whatsapp' && (
+              <motion.div
+                key={wizardStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {wizardStep === 1 && (
+                  <div className="space-y-6">
+                    <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><MessageSquare size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-emerald-900">WhatsApp API Bilgileri</h5>
+                        <p className="text-sm text-emerald-700">Meta for Developers panelinden aldığınız API bilgilerini girin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Phone Number ID</label>
+                        <input 
+                          type="text" 
+                          value={waConfig.phoneNumberId}
+                          onChange={(e) => setWaConfig({...waConfig, phoneNumberId: e.target.value})}
+                          placeholder="1092837465..."
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">WhatsApp Business Account ID</label>
+                        <input 
+                          type="text" 
+                          value={waConfig.businessAccountId}
+                          onChange={(e) => setWaConfig({...waConfig, businessAccountId: e.target.value})}
+                          placeholder="987654321..."
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
+                      <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><ShieldCheck size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-amber-900">Erişim Anahtarı</h5>
+                        <p className="text-sm text-amber-700">Süresiz (Permanent) Access Token bilginizi girin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">System User Access Token</label>
+                        <textarea 
+                          value={waConfig.accessToken}
+                          onChange={(e) => setWaConfig({...waConfig, accessToken: e.target.value})}
+                          rows={3}
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 p-6 rounded-2xl border border-blue-100 flex items-start gap-4">
+                      <div className="p-2 bg-blue-100 text-blue-600 rounded-xl"><Cpu size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-blue-900">Webhook Yapılandırması</h5>
+                        <p className="text-sm text-blue-700">Gelen mesajları dinlemek için Webhook ayarlarını tamamlayın.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Webhook Verify Token</label>
+                        <input 
+                          type="text" 
+                          value={waConfig.webhookVerifyToken}
+                          onChange={(e) => setWaConfig({...waConfig, webhookVerifyToken: e.target.value})}
+                          placeholder="Kendi belirlediğiniz bir anahtar"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                        <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Callback URL</p>
+                        <code className="text-xs text-indigo-600 break-all">https://api.enflow.com/webhooks/whatsapp</code>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {selectedIntegration !== 'nextcloud' && selectedIntegration !== 'exchange' && selectedIntegration !== 'whatsapp' && (
+              <div className="py-12 text-center space-y-4">
+                <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto">
+                  <Cpu size={40} />
+                </div>
+                <h5 className="font-bold text-slate-900">Bu Entegrasyon Yakında Gelecek</h5>
+                <p className="text-sm text-slate-500 max-w-xs mx-auto">Seçtiğiniz servis için sihirbaz hazırlık aşamasındadır.</p>
+              </div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-between">
+          <button 
+            onClick={() => setWizardStep(Math.max(1, wizardStep - 1))}
+            disabled={wizardStep === 1}
+            className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700 disabled:opacity-30"
+          >
+            Geri
+          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={() => setSelectedIntegration(null)}
+              className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+            >
+              İptal
+            </button>
+            <button 
+              onClick={() => {
+                if (wizardStep < 3) setWizardStep(wizardStep + 1);
+                else {
+                  if (selectedIntegration === 'nextcloud') nextcloudService.updateConfig(ncConfig);
+                  if (selectedIntegration === 'exchange') exchangeService.updateConfig(exConfig);
+                  if (selectedIntegration === 'whatsapp') whatsappService.updateConfig(waConfig);
+                  setSelectedIntegration(null);
+                  setWizardStep(1);
+                }
+              }}
+              className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+            >
+              {wizardStep === 3 ? 'Kurulumu Tamamla' : 'Devam Et'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default IntegrationWizard;

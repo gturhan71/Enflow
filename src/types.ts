@@ -65,7 +65,8 @@ export interface CostRequirement {
 
 export interface BoMItem {
   id: string;
-  projectId: string;
+  projectId?: string;
+  opportunityId?: string;
   requirementId?: string;
   partNumber: string;
   description: string;
@@ -83,11 +84,15 @@ export interface Project {
   id: string;
   name: string;
   customerId: string;
-  status: 'DRAFT' | 'ANALYSIS' | 'AWAITING_APPROVAL' | 'APPROVED' | 'WON' | 'LOST';
+  status: 'DRAFT' | 'ANALYSIS' | 'AWAITING_APPROVAL' | 'APPROVED' | 'WON' | 'LOST' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
   totalValue: number;
   avgMargin: number;
   deadline: string;
   ownerId: string;
+  managerId?: string;
+  progress?: number;
+  opportunityId?: string;
+  procurementNotes?: { id: string; date: string; note: string; author: string }[];
 }
 
 export interface CorporateDocument {
@@ -101,9 +106,11 @@ export interface CorporateDocument {
 
 export interface Contract {
   id: string;
-  projectId: string;
+  projectId?: string;
+  opportunityId?: string;
   status: 'DRAFT' | 'PENDING_DOCUMENTS' | 'SIGNED' | 'COMPLETED';
   signedDate?: string;
+  endDate?: string; // Geçerlilik süresi
   guaranteeAmount?: number;
   guaranteeExpiry?: string;
 }
@@ -172,4 +179,20 @@ export interface TodoTask {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate: string;
   createdAt: string;
+}
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  customerId: string;
+  value: number;
+  probability: number; // 0-100
+  expectedCloseDate: string;
+  status: 'NEW' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+  description: string;
+  assignedTo: string; // Sales Rep User ID
+  createdBy: string; // User ID
+  presalesId?: string; // Presales Team Leader ID
+  technicalStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+  bomStatus: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
 }

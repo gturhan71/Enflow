@@ -35,7 +35,9 @@ import {
   Contract,
   ContractDocumentRequirement,
   ProjectTask,
-  TodoTask
+  TodoTask,
+  Opportunity,
+  Project
 } from './types';
 
 export const NAV_ITEMS = [
@@ -58,16 +60,18 @@ export const MOCK_CUSTOMERS = [
   { id: 'c2', name: 'Tekno Lojistik', industry: 'Logistics', riskScore: 45, contactPerson: 'Ayşe Demir', email: 'ayse@teknolojistik.com' },
 ];
 
-export const MOCK_PROJECTS = [
+export const MOCK_PROJECTS: Project[] = [
   { 
     id: 'p1', 
     name: 'Veri Merkezi Modernizasyonu', 
     customerId: 'c1', 
-    status: 'ANALYSIS', 
+    status: 'IN_PROGRESS', 
     totalValue: 450000, 
     avgMargin: 14.5, 
     deadline: '2026-06-15',
-    ownerId: 'u1'
+    ownerId: 'u1',
+    managerId: 'user1',
+    progress: 35
   },
   { 
     id: 'p2', 
@@ -121,6 +125,10 @@ export const MOCK_SYSTEM_USERS: User[] = [
 export const MOCK_BOM_ITEMS: BoMItem[] = [
   { id: 'b1', projectId: 'p1', partNumber: 'DELL-R750-01', description: 'PowerEdge R750 Server', quantity: 2, purchaseCost: 4500, marginPercentage: 15, unitSalePrice: 5294.11, totalSalePrice: 10588.22, vendor: 'Arena', source: 'EXCEL', status: 'MATCHED' },
   { id: 'b2', projectId: 'p1', partNumber: 'CISCO-C9200L', description: 'Catalyst 9200L Switch', quantity: 1, purchaseCost: 2800, marginPercentage: 12, unitSalePrice: 3181.82, totalSalePrice: 3181.82, vendor: 'Index', source: 'EXCEL', status: 'MATCHED' },
+  { id: 'b3', opportunityId: 'opp1', partNumber: 'DELL-R750-01', description: 'PowerEdge R750 Server', quantity: 4, purchaseCost: 4500, marginPercentage: 15, unitSalePrice: 5294.11, totalSalePrice: 21176.44, vendor: 'Arena', source: 'MANUAL', status: 'MATCHED' },
+  { id: 'b4', opportunityId: 'opp3', partNumber: 'HP-DL380-G10', description: 'ProLiant DL380 Gen10', quantity: 3, purchaseCost: 3800, marginPercentage: 18, unitSalePrice: 4634.14, totalSalePrice: 13902.42, vendor: 'Penta', source: 'MANUAL', status: 'MATCHED' },
+  { id: 'b5', opportunityId: 'opp3', partNumber: 'F5-BIG-IP-i2000', description: 'BIG-IP i2000 Series Local Traffic Manager', quantity: 2, purchaseCost: 12500, marginPercentage: 20, unitSalePrice: 15625, totalSalePrice: 31250, vendor: 'Exclusive', source: 'MANUAL', status: 'MATCHED' },
+  { id: 'b6', opportunityId: 'opp4', partNumber: 'PAN-PA-3220', description: 'Palo Alto PA-3220 Firewall', quantity: 2, purchaseCost: 18000, marginPercentage: 25, unitSalePrice: 24000, totalSalePrice: 48000, vendor: 'Exclusive', source: 'MANUAL', status: 'MATCHED' },
 ];
 
 export const MOCK_COST_REQUIREMENTS: CostRequirement[] = [
@@ -130,7 +138,7 @@ export const MOCK_COST_REQUIREMENTS: CostRequirement[] = [
 ];
 
 export const MOCK_CONTRACTS: Contract[] = [
-  { id: 'con1', projectId: 'p1', status: 'PENDING_DOCUMENTS', guaranteeAmount: 45000, guaranteeExpiry: '2027-06-15' },
+  { id: 'con1', projectId: 'p1', status: 'SIGNED', guaranteeAmount: 45000, guaranteeExpiry: '2027-06-15', endDate: '2027-06-15', signedDate: '2026-04-01' },
 ];
 
 export const MOCK_CONTRACT_DOCS: ContractDocumentRequirement[] = [
@@ -180,4 +188,66 @@ export const MOCK_TODO_TASKS: TodoTask[] = [
     dueDate: '2026-04-05', 
     createdAt: '2026-04-01' 
   },
+];
+
+export const MOCK_OPPORTUNITIES: Opportunity[] = [
+  {
+    id: 'opp1',
+    title: 'Banka Veri Merkezi Genişletme',
+    customerId: 'c1',
+    value: 250000,
+    probability: 60,
+    expectedCloseDate: '2026-05-15',
+    status: 'PROPOSAL',
+    description: 'Mevcut veri merkezine 4 adet yeni rack kabinet ve soğutma sistemi eklenmesi.',
+    assignedTo: 'user3',
+    createdBy: 'user1',
+    technicalStatus: 'IN_PROGRESS',
+    bomStatus: 'DRAFT',
+    presalesId: 'user2'
+  },
+  {
+    id: 'opp2',
+    title: 'Lojistik Depo Network Altyapısı',
+    customerId: 'c2',
+    value: 85000,
+    probability: 30,
+    expectedCloseDate: '2026-06-01',
+    status: 'QUALIFIED',
+    description: 'Yeni açılacak depo için kablosuz ağ ve güvenlik kamera altyapısı.',
+    assignedTo: 'user3',
+    createdBy: 'user2',
+    technicalStatus: 'PENDING',
+    bomStatus: 'DRAFT'
+  },
+  {
+    id: 'opp3',
+    title: 'E-Ticaret Sunucu Altyapısı',
+    customerId: 'c3',
+    value: 120000,
+    probability: 80,
+    expectedCloseDate: '2026-04-30',
+    status: 'NEGOTIATION',
+    description: 'Yüksek trafikli e-ticaret sitesi için sunucu ve load balancer konfigürasyonu.',
+    assignedTo: 'user3',
+    createdBy: 'user1',
+    technicalStatus: 'COMPLETED',
+    bomStatus: 'APPROVED',
+    presalesId: 'user2'
+  },
+  {
+    id: 'opp4',
+    title: 'Kamu Kurumu Siber Güvenlik Altyapısı',
+    customerId: 'c1',
+    value: 450000,
+    probability: 100,
+    expectedCloseDate: '2026-03-15',
+    status: 'WON',
+    description: 'Güvenlik duvarı, IPS/IDS ve SIEM çözümleri entegrasyonu.',
+    assignedTo: 'user3',
+    createdBy: 'user1',
+    technicalStatus: 'COMPLETED',
+    bomStatus: 'APPROVED',
+    presalesId: 'user2'
+  }
 ];
