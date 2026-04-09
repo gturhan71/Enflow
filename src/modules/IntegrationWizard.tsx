@@ -49,7 +49,9 @@ import {
   MessageSquare,
   ListTodo,
   UserPlus,
-  FileCheck2
+  FileCheck2,
+  PowerOff,
+  Lock
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -110,34 +112,154 @@ const IntegrationWizard = ({
 }) => {
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState(1);
+  const [disablePrompt, setDisablePrompt] = useState<string | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [passwordError, setPasswordError] = useState(false);
 
   const INTEGRATIONS = [
-    { id: 'nextcloud', name: 'Nextcloud DMS', description: 'Dosya yönetimi ve paylaşım sistemi.', icon: History, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { id: 'sap', name: 'SAP ERP', description: 'Kurumsal kaynak planlama entegrasyonu.', icon: Cpu, color: 'text-slate-600', bg: 'bg-slate-50' },
-    { id: 'exchange', name: 'MS Exchange', description: 'E-posta ve takvim senkronizasyonu.', icon: Mail, color: 'text-red-600', bg: 'bg-red-50' },
-    { id: 'whatsapp', name: 'WhatsApp Business', description: 'Müşteri bildirimleri ve sohbet.', icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { id: 'nextcloud', name: 'Nextcloud DMS', description: 'Dosya yönetimi ve paylaşım sistemi.', icon: History, color: 'text-blue-600', bg: 'bg-blue-50', isEnabled: ncConfig.isEnabled },
+    { id: 'sap', name: 'SAP ERP', description: 'Kurumsal kaynak planlama entegrasyonu.', icon: Cpu, color: 'text-slate-600', bg: 'bg-slate-50', isEnabled: false },
+    { id: 'exchange', name: 'MS Exchange', description: 'E-posta ve takvim senkronizasyonu.', icon: Mail, color: 'text-red-600', bg: 'bg-red-50', isEnabled: exConfig.isEnabled },
+    { id: 'whatsapp', name: 'WhatsApp Business', description: 'Müşteri bildirimleri ve sohbet.', icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50', isEnabled: waConfig.isEnabled },
   ];
+
+  const handleDisable = () => {
+    if (adminPassword === 'admin') {
+      if (disablePrompt === 'nextcloud') {
+        const newConfig = { ...ncConfig, isEnabled: false };
+        setNcConfig(newConfig);
+        nextcloudService.updateConfig(newConfig);
+      } else if (disablePrompt === 'exchange') {
+        const newConfig = { ...exConfig, isEnabled: false };
+        setExConfig(newConfig);
+        exchangeService.updateConfig(newConfig);
+      } else if (disablePrompt === 'whatsapp') {
+        const newConfig = { ...waConfig, isEnabled: false };
+        setWaConfig(newConfig);
+        whatsappService.updateConfig(newConfig);
+      }
+      setDisablePrompt(null);
+      setAdminPassword('');
+      setPasswordError(false);
+    } else {
+      setPasswordError(true);
+    }
+  };
 
   if (!selectedIntegration) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {INTEGRATIONS.map((int) => (
-          <div 
-            key={int.id} 
-            onClick={() => setSelectedIntegration(int.id)}
-            className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all cursor-pointer group"
-          >
-            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform", int.bg, int.color)}>
-              <int.icon size={24} />
+      <div className="relative">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {INTEGRATIONS.map((int) => (
+            <div 
+              key={int.id} 
+              className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all group relative"
+            >
+              <div 
+                className="cursor-pointer"
+                onClick={() => !int.isEnabled && setSelectedIntegration(int.id)}
+              >
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform", int.bg, int.color)}>
+                  <int.icon size={24} />
+                </div>
+                <h4 className="font-bold text-slate-900 mb-1">{int.name}</h4>
+                <p className="text-xs text-slate-500 leading-relaxed">{int.description}</p>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
+                {int.isEnabled ? (
+                  <>
+                    <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
+                      <CheckCircle2 size={14} /> Aktif
+                    </span>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setDisablePrompt(int.id);
+                      }}
+                      className="text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 px-2 py-1 rounded-md transition-colors flex items-center gap-1"
+                    >
+                      <PowerOff size={12} /> Devre Dışı Bırak
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">Kurulum Bekliyor</span>
+                    <button 
+                      onClick={() => setSelectedIntegration(int.id)}
+                      className="text-indigo-600 hover:bg-indigo-50 p-1 rounded-md transition-colors"
+                    >
+                      <Plus size={16} />
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
-            <h4 className="font-bold text-slate-900 mb-1">{int.name}</h4>
-            <p className="text-xs text-slate-500 leading-relaxed">{int.description}</p>
-            <div className="mt-4 pt-4 border-t border-slate-50 flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">Kurulum Bekliyor</span>
-              <Plus size={16} className="text-indigo-600" />
+          ))}
+        </div>
+
+        {/* Disable Prompt Modal */}
+        <AnimatePresence>
+          {disablePrompt && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
+              >
+                <div className="p-8">
+                  <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
+                    <Lock size={32} />
+                  </div>
+                  <h3 className="text-xl font-bold text-slate-900 mb-2 text-center">Yönetici Onayı Gerekli</h3>
+                  <p className="text-slate-600 text-center text-sm mb-6">
+                    Bu entegrasyonu devre dışı bırakmak için yönetici şifrenizi girmeniz gerekmektedir.
+                  </p>
+                  
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Yönetici Şifresi</label>
+                    <input 
+                      type="password" 
+                      value={adminPassword}
+                      onChange={(e) => {
+                        setAdminPassword(e.target.value);
+                        setPasswordError(false);
+                      }}
+                      placeholder="Şifrenizi girin..."
+                      className={cn(
+                        "w-full px-4 py-3 bg-slate-50 border rounded-2xl text-sm outline-none transition-all",
+                        passwordError ? "border-red-500 focus:border-red-500" : "border-slate-200 focus:border-indigo-500"
+                      )}
+                    />
+                    {passwordError && (
+                      <p className="text-xs text-red-500 font-medium">Hatalı şifre girdiniz.</p>
+                    )}
+                  </div>
+                </div>
+                <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setDisablePrompt(null);
+                      setAdminPassword('');
+                      setPasswordError(false);
+                    }}
+                    className="px-6 py-3 rounded-xl text-sm font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition-colors flex-1"
+                  >
+                    İptal
+                  </button>
+                  <button
+                    onClick={handleDisable}
+                    disabled={!adminPassword}
+                    className="px-6 py-3 rounded-xl text-sm font-bold text-white bg-red-600 hover:bg-red-700 shadow-lg shadow-red-200 transition-colors flex-1 disabled:opacity-50"
+                  >
+                    Devre Dışı Bırak
+                  </button>
+                </div>
+              </motion.div>
             </div>
-          </div>
-        ))}
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -495,9 +617,21 @@ const IntegrationWizard = ({
               onClick={() => {
                 if (wizardStep < 3) setWizardStep(wizardStep + 1);
                 else {
-                  if (selectedIntegration === 'nextcloud') nextcloudService.updateConfig(ncConfig);
-                  if (selectedIntegration === 'exchange') exchangeService.updateConfig(exConfig);
-                  if (selectedIntegration === 'whatsapp') whatsappService.updateConfig(waConfig);
+                  if (selectedIntegration === 'nextcloud') {
+                    const newConfig = { ...ncConfig, isEnabled: true };
+                    setNcConfig(newConfig);
+                    nextcloudService.updateConfig(newConfig);
+                  }
+                  if (selectedIntegration === 'exchange') {
+                    const newConfig = { ...exConfig, isEnabled: true };
+                    setExConfig(newConfig);
+                    exchangeService.updateConfig(newConfig);
+                  }
+                  if (selectedIntegration === 'whatsapp') {
+                    const newConfig = { ...waConfig, isEnabled: true };
+                    setWaConfig(newConfig);
+                    whatsappService.updateConfig(newConfig);
+                  }
                   setSelectedIntegration(null);
                   setWizardStep(1);
                 }

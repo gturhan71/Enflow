@@ -98,10 +98,10 @@ import { whatsappService } from '../services/whatsappService';
 interface SettingsModuleProps {
   companyLogo: string | null;
   setCompanyLogo: (logo: string | null) => void;
+  activeSubTab?: string;
 }
 
-const SettingsModule = ({ companyLogo, setCompanyLogo }: SettingsModuleProps) => {
-  const [activeSubTab, setActiveSubTab] = useState('company');
+const SettingsModule = ({ companyLogo, setCompanyLogo, activeSubTab = 'company' }: SettingsModuleProps) => {
   const [showProvisionWizard, setShowProvisionWizard] = useState(false);
   const [units, setUnits] = useState<Unit[]>(MOCK_UNITS);
   const [users, setUsers] = useState<User[]>(MOCK_SYSTEM_USERS);
@@ -130,30 +130,6 @@ const SettingsModule = ({ companyLogo, setCompanyLogo }: SettingsModuleProps) =>
             {activeSubTab === 'units' ? 'Yeni Birim' : activeSubTab === 'users' ? 'Yeni Kullanıcı' : activeSubTab === 'integrations' ? 'Entegrasyon Ekle' : 'Yeni Yetki'}
           </button>
         </div>
-      </div>
-
-      <div className="flex items-center gap-2 border-b border-slate-200">
-        {[
-          { id: 'company', label: 'Şirket Profili', icon: Settings },
-          { id: 'units', label: 'Birimler', icon: LayoutDashboard },
-          { id: 'users', label: 'Kullanıcılar', icon: Users },
-          { id: 'permissions', label: 'Yetkiler', icon: ShieldCheck },
-          { id: 'integrations', label: 'Entegrasyonlar', icon: Puzzle },
-        ].map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveSubTab(tab.id)}
-            className={cn(
-              "px-6 py-4 text-sm font-bold transition-all border-b-2 flex items-center gap-2",
-              activeSubTab === tab.id 
-                ? "border-indigo-600 text-indigo-600" 
-                : "border-transparent text-slate-500 hover:text-slate-700"
-            )}
-          >
-            <tab.icon size={18} />
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       <AnimatePresence mode="wait">
@@ -345,13 +321,21 @@ const SettingsModule = ({ companyLogo, setCompanyLogo }: SettingsModuleProps) =>
       <ProvisionWizard 
         isOpen={showProvisionWizard}
         onClose={() => setShowProvisionWizard(false)}
-        onComplete={(newUnit, newUsers) => {
-          const unitId = `unit-${Date.now()}`;
-          const createdUnit: Unit = {
-            id: unitId,
-            name: newUnit.name || 'Yeni Birim',
-            description: newUnit.description
-          };
+        existingUnits={units}
+        onComplete={(unitData, newUsers) => {
+          let unitId = unitData.id;
+          let createdUnit = null;
+
+          if (!unitId) {
+            // It's a new unit
+            unitId = `unit-${Date.now()}`;
+            createdUnit = {
+              id: unitId,
+              name: unitData.name || 'Yeni Birim',
+              description: unitData.description
+            };
+            setUnits([...units, createdUnit]);
+          }
           
           const createdUsers: User[] = newUsers.map((u, i) => ({
             id: `user-${Date.now()}-${i}`,
@@ -362,10 +346,8 @@ const SettingsModule = ({ companyLogo, setCompanyLogo }: SettingsModuleProps) =>
             unitId: unitId
           }));
 
-          setUnits([...units, createdUnit]);
           setUsers([...users, ...createdUsers]);
           setShowProvisionWizard(false);
-          setActiveSubTab('units');
         }}
       />
     </div>

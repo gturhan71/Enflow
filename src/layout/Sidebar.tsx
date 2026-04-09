@@ -53,6 +53,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { 
   NAV_ITEMS, 
   MOCK_CUSTOMERS,
@@ -94,6 +95,15 @@ import { whatsappService } from '../services/whatsappService';
 
 
 const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
+  const { handleNavigate } = useUnsavedChanges();
+  const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+
+  const toggleMenu = (id: string) => {
+    setExpandedMenus(prev => 
+      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    );
+  };
+
   return (
     <div className="w-64 bg-white border-r border-slate-200 h-screen flex flex-col sticky top-0">
       <div className="p-6 flex items-center gap-3 border-bottom border-slate-100">
@@ -106,31 +116,80 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-1">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setActiveTab(item.id)}
-            className={cn(
-              "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
-              activeTab === item.id 
-                ? "bg-indigo-50 text-indigo-700 shadow-sm" 
-                : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
-            )}
-          >
-            <item.icon size={20} className={cn(
-              "transition-colors",
-              activeTab === item.id ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"
-            )} />
-            {item.label}
-            {activeTab === item.id && (
-              <motion.div 
-                layoutId="active-pill"
-                className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600"
-              />
-            )}
-          </button>
-        ))}
+      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+        {NAV_ITEMS.map((item) => {
+          const isExpanded = expandedMenus.includes(item.id);
+          const hasSubItems = item.subItems && item.subItems.length > 0;
+          const isActive = activeTab === item.id || (hasSubItems && item.subItems?.some(sub => sub.id === activeTab));
+
+          return (
+            <div key={item.id}>
+              <button
+                onClick={() => {
+                  if (hasSubItems) {
+                    toggleMenu(item.id);
+                  } else {
+                    handleNavigate(() => setActiveTab(item.id));
+                  }
+                }}
+                className={cn(
+                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
+                  isActive && !hasSubItems
+                    ? "bg-indigo-50 text-indigo-700 shadow-sm" 
+                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                )}
+              >
+                <item.icon size={20} className={cn(
+                  "transition-colors",
+                  isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"
+                )} />
+                <span className="flex-1 text-left">{item.label}</span>
+                {hasSubItems && (
+                  <ChevronRight size={16} className={cn(
+                    "transition-transform duration-200",
+                    isExpanded ? "rotate-90" : ""
+                  )} />
+                )}
+                {isActive && !hasSubItems && (
+                  <motion.div 
+                    layoutId="active-pill"
+                    className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600"
+                  />
+                )}
+              </button>
+              
+              {hasSubItems && (
+                <AnimatePresence>
+                  {isExpanded && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="pl-11 pr-4 py-2 space-y-1">
+                        {item.subItems?.map((subItem) => (
+                          <button
+                            key={subItem.id}
+                            onClick={() => handleNavigate(() => setActiveTab(subItem.id))}
+                            className={cn(
+                              "w-full text-left px-4 py-2 rounded-lg text-xs font-medium transition-colors",
+                              activeTab === subItem.id
+                                ? "bg-indigo-50 text-indigo-700"
+                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                            )}
+                          >
+                            {subItem.label}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              )}
+            </div>
+          );
+        })}
       </nav>
 
       <div className="p-4 border-t border-slate-100">
@@ -142,7 +201,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
             <p className="text-sm font-semibold text-slate-900 truncate">Gökhan Turhan</p>
             <p className="text-xs text-slate-500 truncate">Genel Müdür</p>
           </div>
-          <button onClick={onLogout} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => handleNavigate(onLogout)} className="text-slate-400 hover:text-slate-600">
             <LogOut size={18} />
           </button>
         </div>

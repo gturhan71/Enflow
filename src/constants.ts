@@ -51,7 +51,15 @@ export const MOCK_TENANTS: Tenant[] = [
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'crm', label: 'CRM & Müşteri', icon: Users },
+  { 
+    id: 'crm', 
+    label: 'CRM & Müşteri', 
+    icon: Users,
+    subItems: [
+      { id: 'crm-opportunities', label: 'Fırsatlar' },
+      { id: 'crm-customers', label: 'Müşteriler' }
+    ]
+  },
   { id: 'presales', label: 'Presales & Dizayn', icon: FileSearch },
   { id: 'sales-support', label: 'Satış Destek', icon: FileCheck },
   { id: 'procurement', label: 'Satın Alma', icon: ShoppingCart },
@@ -61,7 +69,18 @@ export const NAV_ITEMS = [
   { id: 'contracts', label: 'Sözleşme Yönetimi', icon: FileSignature },
   { id: 'project-mgmt', label: 'Proje Yönetimi', icon: Kanban },
   { id: 'todo', label: 'Görevler & Takip', icon: ListTodo },
-  { id: 'settings', label: 'Şirket Ayarları', icon: Settings },
+  { 
+    id: 'settings', 
+    label: 'Şirket Ayarları', 
+    icon: Settings,
+    subItems: [
+      { id: 'settings-company', label: 'Şirket Profili' },
+      { id: 'settings-units', label: 'Birimler' },
+      { id: 'settings-users', label: 'Kullanıcılar' },
+      { id: 'settings-permissions', label: 'Yetkiler' },
+      { id: 'settings-integrations', label: 'Entegrasyonlar' }
+    ]
+  },
 ];
 
 export const MOCK_CUSTOMERS = [

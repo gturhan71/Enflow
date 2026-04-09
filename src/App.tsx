@@ -27,6 +27,7 @@ import ProjectManagementModule from './modules/ProjectManagementModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import Login from './modules/Login';
+import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 
 const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onLogout: () => void }) => {
   const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
@@ -71,9 +72,17 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
   };
 
   const renderContent = () => {
+    if (activeTab.startsWith('settings-')) {
+      const subTab = activeTab.replace('settings-', '');
+      return <SettingsModule companyLogo={companyLogo} setCompanyLogo={setCompanyLogo} activeSubTab={subTab} />;
+    }
+    
+    if (activeTab.startsWith('crm-') || activeTab === 'crm') {
+      return <CRMModule opportunities={opportunities} setOpportunities={setOpportunities} />;
+    }
+
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
-      case 'crm': return <CRMModule opportunities={opportunities} setOpportunities={setOpportunities} />;
       case 'presales': return <SmartImporter />;
       case 'sales-support': return <SalesSupport />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} />;
@@ -82,7 +91,6 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
       case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} />;
       case 'todo': return <TodoModule />;
-      case 'settings': return <SettingsModule companyLogo={companyLogo} setCompanyLogo={setCompanyLogo} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-full text-slate-400">
           <Settings size={48} className="mb-4 opacity-20" />
@@ -93,27 +101,40 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
     }
   };
 
+  const getHeaderTitle = () => {
+    for (const item of NAV_ITEMS) {
+      if (item.id === activeTab) return item.label;
+      if (item.subItems) {
+        const sub = item.subItems.find(s => s.id === activeTab);
+        if (sub) return `${item.label} / ${sub.label}`;
+      }
+    }
+    return 'Dashboard';
+  };
+
   return (
-    <div className="flex min-h-screen bg-[#f8f9fa]">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-      <main className="flex-1 flex flex-col min-w-0">
-        <Header title={NAV_ITEMS.find(i => i.id === activeTab)?.label || 'Dashboard'} />
-        <div className="flex-1 overflow-y-auto">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
-              className="h-full"
-            >
-              {renderContent()}
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
+    <UnsavedChangesProvider>
+      <div className="flex min-h-screen bg-[#f8f9fa]">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
+        <main className="flex-1 flex flex-col min-w-0">
+          <Header title={getHeaderTitle()} onLogout={onLogout} />
+          <div className="flex-1 overflow-y-auto">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+                className="h-full"
+              >
+                {renderContent()}
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
+    </UnsavedChangesProvider>
   );
 };
 

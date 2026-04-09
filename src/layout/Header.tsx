@@ -49,10 +49,12 @@ import {
   MessageSquare,
   ListTodo,
   UserPlus,
-  FileCheck2
+  FileCheck2,
+  Save
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { 
   NAV_ITEMS, 
   MOCK_CUSTOMERS,
@@ -93,7 +95,16 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const Header = ({ title }: { title: string }) => {
+const Header = ({ title, onLogout }: { title: string, onLogout: () => void }) => {
+  const { hasUnsavedChanges, setHasUnsavedChanges, handleNavigate } = useUnsavedChanges();
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    setHasUnsavedChanges(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   return (
     <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4">
@@ -106,21 +117,29 @@ const Header = ({ title }: { title: string }) => {
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-          <input 
-            type="text" 
-            placeholder="Proje, müşteri veya evrak ara..." 
-            className="pl-10 pr-4 py-2 bg-slate-100 border-transparent focus:bg-white focus:border-indigo-500 rounded-full text-sm w-64 transition-all outline-none"
-          />
-        </div>
-        <button className="p-2 text-slate-500 hover:bg-slate-100 rounded-full relative">
-          <Bell size={20} />
-          <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+        <button
+          onClick={handleSave}
+          disabled={!hasUnsavedChanges && !saved}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+            saved
+              ? 'bg-emerald-100 text-emerald-700'
+              : hasUnsavedChanges
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+          }`}
+        >
+          {saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
+          {saved ? 'Kaydedildi' : 'Kaydet'}
         </button>
-        <button className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-full text-sm font-semibold transition-colors shadow-lg shadow-indigo-200">
-          <Plus size={18} />
-          <span>Yeni Proje</span>
+
+        <div className="h-6 w-px bg-slate-200 mx-1" />
+
+        <button 
+          onClick={() => handleNavigate(onLogout)}
+          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-red-600 hover:bg-red-50 transition-all"
+        >
+          <LogOut size={18} />
+          Çıkış Yap
         </button>
       </div>
     </header>

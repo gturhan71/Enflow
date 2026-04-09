@@ -6,13 +6,15 @@ import { Unit, User } from '../types';
 interface ProvisionWizardProps {
   isOpen: boolean;
   onClose: () => void;
+  existingUnits: Unit[];
   onComplete: (unit: Partial<Unit>, users: Partial<User>[]) => void;
 }
 
-const ProvisionWizard = ({ isOpen, onClose, onComplete }: ProvisionWizardProps) => {
+const ProvisionWizard = ({ isOpen, onClose, existingUnits, onComplete }: ProvisionWizardProps) => {
   const [step, setStep] = useState(1);
   
   // Step 1 State
+  const [selectedUnitId, setSelectedUnitId] = useState<string>('');
   const [unitName, setUnitName] = useState('');
   const [unitDescription, setUnitDescription] = useState('');
   
@@ -38,16 +40,17 @@ const ProvisionWizard = ({ isOpen, onClose, onComplete }: ProvisionWizardProps) 
   };
 
   const handleComplete = () => {
-    const unit: Partial<Unit> = {
-      name: unitName,
-      description: unitDescription,
-    };
+    const unitData: Partial<Unit> = selectedUnitId === 'NEW' 
+      ? { name: unitName, description: unitDescription }
+      : { id: selectedUnitId, name: existingUnits.find(u => u.id === selectedUnitId)?.name };
+
     // Filter out empty users
     const validUsers = newUsers.filter(u => u.name?.trim() && u.email?.trim());
-    onComplete(unit, validUsers);
+    onComplete(unitData, validUsers);
     
     // Reset state
     setStep(1);
+    setSelectedUnitId('');
     setUnitName('');
     setUnitDescription('');
     setNewUsers([{ name: '', email: '', role: 'USER', status: 'ACTIVE' }]);
@@ -120,25 +123,48 @@ const ProvisionWizard = ({ isOpen, onClose, onComplete }: ProvisionWizardProps) 
                 className="space-y-6"
               >
                 <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Birim Adı</label>
-                  <input 
-                    type="text" 
-                    value={unitName}
-                    onChange={(e) => setUnitName(e.target.value)}
-                    placeholder="Örn: Yazılım Geliştirme, İnsan Kaynakları..."
+                  <label className="block text-sm font-bold text-slate-700 mb-2">Birim Seçimi</label>
+                  <select
+                    value={selectedUnitId}
+                    onChange={(e) => setSelectedUnitId(e.target.value)}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all"
-                  />
+                  >
+                    <option value="" disabled>-- Birim Seçin veya Oluşturun --</option>
+                    {existingUnits.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                    <option value="NEW" className="font-bold text-indigo-600">+ Yeni Birim Oluştur</option>
+                  </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-2">Birim Açıklaması</label>
-                  <textarea 
-                    rows={4}
-                    value={unitDescription}
-                    onChange={(e) => setUnitDescription(e.target.value)}
-                    placeholder="Bu birimin görev ve sorumluluklarını kısaca açıklayın..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all resize-none"
-                  />
-                </div>
+
+                {selectedUnitId === 'NEW' && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    className="space-y-6 overflow-hidden"
+                  >
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Yeni Birim Adı</label>
+                      <input 
+                        type="text" 
+                        value={unitName}
+                        onChange={(e) => setUnitName(e.target.value)}
+                        placeholder="Örn: Yazılım Geliştirme, İnsan Kaynakları..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-slate-700 mb-2">Birim Açıklaması</label>
+                      <textarea 
+                        rows={4}
+                        value={unitDescription}
+                        onChange={(e) => setUnitDescription(e.target.value)}
+                        placeholder="Bu birimin görev ve sorumluluklarını kısaca açıklayın..."
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500 focus:bg-white transition-all resize-none"
+                      />
+                    </div>
+                  </motion.div>
+                )}
               </motion.div>
             )}
 
@@ -233,10 +259,14 @@ const ProvisionWizard = ({ isOpen, onClose, onComplete }: ProvisionWizardProps) 
                   <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
                     <h5 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                       <Building size={18} className="text-indigo-600" />
-                      Oluşturulacak Birim
+                      {selectedUnitId === 'NEW' ? 'Oluşturulacak Birim' : 'Seçilen Birim'}
                     </h5>
-                    <p className="text-sm font-bold text-slate-900">{unitName || 'İsimsiz Birim'}</p>
-                    <p className="text-xs text-slate-500 mt-1">{unitDescription || 'Açıklama girilmedi.'}</p>
+                    <p className="text-sm font-bold text-slate-900">
+                      {selectedUnitId === 'NEW' ? (unitName || 'İsimsiz Birim') : (existingUnits.find(u => u.id === selectedUnitId)?.name || '')}
+                    </p>
+                    {selectedUnitId === 'NEW' && (
+                      <p className="text-xs text-slate-500 mt-1">{unitDescription || 'Açıklama girilmedi.'}</p>
+                    )}
                   </div>
                   <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100">
                     <h5 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
@@ -275,7 +305,7 @@ const ProvisionWizard = ({ isOpen, onClose, onComplete }: ProvisionWizardProps) 
           {step < 3 ? (
             <button 
               onClick={() => setStep(Math.min(3, step + 1))}
-              disabled={step === 1 && !unitName.trim()}
+              disabled={step === 1 && (selectedUnitId === '' || (selectedUnitId === 'NEW' && !unitName.trim()))}
               className="px-6 py-2.5 rounded-xl text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               İleri <ArrowRight size={18} />
