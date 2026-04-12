@@ -28,46 +28,47 @@ import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
+import { secureStorage } from './lib/storage';
 
 const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onLogout: () => void }) => {
   const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
-    return localStorage.getItem(`enflow_company_logo_${tenantId}`);
+    return secureStorage.getItem<string>(`enflow_company_logo_${tenantId}`);
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
-    const saved = localStorage.getItem(`enflow_opps_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_OPPORTUNITIES;
+    const saved = secureStorage.getItem<Opportunity[]>(`enflow_opps_${tenantId}`);
+    return saved || MOCK_OPPORTUNITIES;
   });
   
   const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(`enflow_projects_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_PROJECTS;
+    const saved = secureStorage.getItem<Project[]>(`enflow_projects_${tenantId}`);
+    return saved || MOCK_PROJECTS;
   });
   
   const [contracts, setContracts] = useState<Contract[]>(() => {
-    const saved = localStorage.getItem(`enflow_contracts_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_CONTRACTS;
+    const saved = secureStorage.getItem<Contract[]>(`enflow_contracts_${tenantId}`);
+    return saved || MOCK_CONTRACTS;
   });
 
   useEffect(() => {
-    localStorage.setItem(`enflow_opps_${tenantId}`, JSON.stringify(opportunities));
+    secureStorage.setItem(`enflow_opps_${tenantId}`, opportunities);
   }, [opportunities, tenantId]);
 
   useEffect(() => {
-    localStorage.setItem(`enflow_projects_${tenantId}`, JSON.stringify(projects));
+    secureStorage.setItem(`enflow_projects_${tenantId}`, projects);
   }, [projects, tenantId]);
 
   useEffect(() => {
-    localStorage.setItem(`enflow_contracts_${tenantId}`, JSON.stringify(contracts));
+    secureStorage.setItem(`enflow_contracts_${tenantId}`, contracts);
   }, [contracts, tenantId]);
 
   const setCompanyLogo = (logo: string | null) => {
     setCompanyLogoState(logo);
     if (logo) {
-      localStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
+      secureStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
     } else {
-      localStorage.removeItem(`enflow_company_logo_${tenantId}`);
+      secureStorage.removeItem(`enflow_company_logo_${tenantId}`);
     }
   };
 

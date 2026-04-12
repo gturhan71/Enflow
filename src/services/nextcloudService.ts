@@ -7,10 +7,10 @@ import { User, NextcloudConfig } from '../types';
 class NextcloudService {
   private config: NextcloudConfig = {
     url: 'http://local-nextcloud.internal',
-    adminUser: 'admin',
-    adminPass: '********',
+    adminUser: '', // Cleaned up for security. A backend must be used for admin tasks.
+    adminPass: '', // NEVER store admin passwords in frontend code.
     basePath: '/ENFLOW_DMS',
-    isEnabled: true
+    isEnabled: false
   };
 
   /**
