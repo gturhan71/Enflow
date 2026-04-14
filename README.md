@@ -50,6 +50,16 @@ Proje, modern web teknolojileri kullanılarak yüksek performanslı ve ölçekle
 *   **İkonografi:** Lucide React
 *   **Yardımcı Kütüphaneler:** `clsx` ve `tailwind-merge` (Dinamik class yönetimi için)
 
+## 👨‍💻 Geliştirici Notları ve Mimari (Developer Notes)
+
+Bu proje, modern web standartlarına uygun olarak **Client-Side SPA (Single Page Application)** mimarisiyle geliştirilmiştir. Geliştirici deneyimini (DX) ve uygulama performansını en üst düzeye çıkarmak için aşağıdaki temel teknolojiler ve mimari kararlar tercih edilmiştir:
+
+*   **React 18:** Kullanıcı arayüzü, modüler ve yeniden kullanılabilir bileşenler (components) halinde inşa edilmiştir. State yönetimi (durum yönetimi) React Hooks (`useState`, `useEffect`) ile sağlanmakta olup, modüller arası veri akışı ana `App.tsx` üzerinden prop drilling veya context yapıları ile yönetilmektedir.
+*   **Vite:** Webpack gibi geleneksel paketleyicilere kıyasla çok daha hızlı bir geliştirme sunucusu (HMR) ve optimize edilmiş build süreçleri sunar. Bu sayede geliştirme aşamasındaki bekleme süreleri minimize edilmiştir.
+*   **TypeScript:** Uygulama genelinde sıkı tip güvenliği (strict type safety) sağlar. `src/types.ts` dosyasında tanımlanan arayüzler (interfaces) sayesinde çalışma zamanı (runtime) hataları en aza indirilmiş ve IDE otomatik tamamlama desteği güçlendirilmiştir.
+*   **Tailwind CSS:** Utility-first yaklaşımı ile harici CSS dosyaları yazmadan, doğrudan JSX içerisinde hızlı ve tutarlı stillendirme (styling) yapılmasına olanak tanır. Özel tasarım token'ları ve responsive yapılar Tailwind konfigürasyonu üzerinden yönetilir.
+*   **Hata Yönetimi (Error Boundaries):** Beklenmeyen çalışma zamanı hatalarının tüm uygulamayı çökertmesini engellemek amacıyla React Error Boundary yapısı entegre edilmiştir.
+
 ## 🚀 Kurulum ve Çalıştırma
 
 Projeyi yerel ortamınızda çalıştırmak için aşağıdaki adımları izleyebilirsiniz:
