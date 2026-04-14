@@ -96,6 +96,26 @@ import { whatsappService } from '../services/whatsappService';
 const SmartImporter = () => {
   const [step, setStep] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
+  const [showMatchModal, setShowMatchModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+
+  const handleSaveBoM = () => {
+    console.log('Saving imported BoM list');
+    // In a real app, this would save the items to the database
+    alert('BoM listesi başarıyla kaydedildi.');
+    setStep(1);
+  };
+
+  const handleMatchItem = (item: any) => {
+    setSelectedItem(item);
+    setShowMatchModal(true);
+  };
+
+  const confirmMatch = () => {
+    console.log('Matched item:', selectedItem);
+    setShowMatchModal(false);
+    setSelectedItem(null);
+  };
 
   return (
     <div className="p-8 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
@@ -196,7 +216,10 @@ const SmartImporter = () => {
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Toplam Maliyet</p>
                     <p className="text-sm font-mono font-bold text-slate-900">$12,450.00</p>
                   </div>
-                  <button className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100">
+                  <button 
+                    onClick={handleSaveBoM}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100"
+                  >
                     Kaydet
                   </button>
                 </div>
@@ -235,7 +258,10 @@ const SmartImporter = () => {
                         <span className="text-xs text-slate-400">Adet:</span>
                         <span className="text-sm font-bold text-slate-900">{item.qty}</span>
                       </div>
-                      <button className="text-xs font-bold text-indigo-600 bg-white border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1">
+                      <button 
+                        onClick={() => handleMatchItem(item)}
+                        className="text-xs font-bold text-indigo-600 bg-white border border-indigo-100 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all flex items-center gap-1"
+                      >
                         <Plus size={12} /> Madde Eşleştir
                       </button>
                     </div>
@@ -246,6 +272,56 @@ const SmartImporter = () => {
           )}
         </div>
       </div>
+
+      {/* Match Modal */}
+      <AnimatePresence>
+        {showMatchModal && selectedItem && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Madde Eşleştir</h4>
+                <button onClick={() => setShowMatchModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
+                  <p className="text-xs font-bold text-indigo-600 mb-1">{selectedItem.pn}</p>
+                  <p className="text-sm text-indigo-900">{selectedItem.desc}</p>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Şartname Maddesi Seçin</label>
+                  <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500">
+                    <option value="">Seçiniz</option>
+                    <option value="r1">Madde 4.2.1 - En az 128 GB RAM ve 2x Gold CPU Sunucu</option>
+                    <option value="r3">Madde 4.3.1 - 10Gbps SFP+ Network Modülü</option>
+                    <option value="r4">Madde 4.3.2 - 24 Port Yönetilebilir Switch</option>
+                  </select>
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowMatchModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={confirmMatch}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Eşleştir
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

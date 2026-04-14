@@ -93,15 +93,50 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
+import { TaskProgressTracker } from '../components/TaskProgressTracker';
+
+const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Project[], tasks?: TodoTask[], setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>> }) => {
   // Assuming current user is user1 for demo purposes
   const currentUser = 'user1';
   const myProjects = projects.filter(p => p.managerId === currentUser);
   const [selectedProjectId, setSelectedProjectId] = useState(myProjects[0]?.id || projects[0]?.id);
-  const [activeTab, setActiveTab] = useState<'KANBAN' | 'PROCUREMENT' | 'REPORTING'>('KANBAN');
+  const [activeTab, setActiveTab] = useState<'KANBAN' | 'PROCUREMENT' | 'REPORTING' | 'TASKS'>('KANBAN');
+  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [newTask, setNewTask] = useState<Partial<ProjectTask>>({
+    status: 'TODO'
+  });
+  const [showNewProcurementReqModal, setShowNewProcurementReqModal] = useState(false);
+  const [newProcurementReq, setNewProcurementReq] = useState({
+    title: '',
+    description: '',
+    priority: 'MEDIUM'
+  });
+  const [showNewReportModal, setShowNewReportModal] = useState(false);
+  const [newReport, setNewReport] = useState({
+    notes: ''
+  });
 
   const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
-  const tasks = MOCK_PROJECT_TASKS.filter(t => t.projectId === selectedProject?.id);
+  const projectTasks = MOCK_PROJECT_TASKS.filter(t => t.projectId === selectedProject?.id);
+  const relatedTasks = tasks?.filter(t => t.relatedModule === 'PROJECT' && t.relatedItemId === selectedProject?.id) || [];
+
+  const handleAddTask = () => {
+    console.log('Adding project task:', newTask);
+    setShowNewTaskModal(false);
+    setNewTask({ status: 'TODO' });
+  };
+
+  const handleCreateProcurementReq = () => {
+    console.log('Creating procurement req:', newProcurementReq);
+    setShowNewProcurementReqModal(false);
+    setNewProcurementReq({ title: '', description: '', priority: 'MEDIUM' });
+  };
+
+  const handleSendReport = () => {
+    console.log('Sending report:', newReport);
+    setShowNewReportModal(false);
+    setNewReport({ notes: '' });
+  };
 
   return (
     <div className="p-8 space-y-8">
@@ -146,6 +181,12 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
             >
               Raporlama
             </button>
+            <button 
+              onClick={() => setActiveTab('TASKS')}
+              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", activeTab === 'TASKS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
+            >
+              İş Emirleri & İlerlemeler
+            </button>
           </div>
         </div>
       </div>
@@ -170,12 +211,12 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
                       {status === 'TODO' ? 'Yapılacaklar' : status === 'IN_PROGRESS' ? 'Devam Edenler' : 'Tamamlananlar'}
                     </h4>
                     <span className="bg-white px-2 py-0.5 rounded-lg text-[10px] font-bold text-slate-400 border border-slate-100">
-                      {tasks.filter(t => t.status === status).length}
+                      {projectTasks.filter(t => t.status === status).length}
                     </span>
                   </div>
                   
                   <div className="space-y-4 flex-1">
-                    {tasks.filter(t => t.status === status).map((task) => (
+                    {projectTasks.filter(t => t.status === status).map((task) => (
                       <motion.div 
                         key={task.id}
                         layoutId={task.id}
@@ -198,12 +239,32 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
                         </div>
                       </motion.div>
                     ))}
-                    <button className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs font-bold hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2">
+                    <button 
+                      onClick={() => setShowNewTaskModal(true)}
+                      className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs font-bold hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2"
+                    >
                       <Plus size={16} /> Görev Ekle
                     </button>
                   </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {activeTab === 'TASKS' && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-8">
+              <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
+                <Target size={20} className="text-indigo-600" />
+                İş Emirleri ve İlerlemeler
+              </h4>
+              <div className="space-y-4">
+                <TaskProgressTracker 
+                  tasks={tasks || []} 
+                  setTasks={setTasks!} 
+                  relatedModule="PROJECT" 
+                  relatedItemId={selectedProject?.id || ''} 
+                />
+              </div>
             </div>
           )}
 
@@ -214,7 +275,10 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
                   <ShoppingCart size={20} className="text-indigo-600" />
                   Satın Alma Koordinasyonu
                 </h4>
-                <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all">
+                <button 
+                  onClick={() => setShowNewProcurementReqModal(true)}
+                  className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all"
+                >
                   Yeni Talep Oluştur
                 </button>
               </div>
@@ -316,8 +380,13 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
                     rows={4}
                     placeholder="Üst yönetime sunulacak haftalık ilerleme notlarını buraya girin..."
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    value={newReport.notes}
+                    onChange={(e) => setNewReport({...newReport, notes: e.target.value})}
                   />
-                  <button className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2">
+                  <button 
+                    onClick={() => setShowNewReportModal(true)}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                  >
                     <ArrowUpRight size={18} /> Raporu Gönder
                   </button>
                 </div>
@@ -325,6 +394,189 @@ const ProjectManagementModule = ({ projects }: { projects: Project[] }) => {
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* New Project Task Modal */}
+      <AnimatePresence>
+        {showNewTaskModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Proje Görevi</h4>
+                <button onClick={() => setShowNewTaskModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Başlığı</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: Saha Keşfi"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Atanan Kişi</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewTask({...newTask, assignedTo: e.target.value})}
+                    >
+                      <option value="">Seçiniz</option>
+                      {MOCK_SYSTEM_USERS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Termin Tarihi</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Detayı</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Görev açıklaması..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewTaskModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleAddTask}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Görevi Kaydet
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* New Procurement Request Modal */}
+      <AnimatePresence>
+        {showNewProcurementReqModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Satın Alma Talebi</h4>
+                <button onClick={() => setShowNewProcurementReqModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Talep Başlığı</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: Ek Sunucu İhtiyacı"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewProcurementReq({...newProcurementReq, title: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Öncelik</label>
+                  <select 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewProcurementReq({...newProcurementReq, priority: e.target.value})}
+                    value={newProcurementReq.priority}
+                  >
+                    <option value="LOW">Düşük</option>
+                    <option value="MEDIUM">Orta</option>
+                    <option value="HIGH">Yüksek</option>
+                    <option value="URGENT">Acil</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Talep Detayı</label>
+                  <textarea 
+                    rows={4}
+                    placeholder="Talebin detayları, teknik özellikler vb..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewProcurementReq({...newProcurementReq, description: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewProcurementReqModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleCreateProcurementReq}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Talebi Gönder
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Send Report Confirmation Modal */}
+      <AnimatePresence>
+        {showNewReportModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Raporu Gönder</h4>
+                <button onClick={() => setShowNewReportModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <p className="text-sm text-slate-600">
+                  Bu rapor üst yönetime iletilecektir. Onaylıyor musunuz?
+                </p>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewReportModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleSendReport}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Evet, Gönder
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

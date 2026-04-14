@@ -93,13 +93,59 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const TodoModule = () => {
+const TodoModule = ({ 
+  tasks, 
+  setTasks,
+  projects,
+  opportunities,
+  contracts
+}: { 
+  tasks: TodoTask[], 
+  setTasks: React.Dispatch<React.SetStateAction<TodoTask[]>>,
+  projects?: Project[],
+  opportunities?: Opportunity[],
+  contracts?: Contract[]
+}) => {
   const [filterUnit, setFilterUnit] = useState<string>('all');
-  const [todos, setTodos] = useState<TodoTask[]>(MOCK_TODO_TASKS);
+  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
+  const [newTask, setNewTask] = useState<Partial<TodoTask>>({
+    priority: 'MEDIUM',
+    status: 'PENDING',
+    relatedModule: 'GENERAL'
+  });
+
+  const handleAddTask = () => {
+    const task: TodoTask = {
+      ...newTask as TodoTask,
+      id: `task${Date.now()}`,
+      assignedBy: 'user1', // Default current user
+      createdAt: new Date().toISOString().split('T')[0]
+    };
+    setTasks([task, ...tasks]);
+    setShowNewTaskModal(false);
+    setNewTask({ priority: 'MEDIUM', status: 'PENDING', relatedModule: 'GENERAL' });
+  };
+
+  const handleStatusChange = (taskId: string, newStatus: TodoTask['status']) => {
+    const taskToUpdate = tasks.find(t => t.id === taskId);
+    if (!taskToUpdate) return;
+
+    setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
+
+    // If task is completed and related to a module, we could trigger an event or update here.
+    // For now, the modules are reading the tasks array directly to show progress, 
+    // which fulfills the requirement of "gözlemlenmesini sağla" (make it observable).
+    // Actual data updates in the related module (e.g. changing project status) 
+    // would require passing down more setters or using a global state/context.
+    if (newStatus === 'COMPLETED' && taskToUpdate.relatedModule !== 'GENERAL') {
+      console.log(`Task ${taskId} completed. Related module ${taskToUpdate.relatedModule} item ${taskToUpdate.relatedItemId} should be notified.`);
+      // Example: if we had setProjects, we could update project progress here.
+    }
+  };
 
   const filteredTodos = filterUnit === 'all' 
-    ? todos 
-    : todos.filter(t => t.unitId === filterUnit);
+    ? tasks 
+    : tasks.filter(t => t.unitId === filterUnit);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -119,6 +165,23 @@ const TodoModule = () => {
     }
   };
 
+  const getRelatedItemName = (todo: TodoTask) => {
+    if (!todo.relatedItemId) return '';
+    switch (todo.relatedModule) {
+      case 'PROJECT':
+      case 'PROCUREMENT':
+        return projects?.find(p => p.id === todo.relatedItemId)?.name || 'Bilinmeyen Proje';
+      case 'OPPORTUNITY':
+        return opportunities?.find(o => o.id === todo.relatedItemId)?.title || 'Bilinmeyen Fırsat';
+      case 'CONTRACT':
+        const contract = contracts?.find(c => c.id === todo.relatedItemId);
+        const proj = projects?.find(p => p.id === contract?.projectId);
+        return proj?.name || contract?.id || 'Bilinmeyen Sözleşme';
+      default:
+        return '';
+    }
+  };
+
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
@@ -126,7 +189,10 @@ const TodoModule = () => {
           <h3 className="text-2xl font-bold text-slate-900">Görevler & Takip</h3>
           <p className="text-slate-500">Birim bazlı yönetimsel görev atamaları ve süreç takibi.</p>
         </div>
-        <button className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+        <button 
+          onClick={() => setShowNewTaskModal(true)}
+          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
+        >
           <Plus size={20} />
           Yeni Görev Ata
         </button>
@@ -172,6 +238,17 @@ const TodoModule = () => {
                   <Briefcase size={14} />
                   {MOCK_UNITS.find(u => u.id === todo.unitId)?.name}
                 </div>
+                {todo.relatedModule && todo.relatedModule !== 'GENERAL' && (
+                  <div className="flex items-center gap-1.5 text-xs text-indigo-500 font-medium bg-indigo-50 px-2 py-1 rounded-md max-w-[250px] truncate">
+                    <Target size={14} className="shrink-0" />
+                    <span className="truncate">
+                      {todo.relatedModule === 'PROJECT' && `Proje: ${getRelatedItemName(todo)}`}
+                      {todo.relatedModule === 'OPPORTUNITY' && `Fırsat: ${getRelatedItemName(todo)}`}
+                      {todo.relatedModule === 'CONTRACT' && `Sözleşme: ${getRelatedItemName(todo)}`}
+                      {todo.relatedModule === 'PROCUREMENT' && `Satın Alma: ${getRelatedItemName(todo)}`}
+                    </span>
+                  </div>
+                )}
                 <div className="flex items-center gap-1.5 text-xs text-slate-400 font-medium">
                   <Calendar size={14} />
                   Termin: {todo.dueDate}
@@ -187,10 +264,13 @@ const TodoModule = () => {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <button className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-indigo-600 transition-colors">
-                  <Settings size={18} />
-                </button>
-                <button className="p-2 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-colors">
+                <button 
+                  onClick={() => handleStatusChange(todo.id, todo.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED')}
+                  className={cn(
+                    "p-2 rounded-xl transition-colors",
+                    todo.status === 'COMPLETED' ? "bg-emerald-100 text-emerald-600" : "hover:bg-slate-50 text-slate-400 hover:text-emerald-600"
+                  )}
+                >
                   <CheckCircle2 size={18} />
                 </button>
               </div>
@@ -198,6 +278,123 @@ const TodoModule = () => {
           </div>
         ))}
       </div>
+
+      {/* New Task Modal */}
+      <AnimatePresence>
+        {showNewTaskModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Görev Ata</h4>
+                <button onClick={() => setShowNewTaskModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Başlığı</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: Haftalık Satış Raporu"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">İlgili Modül (İş Emri)</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      value={newTask.relatedModule || 'GENERAL'}
+                      onChange={(e) => setNewTask({...newTask, relatedModule: e.target.value as any, relatedItemId: ''})}
+                    >
+                      <option value="GENERAL">Genel Görev</option>
+                      <option value="PROJECT">Proje Yönetimi</option>
+                      <option value="OPPORTUNITY">CRM & Fırsat</option>
+                      <option value="CONTRACT">Sözleşme</option>
+                      <option value="PROCUREMENT">Satın Alma</option>
+                    </select>
+                  </div>
+                  {newTask.relatedModule && newTask.relatedModule !== 'GENERAL' && (
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-slate-400 uppercase">İlgili Kayıt</label>
+                      <select 
+                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        onChange={(e) => setNewTask({...newTask, relatedItemId: e.target.value})}
+                      >
+                        <option value="">Seçiniz</option>
+                        {newTask.relatedModule === 'PROJECT' && projects?.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                        {newTask.relatedModule === 'OPPORTUNITY' && opportunities?.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+                        {newTask.relatedModule === 'CONTRACT' && contracts?.map(c => <option key={c.id} value={c.id}>{c.id} - {projects?.find(p => p.id === c.projectId)?.name}</option>)}
+                      </select>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">İlgili Birim</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewTask({...newTask, unitId: e.target.value})}
+                    >
+                      <option value="">Seçiniz</option>
+                      {MOCK_UNITS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Öncelik</label>
+                    <select 
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewTask({...newTask, priority: e.target.value as any})}
+                    >
+                      <option value="LOW">Düşük</option>
+                      <option value="MEDIUM">Orta</option>
+                      <option value="HIGH">Yüksek</option>
+                      <option value="URGENT">Acil</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Termin Tarihi</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Detayı</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Görev ile ilgili detaylı açıklama..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewTask({...newTask, description: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewTaskModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleAddTask}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Görevi Ata
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

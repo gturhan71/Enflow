@@ -5,12 +5,15 @@ import {
   NAV_ITEMS, 
   MOCK_PROJECTS, 
   MOCK_CONTRACTS,
-  MOCK_OPPORTUNITIES
+  MOCK_OPPORTUNITIES,
+  MOCK_CUSTOMERS,
+  MOCK_TODO_TASKS
 } from './constants';
 import { 
   Contract,
   Opportunity,
-  Project
+  Project,
+  TodoTask
 } from './types';
 
 import Sidebar from './layout/Sidebar';
@@ -28,47 +31,64 @@ import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
-import { secureStorage } from './lib/storage';
 
 const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onLogout: () => void }) => {
   const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
-    return secureStorage.getItem<string>(`enflow_company_logo_${tenantId}`);
+    return localStorage.getItem(`enflow_company_logo_${tenantId}`);
   });
   const [activeTab, setActiveTab] = useState('dashboard');
   
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
-    const saved = secureStorage.getItem<Opportunity[]>(`enflow_opps_${tenantId}`);
-    return saved || MOCK_OPPORTUNITIES;
+    const saved = localStorage.getItem(`enflow_opps_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_OPPORTUNITIES;
+  });
+
+  const [customers, setCustomers] = useState<any[]>(() => {
+    const saved = localStorage.getItem(`enflow_customers_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_CUSTOMERS;
   });
   
   const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = secureStorage.getItem<Project[]>(`enflow_projects_${tenantId}`);
-    return saved || MOCK_PROJECTS;
+    const saved = localStorage.getItem(`enflow_projects_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_PROJECTS;
   });
   
   const [contracts, setContracts] = useState<Contract[]>(() => {
-    const saved = secureStorage.getItem<Contract[]>(`enflow_contracts_${tenantId}`);
-    return saved || MOCK_CONTRACTS;
+    const saved = localStorage.getItem(`enflow_contracts_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_CONTRACTS;
+  });
+
+  const [tasks, setTasks] = useState<TodoTask[]>(() => {
+    const saved = localStorage.getItem(`enflow_tasks_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_TODO_TASKS;
   });
 
   useEffect(() => {
-    secureStorage.setItem(`enflow_opps_${tenantId}`, opportunities);
+    localStorage.setItem(`enflow_opps_${tenantId}`, JSON.stringify(opportunities));
   }, [opportunities, tenantId]);
 
   useEffect(() => {
-    secureStorage.setItem(`enflow_projects_${tenantId}`, projects);
+    localStorage.setItem(`enflow_customers_${tenantId}`, JSON.stringify(customers));
+  }, [customers, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_projects_${tenantId}`, JSON.stringify(projects));
   }, [projects, tenantId]);
 
   useEffect(() => {
-    secureStorage.setItem(`enflow_contracts_${tenantId}`, contracts);
+    localStorage.setItem(`enflow_contracts_${tenantId}`, JSON.stringify(contracts));
   }, [contracts, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_tasks_${tenantId}`, JSON.stringify(tasks));
+  }, [tasks, tenantId]);
 
   const setCompanyLogo = (logo: string | null) => {
     setCompanyLogoState(logo);
     if (logo) {
-      secureStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
+      localStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
     } else {
-      secureStorage.removeItem(`enflow_company_logo_${tenantId}`);
+      localStorage.removeItem(`enflow_company_logo_${tenantId}`);
     }
   };
 
@@ -79,19 +99,19 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
     }
     
     if (activeTab.startsWith('crm-') || activeTab === 'crm') {
-      return <CRMModule opportunities={opportunities} setOpportunities={setOpportunities} />;
+      return <CRMModule opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} setCustomers={setCustomers} activeTab={activeTab} tasks={tasks} setTasks={setTasks} />;
     }
 
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
       case 'presales': return <SmartImporter />;
       case 'sales-support': return <SalesSupport />;
-      case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} />;
+      case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'documents': return <DocumentsModule />;
       case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} />;
-      case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} />;
-      case 'project-mgmt': return <ProjectManagementModule projects={projects} />;
-      case 'todo': return <TodoModule />;
+      case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
+      case 'project-mgmt': return <ProjectManagementModule projects={projects} tasks={tasks} setTasks={setTasks} />;
+      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-full text-slate-400">
           <Settings size={48} className="mb-4 opacity-20" />
@@ -139,6 +159,8 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
   );
 };
 
+import { ErrorBoundary } from './components/ErrorBoundary';
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
@@ -147,5 +169,9 @@ export default function App() {
     return <Login onLogin={(tId) => { setIsAuthenticated(true); setActiveTenantId(tId); }} />;
   }
 
-  return <TenantApp key={activeTenantId} tenantId={activeTenantId} onLogout={() => { setIsAuthenticated(false); setActiveTenantId(null); }} />;
+  return (
+    <ErrorBoundary>
+      <TenantApp key={activeTenantId} tenantId={activeTenantId} onLogout={() => { setIsAuthenticated(false); setActiveTenantId(null); }} />
+    </ErrorBoundary>
+  );
 }

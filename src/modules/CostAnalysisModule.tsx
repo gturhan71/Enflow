@@ -104,6 +104,15 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
 
   const [selectedTargetId, setSelectedTargetId] = useState(analysisTargets[0]?.id || '');
   const [view, setView] = useState<'SUMMARY' | 'PRESALES' | 'SALES'>('SUMMARY');
+  const [showNewProductModal, setShowNewProductModal] = useState(false);
+  const [newProduct, setNewProduct] = useState({
+    partNumber: '',
+    description: '',
+    quantity: 1,
+    purchaseCost: 0,
+    marginPercentage: 15
+  });
+  const [newCostDescription, setNewCostDescription] = useState('');
 
   const selectedTarget = analysisTargets.find(t => t.id === selectedTargetId) || analysisTargets[0];
 
@@ -121,6 +130,18 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
   const totalSaleValue = projectBoM.reduce((sum, item) => sum + item.totalSalePrice, 0);
   const grossProfit = totalSaleValue - totalProjectCost;
   const margin = totalSaleValue > 0 ? (grossProfit / totalSaleValue) * 100 : 0;
+
+  const handleAddProduct = () => {
+    console.log('Adding product:', newProduct);
+    setShowNewProductModal(false);
+    setNewProduct({ partNumber: '', description: '', quantity: 1, purchaseCost: 0, marginPercentage: 15 });
+  };
+
+  const handleAddCost = () => {
+    if (!newCostDescription.trim()) return;
+    console.log('Adding cost requirement:', newCostDescription);
+    setNewCostDescription('');
+  };
 
   return (
     <div className="p-8 space-y-8">
@@ -280,7 +301,10 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
                     <ShoppingCart size={20} className="text-indigo-600" />
                     BoM & Fiyatlandırma
                   </h4>
-                  <button className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1">
+                  <button 
+                    onClick={() => setShowNewProductModal(true)}
+                    className="text-xs font-bold text-indigo-600 hover:underline flex items-center gap-1"
+                  >
                     <Plus size={14} /> Ürün Ekle
                   </button>
                 </div>
@@ -327,8 +351,16 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
                         type="text" 
                         placeholder="Örn: 2 hafta kurulum işçiliği" 
                         className="flex-1 px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:border-indigo-500"
+                        value={newCostDescription}
+                        onChange={(e) => setNewCostDescription(e.target.value)}
                       />
-                      <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md">Ekle</button>
+                      <button 
+                        onClick={handleAddCost}
+                        disabled={!newCostDescription.trim()}
+                        className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md disabled:opacity-50"
+                      >
+                        Ekle
+                      </button>
                     </div>
                   </div>
                   <div className="space-y-3">
@@ -404,6 +436,94 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
             </div>
           )}
         </motion.div>
+      </AnimatePresence>
+
+      {/* New Product Modal */}
+      <AnimatePresence>
+        {showNewProductModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Ürün Ekle</h4>
+                <button onClick={() => setShowNewProductModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Parça No</label>
+                    <input 
+                      type="text" 
+                      placeholder="Örn: R750-1"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewProduct({...newProduct, partNumber: e.target.value})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Adet</label>
+                    <input 
+                      type="number" 
+                      min="1"
+                      defaultValue={1}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewProduct({...newProduct, quantity: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Açıklama</label>
+                  <textarea 
+                    rows={2}
+                    placeholder="Ürün açıklaması..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Birim Maliyet ($)</label>
+                    <input 
+                      type="number" 
+                      min="0"
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewProduct({...newProduct, purchaseCost: Number(e.target.value)})}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-slate-400 uppercase">Hedef Marj (%)</label>
+                    <input 
+                      type="number" 
+                      min="0" max="100"
+                      defaultValue={15}
+                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                      onChange={(e) => setNewProduct({...newProduct, marginPercentage: Number(e.target.value)})}
+                    />
+                  </div>
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewProductModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleAddProduct}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Ürünü Ekle
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
       </AnimatePresence>
     </div>
   );

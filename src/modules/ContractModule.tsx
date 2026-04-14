@@ -93,12 +93,16 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const ContractModule = ({ opportunities, contracts, setContracts, projects, setProjects }: { 
+import { TaskProgressTracker } from '../components/TaskProgressTracker';
+
+const ContractModule = ({ opportunities, contracts, setContracts, projects, setProjects, tasks, setTasks }: { 
   opportunities: Opportunity[], 
   contracts: Contract[], 
   setContracts: React.Dispatch<React.SetStateAction<Contract[]>>,
   projects: Project[],
-  setProjects: React.Dispatch<React.SetStateAction<Project[]>>
+  setProjects: React.Dispatch<React.SetStateAction<Project[]>>,
+  tasks?: TodoTask[],
+  setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>
 }) => {
   const generatedContracts = opportunities.filter(o => o.status === 'WON' && !contracts.some(c => c.opportunityId === o.id)).map(o => ({
     id: `contract-${o.id}`,
@@ -115,6 +119,12 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
   const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
   const [showArchiveAccess, setShowArchiveAccess] = useState(false);
   const [pmToAssign, setPmToAssign] = useState('');
+  const [showNewDocReqModal, setShowNewDocReqModal] = useState(false);
+  const [newDocReq, setNewDocReq] = useState({
+    name: '',
+    description: '',
+    dueDate: ''
+  });
   
   const selectedContract = allContracts.find(c => c.id === selectedContractId);
   const project = MOCK_PROJECTS.find(p => p.id === selectedContract?.projectId);
@@ -155,6 +165,12 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
     };
     setProjects([...projects, newProject]);
     setSelectedContractId(null); // Go back to list
+  };
+
+  const handleCreateDocReq = () => {
+    console.log('Creating doc req:', newDocReq);
+    setShowNewDocReqModal(false);
+    setNewDocReq({ name: '', description: '', dueDate: '' });
   };
 
   if (!selectedContractId) {
@@ -336,7 +352,15 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                     <FileSignature size={20} className="text-indigo-600" />
                     Sözleşme Evrakları Listesi
                   </h4>
-                  <span className="text-xs font-bold text-slate-400">Satış Destek Takibi</span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-slate-400">Satış Destek Takibi</span>
+                    <button 
+                      onClick={() => setShowNewDocReqModal(true)}
+                      className="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-1"
+                    >
+                      <Plus size={14} /> Yeni Talep
+                    </button>
+                  </div>
                 </div>
                 <div className="divide-y divide-slate-100">
                   {contractDocs.map((doc) => (
@@ -427,8 +451,86 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                   Tüm evraklar onaylandığında ve sözleşme imzalandığında proje otomatik olarak "Proje Yönetimi" modülüne aktarılacaktır.
                 </p>
               </div>
+
+              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                  <Target size={20} className="text-indigo-600" />
+                  İş Emirleri ve İlerlemeler
+                </h4>
+                <div className="space-y-3">
+                  <TaskProgressTracker 
+                    tasks={tasks || []} 
+                    setTasks={setTasks!} 
+                    relatedModule="CONTRACT" 
+                    relatedItemId={selectedContract?.id || ''} 
+                  />
+                </div>
+              </div>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New Document Request Modal */}
+      <AnimatePresence>
+        {showNewDocReqModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Belge Talebi</h4>
+                <button onClick={() => setShowNewDocReqModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Belge Adı</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: SGK Borcu Yoktur Yazısı"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewDocReq({...newDocReq, name: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Son Teslim Tarihi</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewDocReq({...newDocReq, dueDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Açıklama / Not</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Belge ile ilgili detaylar..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewDocReq({...newDocReq, description: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewDocReqModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleCreateDocReq}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Talebi Oluştur
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

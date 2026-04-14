@@ -93,9 +93,17 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
-const ProcurementModule = ({ projects, setProjects }: { projects: Project[], setProjects: React.Dispatch<React.SetStateAction<Project[]>> }) => {
+import { TaskProgressTracker } from '../components/TaskProgressTracker';
+
+const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { projects: Project[], setProjects: React.Dispatch<React.SetStateAction<Project[]>>, tasks?: TodoTask[], setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>> }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string>(projects[0]?.id || '');
   const [newNote, setNewNote] = useState('');
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [newOrder, setNewOrder] = useState({
+    vendor: '',
+    expectedDate: '',
+    notes: ''
+  });
 
   const selectedProject = projects.find(p => p.id === selectedProjectId);
   const projectBomItems = MOCK_BOM_ITEMS.filter(item => item.opportunityId === selectedProject?.opportunityId);
@@ -124,6 +132,12 @@ const ProcurementModule = ({ projects, setProjects }: { projects: Project[], set
     setNewNote('');
   };
 
+  const handleCreateOrder = () => {
+    console.log('Creating order:', newOrder);
+    setShowNewOrderModal(false);
+    setNewOrder({ vendor: '', expectedDate: '', notes: '' });
+  };
+
   return (
     <div className="p-8 space-y-8">
       <div className="flex items-center justify-between">
@@ -142,7 +156,10 @@ const ProcurementModule = ({ projects, setProjects }: { projects: Project[], set
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
-          <button className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+          <button 
+            onClick={() => setShowNewOrderModal(true)}
+            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
+          >
             <ShoppingCart size={18} />
             Yeni Sipariş
           </button>
@@ -242,8 +259,86 @@ const ProcurementModule = ({ projects, setProjects }: { projects: Project[], set
               ))}
             </div>
           </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 p-6">
+            <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
+              <Target size={20} className="text-indigo-600" />
+              İş Emirleri ve İlerlemeler
+            </h4>
+            <div className="space-y-3">
+              <TaskProgressTracker 
+                tasks={tasks || []} 
+                setTasks={setTasks!} 
+                relatedModule="PROCUREMENT" 
+                relatedItemId={selectedProject?.id || ''} 
+              />
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* New Order Modal */}
+      <AnimatePresence>
+        {showNewOrderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+            >
+              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                <h4 className="text-xl font-bold text-slate-900">Yeni Sipariş Oluştur</h4>
+                <button onClick={() => setShowNewOrderModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+              <div className="p-8 space-y-6">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Tedarikçi Firma</label>
+                  <input 
+                    type="text" 
+                    placeholder="Örn: Arena Bilgisayar"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewOrder({...newOrder, vendor: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Beklenen Teslim Tarihi (ETA)</label>
+                  <input 
+                    type="date" 
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                    onChange={(e) => setNewOrder({...newOrder, expectedDate: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-slate-400 uppercase">Sipariş Notları</label>
+                  <textarea 
+                    rows={3}
+                    placeholder="Siparişe özel notlar..."
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
+                    onChange={(e) => setNewOrder({...newOrder, notes: e.target.value})}
+                  />
+                </div>
+              </div>
+              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button 
+                  onClick={() => setShowNewOrderModal(false)}
+                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
+                >
+                  İptal
+                </button>
+                <button 
+                  onClick={handleCreateOrder}
+                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
+                >
+                  Siparişi Kaydet
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

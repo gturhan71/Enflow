@@ -184,6 +184,9 @@ export interface TodoTask {
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate: string;
   createdAt: string;
+  relatedModule?: 'PROJECT' | 'OPPORTUNITY' | 'CONTRACT' | 'PROCUREMENT' | 'GENERAL';
+  relatedItemId?: string;
+  progressNotes?: { date: string; note: string; author: string }[];
 }
 
 export interface Opportunity {

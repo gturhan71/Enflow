@@ -1,9 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Lock, User, ArrowRight, Settings, Building2, Loader2 } from 'lucide-react';
+import { Lock, User, ArrowRight, Settings, Building2 } from 'lucide-react';
 import { APP_VERSION, MOCK_TENANTS } from '../constants';
-import { secureStorage } from '../lib/storage';
-import { authService } from '../services/authService';
 
 interface LoginProps {
   onLogin: (tenantId: string) => void;
@@ -15,29 +13,19 @@ const Login = ({ onLogin }: LoginProps) => {
   const [tenantId, setTenantId] = useState(MOCK_TENANTS[0].id);
   const [currentLogo, setCurrentLogo] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const logo = secureStorage.getItem<string>(`enflow_company_logo_${tenantId}`);
+    const logo = localStorage.getItem(`enflow_company_logo_${tenantId}`);
     setCurrentLogo(logo);
   }, [tenantId]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
-
-    try {
-      const isValid = await authService.login(username, password);
-      if (isValid) {
-        onLogin(tenantId);
-      } else {
-        setError('Geçersiz kullanıcı adı veya şifre. (İpucu: admin / admin)');
-      }
-    } catch (err) {
-      setError('Giriş yapılırken bir hata oluştu.');
-    } finally {
-      setIsLoading(false);
+    // Simple mock authentication
+    if (username === 'admin' && password === 'admin') {
+      onLogin(tenantId);
+    } else {
+      setError('Geçersiz kullanıcı adı veya şifre. (İpucu: admin / admin)');
     }
   };
 
@@ -175,20 +163,10 @@ const Login = ({ onLogin }: LoginProps) => {
             <div>
               <button
                 type="submit"
-                disabled={isLoading}
-                className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-200 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+                className="w-full flex justify-center items-center gap-2 py-3 px-4 border border-transparent rounded-xl shadow-lg shadow-indigo-200 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-all"
               >
-                {isLoading ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Giriş Yapılıyor...
-                  </>
-                ) : (
-                  <>
-                    Giriş Yap
-                    <ArrowRight size={18} />
-                  </>
-                )}
+                Giriş Yap
+                <ArrowRight size={18} />
               </button>
             </div>
           </form>
