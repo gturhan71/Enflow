@@ -57,6 +57,7 @@ export const NAV_ITEMS = [
     icon: Users,
     subItems: [
       { id: 'crm-opportunities', label: 'Fırsatlar' },
+      { id: 'crm-proposals', label: 'Teklifler' },
       { id: 'crm-customers', label: 'Müşteriler' }
     ]
   },

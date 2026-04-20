@@ -204,7 +204,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
           {view === 'SUMMARY' && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="glass-card p-6 rounded-3xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase mb-1">Toplam Maliyet</p>
                   <h4 className="text-2xl font-bold text-slate-900">${totalProjectCost.toLocaleString()}</h4>
                   <div className="mt-2 flex items-center gap-2 text-[10px]">
@@ -214,19 +214,19 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
                   </div>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="glass-card p-6 rounded-3xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase mb-1">Satış Bedeli</p>
                   <h4 className="text-2xl font-bold text-slate-900">${totalSaleValue.toLocaleString()}</h4>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="glass-card p-6 rounded-3xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase mb-1">Brüt Kar</p>
                   <h4 className={cn("text-2xl font-bold", grossProfit >= 0 ? "text-emerald-600" : "text-red-600")}>
                     ${grossProfit.toLocaleString()}
                   </h4>
                 </div>
 
-                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                <div className="glass-card p-6 rounded-3xl shadow-sm">
                   <p className="text-xs font-bold text-slate-400 uppercase mb-1">Proje Marjı</p>
                   <h4 className={cn("text-2xl font-bold", margin >= 15 ? "text-emerald-600" : margin >= 10 ? "text-amber-600" : "text-red-600")}>
                     %{margin.toFixed(1)}
@@ -235,7 +235,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
               </div>
 
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white rounded-3xl border border-slate-200 p-8">
+                <div className="glass-panel rounded-3xl p-8">
                   <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <PieChart size={20} className="text-indigo-600" />
                     Maliyet Dağılımı
@@ -262,7 +262,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
                   </div>
                 </div>
 
-                <div className="bg-white rounded-3xl border border-slate-200 p-8">
+                <div className="glass-panel rounded-3xl p-8">
                   <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                     <Target size={20} className="text-red-600" />
                     Risk & Duyarlılık Analizi
@@ -295,7 +295,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
           {view === 'PRESALES' && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* BoM Entry */}
-              <div className="bg-white rounded-3xl border border-slate-200 flex flex-col overflow-hidden">
+              <div className="glass-panel rounded-3xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <ShoppingCart size={20} className="text-indigo-600" />
@@ -336,7 +336,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
               </div>
 
               {/* Cost Requirements Identification */}
-              <div className="bg-white rounded-3xl border border-slate-200 flex flex-col overflow-hidden">
+              <div className="glass-panel rounded-3xl flex flex-col overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <FileSearch size={20} className="text-amber-600" />
@@ -390,7 +390,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
           )}
 
           {view === 'SALES' && (
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+            <div className="glass-panel rounded-3xl overflow-hidden">
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <h4 className="font-bold text-slate-900 flex items-center gap-2">
                   <DollarSign size={20} className="text-emerald-600" />
@@ -446,7 +446,7 @@ const CostAnalysisModule = ({ opportunities }: { opportunities: Opportunity[] })
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Ürün Ekle</h4>

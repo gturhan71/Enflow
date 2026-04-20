@@ -183,7 +183,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
           </div>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+        <div className="glass-panel rounded-3xl overflow-hidden">
           <table className="w-full text-left text-sm">
             <thead className="bg-slate-50 border-b border-slate-100">
               <tr>
@@ -279,7 +279,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
             className="space-y-8"
           >
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-3xl border border-slate-200 p-8">
+              <div className="glass-panel rounded-3xl p-8">
                 <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <FileText size={20} className="text-indigo-600" />
                   Şirket Evrak Havuzu
@@ -304,7 +304,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                 </div>
               </div>
 
-              <div className="bg-white rounded-3xl border border-slate-200 p-8">
+              <div className="glass-panel rounded-3xl p-8">
                 <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                   <Archive size={20} className="text-amber-600" />
                   Fiziksel Arşiv Durumu
@@ -346,7 +346,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
             className="grid grid-cols-1 lg:grid-cols-3 gap-8"
           >
             <div className="lg:col-span-2 space-y-6">
-              <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+              <div className="glass-panel rounded-3xl overflow-hidden">
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                   <h4 className="font-bold text-slate-900 flex items-center gap-2">
                     <FileSignature size={20} className="text-indigo-600" />
@@ -408,7 +408,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
             </div>
 
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="glass-panel p-6 rounded-3xl shadow-sm">
                 <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <Gavel size={20} className="text-amber-600" />
                   Teminat Bilgileri
@@ -452,7 +452,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                 </p>
               </div>
 
-              <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+              <div className="glass-panel p-6 rounded-3xl shadow-sm">
                 <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
                   <Target size={20} className="text-indigo-600" />
                   İş Emirleri ve İlerlemeler
@@ -479,7 +479,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Belge Talebi</h4>

@@ -264,7 +264,7 @@ const Dashboard = () => {
             transition={{ delay: i * 0.1 }}
             key={i} 
             onClick={() => setActiveModal(stat.id)}
-            className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+            className="glass-card p-6 rounded-3xl cursor-pointer"
           >
             <div className="flex items-center justify-between mb-4">
               <div className={cn("p-3 rounded-2xl", stat.bg)}>
@@ -282,7 +282,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="glass-panel rounded-3xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h3 className="font-bold text-slate-900">Son Projeler</h3>
               <button onClick={() => setActiveModal('allProjects')} className="text-indigo-600 text-sm font-semibold hover:underline">Tümünü Gör</button>
@@ -315,7 +315,7 @@ const Dashboard = () => {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setActiveModal('alerts')}>
+          <div className="glass-panel rounded-3xl p-6 cursor-pointer" onClick={() => setActiveModal('alerts')}>
             <h3 className="font-bold text-slate-900 mb-6 flex items-center justify-between">
               Kritik Uyarılar
               <ChevronRight size={16} className="text-slate-400" />
@@ -349,7 +349,7 @@ const Dashboard = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col"
+              className="glass-panel w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <h4 className="text-xl font-bold text-slate-900">Detaylar</h4>

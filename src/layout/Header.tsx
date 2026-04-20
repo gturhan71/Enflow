@@ -106,7 +106,7 @@ const Header = ({ title, onLogout }: { title: string, onLogout: () => void }) =>
   };
 
   return (
-    <header className="h-20 bg-white/80 backdrop-blur-md border-b border-slate-200 px-8 flex items-center justify-between sticky top-0 z-10">
+    <header className="h-20 glass-header px-8 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4">
         <h2 className="text-xl font-bold text-slate-900">{title}</h2>
         <div className="h-6 w-px bg-slate-200 mx-2" />

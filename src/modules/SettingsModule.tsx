@@ -141,7 +141,7 @@ const SettingsModule = ({ companyLogo, setCompanyLogo, activeSubTab = 'company' 
           transition={{ duration: 0.2 }}
         >
           {activeSubTab === 'company' && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-8 max-w-2xl">
+            <div className="glass-panel rounded-3xl p-8 max-w-2xl">
               <h4 className="text-lg font-bold text-slate-900 mb-6">Şirket Profili ve Logo</h4>
               <div className="space-y-6">
                 <div>
@@ -197,7 +197,7 @@ const SettingsModule = ({ companyLogo, setCompanyLogo, activeSubTab = 'company' 
           {activeSubTab === 'units' && (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {units.map((unit) => (
-                <div key={unit.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all">
+                <div key={unit.id} className="glass-card p-6 rounded-3xl transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
                       <Briefcase size={24} />
@@ -218,7 +218,7 @@ const SettingsModule = ({ companyLogo, setCompanyLogo, activeSubTab = 'company' 
           )}
 
           {activeSubTab === 'users' && (
-            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+            <div className="glass-panel rounded-3xl overflow-hidden">
               <table className="w-full text-left">
                 <thead>
                   <tr className="text-xs font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100">
@@ -285,7 +285,7 @@ const SettingsModule = ({ companyLogo, setCompanyLogo, activeSubTab = 'company' 
           {activeSubTab === 'permissions' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {MOCK_PERMISSIONS.map((perm) => (
-                <div key={perm.id} className="bg-white p-6 rounded-3xl border border-slate-200 flex items-start gap-4">
+                <div key={perm.id} className="glass-panel p-6 rounded-3xl flex items-start gap-4">
                   <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center flex-shrink-0">
                     <ShieldCheck size={24} />
                   </div>

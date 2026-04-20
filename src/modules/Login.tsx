@@ -30,11 +30,11 @@ const Login = ({ onLogin }: LoginProps) => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="min-h-screen bg-transparent flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Background decoration */}
-      <div className="absolute inset-0 z-0 pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-indigo-100/50 blur-3xl" />
-        <div className="absolute top-[60%] -right-[10%] w-[40%] h-[60%] rounded-full bg-blue-100/50 blur-3xl" />
+      <div className="absolute inset-0 z-0 pointer-events-none opacity-50">
+        <div className="absolute -top-[10%] -left-[10%] w-[40%] h-[40%] rounded-full bg-indigo-500/20 blur-[120px]" />
+        <div className="absolute top-[50%] -right-[10%] w-[40%] h-[40%] rounded-full bg-blue-500/20 blur-[120px]" />
       </div>
 
       <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10">
@@ -44,27 +44,27 @@ const Login = ({ onLogin }: LoginProps) => {
           className="flex flex-col items-center"
         >
           {currentLogo ? (
-            <img src={currentLogo} alt="Company Logo" className="h-24 w-auto object-contain mb-6 drop-shadow-sm" />
+            <img src={currentLogo} alt="Company Logo" className="h-24 w-auto object-contain mb-6 drop-shadow-xl" />
           ) : (
-            <div className="w-20 h-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200 mb-6">
+            <div className="w-20 h-20 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-2xl shadow-indigo-200/50 mb-6">
               <Settings size={40} />
             </div>
           )}
-          <h2 className="text-center text-3xl font-extrabold text-slate-900 tracking-tight">
-            ENFLOW'a Giriş Yapın
+          <h2 className="text-center text-3xl font-black text-slate-900 tracking-tight">
+            ENFLOW
           </h2>
-          <p className="mt-2 text-center text-sm text-slate-600">
-            Kurumsal Süreç Yönetim Sistemi
+          <p className="mt-2 text-center text-sm font-bold text-slate-600 uppercase tracking-widest">
+            Kurumsal Süreç Yönetimi
           </p>
         </motion.div>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10">
+      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-white py-8 px-4 shadow-2xl shadow-slate-200/50 sm:rounded-3xl sm:px-10 border border-slate-100"
+          className="glass-panel py-8 px-4 sm:rounded-[40px] sm:px-10"
         >
           <form className="space-y-6" onSubmit={handleSubmit}>
             <div>

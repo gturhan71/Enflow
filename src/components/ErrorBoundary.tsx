@@ -25,25 +25,28 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public render() {
-    if (this.state.hasError) {
+    const { hasError, error } = this.state;
+    const { children } = (this as any).props;
+
+    if (hasError) {
       return (
-        <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-          <div className="bg-white p-8 rounded-3xl shadow-xl max-w-lg w-full border border-red-100 text-center">
-            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
+          <div className="glass-panel p-8 rounded-3xl shadow-xl max-w-lg w-full text-center">
+            <div className="w-16 h-16 bg-red-100/50 text-red-600 rounded-2xl flex items-center justify-center mx-auto mb-6 backdrop-blur">
               <AlertCircle size={32} />
             </div>
             <h1 className="text-2xl font-bold text-slate-900 mb-2">Bir Hata Oluştu</h1>
             <p className="text-slate-500 mb-6">
               Uygulama çalışırken beklenmeyen bir hata meydana geldi. Lütfen sayfayı yenileyin.
             </p>
-            <div className="bg-slate-50 p-4 rounded-xl text-left overflow-auto mb-6">
+            <div className="bg-white/40 backdrop-blur-sm p-4 rounded-xl text-left overflow-auto mb-6 border border-slate-200/50">
               <p className="text-xs font-mono text-red-600 break-words">
-                {this.state.error?.message}
+                {error?.message}
               </p>
             </div>
             <button
               onClick={() => window.location.reload()}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 transition-colors w-full"
+              className="bg-indigo-600 text-white px-6 py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg shadow-indigo-100 transition-colors w-full"
             >
               Sayfayı Yenile
             </button>
@@ -52,6 +55,6 @@ export class ErrorBoundary extends Component<Props, State> {
       );
     }
 
-    return this.props.children;
+    return children;
   }
 }

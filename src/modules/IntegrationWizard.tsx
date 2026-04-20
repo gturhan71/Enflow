@@ -153,7 +153,7 @@ const IntegrationWizard = ({
           {INTEGRATIONS.map((int) => (
             <div 
               key={int.id} 
-              className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md hover:border-indigo-300 transition-all group relative"
+              className="glass-card p-6 rounded-3xl transition-all group relative"
             >
               <div 
                 className="cursor-pointer"
@@ -206,7 +206,7 @@ const IntegrationWizard = ({
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
+                className="glass-panel rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col"
               >
                 <div className="p-8">
                   <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6 mx-auto">
@@ -266,7 +266,7 @@ const IntegrationWizard = ({
 
   return (
     <div className="max-w-3xl mx-auto">
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="glass-panel rounded-3xl shadow-sm overflow-hidden text-slate-900">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <div className="flex items-center gap-3">
             <button onClick={() => setSelectedIntegration(null)} className="p-2 hover:bg-white rounded-xl transition-colors">

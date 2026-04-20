@@ -7,8 +7,29 @@
 
 @layer base {
   body {
-    @apply bg-[#f8f9fa] text-slate-900 antialiased font-sans;
+    @apply text-slate-900 antialiased font-sans min-h-screen;
+    background: radial-gradient(at 0% 0%, rgba(99, 102, 241, 0.15) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(244, 63, 94, 0.1) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(16, 185, 129, 0.1) 0px, transparent 50%),
+                radial-gradient(at 0% 100%, rgba(245, 158, 11, 0.1) 0px, transparent 50%),
+                #f8f9fa;
   }
+}
+
+.glass-panel {
+  @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-xl shadow-slate-200/50;
+}
+
+.glass-card {
+  @apply bg-white/60 backdrop-blur-sm border border-white/30 shadow-sm hover:shadow-md transition-all duration-300;
+}
+
+.glass-sidebar {
+  @apply bg-white/40 backdrop-blur-xl border-r border-white/20;
+}
+
+.glass-header {
+  @apply bg-white/50 backdrop-blur-lg border-b border-white/20;
 }
 
 /* Custom Scrollbar */

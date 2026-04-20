@@ -168,7 +168,7 @@ const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { project
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="glass-panel rounded-3xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h4 className="font-bold text-slate-900">Proje İhtiyaçları (BoM)</h4>
               <span className="text-xs font-bold text-slate-500">{projectBomItems.length} Kalem</span>
@@ -203,7 +203,7 @@ const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { project
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6">
+          <div className="glass-panel rounded-3xl p-6">
             <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
               <MessageSquare size={20} className="text-indigo-600" />
               Proje Yöneticisine Bilgi Notu
@@ -260,7 +260,7 @@ const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { project
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 p-6">
+          <div className="glass-panel rounded-3xl p-6">
             <h4 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Target size={20} className="text-indigo-600" />
               İş Emirleri ve İlerlemeler
@@ -285,7 +285,7 @@ const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { project
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Sipariş Oluştur</h4>

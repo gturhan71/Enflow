@@ -145,7 +145,7 @@ const SalesSupport = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Active Bids */}
         <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+          <div className="glass-panel rounded-3xl overflow-hidden">
             <div className="p-6 border-b border-slate-100 flex items-center justify-between">
               <h4 className="font-bold text-slate-900">Aktif İhaleler & Teklifler</h4>
               <div className="flex items-center gap-2">
@@ -220,7 +220,7 @@ const SalesSupport = () => {
 
         {/* Compliance & Certs */}
         <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200 p-6">
+          <div className="glass-panel rounded-3xl p-6">
             <h4 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
               <ShieldCheck size={20} className="text-emerald-600" />
               Sertifika & Yetkinlik
@@ -249,7 +249,7 @@ const SalesSupport = () => {
             </button>
           </div>
 
-          <div className="bg-indigo-600 rounded-3xl p-6 text-white shadow-xl shadow-indigo-200">
+          <div className="glass-panel p-6 text-white shadow-xl shadow-indigo-200 rounded-[40px]">
             <h4 className="font-bold mb-2 flex items-center gap-2">
               <FileCheck size={20} />
               İş Bitirme Talebi
@@ -275,7 +275,7 @@ const SalesSupport = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni İhale Dosyası</h4>
@@ -348,7 +348,7 @@ const SalesSupport = () => {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">İş Bitirme Dilekçesi Oluştur</h4>

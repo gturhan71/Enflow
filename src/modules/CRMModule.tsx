@@ -91,6 +91,7 @@ import {
 import { nextcloudService } from '../services/nextcloudService';
 import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
+import ProposalEditor from './ProposalEditor';
 
 
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
@@ -116,6 +117,7 @@ const CRMModule = ({
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showProposalEditor, setShowProposalEditor] = useState(false);
   const [newOpp, setNewOpp] = useState<Partial<Opportunity>>({
     status: 'NEW',
     probability: 10,
@@ -210,6 +212,117 @@ const CRMModule = ({
     }
   };
 
+  if (showProposalEditor && selectedOpp) {
+    return (
+      <ProposalEditor 
+        opportunity={selectedOpp}
+        bomItems={MOCK_BOM_ITEMS.filter(i => i.opportunityId === selectedOpp.id)}
+        customers={customers || MOCK_CUSTOMERS}
+        onSave={(data) => {
+          console.log('Proposal saved:', data);
+          setShowProposalEditor(false);
+          setShowDetailModal(false);
+          updateStatus(selectedOpp.id, 'PROPOSAL');
+        }}
+        onCancel={() => setShowProposalEditor(false)}
+      />
+    );
+  }
+
+  if (activeTab === 'crm-proposals') {
+    const opportunitiesReady = opportunities.filter(o => o.bomStatus === 'APPROVED' || o.status === 'PROPOSAL');
+    return (
+      <div className="p-8 space-y-8">
+        <div>
+          <h3 className="text-2xl font-bold text-slate-900">Fiyat Teklifleri</h3>
+          <p className="text-slate-500">Hazırlanmış teklifler ve teklif bekleyen fırsatlar.</p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 text-emerald-600 mb-4">
+              <div className="p-2 bg-emerald-50 rounded-xl"><CheckCircle2 size={20} /></div>
+              <h5 className="font-bold">BoM Onaylı</h5>
+            </div>
+            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.bomStatus === 'APPROVED' && o.status !== 'PROPOSAL').length}</p>
+            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Teklif bekleyen</p>
+          </div>
+          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 text-indigo-600 mb-4">
+              <div className="p-2 bg-indigo-50 rounded-xl"><FileSignature size={20} /></div>
+              <h5 className="font-bold">Sunulan Teklifler</h5>
+            </div>
+            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.status === 'PROPOSAL').length}</p>
+            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Müşteri aşamasında</p>
+          </div>
+          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-3 text-amber-600 mb-4">
+              <div className="p-2 bg-amber-50 rounded-xl"><Clock size={20} /></div>
+              <h5 className="font-bold">Bekleyen BoM</h5>
+            </div>
+            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.bomStatus === 'SUBMITTED').length}</p>
+            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Onay sürecinde</p>
+          </div>
+        </div>
+
+        <div className="glass-panel rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-200">
+          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+            <h4 className="font-bold text-slate-900">Teklif Sürecindeki Fırsatlar</h4>
+          </div>
+          <div className="divide-y divide-slate-100">
+            {opportunitiesReady.map((opp) => (
+              <div key={opp.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { setSelectedOpp(opp); setShowDetailModal(true); }}>
+                <div className="flex items-center gap-4">
+                  <div className={cn(
+                    "w-12 h-12 rounded-2xl flex items-center justify-center",
+                    opp.status === 'PROPOSAL' ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"
+                  )}>
+                    {opp.status === 'PROPOSAL' ? <FileSignature size={24} /> : <FileCheck size={24} />}
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-slate-900">{opp.title}</h5>
+                    <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-8">
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Değer</p>
+                    <p className="text-sm font-bold text-slate-900">${opp.value.toLocaleString()}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase">Durum</p>
+                    <span className={cn(
+                      "text-xs font-bold px-2 py-1 rounded-lg uppercase",
+                      opp.status === 'PROPOSAL' ? "bg-indigo-100 text-indigo-600" : "bg-emerald-100 text-emerald-600"
+                    )}>
+                      {opp.status === 'PROPOSAL' ? 'TEKLİF SUNULDU' : 'BOM ONAYLI'}
+                    </span>
+                  </div>
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedOpp(opp);
+                      setShowProposalEditor(true);
+                    }}
+                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
+                  >
+                    {opp.status === 'PROPOSAL' ? 'Teklifi Düzenle' : 'Teklif Hazırla'}
+                  </button>
+                </div>
+              </div>
+            ))}
+            {opportunitiesReady.length === 0 && (
+              <div className="p-12 text-center text-slate-400">
+                <FileSignature size={48} className="mx-auto mb-4 opacity-10" />
+                <p>Şu an teklif aşamasında veya BoM onaylı bir fırsat bulunmuyor.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (activeTab === 'crm-customers') {
     return (
       <div className="p-8 space-y-8">
@@ -226,7 +339,7 @@ const CRMModule = ({
           </button>
         </div>
 
-        <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+        <div className="glass-panel rounded-3xl overflow-hidden">
           <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
             <h4 className="font-bold text-slate-900">Müşteri Listesi</h4>
             <div className="flex gap-2">
@@ -284,7 +397,7 @@ const CRMModule = ({
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+                className="glass-panel w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
               >
                 <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                   <h4 className="text-xl font-bold text-slate-900">Yeni Müşteri Ekle</h4>
@@ -402,17 +515,17 @@ const CRMModule = ({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="glass-card p-6 rounded-3xl">
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Toplam Fırsat Değeri</p>
           <h4 className="text-2xl font-bold text-slate-900">
             ${opportunities.reduce((sum, o) => sum + o.value, 0).toLocaleString()}
           </h4>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="glass-card p-6 rounded-3xl">
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Aktif Fırsat Sayısı</p>
           <h4 className="text-2xl font-bold text-slate-900">{opportunities.length}</h4>
         </div>
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+        <div className="glass-card p-6 rounded-3xl">
           <p className="text-xs font-bold text-slate-400 uppercase mb-1">Ortalama Olasılık</p>
           <h4 className="text-2xl font-bold text-indigo-600">
             %{Math.round(opportunities.reduce((sum, o) => sum + o.probability, 0) / (opportunities.length || 1))}
@@ -420,7 +533,7 @@ const CRMModule = ({
         </div>
       </div>
 
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+      <div className="glass-panel rounded-3xl overflow-hidden">
         <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
           <h4 className="font-bold text-slate-900">Aktif Fırsatlar</h4>
           <div className="flex gap-2">
@@ -516,7 +629,7 @@ const CRMModule = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+              className="glass-panel w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-4">
@@ -620,19 +733,52 @@ const CRMModule = ({
                       </div>
                     </div>
                     <div className="flex gap-3">
+                      {selectedOpp.bomStatus === 'APPROVED' && (
+                        <button 
+                          onClick={() => setShowProposalEditor(true)}
+                          className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
+                        >
+                          <FileSignature size={18} />
+                          Fiyat Teklifi Oluştur
+                        </button>
+                      )}
                       <button 
                         onClick={() => approveBoM(selectedOpp.id, true)}
-                        className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100"
+                        className={cn(
+                          "flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100",
+                          selectedOpp.bomStatus === 'APPROVED' && "hidden"
+                        )}
                       >
                         Onayla
                       </button>
                       <button 
                         onClick={() => approveBoM(selectedOpp.id, false)}
-                        className="flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50 transition-all"
+                        className={cn(
+                          "flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50 transition-all",
+                          selectedOpp.bomStatus === 'APPROVED' && "hidden"
+                        )}
                       >
                         Reddet
                       </button>
                     </div>
+                  </div>
+                )}
+
+                {selectedOpp.bomStatus === 'APPROVED' && (
+                  <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 flex items-center justify-between">
+                    <div className="flex items-center gap-3 text-emerald-900">
+                      <div className="p-2 bg-emerald-100 rounded-xl"><CheckCircle2 size={20} /></div>
+                      <div>
+                        <h5 className="font-bold">BoM Onaylandı</h5>
+                        <p className="text-xs text-emerald-700">Teknik detaylandırma tamamlandı ve onaylandı. Artık fiyat teklifi hazırlayabilirsiniz.</p>
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setShowProposalEditor(true)}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
+                    >
+                      <FileSignature size={14} /> Teklif Hazırla
+                    </button>
                   </div>
                 )}
 
@@ -664,7 +810,7 @@ const CRMModule = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Fırsat Ekle</h4>

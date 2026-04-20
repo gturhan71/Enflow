@@ -224,7 +224,7 @@ const TodoModule = ({
 
       <div className="grid grid-cols-1 gap-4">
         {filteredTodos.map((todo) => (
-          <div key={todo.id} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col md:flex-row md:items-center gap-6">
+          <div key={todo.id} className="glass-card p-6 rounded-3xl flex flex-col md:flex-row md:items-center gap-6">
             <div className="flex-1 space-y-2">
               <div className="flex items-center gap-3">
                 <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-md border uppercase tracking-wider", getPriorityColor(todo.priority))}>
@@ -287,7 +287,7 @@ const TodoModule = ({
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Görev Ata</h4>

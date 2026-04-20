@@ -252,7 +252,7 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
           )}
 
           {activeTab === 'TASKS' && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-8">
+            <div className="glass-panel rounded-3xl p-8">
               <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
                 <Target size={20} className="text-indigo-600" />
                 İş Emirleri ve İlerlemeler
@@ -269,7 +269,7 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
           )}
 
           {activeTab === 'PROCUREMENT' && (
-            <div className="bg-white rounded-3xl border border-slate-200 p-8">
+            <div className="glass-panel rounded-3xl p-8">
               <div className="flex items-center justify-between mb-8">
                 <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
                   <ShoppingCart size={20} className="text-indigo-600" />
@@ -404,7 +404,7 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Proje Görevi</h4>
@@ -479,7 +479,7 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Yeni Satın Alma Talebi</h4>
@@ -547,7 +547,7 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
+              className="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <h4 className="text-xl font-bold text-slate-900">Raporu Gönder</h4>

@@ -54,7 +54,7 @@ export const TaskProgressTracker: React.FC<Props> = ({ tasks, setTasks, relatedM
   return (
     <div className="space-y-4">
       {relatedTasks.map(task => (
-        <div key={task.id} className="p-4 border border-slate-100 rounded-2xl bg-slate-50 flex flex-col gap-4">
+        <div key={task.id} className="p-4 rounded-2xl glass-card flex flex-col gap-4">
           <div className="flex items-start justify-between">
             <div>
               <h5 className="font-bold text-slate-900">{task.title}</h5>

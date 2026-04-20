@@ -19,7 +19,7 @@ import {
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
 import Dashboard from './modules/Dashboard';
-import SmartImporter from './modules/SmartImporter';
+import PresalesModule from './modules/PresalesModule';
 import SalesSupport from './modules/SalesSupport';
 import DocumentsModule from './modules/DocumentsModule';
 import ProcurementModule from './modules/ProcurementModule';
@@ -104,7 +104,7 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
 
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
-      case 'presales': return <SmartImporter />;
+      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} />;
       case 'sales-support': return <SalesSupport />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'documents': return <DocumentsModule />;
@@ -135,7 +135,7 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
 
   return (
     <UnsavedChangesProvider>
-      <div className="flex min-h-screen bg-[#f8f9fa]">
+      <div className="flex min-h-screen bg-transparent">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
         <main className="flex-1 flex flex-col min-w-0">
           <Header title={getHeaderTitle()} onLogout={onLogout} />
