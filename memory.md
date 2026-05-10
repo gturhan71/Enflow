@@ -12,6 +12,7 @@
 - `memory.md` oluşturuldu.
 - `package-lock.json` temizlendi (pnpm standartlaştırıldı).
 - `entities.json` root dizinde oluşturuldu/güncellendi.
+- `README.md` NotebookLM için kapsamlı bir şekilde güncellendi.
 
 ### Yapacakları
 - README.md dosyasını gerçek dosya yapısını yansıtacak şekilde detaylandır.
