@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
+import {
+  LayoutDashboard,
+  Users,
+  FileSearch,
+  FileText,
+  ShoppingCart,
+  Archive,
   Settings,
   Bell,
   Search,
@@ -53,12 +53,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { 
-  NAV_ITEMS, 
+import {
+  NAV_ITEMS,
   MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
+  MOCK_PROJECTS,
+  MOCK_DOCUMENTS,
+  MOCK_WORK_EXPERIENCE,
   MOCK_CERTIFICATES,
   MOCK_UNITS,
   MOCK_PERMISSIONS,
@@ -71,12 +71,12 @@ import {
   MOCK_TODO_TASKS,
   MOCK_OPPORTUNITIES
 } from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
+import {
+  CorporateDocument,
+  Unit,
+  User,
+  Permission,
+  BoMItem,
   CostRequirement,
   Contract,
   ContractDocumentRequirement,
@@ -96,16 +96,16 @@ import ProposalEditor from './ProposalEditor';
 
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
 
-const CRMModule = ({ 
-  opportunities, 
+const CRMModule = ({
+  opportunities,
   setOpportunities,
   customers,
   setCustomers,
   activeTab,
   tasks,
   setTasks
-}: { 
-  opportunities: Opportunity[], 
+}: {
+  opportunities: Opportunity[],
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
   customers?: any[],
   setCustomers?: React.Dispatch<React.SetStateAction<any[]>>,
@@ -169,9 +169,9 @@ const CRMModule = ({
   };
 
   const assignPresales = (id: string, presalesId: string) => {
-    const updated = opportunities.map(o => o.id === id ? { 
-      ...o, 
-      presalesId, 
+    const updated = opportunities.map(o => o.id === id ? {
+      ...o,
+      presalesId,
       technicalStatus: 'IN_PROGRESS' as const
     } : o);
     setOpportunities(updated);
@@ -180,8 +180,8 @@ const CRMModule = ({
   };
 
   const submitBoM = (id: string) => {
-    const updated = opportunities.map(o => o.id === id ? { 
-      ...o, 
+    const updated = opportunities.map(o => o.id === id ? {
+      ...o,
       bomStatus: 'SUBMITTED' as const,
       technicalStatus: 'COMPLETED' as const
     } : o);
@@ -191,8 +191,8 @@ const CRMModule = ({
   };
 
   const approveBoM = (id: string, approved: boolean) => {
-    const updated = opportunities.map(o => o.id === id ? { 
-      ...o, 
+    const updated = opportunities.map(o => o.id === id ? {
+      ...o,
       bomStatus: (approved ? 'APPROVED' : 'REJECTED') as any
     } : o);
     setOpportunities(updated);
@@ -331,7 +331,7 @@ const CRMModule = ({
             <h3 className="text-2xl font-bold text-slate-900">Müşteriler</h3>
             <p className="text-slate-500">Müşteri veritabanı ve detaylı firma bilgileri.</p>
           </div>
-          <button 
+          <button
             onClick={() => setShowNewCustomerModal(true)}
             className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
           >
@@ -375,7 +375,7 @@ const CRMModule = ({
                     <span className={cn(
                       "text-xs font-bold px-2 py-1 rounded-lg",
                       customer.riskScore > 40 ? "bg-red-100 text-red-600" :
-                      customer.riskScore > 20 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
+                        customer.riskScore > 20 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
                     )}>
                       {customer.riskScore}
                     </span>
@@ -393,7 +393,7 @@ const CRMModule = ({
         <AnimatePresence>
           {showNewCustomerModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
@@ -409,82 +409,82 @@ const CRMModule = ({
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">Firma Adı</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Örn: TechCorp A.Ş."
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">Sektör</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Örn: Finans"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, industry: e.target.value})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, industry: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">İletişim Kişisi</label>
-                      <input 
-                        type="text" 
+                      <input
+                        type="text"
                         placeholder="Örn: Ahmet Yılmaz"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, contactPerson: e.target.value})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, contactPerson: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">E-posta</label>
-                      <input 
-                        type="email" 
+                      <input
+                        type="email"
                         placeholder="Örn: ahmet@techcorp.com"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                       />
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-6">
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">Telefon</label>
-                      <input 
-                        type="tel" 
+                      <input
+                        type="tel"
                         placeholder="Örn: +90 555 123 4567"
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
                       />
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-bold text-slate-400 uppercase">Risk Skoru (0-100)</label>
-                      <input 
-                        type="number" 
+                      <input
+                        type="number"
                         min="0" max="100"
                         defaultValue={0}
                         className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({...newCustomer, riskScore: Number(e.target.value)})}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, riskScore: Number(e.target.value) })}
                       />
                     </div>
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Adres</label>
-                    <textarea 
+                    <textarea
                       rows={3}
                       placeholder="Firma açık adresi..."
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                      onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})}
+                      onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                     />
                   </div>
                 </div>
                 <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                  <button 
+                  <button
                     onClick={() => setShowNewCustomerModal(false)}
                     className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
                   >
                     İptal
                   </button>
-                  <button 
+                  <button
                     onClick={handleAddCustomer}
                     className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
                   >
@@ -506,7 +506,7 @@ const CRMModule = ({
           <h3 className="text-2xl font-bold text-slate-900">CRM & Fırsat Takibi</h3>
           <p className="text-slate-500">Müşteri ilişkileri ve satış boru hattı yönetimi.</p>
         </div>
-        <button 
+        <button
           onClick={() => setShowNewModal(true)}
           className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
         >
@@ -577,13 +577,13 @@ const CRMModule = ({
                 </div>
                 <div className="text-right">
                   <p className="text-[10px] text-slate-400 font-bold uppercase">Durum</p>
-                  <select 
+                  <select
                     value={opp.status}
                     onChange={(e) => updateStatus(opp.id, e.target.value as Opportunity['status'])}
                     className={cn(
                       "text-xs font-bold px-3 py-1.5 rounded-xl border-none outline-none cursor-pointer",
-                      opp.status === 'WON' ? "bg-emerald-100 text-emerald-700" : 
-                      opp.status === 'LOST' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                      opp.status === 'WON' ? "bg-emerald-100 text-emerald-700" :
+                        opp.status === 'LOST' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
                     )}
                   >
                     <option value="NEW">Yeni</option>
@@ -594,7 +594,7 @@ const CRMModule = ({
                     <option value="LOST">Kaybedildi</option>
                   </select>
                 </div>
-                <button 
+                <button
                   onClick={() => {
                     setSelectedOpp(opp);
                     setShowDetailModal(true);
@@ -625,7 +625,7 @@ const CRMModule = ({
       <AnimatePresence>
         {showDetailModal && selectedOpp && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -659,7 +659,7 @@ const CRMModule = ({
                         {selectedOpp.presalesId ? MOCK_SYSTEM_USERS.find(u => u.id === selectedOpp.presalesId)?.name : 'Atanmadı'}
                       </p>
                       {!selectedOpp.presalesId && (
-                        <button 
+                        <button
                           onClick={() => assignPresales(selectedOpp.id, 'user2')}
                           className="text-[10px] font-bold text-indigo-600 hover:underline"
                         >
@@ -683,7 +683,7 @@ const CRMModule = ({
                       Muhtemel BoM Listesi
                     </h5>
                     {selectedOpp.presalesId && selectedOpp.bomStatus === 'DRAFT' && (
-                      <button 
+                      <button
                         onClick={() => submitBoM(selectedOpp.id)}
                         className="text-xs font-bold text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2"
                       >
@@ -691,7 +691,7 @@ const CRMModule = ({
                       </button>
                     )}
                   </div>
-                  
+
                   <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
                     <table className="w-full text-left text-sm">
                       <thead className="bg-slate-50 border-b border-slate-100">
@@ -733,16 +733,7 @@ const CRMModule = ({
                       </div>
                     </div>
                     <div className="flex gap-3">
-                      {selectedOpp.bomStatus === 'APPROVED' && (
-                        <button 
-                          onClick={() => setShowProposalEditor(true)}
-                          className="flex-1 py-3 bg-indigo-600 text-white rounded-2xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                        >
-                          <FileSignature size={18} />
-                          Fiyat Teklifi Oluştur
-                        </button>
-                      )}
-                      <button 
+                      <button
                         onClick={() => approveBoM(selectedOpp.id, true)}
                         className={cn(
                           "flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100",
@@ -751,7 +742,7 @@ const CRMModule = ({
                       >
                         Onayla
                       </button>
-                      <button 
+                      <button
                         onClick={() => approveBoM(selectedOpp.id, false)}
                         className={cn(
                           "flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50 transition-all",
@@ -788,11 +779,11 @@ const CRMModule = ({
                     İş Emirleri ve İlerlemeler
                   </h5>
                   <div className="space-y-3">
-                    <TaskProgressTracker 
-                      tasks={tasks || []} 
-                      setTasks={setTasks!} 
-                      relatedModule="OPPORTUNITY" 
-                      relatedItemId={selectedOpp.id} 
+                    <TaskProgressTracker
+                      tasks={tasks || []}
+                      setTasks={setTasks!}
+                      relatedModule="OPPORTUNITY"
+                      relatedItemId={selectedOpp.id}
                     />
                   </div>
                 </div>
@@ -806,7 +797,7 @@ const CRMModule = ({
       <AnimatePresence>
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
@@ -821,19 +812,19 @@ const CRMModule = ({
               <div className="p-8 space-y-6">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Fırsat Başlığı</label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     placeholder="Örn: Veri Merkezi Modernizasyonu"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewOpp({...newOpp, title: e.target.value})}
+                    onChange={(e) => setNewOpp({ ...newOpp, title: e.target.value })}
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Müşteri</label>
-                    <select 
+                    <select
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({...newOpp, customerId: e.target.value})}
+                      onChange={(e) => setNewOpp({ ...newOpp, customerId: e.target.value })}
                     >
                       <option value="">Seçiniz</option>
                       {(customers || MOCK_CUSTOMERS).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -841,50 +832,50 @@ const CRMModule = ({
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Tahmini Değer ($)</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({...newOpp, value: Number(e.target.value)})}
+                      onChange={(e) => setNewOpp({ ...newOpp, value: Number(e.target.value) })}
                     />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Olasılık (%)</label>
-                    <input 
-                      type="number" 
+                    <input
+                      type="number"
                       min="0" max="100"
                       defaultValue={10}
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({...newOpp, probability: Number(e.target.value)})}
+                      onChange={(e) => setNewOpp({ ...newOpp, probability: Number(e.target.value) })}
                     />
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-bold text-slate-400 uppercase">Beklenen Kapanış</label>
-                    <input 
-                      type="date" 
+                    <input
+                      type="date"
                       className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({...newOpp, expectedCloseDate: e.target.value})}
+                      onChange={(e) => setNewOpp({ ...newOpp, expectedCloseDate: e.target.value })}
                     />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Açıklama</label>
-                  <textarea 
+                  <textarea
                     rows={3}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewOpp({...newOpp, description: e.target.value})}
+                    onChange={(e) => setNewOpp({ ...newOpp, description: e.target.value })}
                   />
                 </div>
               </div>
               <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
+                <button
                   onClick={() => setShowNewModal(false)}
                   className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
                 >
                   İptal
                 </button>
-                <button 
+                <button
                   onClick={handleAddOpportunity}
                   className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
                 >
