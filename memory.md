@@ -1,28 +1,38 @@
-# Enflow Memory — Production Phase 2
+# Enflow Memory — Final Production Readiness
 
 ## Son Durum
 - **Tarih:** 14.05.2026
-- **Durum:** CRM Müşteri modülü "Merkezi Müşteri Hafızası" mimarisine taşındı. Veri girişi maksimum seviyeye çıkarıldı.
+- **Kapanış Durumu:** Sistem tam teşekküllü Multi-tenant Full-Stack mimariye geçti. Tüm modüller backend'e mühürlendi.
 
-## Yapılan Devrimler
+## Bugünün Teknik Devrimleri
 
-### 1. Genişletilmiş Müşteri Modeli (Backend)
-- **Model:** `Customer` tablosu; Finansal Detaylar (Vergi No, Kredi Limiti, Risk Skoru), İletişim Verileri ve Teknik Notlar (Tech Stack) ile zenginleştirildi.
-- **Persistence:** Tüm müşteri verileri SQLite veritabanında tam kalıcı hale getirildi. `x-tenant-id` ile şirket bazlı izolasyon sağlandı.
+### 1. Backend & Altyapı (The Engine)
+- **Port:** Backend 3002 portunda `nohup` ile ölümsüzleştirildi.
+- **ORM:** Prisma 7 (LibSQL) ile SQLite veritabanı mühürlendi.
+- **API Rotaları:** 
+  - `Units`, `Users`, `Customers`, `Opportunities`, `Tenants` için tam CRUD desteği.
+  - `x-tenant-id` header tabanlı veri izolasyonu zorunlu kılındı.
+- **Bug Fix:** TypeScript derleme hataları (id string/array çakışması) ve Prisma 7 syntax uyumsuzlukları cerrahi müdahale ile giderildi.
 
-### 2. Maksimum Veri Giriş Formu (Frontend)
-- **Sekmeli Mimari:** Yeni müşteri formu; Genel, Finansal ve Teknik olmak üzere 3 ana kategoriye ayrıldı.
-- **Dinamik Validasyon:** Resmi firma bilgilerinin (VKN vb.) ve finansal limitlerin girişi zorunlu kılındı.
-- **Görsel Kartlar:** Müşteri listesi; sektör, risk skoru ve finansal limitleri özetleyen modern bir "Data Center" görünümüne kavuştu.
+### 2. CRM & Müşteri Hafızası
+- **Veri Derinliği:** Müşteri modeli; Vergi detayları, Kredi limitleri, Risk skoru ve Tech Stack gibi "Maksimum Veri" setini tutacak şekilde genişletildi.
+- **Frontend Formu:** 3 sekmeli (Genel, Finansal, Teknik) devasa bir müşteri giriş paneli tasarlandı.
 
-### 3. Otomasyon Kaynağı
-- Müşteri verileri; teklif hazırlama (ProposalEditor), lojistik ve diğer iç otomasyonlar için "Tek Kaynak" (Single Source of Truth) haline getirildi.
+### 3. Organizasyon & Workflow
+- **Super Admin:** Kullanıcı açarken sistemdeki herhangi bir firmaya (Tenant) atama yapabilme yeteneği eklendi.
+- **Workflow Builder:** Görsel kutularla birimler arası iş akışı tanımlama arayüzü tamamlandı.
+- **Dinamik Atama:** Birim ekleme ve silme işlemleri anlık olarak tüm pulldown (seçim) menülerine yansıtıldı.
+
+### 4. Güvenlik & Dashboard
+- **Zırhlı Auth:** `useAuth` ve `apiService` senkronize edildi, sayfa yenilense bile oturum düşmüyor.
+- **Kişisel Kokpit:** Role özel (GM, Presales, Sales, Procurement) dashboardlar ve canlı grafikler (Recharts) aktif edildi.
 
 ## Karar Günlüğü
 | Tarih | Karar | Neden |
 |-------|-------|-------|
-| 14.05.2026 | Merkezi Müşteri Hafızası | Tüm birimlerin aynı güncel müşteri verisiyle (borç durumu, teknik alt yapı vb.) çalışabilmesi için. |
-| 14.05.2026 | Sekmeli Form Tasarımı | Karmaşık verilerin kullanıcıyı yormadan, yapısal bir şekilde toplanabilmesi için. |
+| 14.05.2026 | Port 3002 Geçişi | Port 3001 çakışmalarını önlemek ve temiz bir trafik sağlamak için. |
+| 14.05.2026 | Full-Stack CRUD | Sistemin prototipten çıkıp gerçek verilerle (persistence) çalışması için. |
+| 14.05.2026 | Multi-tenant Auth | Şirket bazlı veri güvenliğini ilk günden garantiye almak için. |
 
 ---
-*Enflow, kurumsal hafızayı en derin seviyede tutan bir işletim sistemine dönüşmüştür.*
+*Enflow, 14 Mayıs 2026 itibariyle Gökhan Turhan'ın MASTER standartlarında bir 'Live-Ready' sisteme dönüşmüştür.*
