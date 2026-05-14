@@ -1,0 +1,135 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  units         Unit[]
+  users         User[]
+  opportunities Opportunity[]
+  projects      Project[]
+}
+
+model Unit {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  managerId   String?
+  manager     User?    @relation("UnitManager", fields: [managerId], references: [id])
+  
+  users       User[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model User {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  role        String   
+  permissions String   // Store as JSON string for SQLite
+  status      String   @default("ACTIVE")
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  unitId      String?
+  unit        Unit?    @relation(fields: [unitId], references: [id])
+  
+  managedUnits Unit[]  @relation("UnitManager")
+
+  assignedOpps Opportunity[] @relation("AssignedTo")
+  createdOpps  Opportunity[] @relation("CreatedBy")
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Opportunity {
+  id                 String   @id @default(cuid())
+  title              String
+  value              Float
+  probability        Int
+  expectedCloseDate  DateTime?
+  status             String   
+  description        String?
+  
+  technicalStatus    String   @default("PENDING")
+  bomStatus          String   @default("DRAFT")
+  
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  
+  assignedToId       String
+  assignedTo         User     @relation("AssignedTo", fields: [assignedToId], references: [id])
+  
+  createdById        String
+  createdBy          User     @relation("CreatedBy", fields: [createdById], references: [id])
+  
+  presalesId         String?
+  
+  bomItems           BoMItem[]
+  workflowLogs       WorkflowLog[]
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model BoMItem {
+  id              String      @id @default(cuid())
+  partNumber      String
+  description     String
+  quantity        Int
+  purchaseCost    Float
+  marginPercentage Float
+  vendor          String?
+  
+  opportunityId   String
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+}
+
+model WorkflowLog {
+  id          String      @id @default(cuid())
+  fromUnitId  String
+  toUnitId    String
+  assignedBy  String
+  assignedTo  String
+  note        String?
+  status      String      @default("PENDING")
+  
+  opportunityId String
+  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
+  
+  timestamp   DateTime    @default(now())
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  status      String
+  totalValue  Float
+  avgMargin   Float
+  deadline    DateTime
+  
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

@@ -94,8 +94,12 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
+import { useAuth } from '../contexts/AuthContext';
+
+
 const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
   const { handleNavigate } = useUnsavedChanges();
+  const { currentUser, hasPermission } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
 
   const toggleMenu = (id: string) => {
@@ -103,6 +107,20 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
       prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
     );
   };
+
+  // Filter NAV_ITEMS based on currentUser permissions
+  const visibleNavItems = NAV_ITEMS.filter(item => {
+    // If no specific permission required, show it (or default to a view permission)
+    const hasBasePermission = hasPermission(item.requiredPermission);
+    
+    if (item.subItems) {
+      // If it has subitems, at least one subitem must be visible OR the parent itself must be allowed
+      const visibleSubItems = item.subItems.filter(sub => hasPermission(sub.requiredPermission));
+      return hasBasePermission || visibleSubItems.length > 0;
+    }
+    
+    return hasBasePermission;
+  });
 
   return (
     <div className="w-64 glass-sidebar h-screen flex flex-col sticky top-0 z-20">
@@ -117,10 +135,15 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
       </div>
 
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => {
+        {visibleNavItems.map((item) => {
           const isExpanded = expandedMenus.includes(item.id);
           const hasSubItems = item.subItems && item.subItems.length > 0;
           const isActive = activeTab === item.id || (hasSubItems && item.subItems?.some(sub => sub.id === activeTab));
+
+          // Filter subItems as well
+          const visibleSubItems = item.subItems?.filter(sub => 
+            currentUser.permissions.includes(sub.requiredPermission) || currentUser.role === 'GENERAL_MANAGER'
+          );
 
           return (
             <div key={item.id}>
@@ -168,7 +191,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                       className="overflow-hidden"
                     >
                       <div className="pl-11 pr-4 py-2 space-y-1">
-                        {item.subItems?.map((subItem) => (
+                        {visibleSubItems?.map((subItem) => (
                           <button
                             key={subItem.id}
                             onClick={() => handleNavigate(() => setActiveTab(subItem.id))}

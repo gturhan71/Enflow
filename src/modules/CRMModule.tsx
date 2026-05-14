@@ -1,100 +1,38 @@
 import React, { useState } from 'react';
 import {
-  LayoutDashboard,
   Users,
-  FileSearch,
-  FileText,
-  ShoppingCart,
-  Archive,
-  Settings,
-  Bell,
   Search,
   Plus,
-  ArrowUpRight,
   Clock,
   CheckCircle2,
   AlertCircle,
   FileCheck,
   ChevronRight,
-  Menu,
   X,
-  LogOut,
   TrendingUp,
   DollarSign,
   Briefcase,
-  Truck,
-  Package,
-  History,
-  FileDown,
-  Calendar,
-  ShieldCheck,
-  MapPin,
-  UserCheck,
-  ExternalLink,
-  Download,
-  Filter,
-  MoreVertical,
-  BarChart3,
-  PieChart,
-  ArrowDownRight,
-  Target,
-  Percent,
-  FileSignature,
-  Gavel,
-  Kanban,
-  Wand2,
-  Puzzle,
-  Cpu,
   Mail,
-  MessageSquare,
-  ListTodo,
-  UserPlus,
-  FileCheck2
+  Filter,
+  Target,
+  FileSignature,
+  FileCheck2,
+  ArrowUpRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import {
-  NAV_ITEMS,
   MOCK_CUSTOMERS,
-  MOCK_PROJECTS,
-  MOCK_DOCUMENTS,
-  MOCK_WORK_EXPERIENCE,
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
   MOCK_SYSTEM_USERS,
   MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
 } from '../constants';
 import {
-  CorporateDocument,
-  Unit,
-  User,
-  Permission,
-  BoMItem,
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
   TodoTask,
   Opportunity,
-  Project,
-  NextcloudConfig,
-  ExchangeConfig,
-  WhatsAppConfig
 } from '../types';
-import { nextcloudService } from '../services/nextcloudService';
-import { exchangeService } from '../services/exchangeService';
-import { whatsappService } from '../services/whatsappService';
 import ProposalEditor from './ProposalEditor';
-
-
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
+import { PermissionGate } from '../components/PermissionGate';
 
 const CRMModule = ({
   opportunities,
@@ -135,69 +73,20 @@ const CRMModule = ({
     address: ''
   });
 
-  const handleAddCustomer = () => {
-    if (setCustomers && customers) {
-      const customer = {
-        ...newCustomer,
-        id: `c${Date.now()}`
-      };
-      setCustomers([customer, ...customers]);
-    }
-    setShowNewCustomerModal(false);
-    setNewCustomer({ name: '', industry: '', riskScore: 0, contactPerson: '', email: '', phone: '', address: '' });
-  };
-
-  const handleAddOpportunity = () => {
-    const opp: Opportunity = {
-      ...newOpp as Opportunity,
-      id: `opp${Date.now()}`,
-      assignedTo: 'user3', // Default to current user for demo
-      createdBy: 'user1', // Default creator for demo
-      technicalStatus: 'PENDING',
-      bomStatus: 'DRAFT'
-    };
-    setOpportunities([opp, ...opportunities]);
-    setShowNewModal(false);
-    setNewOpp({ status: 'NEW', probability: 10, value: 0, technicalStatus: 'PENDING', bomStatus: 'DRAFT' });
-  };
-
   const updateStatus = (id: string, status: Opportunity['status']) => {
     setOpportunities(opportunities.map(o => o.id === id ? { ...o, status } : o));
-    if (status === 'WON') {
-      console.log(`Opportunity ${id} won! Moving to Contract Management.`);
-    }
   };
 
   const assignPresales = (id: string, presalesId: string) => {
-    const updated = opportunities.map(o => o.id === id ? {
-      ...o,
-      presalesId,
-      technicalStatus: 'IN_PROGRESS' as const
-    } : o);
-    setOpportunities(updated);
-    const current = updated.find(o => o.id === id);
-    if (current) setSelectedOpp(current);
+    setOpportunities(opportunities.map(o => o.id === id ? { ...o, presalesId, technicalStatus: 'IN_PROGRESS' } : o));
   };
 
   const submitBoM = (id: string) => {
-    const updated = opportunities.map(o => o.id === id ? {
-      ...o,
-      bomStatus: 'SUBMITTED' as const,
-      technicalStatus: 'COMPLETED' as const
-    } : o);
-    setOpportunities(updated);
-    const current = updated.find(o => o.id === id);
-    if (current) setSelectedOpp(current);
+    setOpportunities(opportunities.map(o => o.id === id ? { ...o, bomStatus: 'SUBMITTED', technicalStatus: 'COMPLETED' } : o));
   };
 
   const approveBoM = (id: string, approved: boolean) => {
-    const updated = opportunities.map(o => o.id === id ? {
-      ...o,
-      bomStatus: (approved ? 'APPROVED' : 'REJECTED') as any
-    } : o);
-    setOpportunities(updated);
-    const current = updated.find(o => o.id === id);
-    if (current) setSelectedOpp(current);
+    setOpportunities(opportunities.map(o => o.id === id ? { ...o, bomStatus: approved ? 'APPROVED' : 'REJECTED' } : o));
   };
 
   const getStatusBadge = (status: string) => {
@@ -212,6 +101,192 @@ const CRMModule = ({
     }
   };
 
+  // --- SUB-TAB: OPPORTUNITIES ---
+  const renderOpportunities = () => (
+    <div className="p-8 space-y-8 h-full overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-2xl font-bold text-slate-900">Fırsat Takibi</h3>
+          <p className="text-slate-500">Satış boru hattı ve aktif fırsatlar.</p>
+        </div>
+        <PermissionGate permission="CRM_EDIT">
+          <button onClick={() => setShowNewModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+            <Plus size={20} /> Yeni Fırsat
+          </button>
+        </PermissionGate>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {[
+          { label: 'Pipeline Değeri', value: `$${opportunities.reduce((sum, o) => sum + o.value, 0).toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+          { label: 'Aktif Fırsat', value: opportunities.length, icon: Target, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+          { label: 'Bekleyen BoM', value: opportunities.filter(o => o.bomStatus === 'SUBMITTED').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+          { label: 'Kazanma Olasılığı', value: `%${Math.round(opportunities.reduce((sum, o) => sum + o.probability, 0) / (opportunities.length || 1))}`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
+        ].map((stat, i) => (
+          <div key={i} className="glass-card p-6 rounded-3xl flex items-center gap-4">
+            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg, stat.color)}>
+              <stat.icon size={24} />
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
+              <p className="text-xl font-black text-slate-900">{stat.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="glass-panel rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-200">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <h4 className="font-bold text-slate-900">Aktif Satış Boru Hattı</h4>
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+              <input type="text" placeholder="Ara..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-500" />
+            </div>
+            <button className="p-2 text-slate-400 hover:text-slate-600"><Filter size={18} /></button>
+          </div>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {opportunities.map((opp) => (
+            <div key={opp.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => { setSelectedOpp(opp); setShowDetailModal(true); }}>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Briefcase size={24} />
+                </div>
+                <div>
+                  <h5 className="font-bold text-slate-900">{opp.title}</h5>
+                  <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-8">
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">BoM Durumu</p>
+                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded uppercase block mt-1", getStatusBadge(opp.bomStatus))}>
+                    {opp.bomStatus}
+                  </span>
+                </div>
+                <div className="text-right w-24">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Değer</p>
+                  <p className="text-sm font-bold text-slate-900">${opp.value.toLocaleString()}</p>
+                </div>
+                <div className="text-right w-28">
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Aşama</p>
+                  <span className={cn(
+                    "text-[10px] font-bold px-3 py-1 rounded-lg block mt-1 text-center",
+                    opp.status === 'WON' ? "bg-emerald-100 text-emerald-700" :
+                    opp.status === 'LOST' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
+                  )}>
+                    {opp.status}
+                  </span>
+                </div>
+                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // --- SUB-TAB: PROPOSALS ---
+  const renderProposals = () => {
+    const proposals = opportunities.filter(o => o.bomStatus === 'APPROVED' || o.status === 'PROPOSAL');
+    return (
+      <div className="p-8 space-y-8 h-full overflow-y-auto">
+        <div>
+          <h3 className="text-2xl font-bold text-slate-900">Teklif Yönetimi</h3>
+          <p className="text-slate-500">Hazırlanan ve onaylanan fiyat teklifleri.</p>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {proposals.map(opp => (
+            <div key={opp.id} className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 hover:border-indigo-300 transition-all group">
+              <div className="flex items-start justify-between mb-6">
+                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
+                  <FileSignature size={24} />
+                </div>
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
+                  opp.status === 'PROPOSAL' ? "bg-indigo-100 text-indigo-600" : "bg-emerald-100 text-emerald-600"
+                )}>
+                  {opp.status === 'PROPOSAL' ? 'SUNULDU' : 'TEKLİF BEKLİYOR'}
+                </span>
+              </div>
+              <h5 className="font-bold text-slate-900 text-lg mb-1">{opp.title}</h5>
+              <p className="text-sm text-slate-500 mb-6">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
+              <div className="flex items-center justify-between pt-6 border-t border-slate-50">
+                <div>
+                  <p className="text-[10px] text-slate-400 font-bold uppercase">Teklif Değeri</p>
+                  <p className="text-lg font-black text-slate-900">${opp.value.toLocaleString()}</p>
+                </div>
+                <button 
+                  onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
+                  className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
+                >
+                  {opp.status === 'PROPOSAL' ? 'Teklifi Güncelle' : 'Teklif Hazırla'}
+                </button>
+              </div>
+            </div>
+          ))}
+          {proposals.length === 0 && (
+            <div className="col-span-full py-20 text-center text-slate-400">
+              <FileSignature size={48} className="mx-auto mb-4 opacity-10" />
+              <p>Teklif aşamasında fırsat bulunmuyor.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // --- SUB-TAB: CUSTOMERS ---
+  const renderCustomers = () => (
+    <div className="p-8 space-y-8 h-full overflow-y-auto">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-2xl font-bold text-slate-900">Müşteri Portföyü</h3>
+          <p className="text-slate-500">Kayıtlı firmalar ve iletişim bilgileri.</p>
+        </div>
+        <PermissionGate permission="CRM_EDIT">
+          <button onClick={() => setShowNewCustomerModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
+            <Plus size={20} /> Yeni Müşteri
+          </button>
+        </PermissionGate>
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {(customers || MOCK_CUSTOMERS).map(customer => (
+          <div key={customer.id} className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 group hover:border-indigo-300 transition-all">
+            <div className="flex items-center gap-4 mb-6">
+              <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-2xl flex items-center justify-center transition-colors">
+                <Users size={24} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h5 className="font-bold text-slate-900 truncate">{customer.name}</h5>
+                <p className="text-xs text-slate-500 truncate">{customer.industry}</p>
+              </div>
+            </div>
+            <div className="space-y-3 mb-6">
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <Mail size={14} className="text-slate-400" /> {customer.email}
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <Clock size={14} className="text-slate-400" /> Son Etkileşim: 2 gün önce
+              </div>
+            </div>
+            <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+              <span className={cn(
+                "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
+                customer.riskScore > 40 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+              )}>
+                Risk: {customer.riskScore}
+              </span>
+              <button className="text-indigo-600 text-xs font-bold hover:underline">Detaylar</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
   if (showProposalEditor && selectedOpp) {
     return (
       <ProposalEditor 
@@ -219,9 +294,7 @@ const CRMModule = ({
         bomItems={MOCK_BOM_ITEMS.filter(i => i.opportunityId === selectedOpp.id)}
         customers={customers || MOCK_CUSTOMERS}
         onSave={(data) => {
-          console.log('Proposal saved:', data);
           setShowProposalEditor(false);
-          setShowDetailModal(false);
           updateStatus(selectedOpp.id, 'PROPOSAL');
         }}
         onCancel={() => setShowProposalEditor(false)}
@@ -229,397 +302,11 @@ const CRMModule = ({
     );
   }
 
-  if (activeTab === 'crm-proposals') {
-    const opportunitiesReady = opportunities.filter(o => o.bomStatus === 'APPROVED' || o.status === 'PROPOSAL');
-    return (
-      <div className="p-8 space-y-8">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-900">Fiyat Teklifleri</h3>
-          <p className="text-slate-500">Hazırlanmış teklifler ve teklif bekleyen fırsatlar.</p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 text-emerald-600 mb-4">
-              <div className="p-2 bg-emerald-50 rounded-xl"><CheckCircle2 size={20} /></div>
-              <h5 className="font-bold">BoM Onaylı</h5>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.bomStatus === 'APPROVED' && o.status !== 'PROPOSAL').length}</p>
-            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Teklif bekleyen</p>
-          </div>
-          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 text-indigo-600 mb-4">
-              <div className="p-2 bg-indigo-50 rounded-xl"><FileSignature size={20} /></div>
-              <h5 className="font-bold">Sunulan Teklifler</h5>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.status === 'PROPOSAL').length}</p>
-            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Müşteri aşamasında</p>
-          </div>
-          <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 shadow-sm">
-            <div className="flex items-center gap-3 text-amber-600 mb-4">
-              <div className="p-2 bg-amber-50 rounded-xl"><Clock size={20} /></div>
-              <h5 className="font-bold">Bekleyen BoM</h5>
-            </div>
-            <p className="text-3xl font-black text-slate-900">{opportunities.filter(o => o.bomStatus === 'SUBMITTED').length}</p>
-            <p className="text-xs text-slate-400 mt-1 uppercase font-bold tracking-wider">Onay sürecinde</p>
-          </div>
-        </div>
-
-        <div className="glass-panel rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-200">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h4 className="font-bold text-slate-900">Teklif Sürecindeki Fırsatlar</h4>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {opportunitiesReady.map((opp) => (
-              <div key={opp.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => { setSelectedOpp(opp); setShowDetailModal(true); }}>
-                <div className="flex items-center gap-4">
-                  <div className={cn(
-                    "w-12 h-12 rounded-2xl flex items-center justify-center",
-                    opp.status === 'PROPOSAL' ? "bg-indigo-50 text-indigo-600" : "bg-emerald-50 text-emerald-600"
-                  )}>
-                    {opp.status === 'PROPOSAL' ? <FileSignature size={24} /> : <FileCheck size={24} />}
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-slate-900">{opp.title}</h5>
-                    <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Değer</p>
-                    <p className="text-sm font-bold text-slate-900">${opp.value.toLocaleString()}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Durum</p>
-                    <span className={cn(
-                      "text-xs font-bold px-2 py-1 rounded-lg uppercase",
-                      opp.status === 'PROPOSAL' ? "bg-indigo-100 text-indigo-600" : "bg-emerald-100 text-emerald-600"
-                    )}>
-                      {opp.status === 'PROPOSAL' ? 'TEKLİF SUNULDU' : 'BOM ONAYLI'}
-                    </span>
-                  </div>
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedOpp(opp);
-                      setShowProposalEditor(true);
-                    }}
-                    className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
-                  >
-                    {opp.status === 'PROPOSAL' ? 'Teklifi Düzenle' : 'Teklif Hazırla'}
-                  </button>
-                </div>
-              </div>
-            ))}
-            {opportunitiesReady.length === 0 && (
-              <div className="p-12 text-center text-slate-400">
-                <FileSignature size={48} className="mx-auto mb-4 opacity-10" />
-                <p>Şu an teklif aşamasında veya BoM onaylı bir fırsat bulunmuyor.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (activeTab === 'crm-customers') {
-    return (
-      <div className="p-8 space-y-8">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-slate-900">Müşteriler</h3>
-            <p className="text-slate-500">Müşteri veritabanı ve detaylı firma bilgileri.</p>
-          </div>
-          <button
-            onClick={() => setShowNewCustomerModal(true)}
-            className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
-          >
-            <Plus size={20} /> Yeni Müşteri Ekle
-          </button>
-        </div>
-
-        <div className="glass-panel rounded-3xl overflow-hidden">
-          <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-            <h4 className="font-bold text-slate-900">Müşteri Listesi</h4>
-            <div className="flex gap-2">
-              <button className="p-2 text-slate-400 hover:text-slate-600"><Filter size={18} /></button>
-              <button className="p-2 text-slate-400 hover:text-slate-600"><Search size={18} /></button>
-            </div>
-          </div>
-          <div className="divide-y divide-slate-100">
-            {(customers || MOCK_CUSTOMERS).map((customer) => (
-              <div key={customer.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                    <Users size={24} />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-slate-900">{customer.name}</h5>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs text-slate-500">{customer.industry}</p>
-                      <span className="text-slate-300">•</span>
-                      <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                        <Mail size={10} /> {customer.email}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-                <div className="flex items-center gap-8">
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">İletişim Kişisi</p>
-                    <p className="text-sm font-bold text-slate-900">{customer.contactPerson}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Risk Skoru</p>
-                    <span className={cn(
-                      "text-xs font-bold px-2 py-1 rounded-lg",
-                      customer.riskScore > 40 ? "bg-red-100 text-red-600" :
-                        customer.riskScore > 20 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"
-                    )}>
-                      {customer.riskScore}
-                    </span>
-                  </div>
-                  <button className="text-slate-400 hover:text-indigo-600 p-2">
-                    <ChevronRight size={20} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* New Customer Modal */}
-        <AnimatePresence>
-          {showNewCustomerModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="glass-panel w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
-              >
-                <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                  <h4 className="text-xl font-bold text-slate-900">Yeni Müşteri Ekle</h4>
-                  <button onClick={() => setShowNewCustomerModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                    <X size={20} />
-                  </button>
-                </div>
-                <div className="p-8 space-y-6 overflow-y-auto flex-1">
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Firma Adı</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: TechCorp A.Ş."
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Sektör</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: Finans"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, industry: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">İletişim Kişisi</label>
-                      <input
-                        type="text"
-                        placeholder="Örn: Ahmet Yılmaz"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, contactPerson: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">E-posta</label>
-                      <input
-                        type="email"
-                        placeholder="Örn: ahmet@techcorp.com"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Telefon</label>
-                      <input
-                        type="tel"
-                        placeholder="Örn: +90 555 123 4567"
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-400 uppercase">Risk Skoru (0-100)</label>
-                      <input
-                        type="number"
-                        min="0" max="100"
-                        defaultValue={0}
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                        onChange={(e) => setNewCustomer({ ...newCustomer, riskScore: Number(e.target.value) })}
-                      />
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Adres</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Firma açık adresi..."
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                      onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                  <button
-                    onClick={() => setShowNewCustomerModal(false)}
-                    className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                  >
-                    İptal
-                  </button>
-                  <button
-                    onClick={handleAddCustomer}
-                    className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                  >
-                    Müşteriyi Kaydet
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
-        </AnimatePresence>
-      </div>
-    );
-  }
-
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-900">CRM & Fırsat Takibi</h3>
-          <p className="text-slate-500">Müşteri ilişkileri ve satış boru hattı yönetimi.</p>
-        </div>
-        <button
-          onClick={() => setShowNewModal(true)}
-          className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
-        >
-          <Plus size={20} /> Yeni Fırsat
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6 rounded-3xl">
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Toplam Fırsat Değeri</p>
-          <h4 className="text-2xl font-bold text-slate-900">
-            ${opportunities.reduce((sum, o) => sum + o.value, 0).toLocaleString()}
-          </h4>
-        </div>
-        <div className="glass-card p-6 rounded-3xl">
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Aktif Fırsat Sayısı</p>
-          <h4 className="text-2xl font-bold text-slate-900">{opportunities.length}</h4>
-        </div>
-        <div className="glass-card p-6 rounded-3xl">
-          <p className="text-xs font-bold text-slate-400 uppercase mb-1">Ortalama Olasılık</p>
-          <h4 className="text-2xl font-bold text-indigo-600">
-            %{Math.round(opportunities.reduce((sum, o) => sum + o.probability, 0) / (opportunities.length || 1))}
-          </h4>
-        </div>
-      </div>
-
-      <div className="glass-panel rounded-3xl overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h4 className="font-bold text-slate-900">Aktif Fırsatlar</h4>
-          <div className="flex gap-2">
-            <button className="p-2 text-slate-400 hover:text-slate-600"><Filter size={18} /></button>
-            <button className="p-2 text-slate-400 hover:text-slate-600"><Search size={18} /></button>
-          </div>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {opportunities.map((opp) => (
-            <div key={opp.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                  <Users size={24} />
-                </div>
-                <div>
-                  <h5 className="font-bold text-slate-900">{opp.title}</h5>
-                  <div className="flex items-center gap-2">
-                    <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
-                    <span className="text-slate-300">•</span>
-                    <p className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
-                      <Users size={10} /> {MOCK_SYSTEM_USERS.find(u => u.id === opp.createdBy)?.name}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="hidden lg:block text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Teknik / BoM</p>
-                  <div className="flex gap-1 mt-1">
-                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded uppercase", getStatusBadge(opp.technicalStatus))}>
-                      Teknik: {opp.technicalStatus}
-                    </span>
-                    <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded uppercase", getStatusBadge(opp.bomStatus))}>
-                      BoM: {opp.bomStatus}
-                    </span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Değer</p>
-                  <p className="text-sm font-bold text-slate-900">${opp.value.toLocaleString()}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Durum</p>
-                  <select
-                    value={opp.status}
-                    onChange={(e) => updateStatus(opp.id, e.target.value as Opportunity['status'])}
-                    className={cn(
-                      "text-xs font-bold px-3 py-1.5 rounded-xl border-none outline-none cursor-pointer",
-                      opp.status === 'WON' ? "bg-emerald-100 text-emerald-700" :
-                        opp.status === 'LOST' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                    )}
-                  >
-                    <option value="NEW">Yeni</option>
-                    <option value="QUALIFIED">Kalifiye</option>
-                    <option value="PROPOSAL">Teklif</option>
-                    <option value="NEGOTIATION">Pazarlık</option>
-                    <option value="WON">Kazanıldı</option>
-                    <option value="LOST">Kaybedildi</option>
-                  </select>
-                </div>
-                <button
-                  onClick={() => {
-                    setSelectedOpp(opp);
-                    setShowDetailModal(true);
-                  }}
-                  className="text-slate-400 hover:text-indigo-600 p-2"
-                >
-                  <ChevronRight size={20} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="bg-amber-50 border border-amber-100 p-6 rounded-3xl flex items-start gap-4">
-        <div className="p-2 bg-amber-100 text-amber-600 rounded-xl">
-          <AlertCircle size={24} />
-        </div>
-        <div>
-          <h5 className="font-bold text-amber-900">Otomatik İş Akışı Bilgisi</h5>
-          <p className="text-sm text-amber-700 mt-1">
-            Fırsat durumu <strong>"Kazanıldı"</strong> olarak güncellendiğinde, sistem otomatik olarak projeyi <strong>Sözleşme Yönetimi</strong> modülüne aktarır ve Satış Destek ekibine bildirim gönderir.
-          </p>
-        </div>
-      </div>
+    <div className="h-full">
+      {activeTab === 'crm-proposals' ? renderProposals() : 
+       activeTab === 'crm-customers' ? renderCustomers() : 
+       renderOpportunities()}
 
       {/* Opportunity Detail Modal */}
       <AnimatePresence>
@@ -634,7 +321,7 @@ const CRMModule = ({
               <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center">
-                    <Users size={20} />
+                    <Briefcase size={20} />
                   </div>
                   <div>
                     <h4 className="text-lg font-bold text-slate-900">{selectedOpp.title}</h4>
@@ -659,10 +346,7 @@ const CRMModule = ({
                         {selectedOpp.presalesId ? MOCK_SYSTEM_USERS.find(u => u.id === selectedOpp.presalesId)?.name : 'Atanmadı'}
                       </p>
                       {!selectedOpp.presalesId && (
-                        <button
-                          onClick={() => assignPresales(selectedOpp.id, 'user2')}
-                          className="text-[10px] font-bold text-indigo-600 hover:underline"
-                        >
+                        <button onClick={() => assignPresales(selectedOpp.id, 'user2')} className="text-[10px] font-bold text-indigo-600 hover:underline">
                           Ata (Mehmet Öz)
                         </button>
                       )}
@@ -676,81 +360,18 @@ const CRMModule = ({
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-bold text-slate-900 flex items-center gap-2">
-                      <FileSearch size={18} className="text-indigo-600" />
-                      Muhtemel BoM Listesi
-                    </h5>
-                    {selectedOpp.presalesId && selectedOpp.bomStatus === 'DRAFT' && (
-                      <button
-                        onClick={() => submitBoM(selectedOpp.id)}
-                        className="text-xs font-bold text-white bg-indigo-600 px-4 py-2 rounded-xl hover:bg-indigo-700 transition-all flex items-center gap-2"
-                      >
-                        <ArrowUpRight size={14} /> Onaya Gönder
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-                    <table className="w-full text-left text-sm">
-                      <thead className="bg-slate-50 border-b border-slate-100">
-                        <tr>
-                          <th className="px-4 py-3 font-bold text-slate-400 uppercase text-[10px]">Parça No</th>
-                          <th className="px-4 py-3 font-bold text-slate-400 uppercase text-[10px]">Açıklama</th>
-                          <th className="px-4 py-3 font-bold text-slate-400 uppercase text-[10px] text-center">Adet</th>
-                          <th className="px-4 py-3 font-bold text-slate-400 uppercase text-[10px] text-right">Maliyet</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {MOCK_BOM_ITEMS.filter(i => i.opportunityId === selectedOpp.id).map((item) => (
-                          <tr key={item.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-4 py-3 font-mono text-xs font-bold text-indigo-600">{item.partNumber}</td>
-                            <td className="px-4 py-3 text-slate-600">{item.description}</td>
-                            <td className="px-4 py-3 text-center font-bold">{item.quantity}</td>
-                            <td className="px-4 py-3 text-right font-bold text-slate-900">${item.purchaseCost.toLocaleString()}</td>
-                          </tr>
-                        ))}
-                        {MOCK_BOM_ITEMS.filter(i => i.opportunityId === selectedOpp.id).length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="px-4 py-8 text-center text-slate-400 italic">
-                              Henüz teknik detaylandırma yapılmamış.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
                 {selectedOpp.bomStatus === 'SUBMITTED' && (
                   <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 space-y-4">
                     <div className="flex items-center gap-3 text-indigo-900">
                       <div className="p-2 bg-indigo-100 rounded-xl"><FileCheck2 size={20} /></div>
                       <div>
                         <h5 className="font-bold">Yönetici Onayı Bekliyor</h5>
-                        <p className="text-xs text-indigo-700">Presales ekibi BoM listesini tamamladı. Satış birim yöneticisi onayı gereklidir.</p>
+                        <p className="text-xs text-indigo-700">BoM listesi hazır. Yönetici onayı sonrası teklif oluşturulabilir.</p>
                       </div>
                     </div>
                     <div className="flex gap-3">
-                      <button
-                        onClick={() => approveBoM(selectedOpp.id, true)}
-                        className={cn(
-                          "flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-100",
-                          selectedOpp.bomStatus === 'APPROVED' && "hidden"
-                        )}
-                      >
-                        Onayla
-                      </button>
-                      <button
-                        onClick={() => approveBoM(selectedOpp.id, false)}
-                        className={cn(
-                          "flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50 transition-all",
-                          selectedOpp.bomStatus === 'APPROVED' && "hidden"
-                        )}
-                      >
-                        Reddet
-                      </button>
+                      <button onClick={() => approveBoM(selectedOpp.id, true)} className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Onayla</button>
+                      <button onClick={() => approveBoM(selectedOpp.id, false)} className="flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50">Reddet</button>
                     </div>
                   </div>
                 )}
@@ -761,13 +382,10 @@ const CRMModule = ({
                       <div className="p-2 bg-emerald-100 rounded-xl"><CheckCircle2 size={20} /></div>
                       <div>
                         <h5 className="font-bold">BoM Onaylandı</h5>
-                        <p className="text-xs text-emerald-700">Teknik detaylandırma tamamlandı ve onaylandı. Artık fiyat teklifi hazırlayabilirsiniz.</p>
+                        <p className="text-xs text-emerald-700">Teknik detaylandırma tamam. Teklif hazırlamaya geçebilirsiniz.</p>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => setShowProposalEditor(true)}
-                      className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all flex items-center gap-2 shadow-lg shadow-indigo-100"
-                    >
+                    <button onClick={() => setShowProposalEditor(true)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-100 flex items-center gap-2">
                       <FileSignature size={14} /> Teklif Hazırla
                     </button>
                   </div>
@@ -776,16 +394,9 @@ const CRMModule = ({
                 <div className="space-y-4">
                   <h5 className="font-bold text-slate-900 flex items-center gap-2">
                     <Target size={18} className="text-indigo-600" />
-                    İş Emirleri ve İlerlemeler
+                    Görevler ve Takip
                   </h5>
-                  <div className="space-y-3">
-                    <TaskProgressTracker
-                      tasks={tasks || []}
-                      setTasks={setTasks!}
-                      relatedModule="OPPORTUNITY"
-                      relatedItemId={selectedOpp.id}
-                    />
-                  </div>
+                  <TaskProgressTracker tasks={tasks || []} setTasks={setTasks!} relatedModule="OPPORTUNITY" relatedItemId={selectedOpp.id} />
                 </div>
               </div>
             </motion.div>
@@ -797,90 +408,41 @@ const CRMModule = ({
       <AnimatePresence>
         {showNewModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">Yeni Fırsat Ekle</h4>
-                <button onClick={() => setShowNewModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Fırsat Başlığı</label>
-                  <input
-                    type="text"
-                    placeholder="Örn: Veri Merkezi Modernizasyonu"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewOpp({ ...newOpp, title: e.target.value })}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Müşteri</label>
-                    <select
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({ ...newOpp, customerId: e.target.value })}
-                    >
-                      <option value="">Seçiniz</option>
-                      {(customers || MOCK_CUSTOMERS).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Tahmini Değer ($)</label>
-                    <input
-                      type="number"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({ ...newOpp, value: Number(e.target.value) })}
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Olasılık (%)</label>
-                    <input
-                      type="number"
-                      min="0" max="100"
-                      defaultValue={10}
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({ ...newOpp, probability: Number(e.target.value) })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Beklenen Kapanış</label>
-                    <input
-                      type="date"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewOpp({ ...newOpp, expectedCloseDate: e.target.value })}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Açıklama</label>
-                  <textarea
-                    rows={3}
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewOpp({ ...newOpp, description: e.target.value })}
-                  />
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6">
+              <h4 className="text-xl font-bold text-slate-900">Yeni Fırsat Ekle</h4>
+              <div className="space-y-4">
+                <input type="text" placeholder="Fırsat Başlığı" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
+                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500">
+                  <option value="">Müşteri Seçin</option>
+                  {(customers || MOCK_CUSTOMERS).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <input type="number" placeholder="Değer ($)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
+                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
                 </div>
               </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button
-                  onClick={() => setShowNewModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button
-                  onClick={handleAddOpportunity}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Fırsatı Kaydet
-                </button>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowNewModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
+                <button className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Kaydet</button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* New Customer Modal */}
+      <AnimatePresence>
+        {showNewCustomerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6">
+              <h4 className="text-xl font-bold text-slate-900">Yeni Müşteri</h4>
+              <div className="space-y-4">
+                <input type="text" placeholder="Firma Adı" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
+                <input type="email" placeholder="E-posta" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button onClick={() => setShowNewCustomerModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
+                <button className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Kaydet</button>
               </div>
             </motion.div>
           </div>

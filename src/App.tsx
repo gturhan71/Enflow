@@ -7,7 +7,9 @@ import {
   MOCK_CONTRACTS,
   MOCK_OPPORTUNITIES,
   MOCK_CUSTOMERS,
-  MOCK_TODO_TASKS
+  MOCK_TODO_TASKS,
+  MOCK_SYSTEM_USERS,
+  MOCK_UNITS
 } from './constants';
 import { 
   Contract,
@@ -29,14 +31,18 @@ import ContractModule from './modules/ContractModule';
 import ProjectManagementModule from './modules/ProjectManagementModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
+import ArchiveModule from './modules/ArchiveModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 
-const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onLogout: () => void }) => {
+const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: () => void }) => {
+  const { currentUser, setCurrentUser } = useAuth();
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
   const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
     return localStorage.getItem(`enflow_company_logo_${tenantId}`);
   });
-  const [activeTab, setActiveTab] = useState('dashboard');
   
   const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
     const saved = localStorage.getItem(`enflow_opps_${tenantId}`);
@@ -63,9 +69,28 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
     return saved ? JSON.parse(saved) : MOCK_TODO_TASKS;
   });
 
+  const [units, setUnits] = useState<Unit[]>(() => {
+    const saved = localStorage.getItem(`enflow_units_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_UNITS;
+  });
+
+  const [systemUsers, setSystemUsers] = useState<User[]>(() => {
+    const saved = localStorage.getItem(`enflow_system_users_${tenantId}`);
+    return saved ? JSON.parse(saved) : MOCK_SYSTEM_USERS;
+  });
+
   useEffect(() => {
-    localStorage.setItem(`enflow_opps_${tenantId}`, JSON.stringify(opportunities));
-  }, [opportunities, tenantId]);
+    localStorage.setItem(`enflow_units_${tenantId}`, JSON.stringify(units));
+  }, [units, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_system_users_${tenantId}`, JSON.stringify(systemUsers));
+  }, [systemUsers, tenantId]);
+
+  useEffect(() => {
+    localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(currentUser));
+  }, [currentUser, tenantId]);
+
 
   useEffect(() => {
     localStorage.setItem(`enflow_customers_${tenantId}`, JSON.stringify(customers));
@@ -95,7 +120,17 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
   const renderContent = () => {
     if (activeTab.startsWith('settings-')) {
       const subTab = activeTab.replace('settings-', '');
-      return <SettingsModule companyLogo={companyLogo} setCompanyLogo={setCompanyLogo} activeSubTab={subTab} />;
+      return (
+        <SettingsModule 
+          companyLogo={companyLogo} 
+          setCompanyLogo={setCompanyLogo} 
+          activeSubTab={subTab} 
+          units={units}
+          setUnits={setUnits}
+          users={systemUsers}
+          setUsers={setSystemUsers}
+        />
+      );
     }
     
     if (activeTab.startsWith('crm-') || activeTab === 'crm') {
@@ -104,19 +139,19 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
 
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
-      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} />;
+      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} />;
       case 'sales-support': return <SalesSupport />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'documents': return <DocumentsModule />;
+      case 'archive': return <ArchiveModule />;
       case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} />;
-      case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
+      case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} units={units} users={systemUsers} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} tasks={tasks} setTasks={setTasks} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;
       default: return (
         <div className="flex flex-col items-center justify-center h-full text-slate-400">
           <Settings size={48} className="mb-4 opacity-20" />
           <p className="text-lg font-medium">Bu modül yakında eklenecek.</p>
-          <p className="text-sm">Şu an Dashboard, CRM, Presales, Satış Destek, Satın Alma, Evrak, Maliyet Analizi, Sözleşme, Proje Yönetimi ve Ayarlar modülleri aktiftir.</p>
         </div>
       );
     }
@@ -134,30 +169,36 @@ const TenantApp = ({ tenantId, onLogout }: { key?: string, tenantId: string, onL
   };
 
   return (
-    <UnsavedChangesProvider>
-      <div className="flex min-h-screen bg-transparent">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-        <main className="flex-1 flex flex-col min-w-0">
-          <Header title={getHeaderTitle()} onLogout={onLogout} />
-          <div className="flex-1 overflow-y-auto">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="h-full"
-              >
-                {renderContent()}
-              </motion.div>
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
-    </UnsavedChangesProvider>
+    <div className="flex min-h-screen bg-transparent">
+      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
+      <main className="flex-1 flex flex-col min-w-0">
+        <Header title={getHeaderTitle()} onLogout={onLogout} />
+        <div className="flex-1 overflow-y-auto">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.2 }}
+              className="h-full"
+            >
+              {renderContent()}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </main>
+    </div>
   );
 };
+
+const TenantApp = (props: any) => (
+  <AuthProvider tenantId={props.tenantId}>
+    <UnsavedChangesProvider>
+      <TenantAppInner {...props} />
+    </UnsavedChangesProvider>
+  </AuthProvider>
+);
 
 import { ErrorBoundary } from './components/ErrorBoundary';
 

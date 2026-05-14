@@ -23,6 +23,16 @@ class WhatsAppService {
       setTimeout(() => resolve(true), 1500);
     });
   }
+
+  async sendMessage(to: string, text: string): Promise<boolean> {
+    if (!this.config.isEnabled) {
+      console.warn('WhatsApp service is not enabled.');
+      return false;
+    }
+    console.log(`[WhatsApp] Sending message to ${to}: ${text}`);
+    // Real Meta API call would happen here
+    return new Promise((resolve) => setTimeout(() => resolve(true), 800));
+  }
 }
 
 export const whatsappService = new WhatsAppService();

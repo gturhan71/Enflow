@@ -26,6 +26,18 @@ class ExchangeService {
       setTimeout(() => resolve(true), 1500);
     });
   }
+
+  async sendEmail(to: string, subject: string, body: string): Promise<boolean> {
+    if (!this.config.isEnabled) return false;
+    console.log(`[Exchange] Sending email to ${to} | Subject: ${subject}`);
+    return new Promise((resolve) => setTimeout(() => resolve(true), 1000));
+  }
+
+  async syncCalendar(userId: string): Promise<boolean> {
+    if (!this.config.isEnabled || !this.config.syncCalendar) return false;
+    console.log(`[Exchange] Syncing calendar for user: ${userId}`);
+    return new Promise((resolve) => setTimeout(() => resolve(true), 2000));
+  }
 }
 
 export const exchangeService = new ExchangeService();

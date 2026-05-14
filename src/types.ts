@@ -189,18 +189,47 @@ export interface TodoTask {
   progressNotes?: { date: string; note: string; author: string }[];
 }
 
-export interface Opportunity {
+export interface WorkflowLog {
   id: string;
+  itemId: string; // Opportunity or Project ID
+  fromUnitId: string;
+  toUnitId: string;
+  assignedBy: string;
+  assignedTo: string;
+  note: string;
+  timestamp: string;
+  status: 'PENDING' | 'COMPLETED';
+}
+
+export interface Notification {
+  id: string;
+  userId: string;
   title: string;
-  customerId: string;
-  value: number;
-  probability: number; // 0-100
-  expectedCloseDate: string;
-  status: 'NEW' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+  message: string;
+  type: 'WHATSAPP' | 'EMAIL' | 'SYSTEM';
+  isRead: boolean;
+  timestamp: string;
+}
+
+export interface ArchiveItem {
+  id: string;
+  boxNo: string;
+  shelfNo: string;
+  category: string;
   description: string;
-  assignedTo: string; // Sales Rep User ID
-  createdBy: string; // User ID
-  presalesId?: string; // Presales Team Leader ID
-  technicalStatus: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
-  bomStatus: 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+  owner: string;
+  date: string;
+  status: 'IN_ARCHIVE' | 'BORROWED' | 'DISPOSED';
+  tags: string[];
+}
+
+export interface AnalysisResult {
+  title: string;
+  summary: string;
+  specDetails: string;
+  extractedProducts: {
+    pn: string;
+    description: string;
+    quantity: number;
+  }[];
 }

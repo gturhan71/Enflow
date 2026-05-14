@@ -50,36 +50,39 @@ export const MOCK_TENANTS: Tenant[] = [
 ];
 
 export const NAV_ITEMS = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
   { 
     id: 'crm', 
     label: 'CRM & Müşteri', 
     icon: Users,
+    requiredPermission: 'CRM_VIEW',
     subItems: [
-      { id: 'crm-opportunities', label: 'Fırsatlar' },
-      { id: 'crm-proposals', label: 'Teklifler' },
-      { id: 'crm-customers', label: 'Müşteriler' }
+      { id: 'crm-opportunities', label: 'Fırsatlar', requiredPermission: 'CRM_OPPS_VIEW' },
+      { id: 'crm-proposals', label: 'Teklifler', requiredPermission: 'CRM_PROPOSALS_VIEW' },
+      { id: 'crm-customers', label: 'Müşteriler', requiredPermission: 'CRM_CUSTOMERS_VIEW' }
     ]
   },
-  { id: 'presales', label: 'Presales & Dizayn', icon: FileSearch },
-  { id: 'sales-support', label: 'Satış Destek', icon: FileCheck },
-  { id: 'procurement', label: 'Satın Alma', icon: ShoppingCart },
-  { id: 'archive', label: 'Fiziksel Arşiv', icon: Archive },
-  { id: 'documents', label: 'Şirket Evrakları', icon: FileText },
-  { id: 'cost-analysis', label: 'Maliyet Analizi', icon: BarChart3 },
-  { id: 'contracts', label: 'Sözleşme Yönetimi', icon: FileSignature },
-  { id: 'project-mgmt', label: 'Proje Yönetimi', icon: Kanban },
-  { id: 'todo', label: 'Görevler & Takip', icon: ListTodo },
+  { id: 'presales', label: 'Presales & Dizayn', icon: FileSearch, requiredPermission: 'PRESALES_VIEW' },
+  { id: 'sales-support', label: 'Satış Destek', icon: FileCheck, requiredPermission: 'SALES_SUPPORT_VIEW' },
+  { id: 'procurement', label: 'Satın Alma', icon: ShoppingCart, requiredPermission: 'PROCUREMENT_VIEW' },
+  { id: 'archive', label: 'Fiziksel Arşiv', icon: Archive, requiredPermission: 'ARCHIVE_VIEW' },
+  { id: 'documents', label: 'Şirket Evrakları', icon: FileText, requiredPermission: 'DOCUMENTS_VIEW' },
+  { id: 'cost-analysis', label: 'Maliyet Analizi', icon: BarChart3, requiredPermission: 'COST_ANALYSIS_VIEW' },
+  { id: 'contracts', label: 'Sözleşme Yönetimi', icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
+  { id: 'project-mgmt', label: 'Proje Yönetimi', icon: Kanban, requiredPermission: 'PROJECT_MGMT_VIEW' },
+  { id: 'todo', label: 'Görevler & Takip', icon: ListTodo, requiredPermission: 'TODO_VIEW' },
   { 
     id: 'settings', 
     label: 'Şirket Ayarları', 
     icon: Settings,
+    requiredPermission: 'SETTINGS_VIEW',
     subItems: [
-      { id: 'settings-company', label: 'Şirket Profili' },
-      { id: 'settings-units', label: 'Birimler' },
-      { id: 'settings-users', label: 'Kullanıcılar' },
-      { id: 'settings-permissions', label: 'Yetkiler' },
-      { id: 'settings-integrations', label: 'Entegrasyonlar' }
+      { id: 'settings-company', label: 'Şirket Profili', requiredPermission: 'SETTINGS_COMPANY' },
+      { id: 'settings-units', label: 'Birimler', requiredPermission: 'SETTINGS_UNITS' },
+      { id: 'settings-users', label: 'Kullanıcılar', requiredPermission: 'SETTINGS_USERS' },
+      { id: 'settings-workflow', label: 'İş Akışı Yapılandırması', requiredPermission: 'SETTINGS_PERMISSIONS' },
+      { id: 'settings-permissions', label: 'Yetkiler', requiredPermission: 'SETTINGS_PERMISSIONS' },
+      { id: 'settings-integrations', label: 'Entegrasyonlar', requiredPermission: 'SETTINGS_INTEGRATIONS' }
     ]
   },
 ];

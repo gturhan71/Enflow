@@ -20,6 +20,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as pdfjs from 'pdfjs-dist';
 import { GoogleGenAI, Type } from "@google/genai";
+import { AnalysisResult } from '../types';
 
 // Configure PDF.js worker using a reliable CDN with modern mjs support
 pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
@@ -45,25 +46,16 @@ const trToEn = (text: string) => {
 
 interface SpecAnalysisProps {
   opportunityId: string;
+  onTransferToBoM?: (products: { pn: string, description: string, quantity: number }[]) => void;
 }
 
-interface AnalysisResult {
-  title: string;
-  summary: string;
-  specDetails: string;
-  extractedProducts: {
-    pn: string;
-    description: string;
-    quantity: number;
-  }[];
-}
-
-const SpecAnalysis = ({ opportunityId }: SpecAnalysisProps) => {
+const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [isTransferring, setIsTransferring] = useState(false);
 
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
@@ -380,16 +372,34 @@ const SpecAnalysis = ({ opportunityId }: SpecAnalysisProps) => {
               <BarChart3 size={20} className="text-indigo-600" />
               Analiz Sonuçları
             </h4>
-            {result && (
-              <button 
-                onClick={exportToPDF}
-                disabled={isExporting}
-                className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
-              >
-                {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-                {isExporting ? 'Hazırlanıyor...' : 'PDF Olarak İndir'}
-              </button>
-            )}
+            <div className="flex items-center gap-2">
+              {result && onTransferToBoM && (
+                <button 
+                  onClick={() => {
+                    setIsTransferring(true);
+                    setTimeout(() => {
+                      onTransferToBoM(result.extractedProducts);
+                      setIsTransferring(false);
+                    }, 1000);
+                  }}
+                  disabled={isTransferring}
+                  className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-emerald-600 transition-all shadow-lg shadow-emerald-100 disabled:opacity-50"
+                >
+                  {isTransferring ? <Loader2 size={14} className="animate-spin" /> : <ShoppingCart size={14} />}
+                  {isTransferring ? 'Aktarılıyor...' : 'BoM\'a Aktar'}
+                </button>
+              )}
+              {result && (
+                <button 
+                  onClick={exportToPDF}
+                  disabled={isExporting}
+                  className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 hover:bg-slate-50 transition-all disabled:opacity-50"
+                >
+                  {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                  {isExporting ? 'Hazırlanıyor...' : 'PDF Olarak İndir'}
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex-1 overflow-y-auto p-8">
             <AnimatePresence mode="wait">
