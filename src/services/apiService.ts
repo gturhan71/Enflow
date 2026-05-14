@@ -51,6 +51,13 @@ class ApiService {
     return this.fetchWithAuth('/units');
   }
 
+  async createUnit(unitData: any) {
+    return this.fetchWithAuth('/units', {
+      method: 'POST',
+      body: JSON.stringify(unitData)
+    });
+  }
+
   async getCustomers() {
     return this.fetchWithAuth('/customers');
   }
@@ -67,6 +74,21 @@ class ApiService {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+  }
+
+  async getOpportunities() {
+    return this.fetchWithAuth('/opportunities');
+  }
+
+  async createOpportunity(data: any) {
+    return this.fetchWithAuth('/opportunities', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getProjects() {
+    return this.fetchWithAuth('/projects');
   }
 
   async createUser(userData: any) {

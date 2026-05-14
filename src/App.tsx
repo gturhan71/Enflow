@@ -69,15 +69,20 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
     return saved ? JSON.parse(saved) : MOCK_TODO_TASKS;
   });
 
-  const [units, setUnits] = useState<Unit[]>(() => {
-    const saved = localStorage.getItem(`enflow_units_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_UNITS;
-  });
+  const [units, setUnits] = useState<Unit[]>([]);
 
   const [systemUsers, setSystemUsers] = useState<User[]>(() => {
     const saved = localStorage.getItem(`enflow_system_users_${tenantId}`);
     return saved ? JSON.parse(saved) : MOCK_SYSTEM_USERS;
   });
+
+  useEffect(() => {
+    if (isAuthenticated && activeTenantId) {
+       import('./services/apiService').then(({ apiService }) => {
+          apiService.getUnits().then(data => setUnits(data)).catch(console.error);
+       });
+    }
+  }, [isAuthenticated, activeTenantId]);
 
   useEffect(() => {
     localStorage.setItem(`enflow_units_${tenantId}`, JSON.stringify(units));

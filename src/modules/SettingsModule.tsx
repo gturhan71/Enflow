@@ -75,23 +75,27 @@ const SettingsModule = ({
     }
   };
 
-  const handleSaveUnit = (e: React.FormEvent) => {
+  const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
-    const newUnit: Unit = {
-      id: editingUnit?.id || `unit-${Date.now()}`,
+    const unitData = {
       name: formData.get('name') as string,
       description: formData.get('description') as string,
       managerId: formData.get('managerId') as string,
     };
 
-    if (editingUnit) {
-      setUnits(units.map(u => u.id === editingUnit.id ? newUnit : u));
-    } else {
-      setUnits([...units, newUnit]);
+    setLoading(true);
+    try {
+      const savedUnit = await apiService.createUnit(unitData);
+      setUnits([...units, savedUnit]);
+      setShowUnitModal(false);
+      setEditingUnit(null);
+      alert('Birim başarıyla oluşturuldu.');
+    } catch (err: any) {
+      alert(err.message || 'Birim kaydedilemedi.');
+    } finally {
+      setLoading(false);
     }
-    setShowUnitModal(false);
-    setEditingUnit(null);
   };
 
   const handleSaveUser = async (e: React.FormEvent) => {
