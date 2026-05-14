@@ -13,7 +13,7 @@ const adapter = new PrismaLibSql({
 const prisma = new PrismaClient({ adapter });
 
 const app = express();
-const port = process.env.PORT || 3001;
+const port = 3002;
 
 app.use(express.json());
 app.use(cors());
@@ -38,18 +38,30 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Tenant Routes
+app.get('/api/tenants', async (req, res) => {
+  const tenants = await prisma.tenant.findMany({
+    orderBy: { name: 'asc' }
+  });
+  res.json(tenants);
+});
+
 app.post('/api/auth/login', async (req, res) => {
   const { email } = req.body;
-  const user = await prisma.user.findUnique({ 
-    where: { email },
-    include: { tenant: true }
-  });
+  try {
+    const user = await prisma.user.findUnique({ 
+      where: { email },
+      include: { tenant: true }
+    });
 
-  if (!user) {
-    return res.status(401).json({ error: 'Invalid credentials' });
+    if (!user) {
+      return res.status(401).json({ error: 'Geçersiz bilgiler.' });
+    }
+
+    res.json({ user, token: 'mock-jwt-token' });
+  } catch (error) {
+    res.status(500).json({ error: 'Login hatası.' });
   }
-
-  res.json({ user, token: 'mock-jwt-token' });
 });
 
 app.get('/api/units', tenantMiddleware, async (req, res) => {
@@ -85,14 +97,14 @@ app.post('/api/customers', tenantMiddleware, async (req, res) => {
 });
 
 app.put('/api/customers/:id', tenantMiddleware, async (req, res) => {
-  const { id } = req.params;
+  const id = req.params.id as string;
   const data = req.body;
   try {
     const customer = await prisma.customer.update({
       where: { id },
       data: {
         ...data,
-        tenantId: (req as any).tenantId // Ensure tenant consistency
+        tenantId: (req as any).tenantId
       }
     });
     res.json(customer);
@@ -103,26 +115,41 @@ app.put('/api/customers/:id', tenantMiddleware, async (req, res) => {
 
 // User Routes
 app.post('/api/users', tenantMiddleware, async (req, res) => {
-  const { name, email, role, unitId, permissions } = req.body;
+  const { name, email, role, unitId, permissions, tenantId } = req.body;
   try {
     const user = await prisma.user.create({
       data: {
         name,
         email,
         role,
-        unitId,
-        tenantId: (req as any).tenantId,
+        unitId: unitId || null,
+        tenantId: tenantId || (req as any).tenantId,
         permissions: JSON.stringify(permissions || ['DASHBOARD_VIEW']),
         status: 'ACTIVE'
       }
     });
     res.json(user);
   } catch (error: any) {
-    res.status(400).json({ error: 'Kullanıcı oluşturulamadı. E-posta zaten kullanımda olabilir.' });
+    console.error('[Prisma Error]:', error);
+    res.status(400).json({ 
+      error: 'Kullanıcı oluşturulamadı.',
+      details: error.message 
+    });
   }
 });
 
-// Forgot Password Route
+app.delete('/api/users/:id', tenantMiddleware, async (req, res) => {
+  const id = req.params.id as string;
+  try {
+    await prisma.user.delete({
+      where: { id }
+    });
+    res.json({ message: 'Kullanıcı başarıyla silindi.' });
+  } catch (error: any) {
+    res.status(400).json({ error: 'Kullanıcı silinemedi.' });
+  }
+});
+
 app.post('/api/auth/forgot-password', async (req, res) => {
   const { email } = req.body;
   const user = await prisma.user.findUnique({ where: { email } });
@@ -130,9 +157,6 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   if (!user) {
     return res.status(404).json({ error: 'Bu e-posta adresiyle kayıtlı bir kullanıcı bulunamadı.' });
   }
-
-  // Simulating email sending via Exchange service
-  console.log(`[Backend] Reset link sent to ${email}`);
   
   res.json({ message: 'Şifre sıfırlama bağlantısı e-posta adresinize gönderildi.' });
 });

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3001/api';
+const API_BASE_URL = 'http://localhost:3002/api';
 
 class ApiService {
   private tenantId: string | null = null;
@@ -41,6 +41,12 @@ class ApiService {
     return response.json();
   }
 
+  async getTenants() {
+    const response = await fetch(`${API_BASE_URL}/tenants`);
+    if (!response.ok) throw new Error('Şirket listesi yüklenemedi.');
+    return response.json();
+  }
+
   async getUnits() {
     return this.fetchWithAuth('/units');
   }
@@ -67,6 +73,12 @@ class ApiService {
     return this.fetchWithAuth('/users', {
       method: 'POST',
       body: JSON.stringify(userData)
+    });
+  }
+
+  async deleteUser(id: string) {
+    return this.fetchWithAuth(`/users/${id}`, {
+      method: 'DELETE'
     });
   }
 

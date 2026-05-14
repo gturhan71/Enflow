@@ -89,6 +89,13 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
 
   useEffect(() => {
     localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(currentUser));
+    if (currentUser && currentUser.tenantId) {
+      // Also update apiService with current auth info
+      const savedToken = 'mock-jwt-token'; // In production, get this from localStorage
+      import('./services/apiService').then(({ apiService }) => {
+        apiService.setAuth(currentUser.tenantId, savedToken);
+      });
+    }
   }, [currentUser, tenantId]);
 
 

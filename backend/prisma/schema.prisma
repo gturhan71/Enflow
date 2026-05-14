@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -10,16 +7,15 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(cuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  units         Unit[]
-  users         User[]
+  id            String        @id @default(cuid())
+  name          String
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  customers     Customer[]
   opportunities Opportunity[]
   projects      Project[]
-  customers     Customer[]
+  units         Unit[]
+  users         User[]
 }
 
 model Unit {
@@ -27,153 +23,124 @@ model Unit {
   name        String
   description String?
   tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
   managerId   String?
-  manager     User?    @relation("UnitManager", fields: [managerId], references: [id])
-  
-  users       User[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  manager     User?    @relation("UnitManager", fields: [managerId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+  users       User[]
 }
 
 model User {
-  id          String   @id @default(cuid())
-  name        String
-  email       String   @unique
-  role        String   
-  permissions String   // JSON string
-  status      String   @default("ACTIVE")
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
-  unitId      String?
-  unit        Unit?    @relation(fields: [unitId], references: [id])
-  
-  managedUnits Unit[]  @relation("UnitManager")
-
-  assignedOpps Opportunity[] @relation("AssignedTo")
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  role         String
+  permissions  String
+  status       String        @default("ACTIVE")
+  tenantId     String
+  unitId       String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   createdOpps  Opportunity[] @relation("CreatedBy")
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  assignedOpps Opportunity[] @relation("AssignedTo")
+  managedUnits Unit[]        @relation("UnitManager")
+  unit         Unit?         @relation(fields: [unitId], references: [id])
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
 }
 
 model Customer {
-  id                 String   @id @default(cuid())
-  name               String   // Firma Resmi Adı
-  shortName          String?  // Marka/Kısa Ad
-  industry           String?  // Sektör
-  website            String?
-  logo               String?  // Logo URL/Base64
-  
-  // İletişim Bilgileri
-  email              String?
-  phone              String?
-  address            String?
-  city               String?
-  country            String?
-  postalCode         String?
-  
-  // Kurumsal / Finansal Bilgiler
-  taxOffice          String?  // Vergi Dairesi
-  taxNumber          String?  // Vergi Numarası
-  chamberOfCommerce  String?  // Ticaret Odası No
-  tradeRegistryNo    String?  // Ticaret Sicil No
-  riskScore          Int      @default(0) // 0-100
-  creditLimit        Float    @default(0)
-  currency           String   @default("USD")
-  
-  // Otomasyon ve Teknik Bilgiler
-  techStack          String?  // JSON String: Kullandığı teknolojiler
-  socialMedia        String?  // JSON String: LinkedIn, Twitter vb.
-  notes              String?  
-  status             String   @default("ACTIVE") // ACTIVE, PASSIVE, PROSPECT
-  
-  tenantId           String
-  tenant             Tenant   @relation(fields: [tenantId], references: [id])
-  
-  opportunities      Opportunity[]
-  
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String        @id @default(cuid())
+  name              String
+  shortName         String?
+  industry          String?
+  website           String?
+  logo              String?
+  email             String?
+  phone             String?
+  address           String?
+  city              String?
+  country           String?
+  postalCode        String?
+  taxOffice         String?
+  taxNumber         String?
+  chamberOfCommerce String?
+  tradeRegistryNo   String?
+  riskScore         Int           @default(0)
+  creditLimit       Float         @default(0)
+  currency          String        @default("USD")
+  techStack         String?
+  socialMedia       String?
+  notes             String?
+  status            String        @default("ACTIVE")
+  tenantId          String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  opportunities     Opportunity[]
 }
 
 model Opportunity {
-  id                 String   @id @default(cuid())
-  title              String
-  value              Float
-  probability        Int
-  expectedCloseDate  DateTime?
-  status             String   
-  description        String?
-  
-  technicalStatus    String   @default("PENDING")
-  bomStatus          String   @default("DRAFT")
-  
-  tenantId           String
-  tenant             Tenant   @relation(fields: [tenantId], references: [id])
-  
-  customerId         String
-  customer           Customer @relation(fields: [customerId], references: [id])
-  
-  assignedToId       String
-  assignedTo         User     @relation("AssignedTo", fields: [assignedToId], references: [id])
-  
-  createdById        String
-  createdBy          User     @relation("CreatedBy", fields: [createdById], references: [id])
-  
-  presalesId         String?
-  
-  bomItems           BoMItem[]
-  workflowLogs       WorkflowLog[]
-  
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  id                String        @id @default(cuid())
+  title             String
+  value             Float
+  probability       Int
+  expectedCloseDate DateTime?
+  status            String
+  description       String?
+  technicalStatus   String        @default("PENDING")
+  bomStatus         String        @default("DRAFT")
+  tenantId          String
+  customerId        String
+  assignedToId      String
+  createdById       String
+  presalesId        String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  bomItems          BoMItem[]
+  createdBy         User          @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo        User          @relation("AssignedTo", fields: [assignedToId], references: [id])
+  customer          Customer      @relation(fields: [customerId], references: [id])
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  workflowLogs      WorkflowLog[]
 }
 
 model BoMItem {
-  id              String      @id @default(cuid())
-  partNumber      String
-  description     String
-  quantity        Int
-  purchaseCost    Float
+  id               String      @id @default(cuid())
+  partNumber       String
+  description      String
+  quantity         Int
+  purchaseCost     Float
   marginPercentage Float
-  vendor          String?
-  
-  opportunityId   String
-  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
-  
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  vendor           String?
+  opportunityId    String
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  opportunity      Opportunity @relation(fields: [opportunityId], references: [id])
 }
 
 model WorkflowLog {
-  id          String      @id @default(cuid())
-  fromUnitId  String
-  toUnitId    String
-  assignedBy  String
-  assignedTo  String
-  note        String?
-  status      String      @default("PENDING")
-  
+  id            String      @id @default(cuid())
+  fromUnitId    String
+  toUnitId      String
+  assignedBy    String
+  assignedTo    String
+  note          String?
+  status        String      @default("PENDING")
   opportunityId String
-  opportunity Opportunity @relation(fields: [opportunityId], references: [id])
-  
-  timestamp   DateTime    @default(now())
+  timestamp     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  name        String
-  status      String
-  totalValue  Float
-  avgMargin   Float
-  deadline    DateTime
-  
-  tenantId    String
-  tenant      Tenant   @relation(fields: [tenantId], references: [id])
-  
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(cuid())
+  name       String
+  status     String
+  totalValue Float
+  avgMargin  Float
+  deadline   DateTime
+  tenantId   String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
 }
