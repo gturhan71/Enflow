@@ -39,6 +39,7 @@ Enflow/
 
 ## 🔄 Öne Çıkan Özellikler
 
+- **Merkezi Müşteri Veri Merkezi:** Finansal skorlar, kredi limitleri ve teknik notlar içeren devasa müşteri hafızası. Diğer tüm birimler bu merkezi veriyi otomasyonlarında kullanır.
 - **Dinamik İş Akışı (Workflow):** Birimler arası iş devirleri (Hand-off) admin tarafından görsel olarak tasarlanabilir.
 - **Kişiselleştirilmiş Dashboardlar:** GM, Satış, Teknik ve Satın Alma birimleri için role özel canlı veri görselleştirmeleri.
 - **AI Tabanlı Analiz:** Şartnamelerden otomatik BoM listesi ve teknik özet çıkarma.

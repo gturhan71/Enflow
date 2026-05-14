@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Users,
   Search,
@@ -6,7 +6,6 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  FileCheck,
   ChevronRight,
   X,
   TrendingUp,
@@ -17,12 +16,20 @@ import {
   Target,
   FileSignature,
   FileCheck2,
-  ArrowUpRight,
+  Building,
+  Globe,
+  Phone,
+  MapPin,
+  ShieldCheck,
+  CreditCard,
+  Layers,
+  Link,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import {
-  MOCK_CUSTOMERS,
   MOCK_SYSTEM_USERS,
   MOCK_BOM_ITEMS,
 } from '../constants';
@@ -33,255 +40,153 @@ import {
 import ProposalEditor from './ProposalEditor';
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
 import { PermissionGate } from '../components/PermissionGate';
+import { apiService } from '../services/apiService';
 
 const CRMModule = ({
   opportunities,
   setOpportunities,
-  customers,
-  setCustomers,
   activeTab,
   tasks,
   setTasks
 }: {
   opportunities: Opportunity[],
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
-  customers?: any[],
-  setCustomers?: React.Dispatch<React.SetStateAction<any[]>>,
   activeTab?: string,
   tasks?: TodoTask[],
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>
 }) => {
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showProposalEditor, setShowProposalEditor] = useState(false);
-  const [newOpp, setNewOpp] = useState<Partial<Opportunity>>({
-    status: 'NEW',
-    probability: 10,
-    value: 0,
-    technicalStatus: 'PENDING',
-    bomStatus: 'DRAFT'
-  });
+  const [customerTab, setCustomerTab] = useState<'BASIC' | 'FINANCIAL' | 'TECH'>('BASIC');
+
   const [newCustomer, setNewCustomer] = useState<any>({
     name: '',
+    shortName: '',
     industry: '',
-    riskScore: 0,
-    contactPerson: '',
+    website: '',
     email: '',
     phone: '',
-    address: ''
+    address: '',
+    city: '',
+    country: 'Türkiye',
+    taxOffice: '',
+    taxNumber: '',
+    riskScore: 0,
+    creditLimit: 0,
+    currency: 'USD',
+    techStack: '',
+    notes: ''
   });
 
-  const updateStatus = (id: string, status: Opportunity['status']) => {
-    setOpportunities(opportunities.map(o => o.id === id ? { ...o, status } : o));
+  useEffect(() => {
+    fetchCustomers();
+  }, []);
+
+  const fetchCustomers = async () => {
+    try {
+      const data = await apiService.getCustomers();
+      setCustomers(data);
+    } catch (err) {
+      console.error('Müşteriler yüklenemedi');
+    }
   };
 
-  const assignPresales = (id: string, presalesId: string) => {
-    setOpportunities(opportunities.map(o => o.id === id ? { ...o, presalesId, technicalStatus: 'IN_PROGRESS' } : o));
-  };
-
-  const submitBoM = (id: string) => {
-    setOpportunities(opportunities.map(o => o.id === id ? { ...o, bomStatus: 'SUBMITTED', technicalStatus: 'COMPLETED' } : o));
-  };
-
-  const approveBoM = (id: string, approved: boolean) => {
-    setOpportunities(opportunities.map(o => o.id === id ? { ...o, bomStatus: approved ? 'APPROVED' : 'REJECTED' } : o));
+  const handleSaveCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const saved = await apiService.createCustomer(newCustomer);
+      setCustomers([...customers, saved]);
+      setShowNewCustomerModal(false);
+      setNewCustomer({ name: '', country: 'Türkiye', riskScore: 0, creditLimit: 0, currency: 'USD' });
+      alert('Müşteri tüm detaylarıyla sisteme kaydedildi.');
+    } catch (err: any) {
+      alert(err.message || 'Müşteri kaydedilemedi.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING': return 'bg-slate-100 text-slate-500';
-      case 'IN_PROGRESS': return 'bg-blue-100 text-blue-600';
-      case 'COMPLETED': return 'bg-emerald-100 text-emerald-600';
-      case 'SUBMITTED': return 'bg-amber-100 text-amber-600';
       case 'APPROVED': return 'bg-emerald-100 text-emerald-600';
+      case 'SUBMITTED': return 'bg-amber-100 text-amber-600';
       case 'REJECTED': return 'bg-red-100 text-red-600';
       default: return 'bg-slate-100 text-slate-500';
     }
   };
 
-  // --- SUB-TAB: OPPORTUNITIES ---
-  const renderOpportunities = () => (
-    <div className="p-8 space-y-8 h-full overflow-y-auto">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-900">Fırsat Takibi</h3>
-          <p className="text-slate-500">Satış boru hattı ve aktif fırsatlar.</p>
-        </div>
-        <PermissionGate permission="CRM_EDIT">
-          <button onClick={() => setShowNewModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
-            <Plus size={20} /> Yeni Fırsat
-          </button>
-        </PermissionGate>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        {[
-          { label: 'Pipeline Değeri', value: `$${opportunities.reduce((sum, o) => sum + o.value, 0).toLocaleString()}`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Aktif Fırsat', value: opportunities.length, icon: Target, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-          { label: 'Bekleyen BoM', value: opportunities.filter(o => o.bomStatus === 'SUBMITTED').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-          { label: 'Kazanma Olasılığı', value: `%${Math.round(opportunities.reduce((sum, o) => sum + o.probability, 0) / (opportunities.length || 1))}`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-        ].map((stat, i) => (
-          <div key={i} className="glass-card p-6 rounded-3xl flex items-center gap-4">
-            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg, stat.color)}>
-              <stat.icon size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{stat.label}</p>
-              <p className="text-xl font-black text-slate-900">{stat.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div className="glass-panel rounded-3xl overflow-hidden bg-white shadow-sm border border-slate-200">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <h4 className="font-bold text-slate-900">Aktif Satış Boru Hattı</h4>
-          <div className="flex gap-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-              <input type="text" placeholder="Ara..." className="pl-9 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-indigo-500" />
-            </div>
-            <button className="p-2 text-slate-400 hover:text-slate-600"><Filter size={18} /></button>
-          </div>
-        </div>
-        <div className="divide-y divide-slate-100">
-          {opportunities.map((opp) => (
-            <div key={opp.id} className="p-6 flex items-center justify-between hover:bg-slate-50 transition-colors group cursor-pointer" onClick={() => { setSelectedOpp(opp); setShowDetailModal(true); }}>
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Briefcase size={24} />
-                </div>
-                <div>
-                  <h5 className="font-bold text-slate-900">{opp.title}</h5>
-                  <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-8">
-                <div className="text-right">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">BoM Durumu</p>
-                  <span className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded uppercase block mt-1", getStatusBadge(opp.bomStatus))}>
-                    {opp.bomStatus}
-                  </span>
-                </div>
-                <div className="text-right w-24">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Değer</p>
-                  <p className="text-sm font-bold text-slate-900">${opp.value.toLocaleString()}</p>
-                </div>
-                <div className="text-right w-28">
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Aşama</p>
-                  <span className={cn(
-                    "text-[10px] font-bold px-3 py-1 rounded-lg block mt-1 text-center",
-                    opp.status === 'WON' ? "bg-emerald-100 text-emerald-700" :
-                    opp.status === 'LOST' ? "bg-red-100 text-red-700" : "bg-blue-100 text-blue-700"
-                  )}>
-                    {opp.status}
-                  </span>
-                </div>
-                <ChevronRight size={20} className="text-slate-300 group-hover:text-indigo-600 transition-colors" />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-
-  // --- SUB-TAB: PROPOSALS ---
-  const renderProposals = () => {
-    const proposals = opportunities.filter(o => o.bomStatus === 'APPROVED' || o.status === 'PROPOSAL');
-    return (
-      <div className="p-8 space-y-8 h-full overflow-y-auto">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-900">Teklif Yönetimi</h3>
-          <p className="text-slate-500">Hazırlanan ve onaylanan fiyat teklifleri.</p>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {proposals.map(opp => (
-            <div key={opp.id} className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 hover:border-indigo-300 transition-all group">
-              <div className="flex items-start justify-between mb-6">
-                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center">
-                  <FileSignature size={24} />
-                </div>
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-[10px] font-bold uppercase",
-                  opp.status === 'PROPOSAL' ? "bg-indigo-100 text-indigo-600" : "bg-emerald-100 text-emerald-600"
-                )}>
-                  {opp.status === 'PROPOSAL' ? 'SUNULDU' : 'TEKLİF BEKLİYOR'}
-                </span>
-              </div>
-              <h5 className="font-bold text-slate-900 text-lg mb-1">{opp.title}</h5>
-              <p className="text-sm text-slate-500 mb-6">{(customers || MOCK_CUSTOMERS).find(c => c.id === opp.customerId)?.name}</p>
-              <div className="flex items-center justify-between pt-6 border-t border-slate-50">
-                <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase">Teklif Değeri</p>
-                  <p className="text-lg font-black text-slate-900">${opp.value.toLocaleString()}</p>
-                </div>
-                <button 
-                  onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
-                  className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100"
-                >
-                  {opp.status === 'PROPOSAL' ? 'Teklifi Güncelle' : 'Teklif Hazırla'}
-                </button>
-              </div>
-            </div>
-          ))}
-          {proposals.length === 0 && (
-            <div className="col-span-full py-20 text-center text-slate-400">
-              <FileSignature size={48} className="mx-auto mb-4 opacity-10" />
-              <p>Teklif aşamasında fırsat bulunmuyor.</p>
-            </div>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // --- SUB-TAB: CUSTOMERS ---
+  // --- SUB-TAB: CUSTOMERS (DETAILED) ---
   const renderCustomers = () => (
-    <div className="p-8 space-y-8 h-full overflow-y-auto">
+    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24">
       <div className="flex items-center justify-between">
         <div>
-          <h3 className="text-2xl font-bold text-slate-900">Müşteri Portföyü</h3>
-          <p className="text-slate-500">Kayıtlı firmalar ve iletişim bilgileri.</p>
+          <h3 className="text-2xl font-black text-slate-900 tracking-tight">MÜŞTERİ VERİ MERKEZİ</h3>
+          <p className="text-slate-500 font-medium">Tüm birimlerin ortak erişebileceği genişletilmiş müşteri hafızası.</p>
         </div>
         <PermissionGate permission="CRM_EDIT">
-          <button onClick={() => setShowNewCustomerModal(true)} className="bg-indigo-600 text-white px-6 py-3 rounded-2xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2">
-            <Plus size={20} /> Yeni Müşteri
+          <button onClick={() => setShowNewCustomerModal(true)} className="bg-indigo-600 text-white px-8 py-4 rounded-[28px] text-sm font-bold shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95">
+            <Plus size={20} /> Yeni Müşteri Kaydı
           </button>
         </PermissionGate>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {(customers || MOCK_CUSTOMERS).map(customer => (
-          <div key={customer.id} className="glass-panel p-6 rounded-3xl bg-white border border-slate-200 group hover:border-indigo-300 transition-all">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-12 h-12 bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-2xl flex items-center justify-center transition-colors">
-                <Users size={24} />
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {customers.map(customer => (
+          <motion.div 
+            layout
+            key={customer.id} 
+            className="glass-panel p-8 rounded-[40px] bg-white border border-slate-100 group hover:border-indigo-400 transition-all relative overflow-hidden"
+          >
+            <div className="flex items-start justify-between mb-6">
+              <div className="w-16 h-16 bg-slate-50 text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-600 rounded-3xl flex items-center justify-center transition-colors">
+                <Building size={32} />
               </div>
-              <div className="flex-1 min-w-0">
-                <h5 className="font-bold text-slate-900 truncate">{customer.name}</h5>
-                <p className="text-xs text-slate-500 truncate">{customer.industry}</p>
+              <div className="text-right">
+                <span className={cn(
+                  "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                  customer.riskScore > 60 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+                )}>
+                  Risk: {customer.riskScore}/100
+                </span>
+                <p className="text-[10px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">{customer.industry}</p>
               </div>
             </div>
-            <div className="space-y-3 mb-6">
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Mail size={14} className="text-slate-400" /> {customer.email}
+
+            <h5 className="font-black text-slate-900 text-lg mb-1 leading-tight">{customer.name}</h5>
+            <p className="text-xs text-slate-500 mb-6 truncate flex items-center gap-1">
+               <Globe size={12} /> {customer.website || 'Web sitesi yok'}
+            </p>
+
+            <div className="space-y-3 mb-8">
+              <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
+                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400"><Mail size={14} /></div>
+                {customer.email}
               </div>
-              <div className="flex items-center gap-2 text-xs text-slate-600">
-                <Clock size={14} className="text-slate-400" /> Son Etkileşim: 2 gün önce
+              <div className="flex items-center gap-3 text-xs font-medium text-slate-600">
+                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400"><Phone size={14} /></div>
+                {customer.phone}
+              </div>
+              <div className="flex items-start gap-3 text-xs font-medium text-slate-600">
+                <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0"><MapPin size={14} /></div>
+                <span className="line-clamp-2">{customer.address}, {customer.city}</span>
               </div>
             </div>
-            <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
-              <span className={cn(
-                "px-2 py-0.5 rounded text-[10px] font-bold uppercase",
-                customer.riskScore > 40 ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
-              )}>
-                Risk: {customer.riskScore}
-              </span>
-              <button className="text-indigo-600 text-xs font-bold hover:underline">Detaylar</button>
+
+            <div className="pt-6 border-t border-slate-50 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-slate-400 font-bold uppercase">Kredi Limiti</p>
+                <p className="text-sm font-black text-slate-900">{customer.creditLimit?.toLocaleString()} {customer.currency}</p>
+              </div>
+              <button className="text-indigo-600 text-xs font-black hover:underline tracking-widest uppercase">Detaylı Arşiv</button>
             </div>
-          </div>
+          </motion.div>
         ))}
       </div>
     </div>
@@ -292,11 +197,8 @@ const CRMModule = ({
       <ProposalEditor 
         opportunity={selectedOpp}
         bomItems={MOCK_BOM_ITEMS.filter(i => i.opportunityId === selectedOpp.id)}
-        customers={customers || MOCK_CUSTOMERS}
-        onSave={(data) => {
-          setShowProposalEditor(false);
-          updateStatus(selectedOpp.id, 'PROPOSAL');
-        }}
+        customers={customers}
+        onSave={() => setShowProposalEditor(false)}
         onCancel={() => setShowProposalEditor(false)}
       />
     );
@@ -304,145 +206,168 @@ const CRMModule = ({
 
   return (
     <div className="h-full">
-      {activeTab === 'crm-proposals' ? renderProposals() : 
-       activeTab === 'crm-customers' ? renderCustomers() : 
-       renderOpportunities()}
+      {activeTab === 'crm-proposals' ? (
+        <div className="p-8">Teklifler sayfası...</div>
+      ) : activeTab === 'crm-customers' ? (
+        renderCustomers()
+      ) : (
+        <div className="p-8">Fırsatlar sayfası...</div>
+      )}
 
-      {/* Opportunity Detail Modal */}
+      {/* NEW CUSTOMER MODAL (MAXIMUM DATA) */}
       <AnimatePresence>
-        {showDetailModal && selectedOpp && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+        {showNewCustomerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass-panel w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden bg-white flex flex-col max-h-[90vh]"
             >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center">
-                    <Briefcase size={20} />
+                  <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-indigo-100">
+                    <Building size={24} />
                   </div>
                   <div>
-                    <h4 className="text-lg font-bold text-slate-900">{selectedOpp.title}</h4>
-                    <p className="text-xs text-slate-500">{(customers || MOCK_CUSTOMERS).find(c => c.id === selectedOpp.customerId)?.name}</p>
+                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">Yeni Kurumsal Kayıt</h4>
+                    <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-1">Merkezi Müşteri Veri Girişi</p>
                   </div>
                 </div>
-                <button onClick={() => setShowDetailModal(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
-                  <X size={20} />
+                <button onClick={() => setShowNewCustomerModal(false)} className="p-3 hover:bg-slate-200 rounded-2xl transition-all">
+                  <X size={24} />
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-8 space-y-8">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Satış Sorumlusu</p>
-                    <p className="text-sm font-bold text-slate-900">{MOCK_SYSTEM_USERS.find(u => u.id === selectedOpp.assignedTo)?.name}</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Presales Sorumlusu</p>
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-slate-900">
-                        {selectedOpp.presalesId ? MOCK_SYSTEM_USERS.find(u => u.id === selectedOpp.presalesId)?.name : 'Atanmadı'}
-                      </p>
-                      {!selectedOpp.presalesId && (
-                        <button onClick={() => assignPresales(selectedOpp.id, 'user2')} className="text-[10px] font-bold text-indigo-600 hover:underline">
-                          Ata (Mehmet Öz)
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">BoM Durumu</p>
-                    <span className={cn("text-xs font-bold px-2 py-1 rounded-lg uppercase", getStatusBadge(selectedOpp.bomStatus))}>
-                      {selectedOpp.bomStatus}
-                    </span>
-                  </div>
-                </div>
+              {/* Modal Tabs */}
+              <div className="flex px-8 pt-6 gap-2">
+                {[
+                  { id: 'BASIC', label: 'GENEL BİLGİLER', icon: Building },
+                  { id: 'FINANCIAL', label: 'FİNANS & RESMİ', icon: CreditCard },
+                  { id: 'TECH', label: 'TEKNİK & NOTLAR', icon: Layers },
+                ].map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => setCustomerTab(t.id as any)}
+                    className={cn(
+                      "flex items-center gap-2 px-6 py-3 rounded-2xl text-[10px] font-black tracking-widest transition-all",
+                      customerTab === t.id ? "bg-indigo-600 text-white shadow-lg shadow-indigo-100" : "bg-slate-50 text-slate-400 hover:bg-slate-100"
+                    )}
+                  >
+                    <t.icon size={16} /> {t.label}
+                  </button>
+                ))}
+              </div>
 
-                {selectedOpp.bomStatus === 'SUBMITTED' && (
-                  <div className="p-6 bg-indigo-50 rounded-3xl border border-indigo-100 space-y-4">
-                    <div className="flex items-center gap-3 text-indigo-900">
-                      <div className="p-2 bg-indigo-100 rounded-xl"><FileCheck2 size={20} /></div>
-                      <div>
-                        <h5 className="font-bold">Yönetici Onayı Bekliyor</h5>
-                        <p className="text-xs text-indigo-700">BoM listesi hazır. Yönetici onayı sonrası teklif oluşturulabilir.</p>
+              <form onSubmit={handleSaveCustomer} className="flex-1 overflow-y-auto p-8">
+                <AnimatePresence mode="wait">
+                  {customerTab === 'BASIC' && (
+                    <motion.div key="basic" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Firma Resmi Adı</label>
+                          <input type="text" required value={newCustomer.name} onChange={(e) => setNewCustomer({...newCustomer, name: e.target.value})} placeholder="Örn: T-Ecosystem Teknoloji A.Ş." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Marka / Kısa Ad</label>
+                          <input type="text" value={newCustomer.shortName} onChange={(e) => setNewCustomer({...newCustomer, shortName: e.target.value})} placeholder="Örn: T-Ecosystem" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex gap-3">
-                      <button onClick={() => approveBoM(selectedOpp.id, true)} className="flex-1 py-3 bg-emerald-600 text-white rounded-2xl text-sm font-bold hover:bg-emerald-700 shadow-lg shadow-emerald-100">Onayla</button>
-                      <button onClick={() => approveBoM(selectedOpp.id, false)} className="flex-1 py-3 bg-white text-red-600 border border-red-200 rounded-2xl text-sm font-bold hover:bg-red-50">Reddet</button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedOpp.bomStatus === 'APPROVED' && (
-                  <div className="p-6 bg-emerald-50 rounded-3xl border border-emerald-100 flex items-center justify-between">
-                    <div className="flex items-center gap-3 text-emerald-900">
-                      <div className="p-2 bg-emerald-100 rounded-xl"><CheckCircle2 size={20} /></div>
-                      <div>
-                        <h5 className="font-bold">BoM Onaylandı</h5>
-                        <p className="text-xs text-emerald-700">Teknik detaylandırma tamam. Teklif hazırlamaya geçebilirsiniz.</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Sektör</label>
+                          <select value={newCustomer.industry} onChange={(e) => setNewCustomer({...newCustomer, industry: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="">Sektör Seçin</option>
+                            <option value="Teknoloji">Teknoloji</option>
+                            <option value="Finans">Finans</option>
+                            <option value="Üretim">Üretim</option>
+                            <option value="Enerji">Enerji</option>
+                          </select>
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Web Sitesi</label>
+                          <input type="url" value={newCustomer.website} onChange={(e) => setNewCustomer({...newCustomer, website: e.target.value})} placeholder="https://..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
                       </div>
-                    </div>
-                    <button onClick={() => setShowProposalEditor(true)} className="px-6 py-2 bg-indigo-600 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-100 flex items-center gap-2">
-                      <FileSignature size={14} /> Teklif Hazırla
-                    </button>
-                  </div>
-                )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Genel E-posta</label>
+                          <input type="email" value={newCustomer.email} onChange={(e) => setNewCustomer({...newCustomer, email: e.target.value})} placeholder="info@firma.com" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Telefon</label>
+                          <input type="text" value={newCustomer.phone} onChange={(e) => setNewCustomer({...newCustomer, phone: e.target.value})} placeholder="+90..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Açık Adres</label>
+                        <textarea rows={3} value={newCustomer.address} onChange={(e) => setNewCustomer({...newCustomer, address: e.target.value})} placeholder="Firma merkez adresi..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+                      </div>
+                    </motion.div>
+                  )}
 
-                <div className="space-y-4">
-                  <h5 className="font-bold text-slate-900 flex items-center gap-2">
-                    <Target size={18} className="text-indigo-600" />
-                    Görevler ve Takip
-                  </h5>
-                  <TaskProgressTracker tasks={tasks || []} setTasks={setTasks!} relatedModule="OPPORTUNITY" relatedItemId={selectedOpp.id} />
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                  {customerTab === 'FINANCIAL' && (
+                    <motion.div key="financial" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Vergi Dairesi</label>
+                          <input type="text" value={newCustomer.taxOffice} onChange={(e) => setNewCustomer({...newCustomer, taxOffice: e.target.value})} placeholder="Daire Adı" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Vergi Numarası / VKNo</label>
+                          <input type="text" value={newCustomer.taxNumber} onChange={(e) => setNewCustomer({...newCustomer, taxNumber: e.target.value})} placeholder="10 Haneli No" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Maksimum Kredi Limiti</label>
+                          <input type="number" value={newCustomer.creditLimit} onChange={(e) => setNewCustomer({...newCustomer, creditLimit: Number(e.target.value)})} placeholder="0.00" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20" />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Çalışma Para Birimi</label>
+                          <select value={newCustomer.currency} onChange={(e) => setNewCustomer({...newCustomer, currency: e.target.value})} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20">
+                            <option value="USD">USD - Amerikan Doları</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="TRY">TRY - Türk Lirası</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">İç Risk Skoru (0-100)</label>
+                        <input type="range" min="0" max="100" value={newCustomer.riskScore} onChange={(e) => setNewCustomer({...newCustomer, riskScore: Number(e.target.value)})} className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-600" />
+                        <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase mt-2">
+                          <span>Güvenli (0)</span>
+                          <span className="text-indigo-600">Skor: {newCustomer.riskScore}</span>
+                          <span>Riskli (100)</span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
 
-      {/* New Opportunity Modal */}
-      <AnimatePresence>
-        {showNewModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6">
-              <h4 className="text-xl font-bold text-slate-900">Yeni Fırsat Ekle</h4>
-              <div className="space-y-4">
-                <input type="text" placeholder="Fırsat Başlığı" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
-                <select className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500">
-                  <option value="">Müşteri Seçin</option>
-                  {(customers || MOCK_CUSTOMERS).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <div className="grid grid-cols-2 gap-4">
-                  <input type="number" placeholder="Değer ($)" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
-                  <input type="date" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowNewModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
-                <button className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Kaydet</button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                  {customerTab === 'TECH' && (
+                    <motion.div key="tech" initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 10 }} className="space-y-6">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Kullandığı Teknolojiler (Tech Stack)</label>
+                        <textarea rows={4} value={newCustomer.techStack} onChange={(e) => setNewCustomer({...newCustomer, techStack: e.target.value})} placeholder="Örn: Cisco, Dell, Microsoft 365, VMware..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Özel Operasyonel Notlar</label>
+                        <textarea rows={4} value={newCustomer.notes} onChange={(e) => setNewCustomer({...newCustomer, notes: e.target.value})} placeholder="Lojistik kısıtları, özel faturalama talepleri vb..." className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl outline-none focus:ring-2 focus:ring-indigo-500/20 resize-none" />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </form>
 
-      {/* New Customer Modal */}
-      <AnimatePresence>
-        {showNewCustomerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden p-8 space-y-6">
-              <h4 className="text-xl font-bold text-slate-900">Yeni Müşteri</h4>
-              <div className="space-y-4">
-                <input type="text" placeholder="Firma Adı" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
-                <input type="email" placeholder="E-posta" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500" />
-              </div>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowNewCustomerModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
-                <button className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold">Kaydet</button>
+              <div className="p-8 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+                <button type="button" onClick={() => setShowNewCustomerModal(false)} className="px-8 py-3 text-sm font-black text-slate-500 uppercase tracking-widest hover:text-slate-700 transition-colors">İPTAL</button>
+                <button 
+                  onClick={handleSaveCustomer}
+                  disabled={loading || !newCustomer.name}
+                  className="bg-indigo-600 text-white px-10 py-4 rounded-3xl text-sm font-black shadow-xl shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50 uppercase tracking-widest"
+                >
+                  {loading ? <Loader2 size={20} className="animate-spin" /> : <><Save size={20} /> KAYDI TAMAMLA</>}
+                </button>
               </div>
             </motion.div>
           </div>

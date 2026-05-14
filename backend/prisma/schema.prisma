@@ -19,6 +19,7 @@ model Tenant {
   users         User[]
   opportunities Opportunity[]
   projects      Project[]
+  customers     Customer[]
 }
 
 model Unit {
@@ -40,7 +41,7 @@ model User {
   name        String
   email       String   @unique
   role        String   
-  permissions String   // Store as JSON string for SQLite
+  permissions String   // JSON string
   status      String   @default("ACTIVE")
   
   tenantId    String
@@ -58,6 +59,46 @@ model User {
   updatedAt   DateTime @updatedAt
 }
 
+model Customer {
+  id                 String   @id @default(cuid())
+  name               String   // Firma Resmi Adı
+  shortName          String?  // Marka/Kısa Ad
+  industry           String?  // Sektör
+  website            String?
+  logo               String?  // Logo URL/Base64
+  
+  // İletişim Bilgileri
+  email              String?
+  phone              String?
+  address            String?
+  city               String?
+  country            String?
+  postalCode         String?
+  
+  // Kurumsal / Finansal Bilgiler
+  taxOffice          String?  // Vergi Dairesi
+  taxNumber          String?  // Vergi Numarası
+  chamberOfCommerce  String?  // Ticaret Odası No
+  tradeRegistryNo    String?  // Ticaret Sicil No
+  riskScore          Int      @default(0) // 0-100
+  creditLimit        Float    @default(0)
+  currency           String   @default("USD")
+  
+  // Otomasyon ve Teknik Bilgiler
+  techStack          String?  // JSON String: Kullandığı teknolojiler
+  socialMedia        String?  // JSON String: LinkedIn, Twitter vb.
+  notes              String?  
+  status             String   @default("ACTIVE") // ACTIVE, PASSIVE, PROSPECT
+  
+  tenantId           String
+  tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  
+  opportunities      Opportunity[]
+  
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
 model Opportunity {
   id                 String   @id @default(cuid())
   title              String
@@ -72,6 +113,9 @@ model Opportunity {
   
   tenantId           String
   tenant             Tenant   @relation(fields: [tenantId], references: [id])
+  
+  customerId         String
+  customer           Customer @relation(fields: [customerId], references: [id])
   
   assignedToId       String
   assignedTo         User     @relation("AssignedTo", fields: [assignedToId], references: [id])

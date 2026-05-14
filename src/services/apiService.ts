@@ -45,6 +45,24 @@ class ApiService {
     return this.fetchWithAuth('/units');
   }
 
+  async getCustomers() {
+    return this.fetchWithAuth('/customers');
+  }
+
+  async createCustomer(data: any) {
+    return this.fetchWithAuth('/customers', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateCustomer(id: string, data: any) {
+    return this.fetchWithAuth(`/customers/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
   async createUser(userData: any) {
     return this.fetchWithAuth('/users', {
       method: 'POST',

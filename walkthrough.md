@@ -27,10 +27,11 @@ Statik bir kayıt sisteminden öte, birimler arası iş akışını (workflow) v
 
 ## 3. Fonksiyonel Modüller
 
-### A. CRM & Fırsat Yönetimi
-Satış boru hattının (Pipeline) başlangıç noktasıdır.
-- **Dinamik Fırsat Takibi:** Fırsatların aşama (Yeni, Teklif, Pazarlık vb.) ve olasılık bazlı yönetimi.
-- **Müşteri Portföyü:** Risk skorlaması ve iletişim geçmişi içeren firma kartları.
+### A. CRM & Merkezi Müşteri Hafızası
+Satış boru hattının (Pipeline) ve kurumsal hafızanın merkezidir.
+- **Maksimum Veri Derinliği:** Müşterilerin sadece iletişim bilgileri değil; Vergi Detayları, Finansal Risk Skorları, Kredi Limitleri ve Teknik Alt Yapı (Tech Stack) verileri merkezi olarak tutulur.
+- **Sekmeli Veri Girişi:** Karmaşık kurumsal verilerin yapısal ve hatasız toplanmasını sağlayan modern arayüz.
+- **Otomasyon Kaynağı:** Kaydedilen her müşteri verisi; otomatik PDF teklif üretimi, lojistik planlama ve satın alma onayları için "Tek Kaynak" (Single Source of Truth) işlevi görür.
 
 ### B. Presales & AI Teknik Analiz
 Projenin teknik omurgasını oluşturur.

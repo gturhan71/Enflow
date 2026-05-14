@@ -60,6 +60,47 @@ app.get('/api/units', tenantMiddleware, async (req, res) => {
   res.json(units);
 });
 
+// Customer Routes
+app.get('/api/customers', tenantMiddleware, async (req, res) => {
+  const customers = await prisma.customer.findMany({
+    where: { tenantId: (req as any).tenantId },
+    orderBy: { name: 'asc' }
+  });
+  res.json(customers);
+});
+
+app.post('/api/customers', tenantMiddleware, async (req, res) => {
+  const data = req.body;
+  try {
+    const customer = await prisma.customer.create({
+      data: {
+        ...data,
+        tenantId: (req as any).tenantId
+      }
+    });
+    res.json(customer);
+  } catch (error: any) {
+    res.status(400).json({ error: 'Müşteri oluşturulamadı.' });
+  }
+});
+
+app.put('/api/customers/:id', tenantMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const data = req.body;
+  try {
+    const customer = await prisma.customer.update({
+      where: { id },
+      data: {
+        ...data,
+        tenantId: (req as any).tenantId // Ensure tenant consistency
+      }
+    });
+    res.json(customer);
+  } catch (error: any) {
+    res.status(400).json({ error: 'Müşteri güncellenemedi.' });
+  }
+});
+
 // User Routes
 app.post('/api/users', tenantMiddleware, async (req, res) => {
   const { name, email, role, unitId, permissions } = req.body;
