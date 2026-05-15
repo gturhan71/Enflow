@@ -208,15 +208,15 @@ const SettingsModule = ({
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h4 className="text-xl font-bold text-slate-900">Kurumsal Birimler</h4>
-              <button onClick={() => { setEditingUnit(null); setShowUnitModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><Plus size={18} /> Yeni Birim Ekle</button>
+              <button onClick={() => { setEditingUnit(null); setShowUnitModal(true); }} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"><Plus size={18} /> Yeni Birim Ekle</button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {units.map(unit => (
                 <div key={unit.id} className="glass-panel p-6 rounded-3xl flex flex-col group border-slate-100 hover:border-indigo-300 transition-all">
                   <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-2xl flex items-center justify-center"><Building size={24} /></div>
+                    <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center"><Building size={24} /></div>
                     <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setEditingUnit(unit); setShowUnitModal(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Edit3 size={16} /></button>
+                      <button onClick={() => { setEditingUnit(unit); setShowUnitModal(true); }} className="p-2 text-slate-400 hover:text-primary hover:bg-primary/5 rounded-lg"><Edit3 size={16} /></button>
                       <button className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg"><Trash2 size={16} /></button>
                     </div>
                   </div>
@@ -232,7 +232,7 @@ const SettingsModule = ({
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h4 className="text-xl font-bold text-slate-900">Sistem Kullanıcıları</h4>
-              <button onClick={() => { setEditingUser(null); setShowUserModal(true); }} className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2"><UserPlus size={18} /> Yeni Kullanıcı</button>
+              <button onClick={() => { setEditingUser(null); setShowUserModal(true); }} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"><UserPlus size={18} /> Yeni Kullanıcı</button>
             </div>
             <div className="bg-white border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
               <table className="w-full text-left text-sm">
@@ -252,7 +252,7 @@ const SettingsModule = ({
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
-                          <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded text-[10px] font-bold uppercase w-fit">{user.role}</span>
+                          <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold uppercase w-fit">{user.role}</span>
                           <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1"><Building2 size={10} /> {tenants.find(t => t.id === user.tenantId)?.name || 'Bilinmeyen'}</span>
                         </div>
                       </td>
@@ -275,7 +275,7 @@ const SettingsModule = ({
               <div key={item.id} className="glass-panel p-6 rounded-3xl flex flex-col gap-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center"><item.icon size={20} /></div>
+                    <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><item.icon size={20} /></div>
                     <h4 className="font-bold text-slate-900">{item.label}</h4>
                   </div>
                   <div onClick={() => togglePermission(item.requiredPermission)} className={cn("w-12 h-6 rounded-full relative cursor-pointer transition-colors shadow-inner", currentUser.permissions.includes(item.requiredPermission) ? "bg-emerald-500" : "bg-slate-300")}>
@@ -299,7 +299,7 @@ const SettingsModule = ({
                 <textarea name="description" placeholder="Birim Açıklaması" className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none" />
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setShowUnitModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
-                  <button type="submit" className="bg-indigo-600 text-white px-8 py-2 rounded-xl text-sm font-bold">Kaydet</button>
+                  <button type="submit" className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all">Kaydet</button>
                 </div>
               </form>
             </motion.div>
@@ -338,7 +338,7 @@ const SettingsModule = ({
                   <button 
                     type="submit" 
                     disabled={loading}
-                    className="bg-indigo-600 text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"
+                    className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
                   >
                     {loading ? <Loader2 size={16} className="animate-spin" /> : 'Kaydet ve Ata'}
                   </button>

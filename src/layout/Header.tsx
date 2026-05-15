@@ -1,102 +1,16 @@
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
-  Settings,
   Bell,
   Search,
-  Plus,
-  ArrowUpRight,
-  Clock,
   CheckCircle2,
-  AlertCircle,
-  FileCheck,
-  ChevronRight,
-  Menu,
-  X,
   LogOut,
-  TrendingUp,
-  DollarSign,
-  Briefcase,
-  Truck,
-  Package,
-  History,
-  FileDown,
-  Calendar,
-  ShieldCheck,
-  MapPin,
-  UserCheck,
-  ExternalLink,
-  Download,
-  Filter,
-  MoreVertical,
-  BarChart3,
-  PieChart,
-  ArrowDownRight,
-  Target,
-  Percent,
-  FileSignature,
-  Gavel,
-  Kanban,
-  Wand2,
-  Puzzle,
-  Cpu,
-  Mail,
-  MessageSquare,
-  ListTodo,
-  UserPlus,
-  FileCheck2,
+  Clock,
   Save
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
-import { 
-  NAV_ITEMS, 
-  MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
-  MOCK_SYSTEM_USERS,
-  MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
-} from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
-  TodoTask,
-  Opportunity,
-  Project,
-  NextcloudConfig,
-  ExchangeConfig,
-  WhatsAppConfig
-} from '../types';
-import { nextcloudService } from '../services/nextcloudService';
-import { exchangeService } from '../services/exchangeService';
-import { whatsappService } from '../services/whatsappService';
 
-
-const Header = ({ title, onLogout }: { title: string, onLogout: () => void }) => {
-  const { hasUnsavedChanges, setHasUnsavedChanges, handleNavigate } = useUnsavedChanges();
+const Header = ({ activeTab, companyLogo }: { activeTab: string, companyLogo: string | null }) => {
+  const { hasUnsavedChanges, setHasUnsavedChanges } = useUnsavedChanges();
   const [saved, setSaved] = useState(false);
 
   const handleSave = () => {
@@ -105,47 +19,69 @@ const Header = ({ title, onLogout }: { title: string, onLogout: () => void }) =>
     setTimeout(() => setSaved(false), 2000);
   };
 
+  const getTitle = () => {
+    const titles: Record<string, string> = {
+      'dashboard': 'KONTROL PANELİ',
+      'crm': 'MÜŞTERİ İLİŞKİLERİ',
+      'crm-opportunities': 'SATIŞ FIRSATLARI',
+      'crm-customers': 'MÜŞTERİ PORTFÖYÜ',
+      'todo': 'GÖREV TAKİBİ',
+      'project-mgmt': 'PROJE YÖNETİMİ',
+      'procurement': 'SATIN ALMA',
+      'contract': 'SÖZLEŞME MERKEZİ',
+      'archive': 'DİJİTAL ARŞİV',
+      'settings-general': 'GENEL AYARLAR',
+      'settings-users': 'KULLANICI YÖNETİMİ'
+    };
+    return titles[activeTab] || 'ENFLOW';
+  };
+
   return (
-    <header className="h-20 glass-header px-8 flex items-center justify-between sticky top-0 z-10">
-      <div className="flex items-center gap-4">
-        <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-        <div className="h-6 w-px bg-slate-200 mx-2" />
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Clock size={16} />
-          <span>8 Nisan 2026, 13:56</span>
+    <header className="h-20 px-8 flex items-center justify-between sticky top-0 z-10 glass-header border-b border-white/40">
+      <div className="flex items-center gap-6">
+        <div className="flex flex-col">
+          <h2 className="text-xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">{getTitle()}</h2>
+          <div className="flex items-center gap-2 mt-1">
+             <div className="w-1.5 h-1.5 rounded-full bg-primary" />
+             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">Canlı Sistem</span>
+          </div>
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <button
-          onClick={handleSave}
-          disabled={!hasUnsavedChanges && !saved}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all ${
-            saved
-              ? 'bg-emerald-100 text-emerald-700'
-              : hasUnsavedChanges
-              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 hover:bg-indigo-700'
-              : 'bg-slate-100 text-slate-400 cursor-not-allowed'
-          }`}
-        >
-          {saved ? <CheckCircle2 size={18} /> : <Save size={18} />}
-          {saved ? 'Kaydedildi' : 'Kaydet'}
-        </button>
+      <div className="flex items-center gap-6">
+        <div className="relative group hidden md:block">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={16} />
+          <input 
+            type="text" 
+            placeholder="Sistemde ara..." 
+            className="pl-11 pr-4 py-2.5 bg-slate-100/50 border border-transparent rounded-xl text-xs font-bold focus:bg-white focus:border-primary/20 outline-none w-64 transition-all"
+          />
+        </div>
 
-        <div className="h-6 w-px bg-slate-200 mx-1" />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            disabled={!hasUnsavedChanges && !saved}
+            className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all ${
+              saved
+                ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                : hasUnsavedChanges
+                ? 'bg-primary text-white shadow-lg shadow-primary/20 hover:bg-primary/90'
+                : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-50'
+            }`}
+          >
+            {saved ? <CheckCircle2 size={14} /> : <Save size={14} />}
+            {saved ? 'KAYDEDİLDİ' : 'DEĞİŞİKLİKLERİ KAYDET'}
+          </button>
 
-        <button 
-          onClick={() => handleNavigate(onLogout)}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm text-red-600 hover:bg-red-50 transition-all"
-        >
-          <LogOut size={18} />
-          Çıkış Yap
-        </button>
+          <button className="p-2.5 bg-white border border-slate-100 rounded-xl text-slate-400 hover:text-primary hover:border-primary/20 transition-all relative">
+            <Bell size={20} />
+            <div className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+          </button>
+        </div>
       </div>
     </header>
   );
 };
-
-// --- Modules ---
 
 export default Header;

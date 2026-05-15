@@ -27,10 +27,23 @@ export interface User {
 export interface Customer {
   id: string;
   name: string;
+  shortName?: string;
   industry: string;
-  riskScore: number;
-  contactPerson: string;
+  website?: string;
   email: string;
+  phone?: string;
+  address?: string;
+  city?: string;
+  country: string;
+  taxOffice?: string;
+  taxNumber?: string;
+  riskScore: number;
+  creditLimit: number;
+  currency: string;
+  techStack?: string;
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface TimelineEvent {
@@ -232,4 +245,24 @@ export interface AnalysisResult {
     description: string;
     quantity: number;
   }[];
+}
+
+export interface WorkflowStep {
+  id: string;
+  workflowId: string;
+  unitId: string;
+  order: number;
+  type: 'AUTO' | 'MANUAL';
+  description: string;
+  nextStepId: string | null;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  steps: WorkflowStep[];
+  createdAt: string;
+  updatedAt: string;
 }

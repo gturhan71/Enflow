@@ -1,270 +1,199 @@
-import React, { useState } from 'react';
+import React, { useMemo } from 'react';
 import { 
-  Plus, 
-  ArrowUpRight, 
-  Clock, 
-  CheckCircle2, 
-  AlertCircle, 
-  ChevronRight, 
-  X, 
   TrendingUp, 
   DollarSign, 
   Briefcase, 
-  History, 
-  Activity,
-  Building,
-  Users,
-  GitBranch,
+  Clock, 
   Target,
-  ShoppingCart,
-  FileSearch,
-  FileCheck2,
-  Package
+  ArrowUpRight,
+  ShieldCheck,
+  Zap
 } from 'lucide-react';
-import { motion } from 'motion/react';
 import { 
-  AreaChart, 
-  Area, 
+  BarChart, 
+  Bar, 
   XAxis, 
   YAxis, 
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  BarChart,
-  Bar
+  Cell
 } from 'recharts';
-import { cn } from '@/src/lib/utils';
-import { 
-  MOCK_PROJECTS, 
-  MOCK_OPPORTUNITIES,
-  MOCK_UNITS,
-  MOCK_SYSTEM_USERS
-} from '../constants';
-import { useAuth } from '../contexts/AuthContext';
-import { PermissionGate } from '../components/PermissionGate';
+import { motion } from 'motion/react';
+import { Opportunity, Project, TodoTask } from '../types';
+import { cn } from '../lib/utils';
 
-const PIPELINE_DATA = [
-  { month: 'Ocak', value: 4200000 },
-  { month: 'Şubat', value: 5100000 },
-  { month: 'Mart', value: 4800000 },
-  { month: 'Nisan', value: 6200000 },
-  { month: 'Mayıs', value: 8500000 },
-];
+// Sub-component for KPI cards (Memoized for performance)
+const KPICard = React.memo(({ kpi, index }: { kpi: any, index: number }) => (
+  <motion.div 
+    initial={{ opacity: 0, y: 20 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ delay: index * 0.1 }}
+    className="glass-panel p-8 rounded-[32px] group relative overflow-hidden shadow-sm hover:shadow-xl transition-all border-white/40"
+  >
+    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+      <kpi.icon size={80} />
+    </div>
+    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", kpi.bg, kpi.color)}>
+      <kpi.icon size={28} />
+    </div>
+    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{kpi.label}</p>
+    <div className="flex items-baseline gap-2">
+      <h4 className="text-3xl font-black text-slate-900 tracking-tighter">{kpi.value}</h4>
+      <ArrowUpRight size={16} className="text-primary" />
+    </div>
+    <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 italic">{kpi.sub}</p>
+  </motion.div>
+));
 
-const UNIT_LOAD_DATA = [
-  { name: 'Teknik', value: 45, color: '#6366f1' },
-  { name: 'Satış', value: 25, color: '#10b981' },
-  { name: 'Hukuk', value: 15, color: '#f59e0b' },
-  { name: 'Proje', value: 15, color: '#ef4444' },
-];
-
-const Dashboard = () => {
-  const { currentUser } = useAuth();
-  const role = currentUser?.role;
+const Dashboard = ({ 
+  opportunities = [], 
+  projects = [], 
+  tasks = [] 
+}: { 
+  opportunities: Opportunity[], 
+  projects: Project[], 
+  tasks: TodoTask[] 
+}) => {
   
-  // Logic for filtering data based on role
-  const totalPipelineValue = MOCK_OPPORTUNITIES.reduce((sum, o) => sum + o.value, 0);
-  const pendingBoMs = MOCK_OPPORTUNITIES.filter(o => o.bomStatus === 'SUBMITTED').length;
+  // Optimization: useMemo for expensive calculations
+  const kpis = useMemo(() => {
+    const totalPipelineValue = opportunities.reduce((sum, o) => sum + (o.value || 0), 0);
+    const weightedValue = opportunities.reduce((sum, o) => sum + ((o.value || 0) * ((o.probability || 0) / 100)), 0);
+    const activeProjects = projects.filter(p => ['IN_PROGRESS', 'NOT_STARTED'].includes(p.status)).length;
+    const pendingTasks = tasks.filter(t => t.status !== 'COMPLETED').length;
 
-  // Role-based Alert Logic
-  const getAlerts = () => {
-    const common = [
-      { title: 'Şartname Analizi Tamamlandı', desc: 'Global Bank projesi için BoM hazır.', type: 'info' },
+    return [
+      { label: 'Toplam Pipeline', value: `${(totalPipelineValue / 1000000).toFixed(1)}M $`, sub: 'Brüt Fırsat Değeri', icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10' },
+      { label: 'Ağırlıklı Değer', value: `${(weightedValue / 1000000).toFixed(1)}M $`, sub: 'Olasılık Bazlı Tahmin', icon: Target, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { label: 'Aktif Projeler', value: activeProjects, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-50' },
+      { label: 'Bekleyen Görevler', value: pendingTasks, sub: 'Aksiyon Bekleyen', icon: Clock, color: 'text-orange-600', bg: 'bg-orange-50' },
     ];
+  }, [opportunities, projects, tasks]);
 
-    if (role === 'GENERAL_MANAGER') return [
-      ...common,
-      { title: 'Düşük Marjlı Teklif', desc: 'P2 projesi %9.2 marj ile onay bekliyor.', type: 'danger' },
-      { title: 'Birim Ataması Bekleniyor', desc: 'Yeni müşteri fırsatı için teknik birim atanmadı.', type: 'warning' },
-    ];
+  const pipelineChartData = useMemo(() => [
+    { name: 'Yeni', value: opportunities.filter(o => o.status === 'NEW').length },
+    { name: 'Nitelikli', value: opportunities.filter(o => o.status === 'QUALIFIED').length },
+    { name: 'Teklif', value: opportunities.filter(o => o.status === 'PROPOSAL').length },
+    { name: 'Pazarlık', value: opportunities.filter(o => o.status === 'NEGOTIATION').length },
+    { name: 'Kazanıldı', value: opportunities.filter(o => o.status === 'WON').length },
+  ], [opportunities]);
 
-    if (role === 'PRESALES_ENG') return [
-      ...common,
-      { title: 'Yeni Şartname Atandı', desc: 'Kamu Hastanesi projesi analiz bekliyor.', type: 'warning' },
-      { title: 'BoM Revizyonu', desc: 'Veri Merkezi BoM listesi reddedildi.', type: 'danger' },
-    ];
-
-    if (role === 'PROCUREMENT_MGR') return [
-      ...common,
-      { title: 'Geciken Sipariş', desc: 'Dell Sunucu ETA süresi 3 gün geçti.', type: 'danger' },
-      { title: 'Fiyat Onayı', desc: 'Cisco yedek parça alımı onay bekliyor.', type: 'warning' },
-    ];
-
-    return common;
-  };
-
-  const renderRoleStats = () => {
-    const stats = {
-      GENERAL_MANAGER: [
-        { label: 'Pipeline Değeri', value: `$${(totalPipelineValue / 1000000).toFixed(1)}M`, icon: Target, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'Aylık Büyüme', value: '+%24', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Aktif Devirler', value: '12', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Bekleyen Onaylar', value: pendingBoMs, icon: AlertCircle, color: 'text-amber-600', bg: 'bg-amber-50' },
-      ],
-      PRESALES_ENG: [
-        { label: 'Bekleyen Analiz', value: '3', icon: FileSearch, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Aktif BoM', value: '8', icon: Target, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'Onaylı Listeler', value: '142', icon: CheckCircle2, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'İş Yükü Skoru', value: '82/100', icon: Activity, color: 'text-blue-600', bg: 'bg-blue-50' },
-      ],
-      PROCUREMENT_MGR: [
-        { label: 'Açık Siparişler', value: '14', icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'Geciken ETA', value: '2', icon: Clock, color: 'text-red-600', bg: 'bg-red-50' },
-        { label: 'Teslim Alınan', value: '45', icon: Package, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Bütçe Kullanımı', value: '%64', icon: DollarSign, color: 'text-blue-600', bg: 'bg-blue-50' },
-      ],
-      SALES_REP: [
-        { label: 'Kişisel Pipeline', value: '$840K', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-        { label: 'Teklif Verilen', value: '5', icon: FileCheck2, color: 'text-indigo-600', bg: 'bg-indigo-50' },
-        { label: 'Kazanılan (Ay)', value: '2', icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50' },
-        { label: 'Toplantı (Hafta)', value: '6', icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
-      ]
-    };
-
-    const currentStats = stats[role as keyof typeof stats] || stats.GENERAL_MANAGER;
-
-    return currentStats.map((stat, i) => (
-      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }} key={i} className="glass-panel p-6 rounded-[32px] border border-slate-100 hover:shadow-2xl transition-all">
-        <div className={cn("p-3 rounded-2xl w-fit mb-4", stat.bg)}>
-          <stat.icon size={24} className={stat.color} />
-        </div>
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{stat.label}</p>
-        <h3 className="text-2xl font-black text-slate-900 mt-1">{stat.value}</h3>
-      </motion.div>
-    ));
-  };
+  const COLORS = ['hsla(151, 86%, 39%, 0.8)', 'hsla(217, 91%, 60%, 0.8)', 'hsla(271, 91%, 65%, 0.8)', 'hsla(14, 91%, 60%, 0.8)', 'hsla(151, 86%, 39%, 1)'];
 
   return (
-    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24">
-      {/* Welcome & Role Badge */}
-      <div className="flex items-center justify-between">
+    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-             <h2 className="text-3xl font-black text-slate-900 tracking-tight underline decoration-indigo-500/30 decoration-8 underline-offset-8">HOŞ GELDİN, {currentUser?.name?.split(' ')[0].toUpperCase()}!</h2>
-             <span className="px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-black rounded-full uppercase border border-indigo-100">
-               {role?.replace('_', ' ')}
-             </span>
+          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Kurumsal Kokpit</h3>
+          <p className="text-slate-500 font-medium text-sm">Sistem genelindeki canlı performans ve operasyonel veriler.</p>
+        </div>
+        <div className="flex items-center gap-3 glass-card p-3 rounded-2xl bg-white/40 border-white/60">
+          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+            <Zap size={20} fill="currentColor" />
           </div>
-          <p className="text-slate-500 font-medium mt-3">Bugün odaklanmanız gereken {(role === 'PRESALES_ENG' ? 'teknik analizler' : role === 'PROCUREMENT_MGR' ? 'satın alma kalemleri' : 'fırsatlar')} aşağıdadır.</p>
+          <div>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sistem Durumu</p>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full bg-primary shadow-sm shadow-primary/40" />
+              <p className="text-xs font-bold text-slate-900 italic">Senkronize</p>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Dynamic Stats */}
+      {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {renderRoleStats()}
+        {kpis.map((kpi, i) => <KPICard key={kpi.label} kpi={kpi} index={i} />)}
       </div>
 
-      {/* Main Charts / Focused Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Left Column: Contextual Chart or List */}
-        <div className="lg:col-span-2 space-y-8">
-          {role === 'GENERAL_MANAGER' ? (
-            <div className="glass-panel rounded-[40px] p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-lg"><TrendingUp size={20} className="text-emerald-500" />Şirket Geneli Pipeline Trendi</h3>
-              </div>
-              <div className="h-[300px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={PIPELINE_DATA}>
-                    <defs><linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient></defs>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fontWeight: 'bold', fill: '#94a3b8' }} tickFormatter={(v) => `$${v/1000000}M`} />
-                    <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0,0,0,0.1)' }} />
-                    <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorValue)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+        {/* Sales Pipeline Chart */}
+        <div className="lg:col-span-3 glass-panel p-8 rounded-[32px] flex flex-col min-h-[450px] shadow-sm bg-white/40 border-white/40">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Satış Boru Hattı</h4>
+              <p className="text-xs text-slate-500 font-bold">Fırsatların aşamalara göre dağılımı</p>
             </div>
-          ) : (
-            <div className="glass-panel rounded-[40px] p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50">
-              <div className="flex items-center justify-between mb-8">
-                <h3 className="font-bold text-slate-900 flex items-center gap-2 text-lg">
-                  <Activity size={20} className="text-indigo-600" />
-                  Birim İçi Görev Dağılımı
-                </h3>
-              </div>
-              <div className="space-y-6">
-                {MOCK_PROJECTS.slice(0, 4).map(p => (
-                   <div key={p.id} className="p-5 bg-slate-50 rounded-3xl flex items-center justify-between group hover:bg-white hover:shadow-lg transition-all border border-transparent hover:border-indigo-100">
-                      <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm"><Briefcase size={20} /></div>
-                         <div>
-                            <h5 className="font-bold text-slate-900">{p.name}</h5>
-                            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{p.status}</p>
-                         </div>
-                      </div>
-                      <div className="w-32 h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                         <div className="h-full bg-indigo-600" style={{ width: `${p.progress}%` }} />
-                      </div>
-                   </div>
-                ))}
-              </div>
+            <div className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20">
+              <ShieldCheck size={12} /> Doğrulanmış Veri
             </div>
-          )}
-
-          <div className="glass-panel rounded-[40px] p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50">
-            <h3 className="font-bold text-slate-900 mb-8 flex items-center gap-2 text-lg"><History size={20} className="text-blue-600" />Son Aksiyonlar (Biriminiz)</h3>
-            <div className="space-y-6">
-               {[
-                 { from: 'Sistem', desc: 'Yeni şartname dosyası yüklendi.', time: '12 dk önce' },
-                 { from: 'Ahmet Y.', desc: 'Maliyet listesi onaylandı.', time: '1 saat önce' },
-                 { from: 'Zeynep K.', desc: 'Teklif revizyonu yapıldı.', time: 'Dün' },
-               ].map((log, i) => (
-                 <div key={i} className="flex items-start gap-4">
-                    <div className="w-1 h-10 rounded-full bg-indigo-500/20" />
-                    <div>
-                       <p className="text-sm font-bold text-slate-900">{log.desc}</p>
-                       <p className="text-xs text-slate-400">{log.from} • {log.time}</p>
-                    </div>
-                 </div>
-               ))}
-            </div>
+          </div>
+          <div className="flex-1 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={pipelineChartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.03)" />
+                <XAxis 
+                  dataKey="name" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
+                  dy={15}
+                />
+                <YAxis hide />
+                <Tooltip 
+                  cursor={{ fill: 'rgba(0,0,0,0.01)' }}
+                  contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.2)', padding: '20px', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)' }}
+                />
+                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={45}>
+                  {pipelineChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Right Column: Notifications & Role-Specific Tools */}
-        <div className="space-y-6">
-          <div className="glass-panel rounded-[40px] p-8 bg-slate-900 text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-600/20 blur-[60px] rounded-full" />
-            <h3 className="font-bold mb-8 flex items-center justify-between relative z-10 text-lg">
-              Kritik Bildirimler
-              <span className="bg-red-500 text-white text-[10px] px-2 py-0.5 rounded-full">{getAlerts().length}</span>
-            </h3>
-            <div className="space-y-6 relative z-10">
-              {getAlerts().map((alert, i) => (
-                <div key={i} className="flex gap-4 group cursor-pointer">
-                  <div className={cn(
-                    "w-1 h-12 rounded-full",
-                    alert.type === 'danger' ? "bg-red-500" : alert.type === 'warning' ? "bg-amber-500" : "bg-blue-500"
-                  )} />
-                  <div className="flex-1">
-                    <h5 className="text-sm font-bold text-white group-hover:text-indigo-300 transition-colors leading-tight">{alert.title}</h5>
-                    <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">{alert.desc}</p>
-                  </div>
-                </div>
-              ))}
+        {/* Recent Projects List */}
+        <div className="lg:col-span-2 glass-panel p-8 rounded-[32px] flex flex-col max-h-[450px] shadow-sm bg-white/40 border-white/40">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Aktif Projeler</h4>
+              <p className="text-xs text-slate-500 font-bold">Kritik uygulama süreçleri</p>
             </div>
-            <button className="w-full mt-10 py-4 bg-white/10 hover:bg-white/20 rounded-2xl text-[10px] font-black tracking-widest transition-all border border-white/5 backdrop-blur-md uppercase">
-              TÜMÜNÜ GÖR
-            </button>
+            <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary/5 px-4 py-2 rounded-xl transition-all border border-primary/10">Tümünü Gör</button>
           </div>
-
-          <div className="glass-panel rounded-[40px] p-8 bg-white border border-slate-100 shadow-xl shadow-slate-100/50">
-             <h3 className="font-bold text-slate-900 mb-6 flex items-center gap-2 text-lg"><Users size={20} className="text-indigo-600" />İş Yükü Dağılımı</h3>
-             <div className="h-[200px] w-full">
-               <ResponsiveContainer width="100%" height="100%">
-                 <PieChart>
-                   <Pie data={UNIT_LOAD_DATA} innerRadius={50} outerRadius={70} paddingAngle={5} dataKey="value">
-                     {UNIT_LOAD_DATA.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                   </Pie>
-                   <Tooltip />
-                 </PieChart>
-               </ResponsiveContainer>
-             </div>
+          <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+            {projects.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-4">
+                <Briefcase size={48} className="opacity-10" />
+                <p className="text-[10px] font-black uppercase tracking-widest italic">Henüz proje kaydı bulunmuyor</p>
+              </div>
+            ) : (
+              projects.slice(0, 8).map(p => (
+                <motion.div 
+                  layout
+                  key={p.id} 
+                  className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white transition-all border border-transparent hover:border-slate-100 group cursor-pointer shadow-none hover:shadow-lg"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-primary group-hover:text-white flex items-center justify-center transition-all shrink-0">
+                    <Briefcase size={18} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-primary transition-colors">{p.name}</h5>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className={cn(
+                        "text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter",
+                        p.status === 'IN_PROGRESS' ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-500"
+                      )}>
+                        {p.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-black text-slate-900">{((p.totalValue || 0) / 1000).toFixed(0)}k $</p>
+                    <div className="w-16 h-1 bg-slate-100 rounded-full mt-2 overflow-hidden border border-slate-200/50">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${p.progress || 0}%` }}
+                        className="h-full bg-primary rounded-full shadow-sm shadow-primary/40"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </div>

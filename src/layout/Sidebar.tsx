@@ -124,13 +124,13 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
 
   return (
     <div className="w-64 glass-sidebar h-screen flex flex-col sticky top-0 z-20">
-      <div className="p-6 flex items-center gap-3 border-bottom border-slate-100">
-        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-200">
-          <Briefcase size={24} />
+      <div className="p-6 flex items-center gap-3 border-b border-white/20">
+        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
+          <Briefcase size={22} />
         </div>
         <div>
           <h1 className="font-bold text-slate-900 leading-tight uppercase tracking-tighter text-xl">ENFLOW</h1>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Sistem Entegratörü</p>
+          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Sistem Entegratörü</p>
         </div>
       </div>
 
@@ -158,13 +158,13 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
                   isActive && !hasSubItems
-                    ? "bg-indigo-50 text-indigo-700 shadow-sm" 
+                    ? "bg-primary/10 text-primary shadow-sm shadow-primary/5" 
                     : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                 )}
               >
                 <item.icon size={20} className={cn(
                   "transition-colors",
-                  isActive ? "text-indigo-600" : "text-slate-400 group-hover:text-slate-600"
+                  isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
                 )} />
                 <span className="flex-1 text-left">{item.label}</span>
                 {hasSubItems && (
@@ -176,7 +176,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                 {isActive && !hasSubItems && (
                   <motion.div 
                     layoutId="active-pill"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-600"
+                    className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
                   />
                 )}
               </button>
@@ -198,7 +198,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                             className={cn(
                               "w-full text-left px-4 py-2 rounded-lg text-xs font-medium transition-colors",
                               activeTab === subItem.id
-                                ? "bg-indigo-50 text-indigo-700"
+                                ? "bg-primary/5 text-primary"
                                 : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
                             )}
                           >
@@ -215,16 +215,16 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
         })}
       </nav>
 
-      <div className="p-4 border-t border-slate-100">
-        <div className="bg-slate-50 rounded-2xl p-4 flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 font-bold">
-            GT
+      <div className="p-4 border-t border-white/20">
+        <div className="bg-white/40 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 border border-white/40">
+          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-inner">
+            {currentUser?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">Gökhan Turhan</p>
-            <p className="text-xs text-slate-500 truncate">Genel Müdür</p>
+            <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name || 'Kullanıcı'}</p>
+            <p className="text-[10px] text-slate-500 truncate uppercase tracking-wider font-bold">{currentUser?.role?.replace('_', ' ') || 'GÖREV TANIMSIZ'}</p>
           </div>
-          <button onClick={() => handleNavigate(onLogout)} className="text-slate-400 hover:text-slate-600">
+          <button onClick={() => handleNavigate(onLogout)} className="text-slate-400 hover:text-primary transition-colors">
             <LogOut size={18} />
           </button>
         </div>

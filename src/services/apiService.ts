@@ -47,6 +47,7 @@ class ApiService {
     return response.json();
   }
 
+  // --- UNITS ---
   async getUnits() {
     return this.fetchWithAuth('/units');
   }
@@ -58,6 +59,32 @@ class ApiService {
     });
   }
 
+  // --- USERS ---
+  async getUsers() {
+    return this.fetchWithAuth('/users');
+  }
+
+  async createUser(userData: any) {
+    return this.fetchWithAuth('/users', {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+  }
+
+  async updateUser(id: string, userData: any) {
+    return this.fetchWithAuth(`/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  }
+
+  async deleteUser(id: string) {
+    return this.fetchWithAuth(`/users/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- CUSTOMERS ---
   async getCustomers() {
     return this.fetchWithAuth('/customers');
   }
@@ -76,6 +103,13 @@ class ApiService {
     });
   }
 
+  async deleteCustomer(id: string) {
+    return this.fetchWithAuth(`/customers/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- OPPORTUNITIES ---
   async getOpportunities() {
     return this.fetchWithAuth('/opportunities');
   }
@@ -87,19 +121,165 @@ class ApiService {
     });
   }
 
+  async updateOpportunity(id: string, data: any) {
+    return this.fetchWithAuth(`/opportunities/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteOpportunity(id: string) {
+    return this.fetchWithAuth(`/opportunities/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- PROJECTS ---
   async getProjects() {
     return this.fetchWithAuth('/projects');
   }
 
-  async createUser(userData: any) {
-    return this.fetchWithAuth('/users', {
+  async createProject(data: any) {
+    return this.fetchWithAuth('/projects', {
       method: 'POST',
-      body: JSON.stringify(userData)
+      body: JSON.stringify(data)
     });
   }
 
-  async deleteUser(id: string) {
-    return this.fetchWithAuth(`/users/${id}`, {
+  async updateProject(id: string, data: any) {
+    return this.fetchWithAuth(`/projects/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteProject(id: string) {
+    return this.fetchWithAuth(`/projects/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- TASKS ---
+  async getTasks() {
+    return this.fetchWithAuth('/tasks');
+  }
+
+  async createTask(data: any) {
+    return this.fetchWithAuth('/tasks', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateTask(id: string, data: any) {
+    return this.fetchWithAuth(`/tasks/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteTask(id: string) {
+    return this.fetchWithAuth(`/tasks/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- CONTRACTS ---
+  async getContracts() {
+    return this.fetchWithAuth('/contracts');
+  }
+
+  async createContract(data: any) {
+    return this.fetchWithAuth('/contracts', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateContract(id: string, data: any) {
+    return this.fetchWithAuth(`/contracts/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteContract(id: string) {
+    return this.fetchWithAuth(`/contracts/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- ARCHIVE ---
+  async getArchiveItems() {
+    return this.fetchWithAuth('/archive');
+  }
+
+  async createArchiveItem(data: any) {
+    return this.fetchWithAuth('/archive', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateArchiveItem(id: string, data: any) {
+    return this.fetchWithAuth(`/archive/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteArchiveItem(id: string) {
+    return this.fetchWithAuth(`/archive/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- NOTIFICATIONS ---
+  async getNotifications() {
+    return this.fetchWithAuth('/notifications');
+  }
+
+  async createNotification(data: any) {
+    return this.fetchWithAuth('/notifications', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateNotification(id: string, data: any) {
+    return this.fetchWithAuth(`/notifications/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteNotification(id: string) {
+    return this.fetchWithAuth(`/notifications/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- DOCUMENTS ---
+  async getDocuments() {
+    return this.fetchWithAuth('/documents');
+  }
+
+  async createDocument(data: any) {
+    return this.fetchWithAuth('/documents', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateDocument(id: string, data: any) {
+    return this.fetchWithAuth(`/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteDocument(id: string) {
+    return this.fetchWithAuth(`/documents/${id}`, {
       method: 'DELETE'
     });
   }
@@ -116,6 +296,25 @@ class ApiService {
       throw new Error(error.error || 'İşlem başarısız.');
     }
     return response.json();
+  }
+
+  // --- WORKFLOWS ---
+  async getWorkflows() {
+    return this.fetchWithAuth('/workflows');
+  }
+
+  async createWorkflow(data: any) {
+    return this.fetchWithAuth('/workflows', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateWorkflow(id: string, data: any) {
+    return this.fetchWithAuth(`/workflows/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
   }
 }
 

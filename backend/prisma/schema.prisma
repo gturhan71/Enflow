@@ -16,6 +16,11 @@ model Tenant {
   projects      Project[]
   units         Unit[]
   users         User[]
+  contracts     Contract[]
+  tasks         TodoTask[]
+  archiveItems  ArchiveItem[]
+  documents     CorporateDocument[]
+  workflows     Workflow[]
 }
 
 model Unit {
@@ -29,6 +34,7 @@ model Unit {
   manager     User?    @relation("UnitManager", fields: [managerId], references: [id])
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   users       User[]
+  steps       WorkflowStep[]
 }
 
 model User {
@@ -103,6 +109,7 @@ model Opportunity {
   customer          Customer      @relation(fields: [customerId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   workflowLogs      WorkflowLog[]
+  contracts         Contract[]
 }
 
 model BoMItem {
@@ -133,14 +140,125 @@ model WorkflowLog {
 }
 
 model Project {
+  id               String        @id @default(cuid())
+  name             String
+  status           String
+  totalValue       Float
+  avgMargin        Float
+  deadline         DateTime
+  progress         Int           @default(0)
+  customerId       String?
+  ownerId          String?
+  managerId        String?
+  opportunityId    String?       @unique
+  procurementNotes String?       // JSON string
+  tenantId         String
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  tasks            TodoTask[]    @relation("ProjectTasks")
+}
+
+model Contract {
+  id              String        @id @default(cuid())
+  title           String?
+  status          String        @default("DRAFT")
+  signedDate      DateTime?
+  endDate         DateTime?
+  guaranteeAmount Float         @default(0)
+  guaranteeExpiry DateTime?
+  projectId       String?
+  opportunityId   String?
+  tenantId        String
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  opportunity     Opportunity?  @relation(fields: [opportunityId], references: [id])
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
+}
+
+model TodoTask {
+  id            String   @id @default(cuid())
+  title         String
+  description   String?
+  unitId        String
+  assignedBy    String
+  priority      String   @default("MEDIUM")
+  status        String   @default("PENDING")
+  dueDate       DateTime?
+  progressNotes String?  // JSON string
+  relatedModule String?  // PROJECT, OPPORTUNITY, CONTRACT, PROCUREMENT, GENERAL
+  relatedItemId String?
+  tenantId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tenant        Tenant   @relation(fields: [tenantId], references: [id])
+  project       Project? @relation("ProjectTasks", fields: [relatedItemId], references: [id])
+}
+
+model ArchiveItem {
+  id          String   @id @default(cuid())
+  boxNo       String
+  shelfNo     String
+  category    String
+  description String?
+  owner       String
+  date        DateTime @default(now())
+  status      String   @default("IN_ARCHIVE")
+  tags        String?  // Comma separated or JSON
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  timestamp DateTime @default(now())
+  tenantId  String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CorporateDocument {
   id         String   @id @default(cuid())
   name       String
-  status     String
-  totalValue Float
-  avgMargin  Float
-  deadline   DateTime
+  category   String
+  expiryDate DateTime?
+  fileUrl    String?
+  tags       String?
   tenantId   String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
   tenant     Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model Workflow {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean        @default(true)
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  steps       WorkflowStep[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+model WorkflowStep {
+  id          String   @id @default(cuid())
+  workflowId  String
+  workflow    Workflow @relation(fields: [workflowId], references: [id])
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id])
+  order       Int
+  type        String   @default("AUTO") // AUTO, MANUAL
+  description String
+  nextStepId  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

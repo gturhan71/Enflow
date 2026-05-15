@@ -1,21 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Settings } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   NAV_ITEMS, 
-  MOCK_PROJECTS, 
-  MOCK_CONTRACTS,
-  MOCK_OPPORTUNITIES,
-  MOCK_CUSTOMERS,
-  MOCK_TODO_TASKS,
-  MOCK_SYSTEM_USERS,
-  MOCK_UNITS
 } from './constants';
 import { 
   Contract,
   Opportunity,
   Project,
-  TodoTask
+  TodoTask,
+  Unit,
+  User
 } from './types';
 
 import Sidebar from './layout/Sidebar';
@@ -35,90 +29,58 @@ import ArchiveModule from './modules/ArchiveModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { apiService } from './services/apiService';
 
 const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: () => void }) => {
-  const { currentUser, setCurrentUser } = useAuth();
+  const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [loading, setLoading] = useState(true);
   
-  const [companyLogo, setCompanyLogoState] = useState<string | null>(() => {
-    return localStorage.getItem(`enflow_company_logo_${tenantId}`);
-  });
-  
-  const [opportunities, setOpportunities] = useState<Opportunity[]>(() => {
-    const saved = localStorage.getItem(`enflow_opps_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_OPPORTUNITIES;
-  });
-
-  const [customers, setCustomers] = useState<any[]>(() => {
-    const saved = localStorage.getItem(`enflow_customers_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_CUSTOMERS;
-  });
-  
-  const [projects, setProjects] = useState<Project[]>(() => {
-    const saved = localStorage.getItem(`enflow_projects_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_PROJECTS;
-  });
-  
-  const [contracts, setContracts] = useState<Contract[]>(() => {
-    const saved = localStorage.getItem(`enflow_contracts_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_CONTRACTS;
-  });
-
-  const [tasks, setTasks] = useState<TodoTask[]>(() => {
-    const saved = localStorage.getItem(`enflow_tasks_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_TODO_TASKS;
-  });
-
+  // States derived from API
+  const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [tasks, setTasks] = useState<TodoTask[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
+  const [systemUsers, setSystemUsers] = useState<User[]>([]);
+  const [companyLogo, setCompanyLogoState] = useState<string | null>(null);
 
-  const [systemUsers, setSystemUsers] = useState<User[]>(() => {
-    const saved = localStorage.getItem(`enflow_system_users_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_SYSTEM_USERS;
-  });
+  const fetchData = useCallback(async () => {
+    if (!tenantId) return;
+    setLoading(true);
+    try {
+      const [oppsData, custData, projData, contrData, tasksData, unitsData, usersData] = await Promise.all([
+        apiService.getOpportunities(),
+        apiService.getCustomers(),
+        apiService.getProjects(),
+        apiService.getContracts(),
+        apiService.getTasks(),
+        apiService.getUnits(),
+        apiService.getUsers()
+      ]);
 
-  useEffect(() => {
-    if (isAuthenticated && activeTenantId) {
-       import('./services/apiService').then(({ apiService }) => {
-          apiService.getUnits().then(data => setUnits(data)).catch(console.error);
-       });
+      setOpportunities(oppsData);
+      setCustomers(custData);
+      setProjects(projData);
+      setContracts(contrData);
+      setTasks(tasksData);
+      setUnits(unitsData);
+      setSystemUsers(usersData);
+      
+      // Logo still in localStorage for now as it's a tenant setting
+      const savedLogo = localStorage.getItem(`enflow_company_logo_${tenantId}`);
+      setCompanyLogoState(savedLogo);
+    } catch (error) {
+      console.error('Data fetching error:', error);
+    } finally {
+      setLoading(false);
     }
-  }, [isAuthenticated, activeTenantId]);
+  }, [tenantId]);
 
   useEffect(() => {
-    localStorage.setItem(`enflow_units_${tenantId}`, JSON.stringify(units));
-  }, [units, tenantId]);
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_system_users_${tenantId}`, JSON.stringify(systemUsers));
-  }, [systemUsers, tenantId]);
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(currentUser));
-    if (currentUser && currentUser.tenantId) {
-      // Also update apiService with current auth info
-      const savedToken = 'mock-jwt-token'; // In production, get this from localStorage
-      import('./services/apiService').then(({ apiService }) => {
-        apiService.setAuth(currentUser.tenantId, savedToken);
-      });
-    }
-  }, [currentUser, tenantId]);
-
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_customers_${tenantId}`, JSON.stringify(customers));
-  }, [customers, tenantId]);
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_projects_${tenantId}`, JSON.stringify(projects));
-  }, [projects, tenantId]);
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_contracts_${tenantId}`, JSON.stringify(contracts));
-  }, [contracts, tenantId]);
-
-  useEffect(() => {
-    localStorage.setItem(`enflow_tasks_${tenantId}`, JSON.stringify(tasks));
-  }, [tasks, tenantId]);
+    fetchData();
+  }, [fetchData]);
 
   const setCompanyLogo = (logo: string | null) => {
     setCompanyLogoState(logo);
@@ -130,6 +92,32 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
   };
 
   const renderContent = () => {
+    if (loading) {
+      return (
+        <div className="flex-1 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-6">
+            <div className="relative">
+              <div className="w-20 h-20 border-4 border-primary/10 rounded-full" />
+              <div className="w-20 h-20 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0 left-0 shadow-lg shadow-primary/20" />
+            </div>
+            <div className="text-center">
+              <p className="text-slate-900 font-black uppercase tracking-[0.2em] text-[10px] italic">Sistem Verileri Yükleniyor</p>
+              <div className="flex items-center justify-center gap-1 mt-2">
+                {[0, 1, 2].map(i => (
+                  <motion.div 
+                    key={i}
+                    animate={{ opacity: [0.3, 1, 0.3] }}
+                    transition={{ repeat: Infinity, duration: 1, delay: i * 0.2 }}
+                    className="w-1.5 h-1.5 bg-primary rounded-full" 
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (activeTab.startsWith('settings-')) {
       const subTab = activeTab.replace('settings-', '');
       return (
@@ -145,57 +133,54 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       );
     }
     
-    if (activeTab.startsWith('crm-') || activeTab === 'crm') {
-      return <CRMModule opportunities={opportunities} setOpportunities={setOpportunities} customers={customers} setCustomers={setCustomers} activeTab={activeTab} tasks={tasks} setTasks={setTasks} />;
-    }
-
     switch (activeTab) {
-      case 'dashboard': return <Dashboard />;
-      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} />;
-      case 'sales-support': return <SalesSupport />;
-      case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
+      case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} />;
+      case 'crm':
+      case 'crm-opportunities':
+      case 'crm-customers':
+      case 'crm-proposals':
+        return (
+          <CRMModule 
+            opportunities={opportunities} 
+            setOpportunities={setOpportunities} 
+            customers={customers} 
+            setCustomers={setCustomers} 
+            activeTab={activeTab} 
+            tasks={tasks} 
+            setTasks={setTasks} 
+          />
+        );
+      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} />;
+      case 'sales-support': return <SalesSupport opportunities={opportunities} />;
+      case 'spec-analysis': return <CostAnalysisModule opportunities={opportunities} />;
       case 'documents': return <DocumentsModule />;
+      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} />;
       case 'archive': return <ArchiveModule />;
-      case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} />;
-      case 'contracts': return <ContractModule opportunities={opportunities} contracts={contracts} setContracts={setContracts} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} units={units} users={systemUsers} />;
+      case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} tasks={tasks} setTasks={setTasks} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;
-      default: return (
-        <div className="flex flex-col items-center justify-center h-full text-slate-400">
-          <Settings size={48} className="mb-4 opacity-20" />
-          <p className="text-lg font-medium">Bu modül yakında eklenecek.</p>
-        </div>
-      );
+      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} />;
     }
-  };
-
-  const getHeaderTitle = () => {
-    for (const item of NAV_ITEMS) {
-      if (item.id === activeTab) return item.label;
-      if (item.subItems) {
-        const sub = item.subItems.find(s => s.id === activeTab);
-        if (sub) return `${item.label} / ${sub.label}`;
-      }
-    }
-    return 'Dashboard';
   };
 
   return (
-    <div className="flex min-h-screen bg-transparent">
+    <div className="flex h-screen bg-slate-50 overflow-hidden font-geist">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-      <main className="flex-1 flex flex-col min-w-0">
-        <Header title={getHeaderTitle()} onLogout={onLogout} />
-        <div className="flex-1 overflow-y-auto">
+      <main className="flex-1 flex flex-col min-w-0 relative">
+        <Header activeTab={activeTab} companyLogo={companyLogo} />
+        <div className="flex-1 overflow-hidden relative">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 1.02 }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
               className="h-full"
             >
-              {renderContent()}
+              <UnsavedChangesProvider>
+                {renderContent()}
+              </UnsavedChangesProvider>
             </motion.div>
           </AnimatePresence>
         </div>
@@ -204,27 +189,34 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
   );
 };
 
-const TenantApp = (props: any) => (
-  <AuthProvider tenantId={props.tenantId}>
-    <UnsavedChangesProvider>
-      <TenantAppInner {...props} />
-    </UnsavedChangesProvider>
-  </AuthProvider>
-);
+const App = () => {
+  const [activeTenantId, setActiveTenantId] = useState<string | null>(() => localStorage.getItem('enflow_active_tenant_id'));
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('enflow_auth_token'));
 
-import { ErrorBoundary } from './components/ErrorBoundary';
+  const handleLogin = (tenantId: string, token: string, user: any) => {
+    localStorage.setItem('enflow_active_tenant_id', tenantId);
+    localStorage.setItem('enflow_auth_token', token);
+    apiService.setAuth(tenantId, token);
+    setActiveTenantId(tenantId);
+    setIsAuthenticated(true);
+  };
 
-export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [activeTenantId, setActiveTenantId] = useState<string | null>(null);
+  const handleLogout = () => {
+    localStorage.removeItem('enflow_active_tenant_id');
+    localStorage.removeItem('enflow_auth_token');
+    setActiveTenantId(null);
+    setIsAuthenticated(false);
+  };
 
   if (!isAuthenticated || !activeTenantId) {
-    return <Login onLogin={(tId) => { setIsAuthenticated(true); setActiveTenantId(tId); }} />;
+    return <Login onLogin={handleLogin} />;
   }
 
   return (
-    <ErrorBoundary>
-      <TenantApp key={activeTenantId} tenantId={activeTenantId} onLogout={() => { setIsAuthenticated(false); setActiveTenantId(null); }} />
-    </ErrorBoundary>
+    <AuthProvider tenantId={activeTenantId}>
+      <TenantAppInner tenantId={activeTenantId} onLogout={handleLogout} />
+    </AuthProvider>
   );
-}
+};
+
+export default App;

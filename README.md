@@ -2,18 +2,32 @@
 
 Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliyetlendirme, sözleşme yönetimi, fiziksel arşiv, satın alma ve proje uygulama süreçlerini tek bir çatı altında toplayan, veriye dayalı karar destek mekanizmalarıyla güçlendirilmiş, **Multi-tenant Full-Stack** bir ERP/CRM platformudur.
 
-> 📘 **Detaylı Sunum ve Analiz:** Projenin teknik mimarisi, iş akışları ve NotebookLM entegrasyonu için hazırlanan kapsamlı rapor dökümanına [walkthrough.md](./walkthrough.md) üzerinden ulaşabilirsiniz.
+> [!IMPORTANT]
+> **v1.2.0 Hardened Edition:** Bu sürüm, kurumsal standartlarda hata yönetimi, yüksek performanslı state yönetimi ve "tek-ui" tasarım diliyle tamamen modernize edilmiştir.
 
 ---
 
-## 🏗 Teknik Mimari (Technical Stack)
+## 🏗 Teknik Mimari & Modernizasyon (v1.2.0)
 
-- **Frontend:** React 18 (SPA) + Framer Motion + Recharts
-- **Backend:** Node.js (TypeScript) + Express.js
-- **Veritabanı:** Prisma 7 + SQLite (LibSQL)
-- **Güvenlik:** JWT tabanlı Auth + Role-based Access Control (RBAC)
-- **AI:** Google Gemini API (Teknik şartname analizi için)
-- **Entegrasyonlar:** Nextcloud (DMS), MS Exchange, WhatsApp Business API
+### 🎨 Görsel Standart (tek-ui)
+- **Design System:** Geist Sans tipografisi, HSL Primary (151 86% 39%) paleti.
+- **Glassmorphism:** `backdrop-blur-xl` ve premium gölgelendirmelerle modern "Cockpit" estetiği.
+- **Micro-animations:** Framer Motion ile güçlendirilmiş pürüzsüz geçişler ve etkileşimler.
+
+### ⚡ Performans ve Mimari
+- **Frontend Core:** `useMemo`, `React.memo` ve özel geliştirilmiş `useSearch`, `useForm` hook'ları ile optimize edilmiş render performansı.
+- **Backend Hardening:** Global `asyncHandler` sarmalı, merkezi hata yönetimi (Error Middleware) ve tenant izolasyonu.
+- **Veritabanı:** Prisma 7 + SQLite (LibSQL) ile ilişkisel veri bütünlüğü.
+
+---
+
+## 🔄 Öne Çıkan Özellikler
+
+- **Gelişmiş İş Akışı Motoru (Workflow Engine):** Birimler arası iş devirleri (Hand-off) admin tarafından görsel olarak tasarlanabilir ve veritabanında kalıcı olarak saklanır.
+- **Akıllı CRM Portföyü:** Risk skorları, kredi limitleri ve teknik stack takibi içeren zırhlı müşteri veri merkezi.
+- **Performanslı Dashboard:** Canlı KPI hesaplamaları ve role özel veri görselleştirmeleri (Memoized).
+- **AI Tabanlı Analiz:** Şartnamelerden otomatik BoM listesi ve teknik özet çıkarma (Gemini API).
+- **Zırhlı Yetkilendirme:** Buton seviyesine kadar inen granular yetki kontrolü (RBAC).
 
 ---
 
@@ -21,29 +35,18 @@ Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliye
 
 ```text
 Enflow/
-├── backend/            # Prisma 7 + Express API (The Core)
+├── backend/            # Prisma + Express API (The Core)
+│   ├── prisma/         # Workflow & Tenant Şemaları
+│   └── src/            # AsyncHandlers & Error Middleware
 ├── src/
-│   ├── components/     # Ortak bileşenler (PermissionGate, Tracker vb.)
-│   ├── contexts/       # Global State (AuthContext, UnsavedChanges)
-│   ├── layout/         # Dinamik Sidebar ve Header
-│   ├── services/       # API ve Dış Servis (WhatsApp, Workflow) entegrasyonları
-│   ├── modules/        # Ana iş mantığı modülleri (CRM, Presales, WorkflowBuilder vb.)
-│   ├── types.ts        # Merkezi TypeScript tanımları
-│   └── constants.ts    # Sistem sabitleri ve mock veriler
-├── reference/          # Canlıya geçiş ve entegrasyon rehberleri
-├── walkthrough.md      # NotebookLM ve Sunum dökümanı
-└── README.md
+│   ├── components/     # Standart UI Bileşenleri
+│   ├── contexts/       # Auth & UnsavedChanges Management
+│   ├── hooks/          # useSearch, useForm (Optimization Core)
+│   ├── layout/         # tek-ui Sidebar ve Header
+│   ├── modules/        # CRM, Dashboard, WorkflowBuilder (Logic)
+│   └── types.ts        # v1.2.0 Extended Types
+└── reference/          # Entegrasyon Rehberleri
 ```
-
----
-
-## 🔄 Öne Çıkan Özellikler
-
-- **Merkezi Müşteri Veri Merkezi:** Finansal skorlar, kredi limitleri ve teknik notlar içeren devasa müşteri hafızası. Diğer tüm birimler bu merkezi veriyi otomasyonlarında kullanır.
-- **Dinamik İş Akışı (Workflow):** Birimler arası iş devirleri (Hand-off) admin tarafından görsel olarak tasarlanabilir.
-- **Kişiselleştirilmiş Dashboardlar:** GM, Satış, Teknik ve Satın Alma birimleri için role özel canlı veri görselleştirmeleri.
-- **AI Tabanlı Analiz:** Şartnamelerden otomatik BoM listesi ve teknik özet çıkarma.
-- **Zırhlı Yetkilendirme:** Buton seviyesine kadar inen granular yetki kontrolü.
 
 ---
 
@@ -53,7 +56,7 @@ Enflow/
 1. `cd backend`
 2. `pnpm install`
 3. `npx prisma migrate dev`
-4. `pnpm dev` (3001 portunda çalışır)
+4. `pnpm dev` (3002 portunda çalışır)
 
 ### Frontend Kurulumu
 1. `pnpm install`
@@ -61,4 +64,4 @@ Enflow/
 3. `pnpm dev` (3000 portunda çalışır)
 
 ---
-*Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize edilmiştir.*
+*Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize ve optimize edilmiştir.*

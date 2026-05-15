@@ -1,38 +1,24 @@
-# Enflow Memory — Final Production Readiness
+# Enflow Memory — True Full-Stack Evolution
 
 ## Son Durum
-- **Tarih:** 14.05.2026
-- **Kapanış Durumu:** Sistem tam teşekküllü Multi-tenant Full-Stack mimariye geçti. Tüm modüller backend'e mühürlendi.
+- **Tarih:** 15.05.2026
+- **Kapanış Durumu:** Sistem, "Fake Full-Stack" (localStorage) yapısından tamamen kurtularak gerçek zamanlı Backend-Sync mimarisine geçti.
 
 ## Bugünün Teknik Devrimleri
 
-### 1. Backend & Altyapı (The Engine)
-- **Port:** Backend 3002 portunda `nohup` ile ölümsüzleştirildi.
-- **ORM:** Prisma 7 (LibSQL) ile SQLite veritabanı mühürlendi.
-- **API Rotaları:** 
-  - `Units`, `Users`, `Customers`, `Opportunities`, `Tenants` için tam CRUD desteği.
-  - `x-tenant-id` header tabanlı veri izolasyonu zorunlu kılındı.
-- **Bug Fix:** TypeScript derleme hataları (id string/array çakışması) ve Prisma 7 syntax uyumsuzlukları cerrahi müdahale ile giderildi.
-
-### 2. CRM & Müşteri Hafızası
-- **Veri Derinliği:** Müşteri modeli; Vergi detayları, Kredi limitleri, Risk skoru ve Tech Stack gibi "Maksimum Veri" setini tutacak şekilde genişletildi.
-- **Frontend Formu:** 3 sekmeli (Genel, Finansal, Teknik) devasa bir müşteri giriş paneli tasarlandı.
-
-### 3. Organizasyon & Workflow
-- **Super Admin:** Kullanıcı açarken sistemdeki herhangi bir firmaya (Tenant) atama yapabilme yeteneği eklendi.
-- **Workflow Builder:** Görsel kutularla birimler arası iş akışı tanımlama arayüzü tamamlandı.
-- **Dinamik Atama:** Birim ekleme ve silme işlemleri anlık olarak tüm pulldown (seçim) menülerine yansıtıldı.
-
-### 4. Güvenlik & Dashboard
-- **Zırhlı Auth:** `useAuth` ve `apiService` senkronize edildi, sayfa yenilense bile oturum düşmüyor.
-- **Kişisel Kokpit:** Role özel (GM, Presales, Sales, Procurement) dashboardlar ve canlı grafikler (Recharts) aktif edildi.
+### 4. Top-to-Bottom Audit & Standardization (The Master Audit)
+- **Design System:** `index.css` tek-ui standartlarına çekildi (Geist Sans, HSL Primary: `151 86% 39%`).
+- **UI Premiumization:** Dashboard "Kurumsal Kokpit" adıyla yeniden tasarlandı; glassmorphism, HSL bazlı chart renkleri ve dinamik animasyonlarla "WOW" efekti güçlendirildi.
+- **Sidebar & Profile:** Sidebar dinamik `currentUser` verisine bağlandı, hardcoded isimler temizlendi ve glass-effect optimize edildi.
+- **Backend Hardening:** Eksik olan `forgot-password` endpoint'i eklendi, tüm auth akışı senkronize edildi.
+- **Registry:** `entities.json` oluşturuldu, `atlas.md` ve `gitrepo.md` güncellendi.
 
 ## Karar Günlüğü
 | Tarih | Karar | Neden |
 |-------|-------|-------|
-| 14.05.2026 | Port 3002 Geçişi | Port 3001 çakışmalarını önlemek ve temiz bir trafik sağlamak için. |
-| 14.05.2026 | Full-Stack CRUD | Sistemin prototipten çıkıp gerçek verilerle (persistence) çalışması için. |
-| 14.05.2026 | Multi-tenant Auth | Şirket bazlı veri güvenliğini ilk günden garantiye almak için. |
+| 15.05.2026 | LocalStorage Emekliliği | Veri tutarlılığını sağlamak ve gerçek ERP deneyimi sunmak için. |
+| 15.05.2026 | Centralized Data Fetch | Modül bazlı fetch karmaşasını önlemek ve Single Source of Truth prensibi için. |
+| 15.05.2026 | Tek-UI Standardizasyonu | Gökhan Turhan MASTER standartlarına tam uyum ve premium kullanıcı deneyimi için. |
 
 ---
-*Enflow, 14 Mayıs 2026 itibariyle Gökhan Turhan'ın MASTER standartlarında bir 'Live-Ready' sisteme dönüşmüştür.*
+*Enflow, 15 Mayıs 2026 itibariyle Gökhan Turhan'ın MASTER standartlarında 'Production-Ready Enterprise System' unvanını hak etmiştir.*
