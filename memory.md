@@ -43,6 +43,11 @@
 - **Parallel PM & Procurement Activation:** Upon contract transfer, parallel high-priority tasks are automatically created in the tasks registry (`TodoTask`) for both **Project Management** (Unit `u4` - Proje Başlatma Planı) and **Procurement** (Unit `u3` - BoM Satınalma Başlatma).
 - **Dashboard Operations Feed:** Created a "Canlı Operasyon Gelişmeleri" (Live Operations Developments) feed on the admin dashboard, displaying signed contracts and active PM/Procurement workflow task statuses in real-time.
 
+### 10. Interactive 8-Step End-to-End Simulation Dashboard (v1.2.6)
+- **End-to-End Stepper Simulator:** Developed a stunning, state-of-the-art interactive stepper simulator inside `WorkflowBuilder.tsx` charting the complete ERP flow: CRM Opportunity → AI Presales BoM → Cost & Proposal Approval → Won Conversion → Contract Docs Checklist → Parallel PM & Procurement Activation → Procurement Order ETA & Kanban Execution → Project Closure & Physical Archiving.
+- **Mock Integration Terminal:** Renders live, reactive WhatsApp API and MS Exchange Graph API mock payloads for each stage, detailing exactly what notifications are fired, to whom, and why.
+- **Prisma Entity Inspector:** Displays realistic JSON schema models of the records created/mutated in SQLite database at each step.
+
 ## Portlar
 - **Frontend:** `http://localhost:3000`
 - **Backend:** `http://localhost:3002`
@@ -67,6 +72,7 @@ cd backend && npx tsx src/index.ts
 | 17.05.2026 | PrismaLibSql URL-only | v7.8.0 adapter Client değil Config alıyor. |
 | 17.05.2026 | Workflow Migration | Schema'da tablolar DB'de yoktu, migration oluşturuldu. |
 | 17.05.2026 | Evrak Bazlı Paralel Handoff | Sözleşme güvencesiyle eş zamanlı PM ve Satınalma aktivasyonu için. |
+| 17.05.2026 | E2E Operasyonel Simülatör | Müşterinin fırsattan kapanışa kadar olan tüm akışı görsel olarak deneyimlemesi için. |
 
 ---
-*Enflow v1.2.5 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven.*
+*Enflow v1.2.6 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, interactive simulation console.*
