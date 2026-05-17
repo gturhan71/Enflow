@@ -96,8 +96,8 @@ import { whatsappService } from '../services/whatsappService';
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
 
 const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Project[], tasks?: TodoTask[], setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>> }) => {
-  // Assuming current user is user1 for demo purposes
-  const currentUser = 'user1';
+  // Assuming current user is cmp5lhehc000259w33zxhyy0p for demo purposes
+  const currentUser = 'cmp5lhehc000259w33zxhyy0p';
   const myProjects = projects.filter(p => p.managerId === currentUser);
   const [selectedProjectId, setSelectedProjectId] = useState(myProjects[0]?.id || projects[0]?.id);
   const [activeTab, setActiveTab] = useState<'KANBAN' | 'PROCUREMENT' | 'REPORTING' | 'TASKS'>('KANBAN');

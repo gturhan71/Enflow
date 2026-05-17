@@ -1,103 +1,19 @@
 import React, { useState } from 'react';
 import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  ArrowUpRight,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  FileCheck,
+  Zap,
   ChevronRight,
-  Menu,
-  X,
   LogOut,
-  TrendingUp,
-  DollarSign,
-  Briefcase,
-  Truck,
-  Package,
-  History,
-  FileDown,
-  Calendar,
-  ShieldCheck,
-  MapPin,
-  UserCheck,
-  ExternalLink,
-  Download,
-  Filter,
-  MoreVertical,
-  BarChart3,
-  PieChart,
-  ArrowDownRight,
-  Target,
-  Percent,
-  FileSignature,
-  Gavel,
-  Kanban,
-  Wand2,
-  Puzzle,
-  Cpu,
-  Mail,
-  MessageSquare,
-  ListTodo,
-  UserPlus,
-  FileCheck2
+  Briefcase
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
+import { cn } from '../lib/utils';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { 
-  NAV_ITEMS, 
-  MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
-  MOCK_SYSTEM_USERS,
-  MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
+  NAV_ITEMS
 } from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
-  TodoTask,
-  Opportunity,
-  Project,
-  NextcloudConfig,
-  ExchangeConfig,
-  WhatsAppConfig
-} from '../types';
-import { nextcloudService } from '../services/nextcloudService';
-import { exchangeService } from '../services/exchangeService';
-import { whatsappService } from '../services/whatsappService';
-
-
 import { useAuth } from '../contexts/AuthContext';
 
-
-const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void }) => {
+const Sidebar = ({ activeTab, setActiveTab, onLogout, companyLogo }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void, companyLogo?: string | null }) => {
   const { handleNavigate } = useUnsavedChanges();
   const { currentUser, hasPermission } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
@@ -108,45 +24,43 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
     );
   };
 
-  // Filter NAV_ITEMS based on currentUser permissions
   const visibleNavItems = NAV_ITEMS.filter(item => {
-    // If no specific permission required, show it (or default to a view permission)
     const hasBasePermission = hasPermission(item.requiredPermission);
-    
     if (item.subItems) {
-      // If it has subitems, at least one subitem must be visible OR the parent itself must be allowed
       const visibleSubItems = item.subItems.filter(sub => hasPermission(sub.requiredPermission));
       return hasBasePermission || visibleSubItems.length > 0;
     }
-    
     return hasBasePermission;
   });
 
   return (
-    <div className="w-64 glass-sidebar h-screen flex flex-col sticky top-0 z-20">
-      <div className="p-6 flex items-center gap-3 border-b border-white/20">
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center text-white shadow-lg shadow-primary/20">
-          <Briefcase size={22} />
+    <div className="w-72 bg-white/20 backdrop-blur-3xl border-r border-white/20 h-screen flex flex-col sticky top-0 z-20 overflow-hidden">
+      <div className="p-8 flex items-center gap-4 border-b border-white/10 group cursor-pointer">
+        <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-all duration-500 overflow-hidden">
+          {companyLogo ? (
+            <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <Zap size={24} fill="currentColor" />
+          )}
         </div>
-        <div>
-          <h1 className="font-bold text-slate-900 leading-tight uppercase tracking-tighter text-xl">ENFLOW</h1>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">Sistem Entegratörü</p>
+        <div className="flex flex-col">
+          <h1 className="font-black text-slate-900 leading-none uppercase tracking-tighter text-2xl italic">ENFLOW</h1>
+          <p className="text-[10px] text-primary uppercase tracking-[0.2em] font-black mt-1 opacity-70">COCKPIT v1.2</p>
         </div>
       </div>
 
-      <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
+      <nav className="flex-1 px-4 py-8 space-y-2 overflow-y-auto custom-scrollbar">
         {visibleNavItems.map((item) => {
           const isExpanded = expandedMenus.includes(item.id);
           const hasSubItems = item.subItems && item.subItems.length > 0;
           const isActive = activeTab === item.id || (hasSubItems && item.subItems?.some(sub => sub.id === activeTab));
 
-          // Filter subItems as well
           const visibleSubItems = item.subItems?.filter(sub => 
-            currentUser.permissions.includes(sub.requiredPermission) || currentUser.role === 'GENERAL_MANAGER'
+            hasPermission(sub.requiredPermission)
           );
 
           return (
-            <div key={item.id}>
+            <div key={item.id} className="mb-1">
               <button
                 onClick={() => {
                   if (hasSubItems) {
@@ -156,27 +70,27 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                   }
                 }}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 group",
+                  "w-full flex items-center gap-4 px-6 py-4 rounded-[24px] transition-all duration-300 group relative",
                   isActive && !hasSubItems
-                    ? "bg-primary/10 text-primary shadow-sm shadow-primary/5" 
-                    : "text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                    ? "bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]" 
+                    : "text-slate-500 hover:bg-white/40 hover:text-slate-900"
                 )}
               >
-                <item.icon size={20} className={cn(
-                  "transition-colors",
-                  isActive ? "text-primary" : "text-slate-400 group-hover:text-slate-600"
+                <item.icon size={20} strokeWidth={2.5} className={cn(
+                  "transition-all duration-300",
+                  isActive && !hasSubItems ? "text-white scale-110" : "text-slate-400 group-hover:text-slate-600 group-hover:scale-110"
                 )} />
-                <span className="flex-1 text-left">{item.label}</span>
+                <span className="flex-1 text-left text-[11px] font-black uppercase tracking-widest">{item.label}</span>
                 {hasSubItems && (
-                  <ChevronRight size={16} className={cn(
-                    "transition-transform duration-200",
+                  <ChevronRight size={16} strokeWidth={3} className={cn(
+                    "transition-transform duration-300 opacity-40",
                     isExpanded ? "rotate-90" : ""
                   )} />
                 )}
                 {isActive && !hasSubItems && (
                   <motion.div 
                     layoutId="active-pill"
-                    className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
+                    className="absolute left-0 w-1.5 h-6 bg-white rounded-r-full"
                   />
                 )}
               </button>
@@ -190,16 +104,16 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
                       exit={{ opacity: 0, height: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="pl-11 pr-4 py-2 space-y-1">
+                      <div className="pl-14 pr-4 py-2 space-y-1">
                         {visibleSubItems?.map((subItem) => (
                           <button
                             key={subItem.id}
                             onClick={() => handleNavigate(() => setActiveTab(subItem.id))}
                             className={cn(
-                              "w-full text-left px-4 py-2 rounded-lg text-xs font-medium transition-colors",
+                              "w-full text-left px-4 py-2.5 rounded-xl text-[10px] font-black tracking-widest uppercase transition-all",
                               activeTab === subItem.id
-                                ? "bg-primary/5 text-primary"
-                                : "text-slate-500 hover:text-slate-900 hover:bg-slate-50"
+                                ? "bg-primary/10 text-primary"
+                                : "text-slate-400 hover:text-slate-900 hover:bg-white/40"
                             )}
                           >
                             {subItem.label}
@@ -215,16 +129,19 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout }: { activeTab: string, set
         })}
       </nav>
 
-      <div className="p-4 border-t border-white/20">
-        <div className="bg-white/40 backdrop-blur-md rounded-2xl p-4 flex items-center gap-3 border border-white/40">
-          <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold shadow-inner">
+      <div className="p-6">
+        <div className="glass-card rounded-[28px] p-5 flex items-center gap-4 border-white/40 bg-white/30 backdrop-blur-xl">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-emerald-600 flex items-center justify-center text-white font-black text-lg shadow-inner shadow-black/10">
             {currentUser?.name?.split(' ').map((n: string) => n[0]).join('') || 'U'}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-900 truncate">{currentUser?.name || 'Kullanıcı'}</p>
-            <p className="text-[10px] text-slate-500 truncate uppercase tracking-wider font-bold">{currentUser?.role?.replace('_', ' ') || 'GÖREV TANIMSIZ'}</p>
+            <p className="text-xs font-black text-slate-900 truncate tracking-tighter uppercase leading-tight">{currentUser?.name || 'Kullanıcı'}</p>
+            <p className="text-[10px] text-slate-400 truncate uppercase tracking-widest font-black mt-0.5">{currentUser?.role?.replace('_', ' ') || 'GÖREV TANIMSIZ'}</p>
           </div>
-          <button onClick={() => handleNavigate(onLogout)} className="text-slate-400 hover:text-primary transition-colors">
+          <button 
+            onClick={() => handleNavigate(onLogout)} 
+            className="p-2.5 hover:bg-white/50 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90"
+          >
             <LogOut size={18} />
           </button>
         </div>

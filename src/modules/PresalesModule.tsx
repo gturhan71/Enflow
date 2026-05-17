@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   LayoutDashboard, 
   FileSearch, 
@@ -12,8 +12,11 @@ import {
   X,
   ShoppingCart,
   Loader2,
-  Users
+  Users,
+  FileDown,
+  Upload
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { 
@@ -28,6 +31,7 @@ import SpecAnalysis from './SpecAnalysis';
 import { workflowService } from '../services/workflowService';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
+import { apiService } from '../services/apiService';
 
 interface PresalesModuleProps {
   opportunities: Opportunity[];
@@ -38,6 +42,7 @@ interface PresalesModuleProps {
 
 const PresalesModule = ({ opportunities, setOpportunities, units, users }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
   const [step, setStep] = useState(1);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
@@ -106,10 +111,131 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
     margin: 15
   });
 
-  const handleAddItem = () => {
-    if (!newItem.pn || !newItem.desc) return;
-    setBomItems([newItem, ...bomItems]);
-    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15 });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showApprovalPreview, setShowApprovalPreview] = useState(false);
+
+  const handleRequestApproval = () => {
+    if (!selectedOppId) return;
+    if (bomItems.length === 0) {
+      alert('BoM listesi boş. Lütfen önce kalem ekleyin.');
+      return;
+    }
+    setShowApprovalPreview(true);
+  };
+
+  const handleFinalApproval = async () => {
+    setIsSubmitting(true);
+    try {
+      // 1. Önce BoM kalemlerini veritabanına kaydet
+      const savedBoM = await apiService.saveBoMItems(selectedOppId, bomItems);
+      
+      // 2. Onay sürecini başlat
+      await apiService.requestProposalApproval(selectedOppId, {
+        note: 'Teknik çalışma tamamlandı, fiyat teklifi onaya sunulmuştur.',
+        managerId: 'cmp5lhehc000259w33zxhyy0p' // Gökhan Turhan (General Manager)
+      });
+
+      alert('Teklif başarıyla yönetici onayına sunuldu.');
+      
+      // UPDATE GLOBAL STATE WITH NEW BoM ITEMS AND STATUS
+      setOpportunities(prev => prev.map(o => 
+        o.id === selectedOppId 
+          ? { ...o, technicalStatus: 'WAITING_APPROVAL', bomItems: savedBoM } 
+          : o
+      ));
+      
+      setShowApprovalPreview(false);
+    } catch (err: any) {
+      alert(err.message || 'Onay sürecinde hata oluştu.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    const isXML = file.name.toLowerCase().endsWith('.xml');
+
+    reader.onload = (evt) => {
+      const content = evt.target?.result;
+      let mappedItems: any[] = [];
+
+      if (isXML) {
+        // XML Parsing Logic
+        try {
+          const parser = new DOMParser();
+          const xmlDoc = parser.parseFromString(content as string, "text/xml");
+          const items = xmlDoc.querySelectorAll("Item, product, row, item"); // Common tags
+          
+          mappedItems = Array.from(items).map(item => {
+            const getVal = (selectors: string[]) => {
+              for (const s of selectors) {
+                const el = item.querySelector(s);
+                if (el) return el.textContent;
+              }
+              return '';
+            };
+
+            const pn = getVal(['PN', 'PartNumber', 'Part_Number', 'product_code', 'id']);
+            const desc = getVal(['Description', 'Desc', 'product_name', 'name', 'aciklama']);
+            const qty = parseInt(getVal(['Quantity', 'Qty', 'amount', 'adet', 'miktar']) || '1');
+            const cost = parseFloat(getVal(['Cost', 'Price', 'unit_price', 'maliyet', 'fiyat']) || '0');
+
+            return {
+              pn: String(pn || ''),
+              desc: String(desc || ''),
+              qty: isNaN(qty) ? 1 : qty,
+              cost: isNaN(cost) ? 0 : cost,
+              margin: 15
+            };
+          }).filter(item => item.pn || item.desc);
+        } catch (err) {
+          console.error('XML parse error:', err);
+          alert('XML dosyası ayrıştırılamadı.');
+          return;
+        }
+      } else {
+        // Excel/CSV Parsing Logic (using xlsx)
+        const bstr = content;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        mappedItems = data.map((row: any) => {
+          const pn = row['PN'] || row['Part Number'] || row['Ürün Kodu'] || row['Model'] || '';
+          const desc = row['Description'] || row['Açıklama'] || row['Ürün Adı'] || '';
+          const qty = parseInt(row['Quantity'] || row['Adet'] || row['Miktar'] || '1');
+          const cost = parseFloat(row['Cost'] || row['Maliyet'] || row['Birim Fiyat'] || '0');
+          
+          return {
+            pn: String(pn),
+            desc: String(desc),
+            qty: isNaN(qty) ? 1 : qty,
+            cost: isNaN(cost) ? 0 : cost,
+            margin: 15
+          };
+        }).filter(item => item.pn || item.desc);
+      }
+
+      if (mappedItems.length > 0) {
+        setBomItems(prev => [...mappedItems, ...prev]);
+        alert(`${mappedItems.length} kalem başarıyla içe aktarıldı.`);
+      } else {
+        alert('Dosyada uygun veri bulunamadı. Lütfen formatı kontrol edin.');
+      }
+    };
+
+    if (isXML) {
+      reader.readAsText(file);
+    } else {
+      reader.readAsBinaryString(file);
+    }
+    
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -133,13 +259,23 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
         </div>
         <div className="flex items-center gap-4">
           <PermissionGate permission="PRESALES_EDIT">
-            <button 
-              onClick={() => setShowHandOffModal(true)}
-              disabled={!selectedOppId}
-              className="bg-slate-900 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50"
-            >
-              <ArrowUpRight size={18} /> İşi Devret
-            </button>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={handleRequestApproval}
+                disabled={!selectedOppId || isSubmitting}
+                className="bg-primary text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                Yönetici Onayına Sun
+              </button>
+              <button 
+                onClick={() => setShowHandOffModal(true)}
+                disabled={!selectedOppId}
+                className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest"
+              >
+                <ArrowUpRight size={16} /> İşi Devret
+              </button>
+            </div>
           </PermissionGate>
           <div className="h-8 w-px bg-slate-200" />
           <div className="flex bg-slate-200/50 p-1 rounded-2xl">
@@ -164,13 +300,29 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
           {/* Right Side: BoM Table */}
           <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white">
              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="font-bold text-slate-900">BoM Listesi</h4>
+                <div className="flex items-center gap-4">
+                  <h4 className="font-bold text-slate-900">BoM Listesi</h4>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    onChange={handleFileUpload} 
+                    accept=".xlsx, .xls, .csv, .xml" 
+                    className="hidden" 
+                  />
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                  >
+                    <Upload size={14} />
+                    Excel / XML Yükle
+                  </button>
+                </div>
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Toplam Maliyet</p>
                     <p className="text-sm font-mono font-bold text-slate-900">${bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0).toLocaleString()}</p>
                   </div>
-                  <button className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100">Kaydet</button>
+                  <button onClick={handleRequestApproval} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100">Kaydet</button>
                 </div>
              </div>
              <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -227,6 +379,112 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
                   className="bg-indigo-600 text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   {isHandingOff ? <Loader2 size={18} className="animate-spin" /> : 'Devret ve Bildir'}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* BoM Approval Preview Modal */}
+      <AnimatePresence>
+        {showApprovalPreview && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, y: 20, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 20, scale: 0.95 }}
+              className="glass-panel w-full max-w-4xl max-h-[90vh] rounded-[2.5rem] shadow-2xl overflow-hidden bg-white/80 flex flex-col border border-white/50"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-white/40 backdrop-blur-sm">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary">
+                    <CheckCircle2 size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">BoM Onay Önizleme</h4>
+                    <p className="text-sm text-slate-500 font-medium">Lütfen listeyi son kez kontrol edin.</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setShowApprovalPreview(false)}
+                  className="w-10 h-10 rounded-full hover:bg-slate-100 flex items-center justify-center transition-colors"
+                >
+                  <X size={20} className="text-slate-400" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-8">
+                <div className="bg-white rounded-3xl border border-slate-100 overflow-hidden shadow-sm">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-slate-50/50">
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">P/N (Parça No)</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Açıklama</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-center">Adet</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Maliyet</th>
+                        <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 text-right">Toplam</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {bomItems.map((item, i) => (
+                        <tr key={i} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 text-xs font-mono font-bold text-indigo-600">{item.pn}</td>
+                          <td className="px-6 py-4 text-xs text-slate-600 font-medium">{item.desc}</td>
+                          <td className="px-6 py-4 text-xs text-slate-900 font-bold text-center">{item.qty}</td>
+                          <td className="px-6 py-4 text-xs text-slate-900 font-bold text-right">${item.cost.toLocaleString()}</td>
+                          <td className="px-6 py-4 text-xs text-primary font-black text-right">${(item.cost * item.qty).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-slate-900 text-white">
+                        <td colSpan={4} className="px-6 py-4 text-xs font-black uppercase tracking-widest">Genel Toplam</td>
+                        <td className="px-6 py-4 text-lg font-black text-right">
+                          ${bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0).toLocaleString()}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <div className="mt-6 p-6 rounded-3xl bg-amber-50 border border-amber-100 flex items-start gap-4">
+                  <div className="mt-1 text-amber-500">
+                    <AlertCircle size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold text-amber-900">Önemli Not</p>
+                    <p className="text-xs text-amber-700 leading-relaxed mt-1">
+                      Onay sürecine gönderilen BoM listesi üzerinde yönetici incelemesi tamamlanana kadar değişiklik yapılamaz. 
+                      Lütfen tüm kalemlerin ve maliyetlerin doğru olduğundan emin olun.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-8 bg-slate-50/50 border-t border-slate-100 flex justify-end gap-4">
+                <button 
+                  onClick={() => setShowApprovalPreview(false)}
+                  className="px-8 py-3 text-sm font-bold text-slate-500 hover:text-slate-700 transition-colors"
+                >
+                  Vazgeç
+                </button>
+                <button 
+                  onClick={handleFinalApproval}
+                  disabled={isSubmitting}
+                  className="bg-primary text-white px-10 py-3 rounded-2xl text-xs font-black shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-3 disabled:opacity-50 uppercase tracking-[0.2em]"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Gönderiliyor...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Yönetici Onayına Gönder
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

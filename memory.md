@@ -32,6 +32,17 @@
 - **UnsavedChangesProvider:** Layout root'una taşındı, Sidebar da kapsanıyor.
 - **Sonuç:** `tsc` ✅ `vite build` ✅ Backend `/health` ✅ `/api/workflows` ✅
 
+### 8. CRM Proposal Statuses & Lost Dashboard KPIs (v1.2.4)
+- **Status Tracking:** Proposal flow updated to track "Kazanıldı (Won)", "Kaybedildi (Lost)", and "Bekliyor (Pending)". Lost deals are automatically subtracted from the active pipeline and routed to the "Lost List".
+- **Dashboard Integration:** Added "Kaybedilen Değer" KPI card and "Kaybedilenler Listesi" panel to the admin dashboard, reflecting lost value transparently.
+
+### 9. Contract Document Checklist & Parallel Workflows (v1.2.5)
+- **Dynamic Documents Checklist:** The required documents checklist in the Contract Detail view is now fully stateful and interactive.
+- **Sales Support Assignment:** Explicitly assigned the Sales Support Unit to prepare these files.
+- **Strict Handoff Block:** The "Sözleşmeyi İmzala & Devret" button is strictly locked until all checklist documents are approved/verified.
+- **Parallel PM & Procurement Activation:** Upon contract transfer, parallel high-priority tasks are automatically created in the tasks registry (`TodoTask`) for both **Project Management** (Unit `u4` - Proje Başlatma Planı) and **Procurement** (Unit `u3` - BoM Satınalma Başlatma).
+- **Dashboard Operations Feed:** Created a "Canlı Operasyon Gelişmeleri" (Live Operations Developments) feed on the admin dashboard, displaying signed contracts and active PM/Procurement workflow task statuses in real-time.
+
 ## Portlar
 - **Frontend:** `http://localhost:3000`
 - **Backend:** `http://localhost:3002`
@@ -55,6 +66,7 @@ cd backend && npx tsx src/index.ts
 | 17.05.2026 | Tek Tuşla Başlatıcı (run.js) | Geliştirici üretkenliği ve cross-platform kolaylık için. |
 | 17.05.2026 | PrismaLibSql URL-only | v7.8.0 adapter Client değil Config alıyor. |
 | 17.05.2026 | Workflow Migration | Schema'da tablolar DB'de yoktu, migration oluşturuldu. |
+| 17.05.2026 | Evrak Bazlı Paralel Handoff | Sözleşme güvencesiyle eş zamanlı PM ve Satınalma aktivasyonu için. |
 
 ---
-*Enflow v1.2.3 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron.*
+*Enflow v1.2.5 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven.*

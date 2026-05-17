@@ -94,6 +94,7 @@ function startProcess(name, cmd, args, cwd, color) {
 
 // Start both Frontend and Backend
 const backendDir = path.join(__dirname, 'backend');
+const restarterProc = startProcess('Restarter', 'node', ['restarter.cjs'], __dirname, MAGENTA);
 const backendProc = startProcess('Backend', 'pnpm', ['run', 'dev'], backendDir, CYAN);
 const frontendProc = startProcess('Frontend', 'pnpm', ['run', 'dev'], __dirname, GREEN);
 
@@ -104,6 +105,9 @@ function shutdown() {
   if (os.platform() === 'win32') {
     // Windows process tree kill
     try {
+      if (restarterProc.pid) execSync(`taskkill /F /T /PID ${restarterProc.pid}`, { stdio: 'ignore' });
+    } catch (e) {}
+    try {
       if (backendProc.pid) execSync(`taskkill /F /T /PID ${backendProc.pid}`, { stdio: 'ignore' });
     } catch (e) {}
     try {
@@ -111,6 +115,9 @@ function shutdown() {
     } catch (e) {}
   } else {
     // Unix process group kill
+    try {
+      if (restarterProc.pid) process.kill(-restarterProc.pid, 'SIGKILL');
+    } catch (e) {}
     try {
       if (backendProc.pid) process.kill(-backendProc.pid, 'SIGKILL');
     } catch (e) {

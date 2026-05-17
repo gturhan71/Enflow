@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://localhost:3002/api';
+const API_BASE_URL = '/api';
 
 class ApiService {
   private tenantId: string | null = null;
@@ -10,24 +10,43 @@ class ApiService {
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    // Fallback to localStorage if state is lost
+    const effectiveTenantId = this.tenantId || localStorage.getItem('enflow_active_tenant_id') || '';
+    const effectiveToken = this.token || localStorage.getItem('enflow_auth_token') || 'mock-token';
+
     const headers = {
       ...options.headers,
       'Content-Type': 'application/json',
-      'x-tenant-id': this.tenantId || '',
-      'Authorization': `Bearer ${this.token}`
+      'x-tenant-id': effectiveTenantId,
+      'Authorization': `Bearer ${effectiveToken}`
     };
+
+    if (!effectiveTenantId) {
+      console.error('CRITICAL: tenantId is missing for API call:', endpoint);
+    }
 
     const response = await fetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
       headers
     });
 
+    const contentType = response.headers.get('content-type');
+    
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'API request failed');
+      if (contentType && contentType.includes('application/json')) {
+        const error = await response.json();
+        throw new Error(error.error || 'API request failed');
+      } else {
+        const text = await response.text();
+        console.error('Non-JSON Error Response:', text);
+        throw new Error(`Sunucu hatası (${response.status}). Lütfen daha sonra tekrar deneyin.`);
+      }
     }
 
-    return response.json();
+    if (contentType && contentType.includes('application/json')) {
+      return response.json();
+    }
+    return response;
   }
 
   async login(email: string) {
@@ -131,6 +150,40 @@ class ApiService {
   async deleteOpportunity(id: string) {
     return this.fetchWithAuth(`/opportunities/${id}`, {
       method: 'DELETE'
+    });
+  }
+
+  async saveBoMItems(opportunityId: string, items: any[]) {
+    return this.fetchWithAuth(`/opportunities/${opportunityId}/bom`, {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    });
+  }
+
+  async saveCostItems(opportunityId: string, items: any[]) {
+    return this.fetchWithAuth(`/opportunities/${opportunityId}/costs`, {
+      method: 'POST',
+      body: JSON.stringify({ items })
+    });
+  }
+
+  async requestProposalApproval(opportunityId: string, data: { note: string, managerId: string }) {
+    return this.fetchWithAuth(`/opportunities/${opportunityId}/request-approval`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async approveProposal(opportunityId: string, data: { note: string }) {
+    return this.fetchWithAuth(`/opportunities/${opportunityId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async revertOpportunityApproval(opportunityId: string) {
+    return this.fetchWithAuth(`/opportunities/${opportunityId}/revert-approval`, {
+      method: 'POST'
     });
   }
 
@@ -280,6 +333,31 @@ class ApiService {
 
   async deleteDocument(id: string) {
     return this.fetchWithAuth(`/documents/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  // --- PROPOSALS ---
+  async getProposals() {
+    return this.fetchWithAuth('/proposals');
+  }
+
+  async createProposal(data: any) {
+    return this.fetchWithAuth('/proposals', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateProposal(id: string, data: any) {
+    return this.fetchWithAuth(`/proposals/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteProposal(id: string) {
+    return this.fetchWithAuth(`/proposals/${id}`, {
       method: 'DELETE'
     });
   }

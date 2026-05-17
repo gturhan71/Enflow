@@ -21,6 +21,8 @@ model Tenant {
   archiveItems  ArchiveItem[]
   documents     CorporateDocument[]
   workflows     Workflow[]
+  costItems     CostItem[]
+  proposals     Proposal[]
 }
 
 model Unit {
@@ -104,12 +106,27 @@ model Opportunity {
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   bomItems          BoMItem[]
+  costItems         CostItem[]
   createdBy         User          @relation("CreatedBy", fields: [createdById], references: [id])
   assignedTo        User          @relation("AssignedTo", fields: [assignedToId], references: [id])
   customer          Customer      @relation(fields: [customerId], references: [id])
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   workflowLogs      WorkflowLog[]
   contracts         Contract[]
+  proposals         Proposal[]
+}
+
+model Proposal {
+  id            String      @id @default(cuid())
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  content       String      // JSON string with items, terms, description, total
+  version       Int         @default(1)
+  status        String      @default("DRAFT") // DRAFT, SENT, EXPIRED, REJECTED, ACCEPTED
+  tenantId      String
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
 }
 
 model BoMItem {
@@ -124,6 +141,19 @@ model BoMItem {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   opportunity      Opportunity @relation(fields: [opportunityId], references: [id])
+}
+
+model CostItem {
+  id              String      @id @default(cuid())
+  description     String
+  category        String      // LABOR, LOGISTICS, TRAVEL, OTHER
+  amount          Float
+  opportunityId   String
+  tenantId        String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
 }
 
 model WorkflowLog {
@@ -156,7 +186,6 @@ model Project {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   tenant           Tenant        @relation(fields: [tenantId], references: [id])
-  tasks            TodoTask[]    @relation("ProjectTasks")
 }
 
 model Contract {
@@ -192,7 +221,6 @@ model TodoTask {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
-  project       Project? @relation("ProjectTasks", fields: [relatedItemId], references: [id])
 }
 
 model ArchiveItem {
@@ -209,6 +237,17 @@ model ArchiveItem {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model ActivityLog {
+  id            String      @id @default(cuid())
+  action        String      // "UPDATE", "CREATE", "DELETE"
+  entityType    String      // "OPPORTUNITY", "CUSTOMER", vb.
+  entityId      String
+  details       String?     // Değişiklik detayları (JSON string)
+  userId        String
+  tenantId      String
+  timestamp     DateTime    @default(now())
 }
 
 model Notification {

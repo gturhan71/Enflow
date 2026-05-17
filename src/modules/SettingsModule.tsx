@@ -270,20 +270,105 @@ const SettingsModule = ({
 
         {activeSubTab === 'workflow' && <WorkflowBuilder units={units} />}
         {activeSubTab === 'permissions' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {NAV_ITEMS.map((item) => (
-              <div key={item.id} className="glass-panel p-6 rounded-3xl flex flex-col gap-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><item.icon size={20} /></div>
-                    <h4 className="font-bold text-slate-900">{item.label}</h4>
-                  </div>
-                  <div onClick={() => togglePermission(item.requiredPermission)} className={cn("w-12 h-6 rounded-full relative cursor-pointer transition-colors shadow-inner", currentUser.permissions.includes(item.requiredPermission) ? "bg-emerald-500" : "bg-slate-300")}>
-                    <div className={cn("absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm", currentUser.permissions.includes(item.requiredPermission) ? "right-1" : "left-1")} />
-                  </div>
+          <div className="space-y-8">
+            <div className="glass-panel p-8 rounded-[32px] border-primary/20 bg-primary/5 flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div>
+                <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Kullanıcı Yetki Yönetimi</h4>
+                <p className="text-xs text-slate-500 font-bold mt-1">Sistem fonksiyonlarına erişimi kullanıcı bazında granular olarak yönetin.</p>
+              </div>
+              <div className="flex items-center gap-4">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Düzenlenecek Kullanıcı:</p>
+                <select 
+                  value={editingUser?.id || ''} 
+                  onChange={(e) => {
+                    const user = users.find(u => u.id === e.target.value);
+                    setEditingUser(user || null);
+                  }}
+                  className="bg-white px-6 py-3 border border-slate-200 rounded-2xl text-xs font-black outline-none focus:ring-4 focus:ring-primary/5 min-w-[240px] uppercase tracking-tighter"
+                >
+                  <option value="">Kullanıcı Seçin...</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                </select>
+              </div>
+            </div>
+
+            {editingUser ? (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {NAV_ITEMS.filter(item => item.requiredPermission).map((item) => (
+                    <div key={item.id} className="glass-panel p-8 rounded-[32px] group hover:border-primary/40 transition-all flex flex-col gap-6 relative overflow-hidden">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+                            <item.icon size={24} />
+                          </div>
+                          <div>
+                            <h4 className="font-black text-slate-900 uppercase tracking-tighter italic">{item.label}</h4>
+                            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Erişim Kodu: {item.requiredPermission}</p>
+                          </div>
+                        </div>
+                        <div 
+                          onClick={() => {
+                            const currentPerms = editingUser.permissions || [];
+                            const newPerms = currentPerms.includes(item.requiredPermission)
+                              ? currentPerms.filter(p => p !== item.requiredPermission)
+                              : [...currentPerms, item.requiredPermission];
+                            setEditingUser({ ...editingUser, permissions: newPerms });
+                          }} 
+                          className={cn(
+                            "w-14 h-7 rounded-full relative cursor-pointer transition-all duration-300 shadow-inner", 
+                            editingUser.permissions?.includes(item.requiredPermission) ? "bg-primary" : "bg-slate-200"
+                          )}
+                        >
+                          <div className={cn(
+                            "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm flex items-center justify-center", 
+                            editingUser.permissions?.includes(item.requiredPermission) ? "right-1" : "left-1"
+                          )}>
+                            {editingUser.permissions?.includes(item.requiredPermission) && <ShieldCheck size={10} className="text-primary" />}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-end gap-4 pt-6">
+                  <button 
+                    onClick={() => setEditingUser(null)}
+                    className="px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-slate-800 transition-colors"
+                  >
+                    Vazgeç
+                  </button>
+                  <button 
+                    onClick={async () => {
+                      setLoading(true);
+                      try {
+                        const updated = await apiService.updateUser(editingUser.id, { permissions: editingUser.permissions });
+                        setUsers(users.map(u => u.id === updated.id ? { ...u, permissions: updated.permissions } : u));
+                        alert('Yetkiler başarıyla güncellendi.');
+                      } catch (err: any) {
+                        alert(err.message || 'Hata oluştu.');
+                      } finally {
+                        setLoading(false);
+                      }
+                    }}
+                    className="bg-primary text-white px-12 py-4 rounded-2xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all uppercase tracking-widest flex items-center gap-2"
+                  >
+                    {loading ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+                    Yetkileri Kalıcı Olarak Kaydet
+                  </button>
                 </div>
               </div>
-            ))}
+            ) : (
+              <div className="glass-panel p-20 rounded-[40px] border-dashed flex flex-col items-center justify-center text-center">
+                <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mb-6">
+                  <Users size={40} />
+                </div>
+                <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">İşlem Yapılacak Kullanıcıyı Seçin</h4>
+                <p className="text-sm text-slate-400 font-bold max-w-sm mt-2">Yetkilerini düzenlemek istediğiniz personeli yukarıdaki listeden seçerek başlayabilirsiniz.</p>
+              </div>
+            )}
           </div>
         )}
       </div>

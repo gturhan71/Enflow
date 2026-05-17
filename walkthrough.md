@@ -30,7 +30,7 @@ Statik bir kayıt sisteminden öte, birimler arası iş akışını (workflow) v
 ### A. CRM & Merkezi Müşteri Hafızası
 Satış boru hattının (Pipeline) ve kurumsal hafızanın merkezidir.
 - **Maksimum Veri Derinliği:** Müşterilerin sadece iletişim bilgileri değil; Vergi Detayları, Finansal Risk Skorları, Kredi Limitleri ve Teknik Alt Yapı (Tech Stack) verileri merkezi olarak tutulur.
-- **Sekmeli Veri Girişi:** Karmaşık kurumsal verilerin yapısal ve hatasız toplanmasını sağlayan modern arayüz.
+- **Teklif Statüleri (Won / Lost / Pending):** Fırsatlar ve teklifler "Kazanıldı, Kaybedildi, Bekliyor" statülerinde takip edilir. Kaybedilen teklifler anlık olarak pipeline toplam değerinden düşürülerek Dashboard'da "Kaybedilen Değer" KPI kartına ve listesine aktarılır.
 - **Otomasyon Kaynağı:** Kaydedilen her müşteri verisi; otomatik PDF teklif üretimi, lojistik planlama ve satın alma onayları için "Tek Kaynak" (Single Source of Truth) işlevi görür.
 
 ### B. Presales & AI Teknik Analiz
@@ -42,11 +42,13 @@ Projenin teknik omurgasını oluşturur.
 - **Marj Yönetimi:** BoM kalemlerinin alış maliyetleri üzerinden hedef kâr marjları ile fiyatlandırılması.
 - **Onay Mekanizması:** BoM listelerinin yönetici onayına sunulması.
 
-### D. Sözleşme & Fiziksel Arşiv
-- **Otomatik Sözleşme Üretimi:** Kazanılan fırsatların otomatik olarak sözleşme taslağına dönüşmesi.
+### D. Sözleşme Yönetimi & Evrak Doğrulama
+- **Dinamik Evrak Hazırlığı (Satış Destek):** Kazanılan teklifler için otomatik sözleşme kartı oluşturulur. Sözleşmenin imzalanabilmesi için gerekli olan evrakların (Sözleşme Taslağı, Maliyet Analizi, İmza Sirküleri vb.) toplanması görevi **Satış Destek Birimi'ne** atanır.
+- **Strict Validation:** Tüm evraklar tek tek onaylanmadığı sürece sözleşme imzalanıp devredilemez. 
 - **Fiziksel Arşiv Takibi:** Islak imzalı evrakların raf, kutu ve ödünç durumlarının takibi.
 
-### E. Satın Alma & Proje Yönetimi
+### E. Paralel İş Akışları (PM & Satın Alma)
+- **Eş Zamanlı İş Açma:** Sözleşme tamamlandığı an, paralel olarak **Proje Yönetimi** (Proje Başlatma Planı) ve **Satın Alma** (BoM Kalemleri Tedariği) birimlerine otomatik yüksek öncelikli görevler (`TodoTask`) atanarak süreçler eş zamanlı tetiklenir.
 - **Tedarik Zinciri:** Onaylı BoM kalemlerinin sipariş (ETA) takibi ve depo giriş yönetimi.
 - **Kanban Proje Takibi:** Saha operasyonlarının görev bazlı takibi.
 
@@ -58,6 +60,7 @@ Projenin teknik omurgasını oluşturur.
 Enflow'un en güçlü yanıdır.
 - **Workflow Builder:** Admin tarafından görsel olarak tasarlanabilen birimler arası akışlar.
 - **Dinamik Hand-off (Devir):** Bir iş bittiğinde, sistemin otomatik olarak bir sonraki birimi ve personeli belirleyerek işi ataması.
+- **Dashboard Canlı Gelişmeler Paneli:** İmzalanan sözleşmeler ve atanan paralel işlerin güncel durumları anlık olarak Dashboard'da "Canlı Operasyon Gelişmeleri" panelinden yayınlanır.
 
 ### II. Bildirim Katmanı (Notifications)
 İş akışındaki her devir anında şu kanallar üzerinden bildirim gider:
@@ -77,4 +80,5 @@ Sistem şu an "Ready to Deploy" iskeletine sahiptir:
 - **Role-based Dashboards:** Her personelin (GM, Satış, Teknik vb.) işine odaklanmasını sağlayan kişiselleştirilmiş ana sayfalar.
 
 ---
-*Bu doküman Enflow v1.0 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
+
+*Bu doküman Enflow v1.2.5 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*

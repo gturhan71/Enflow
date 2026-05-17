@@ -1,49 +1,77 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: "Geist Sans", "Inter", sans-serif;
   --color-primary: hsl(151 86% 39%);
   --color-primary-foreground: hsl(0 0% 100%);
 }
 
 @layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --primary: 151 86% 39%;
+    --primary-foreground: 0 0% 100%;
+  }
+
+  * {
+    @apply border-slate-200/40;
+  }
+
   body {
-    @apply text-slate-900 antialiased font-sans min-h-screen selection:bg-primary/20 selection:text-primary;
-    background: radial-gradient(at 0% 0%, hsla(151, 86%, 39%, 0.1) 0px, transparent 50%),
-                radial-gradient(at 100% 0%, hsla(217, 91%, 60%, 0.05) 0px, transparent 50%),
-                radial-gradient(at 100% 100%, hsla(151, 86%, 39%, 0.05) 0px, transparent 50%),
-                radial-gradient(at 0% 100%, hsla(217, 91%, 60%, 0.1) 0px, transparent 50%),
-                #fcfdfd;
+    @apply bg-[#f8fafc] text-slate-900 font-sans antialiased selection:bg-primary/20;
+    background-image: 
+      radial-gradient(at 0% 0%, hsla(151, 86%, 39%, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, hsla(217, 91%, 60%, 0.05) 0px, transparent 50%),
+      radial-gradient(at 100% 100%, hsla(271, 91%, 65%, 0.05) 0px, transparent 50%),
+      radial-gradient(at 0% 100%, hsla(151, 86%, 39%, 0.05) 0px, transparent 50%);
+    background-attachment: fixed;
   }
 }
 
-.glass-panel {
-  @apply bg-white/70 backdrop-blur-md border border-white/40 shadow-xl shadow-slate-200/50;
+@layer components {
+  .glass-card {
+    @apply bg-white/40 backdrop-blur-xl border border-white/40 shadow-[0_8px_32px_0_rgba(31,38,135,0.07)];
+  }
+
+  .glass-panel {
+    @apply bg-white/60 backdrop-blur-2xl border border-white/60 shadow-2xl;
+  }
+
+  .glass-sidebar {
+    @apply bg-white/20 backdrop-blur-2xl border-r border-white/20 shadow-2xl;
+  }
+
+  .glass-header {
+    @apply bg-white/40 backdrop-blur-2xl border-b border-white/20 shadow-xl;
+  }
+
+  .glass-input {
+    @apply bg-white/30 backdrop-blur-md border border-white/40 focus:bg-white/60 focus:ring-4 focus:ring-primary/5 transition-all outline-none;
+  }
+
+  .glass-button-primary {
+    @apply bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:bg-primary/90 active:scale-95 transition-all;
+  }
+
+  /* Custom Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+  }
 }
 
-.glass-card {
-  @apply bg-white/60 backdrop-blur-sm border border-white/30 shadow-sm hover:shadow-md transition-all duration-300;
+.animate-glass-pulse {
+  animation: glass-pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
-.glass-sidebar {
-  @apply bg-white/40 backdrop-blur-xl border-r border-white/20;
-}
-
-.glass-header {
-  @apply bg-white/50 backdrop-blur-lg border-b border-white/20;
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full hover:bg-slate-300;
+@keyframes glass-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }

@@ -102,7 +102,7 @@ export const MOCK_PROJECTS: Project[] = [
     avgMargin: 14.5, 
     deadline: '2026-06-15',
     ownerId: 'u1',
-    managerId: 'user1',
+    managerId: 'cmp5lhehc000259w33zxhyy0p',
     progress: 35
   },
   { 
@@ -117,12 +117,7 @@ export const MOCK_PROJECTS: Project[] = [
   }
 ];
 
-export const MOCK_DOCUMENTS: CorporateDocument[] = [
-  { id: 'd1', name: 'İmza Sirküleri 2026', category: 'LEGAL', expiryDate: '2026-12-31', fileUrl: '#', tags: ['Yasal', 'İmza'] },
-  { id: 'd2', name: 'ISO 27001:2022 Sertifikası', category: 'ISO', expiryDate: '2026-04-20', fileUrl: '#', tags: ['Güvenlik', 'ISO'] },
-  { id: 'd3', name: 'Vergi Levhası 2025', category: 'LEGAL', expiryDate: '2026-05-31', fileUrl: '#', tags: ['Yasal', 'Finans'] },
-  { id: 'd4', name: 'Dell Platinum Partner Belgesi', category: 'CERTIFICATE', expiryDate: '2027-01-15', fileUrl: '#', tags: ['Üretici', 'Dell'] },
-];
+export const MOCK_DOCUMENTS: CorporateDocument[] = [];
 
 export const MOCK_WORK_EXPERIENCE = [
   { id: 'w1', name: 'Kamu Hastaneleri Veri Merkezi', customer: 'Sağlık Bakanlığı', value: 12500000, date: '2025-11-10', tags: ['Veri Merkezi', 'Kamu'] },
@@ -149,9 +144,9 @@ export const MOCK_PERMISSIONS: Permission[] = [
 ];
 
 export const MOCK_SYSTEM_USERS: User[] = [
-  { id: 'user1', name: 'Gökhan Turhan', email: 'gokhanturhan71@gmail.com', role: 'GENERAL_MANAGER', unitId: 'u4', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW', 'OFFER_APPROVE', 'DOC_DELETE'] },
-  { id: 'user2', name: 'Mehmet Öz', email: 'mehmet@idarihafiza.com', role: 'PRESALES_ENG', unitId: 'u2', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW'] },
-  { id: 'user3', name: 'Canan Can', email: 'canan@idarihafiza.com', role: 'SALES_SUPPORT', unitId: 'u1', status: 'ACTIVE', permissions: ['PROJECT_CREATE'] },
+  { id: 'cmp5lhehc000259w33zxhyy0p', name: 'Gökhan Turhan', email: 'gokhan@t-ecosystem.com', role: 'GENERAL_MANAGER', unitId: 'u4', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW', 'OFFER_APPROVE', 'DOC_DELETE'] },
+  { id: 'cmp9s29090002h4o37jgwc4we', name: 'GOKTUG TURHAN', email: 'goktugturhan74@gmail.com', role: 'PRESALES_ENG', unitId: 'u2', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW'] },
+  { id: 'cmp9uzx6e0007erw3ki7ym0cv', name: 'Ali Veli', email: 'aliveli@enflow.com', role: 'SALES_SUPPORT', unitId: 'u1', status: 'ACTIVE', permissions: ['PROJECT_CREATE'] },
 ];
 
 export const MOCK_BOM_ITEMS: BoMItem[] = [
@@ -164,9 +159,9 @@ export const MOCK_BOM_ITEMS: BoMItem[] = [
 ];
 
 export const MOCK_COST_REQUIREMENTS: CostRequirement[] = [
-  { id: 'cr1', projectId: 'p1', description: 'Sunucu Odası Kurulum İşçiliği', category: 'LABOR', identifiedBy: 'user2', status: 'IDENTIFIED' },
-  { id: 'cr2', projectId: 'p1', description: 'Şehir Dışı Nakliye ve Sigorta', category: 'LOGISTICS', identifiedBy: 'user2', status: 'COSTED', estimatedCost: 1200, costedBy: 'user3' },
-  { id: 'cr3', projectId: 'p1', description: 'Dış Kaynak Firewall Konfigürasyon', category: 'OUTSOURCING', identifiedBy: 'user2', status: 'IDENTIFIED' },
+  { id: 'cr1', projectId: 'p1', description: 'Sunucu Odası Kurulum İşçiliği', category: 'LABOR', identifiedBy: 'cmp9s29090002h4o37jgwc4we', status: 'IDENTIFIED' },
+  { id: 'cr2', projectId: 'p1', description: 'Şehir Dışı Nakliye ve Sigorta', category: 'LOGISTICS', identifiedBy: 'cmp9s29090002h4o37jgwc4we', status: 'COSTED', estimatedCost: 1200, costedBy: 'cmp9uzx6e0007erw3ki7ym0cv' },
+  { id: 'cr3', projectId: 'p1', description: 'Dış Kaynak Firewall Konfigürasyon', category: 'OUTSOURCING', identifiedBy: 'cmp9s29090002h4o37jgwc4we', status: 'IDENTIFIED' },
 ];
 
 export const MOCK_CONTRACTS: Contract[] = [
@@ -181,9 +176,9 @@ export const MOCK_CONTRACT_DOCS: ContractDocumentRequirement[] = [
 ];
 
 export const MOCK_PROJECT_TASKS: ProjectTask[] = [
-  { id: 't1', projectId: 'p1', title: 'Saha Keşfi', description: 'Veri merkezi fiziksel alan ölçümleri.', status: 'DONE', assignedTo: 'user2' },
-  { id: 't2', projectId: 'p1', title: 'Donanım Montajı', description: 'Server rack kurulumu.', status: 'IN_PROGRESS', assignedTo: 'user2', dueDate: '2026-05-10' },
-  { id: 't3', projectId: 'p1', title: 'UAT Testleri', description: 'Kullanıcı kabul testlerinin yapılması.', status: 'TODO', assignedTo: 'user2', dueDate: '2026-06-01' },
+  { id: 't1', projectId: 'p1', title: 'Saha Keşfi', description: 'Veri merkezi fiziksel alan ölçümleri.', status: 'DONE', assignedTo: 'cmp9s29090002h4o37jgwc4we' },
+  { id: 't2', projectId: 'p1', title: 'Donanım Montajı', description: 'Server rack kurulumu.', status: 'IN_PROGRESS', assignedTo: 'cmp9s29090002h4o37jgwc4we', dueDate: '2026-05-10' },
+  { id: 't3', projectId: 'p1', title: 'UAT Testleri', description: 'Kullanıcı kabul testlerinin yapılması.', status: 'TODO', assignedTo: 'cmp9s29090002h4o37jgwc4we', dueDate: '2026-06-01' },
 ];
 
 export const MOCK_TODO_TASKS: TodoTask[] = [
@@ -192,7 +187,7 @@ export const MOCK_TODO_TASKS: TodoTask[] = [
     title: 'Haftalık Satış Raporu', 
     description: 'Tüm bölge satışlarının konsolide raporu hazırlanacak.', 
     unitId: 'u1', 
-    assignedBy: 'user1', 
+    assignedBy: 'cmp5lhehc000259w33zxhyy0p', 
     priority: 'HIGH', 
     status: 'PENDING', 
     dueDate: '2026-04-12', 
@@ -203,7 +198,7 @@ export const MOCK_TODO_TASKS: TodoTask[] = [
     title: 'Envanter Sayımı', 
     description: 'Merkez depo ve şube depolarındaki tüm donanımların sayımı.', 
     unitId: 'u3', 
-    assignedBy: 'user1', 
+    assignedBy: 'cmp5lhehc000259w33zxhyy0p', 
     priority: 'URGENT', 
     status: 'IN_PROGRESS', 
     dueDate: '2026-04-10', 
@@ -214,7 +209,7 @@ export const MOCK_TODO_TASKS: TodoTask[] = [
     title: 'Yeni Personel Eğitimi', 
     description: 'Teknik ekibe yeni katılan arkadaşların presales süreç eğitimi.', 
     unitId: 'u2', 
-    assignedBy: 'user1', 
+    assignedBy: 'cmp5lhehc000259w33zxhyy0p', 
     priority: 'MEDIUM', 
     status: 'COMPLETED', 
     dueDate: '2026-04-05', 
@@ -232,11 +227,11 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-05-15',
     status: 'PROPOSAL',
     description: 'Mevcut veri merkezine 4 adet yeni rack kabinet ve soğutma sistemi eklenmesi.',
-    assignedToId: 'user3',
-    createdById: 'user1',
+    assignedToId: 'cmp9uzx6e0007erw3ki7ym0cv',
+    createdById: 'cmp5lhehc000259w33zxhyy0p',
     technicalStatus: 'IN_PROGRESS',
     bomStatus: 'DRAFT',
-    presalesId: 'user2'
+    presalesId: 'cmp9s29090002h4o37jgwc4we'
   },
   {
     id: 'opp2',
@@ -247,8 +242,8 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-06-01',
     status: 'QUALIFIED',
     description: 'Yeni açılacak depo için kablosuz ağ ve güvenlik kamera altyapısı.',
-    assignedToId: 'user3',
-    createdById: 'user2',
+    assignedToId: 'cmp9uzx6e0007erw3ki7ym0cv',
+    createdById: 'cmp9s29090002h4o37jgwc4we',
     technicalStatus: 'PENDING',
     bomStatus: 'DRAFT'
   },
@@ -261,11 +256,11 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-04-30',
     status: 'NEGOTIATION',
     description: 'Yüksek trafikli e-ticaret sitesi için sunucu ve load balancer konfigürasyonu.',
-    assignedToId: 'user3',
-    createdById: 'user1',
+    assignedToId: 'cmp9uzx6e0007erw3ki7ym0cv',
+    createdById: 'cmp5lhehc000259w33zxhyy0p',
     technicalStatus: 'COMPLETED',
     bomStatus: 'APPROVED',
-    presalesId: 'user2'
+    presalesId: 'cmp9s29090002h4o37jgwc4we'
   },
   {
     id: 'opp4',
@@ -276,10 +271,10 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-03-15',
     status: 'WON',
     description: 'Güvenlik duvarı, IPS/IDS ve SIEM çözümleri entegrasyonu.',
-    assignedToId: 'user3',
-    createdById: 'user1',
+    assignedToId: 'cmp9uzx6e0007erw3ki7ym0cv',
+    createdById: 'cmp5lhehc000259w33zxhyy0p',
     technicalStatus: 'COMPLETED',
     bomStatus: 'APPROVED',
-    presalesId: 'user2'
+    presalesId: 'cmp9s29090002h4o37jgwc4we'
   }
 ];

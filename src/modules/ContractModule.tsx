@@ -71,10 +71,41 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
   const project = MOCK_PROJECTS.find(p => p.id === selectedContract?.projectId);
   const opportunity = opportunities.find(o => o.id === selectedContract?.opportunityId);
   
-  const contractDocs = selectedContract?.opportunityId ? [
-    { id: `doc-1-${selectedContract.id}`, contractId: selectedContract.id, name: 'Sözleşme Taslağı', status: 'PENDING' as const },
-    { id: `doc-2-${selectedContract.id}`, contractId: selectedContract.id, name: 'Maliyet Analizi (Onaylı)', status: 'APPROVED' as const, description: 'Sistemden otomatik aktarıldı.' }
-  ] : MOCK_CONTRACT_DOCS.filter(doc => doc.contractId === selectedContract?.id);
+  // Dynamic stateful tracking of documents
+  const [docsList, setDocsList] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    if (selectedContractId) {
+      const currentContract = allContracts.find(c => c.id === selectedContractId);
+      const initialDocs = currentContract?.opportunityId ? [
+        { id: `doc-1-${selectedContractId}`, contractId: selectedContractId, name: 'Sözleşme Taslağı', status: 'PENDING', description: 'Satış Destek Birimi tarafından hazırlanacak ana taslak.' },
+        { id: `doc-2-${selectedContractId}`, contractId: selectedContractId, name: 'Maliyet Analizi (Onaylı)', status: 'APPROVED', description: 'Sistemden otomatik aktarıldı.' },
+        { id: `doc-3-${selectedContractId}`, contractId: selectedContractId, name: 'İmza Sirküleri', status: 'PENDING', description: 'Satış Destek tarafından temin edilecek imza beyannamesi.' },
+        { id: `doc-4-${selectedContractId}`, contractId: selectedContractId, name: 'Ticaret Sicil Gazetesi', status: 'PENDING', description: 'Satış Destek tarafından arşivden/sistemden alınacak.' },
+        { id: `doc-5-${selectedContractId}`, contractId: selectedContractId, name: 'SGK Borcu Yoktur', status: 'PENDING', description: 'Satış Destek tarafından e-devlet/SGK üzerinden temin edilecek.' }
+      ] : MOCK_CONTRACT_DOCS.filter(doc => doc.contractId === selectedContractId).map(doc => ({
+        id: doc.id,
+        contractId: doc.contractId,
+        name: (doc as any).name || 'Gerekli Evrak',
+        status: doc.status === 'VERIFIED' ? 'APPROVED' : doc.status,
+        description: (doc as any).description || 'Sözleşme için idari evrak.'
+      }));
+      setDocsList(initialDocs);
+    } else {
+      setDocsList([]);
+    }
+  }, [selectedContractId]);
+
+  const handleToggleDocStatus = (docId: string) => {
+    setDocsList(prev => prev.map(doc => {
+      if (doc.id === docId) {
+        return { ...doc, status: doc.status === 'APPROVED' ? 'PENDING' : 'APPROVED' };
+      }
+      return doc;
+    }));
+  };
+
+  const allDocsApproved = docsList.length > 0 && docsList.every(d => d.status === 'APPROVED');
 
   const targetName = project?.name || opportunity?.title || 'Bilinmeyen';
 
@@ -101,7 +132,7 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
       totalValue: opportunity?.value || 0,
       avgMargin: 15,
       deadline: updatedContract.endDate || '2027-12-31',
-      ownerId: 'user1',
+      ownerId: 'cmp5lhehc000259w33zxhyy0p',
       managerId: pmToAssign,
       progress: 0,
       opportunityId: opportunity?.id
@@ -135,8 +166,40 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
     }
 
     setIsHandingOff(false);
-    alert('Sözleşme imzalandı, Proje oluşturuldu ve ilgili birimlere bildirimler gönderildi.');
     setSelectedContractId(null); 
+
+    // 4. Create parallel tasks for Project Management and Procurement
+    const pmTask: TodoTask = {
+      id: `task-pm-${Date.now()}`,
+      title: `${targetName} - Proje Başlatma Planı (PM)`,
+      description: `Sözleşme evrakları tamamlandı. Proje planı hazırlanmalı, PM süreci aktive edilmelidir.`,
+      unitId: 'u4', // PM / İdari
+      assignedBy: currentUser?.id || 'cmp5lhehc000259w33zxhyy0p',
+      priority: 'HIGH',
+      status: 'PENDING',
+      dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      relatedModule: 'PROJECT',
+      relatedItemId: newProject.id
+    };
+
+    const procurementTask: TodoTask = {
+      id: `task-proc-${Date.now()}`,
+      title: `${targetName} - BoM Satınalma Başlatma`,
+      description: `Sözleşme evrakları tamamlandı. Projenin BoM listesindeki donanım/lisans tedarik süreci başlatılmalıdır.`,
+      unitId: 'u3', // Procurement / Satınalma
+      assignedBy: currentUser?.id || 'cmp5lhehc000259w33zxhyy0p',
+      priority: 'HIGH',
+      status: 'PENDING',
+      dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      relatedModule: 'PROCUREMENT',
+      relatedItemId: newProject.id
+    };
+
+    if (setTasks && tasks) {
+      setTasks([...tasks, pmTask, procurementTask]);
+    }
+
+    alert('Sözleşme imzalandı, Proje oluşturuldu. Proje Yönetimi ve Satınalma birimlerine paralel işler atandı!');
   };
 
   const handleCreateDocReq = () => {
@@ -233,8 +296,12 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                 </button>
               </PermissionGate>
             </div>
+            <div className="p-4 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-bold leading-relaxed px-6">
+              📌 Bu evrakların toplanması ve doğrulanması için <strong className="text-indigo-900">Satış Destek Birimi</strong> görevlendirilmiştir. 
+              Sözleşmenin imzalanıp devredilebilmesi için tüm evrakların onaylanması gerekmektedir.
+            </div>
             <div className="divide-y divide-slate-100">
-              {contractDocs.map((doc) => (
+              {docsList.map((doc) => (
                 <div key={doc.id} className="p-6 flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400">
@@ -245,12 +312,23 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                       <p className="text-xs text-slate-500">{doc.description || 'Gerekli evrak.'}</p>
                     </div>
                   </div>
-                  <span className={cn(
-                    "text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider",
-                    doc.status === 'APPROVED' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                  )}>
-                    {doc.status}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "text-[10px] font-bold px-2 py-1 rounded-md uppercase tracking-wider",
+                      doc.status === 'APPROVED' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                    )}>
+                      {doc.status}
+                    </span>
+                    <button
+                      onClick={() => handleToggleDocStatus(doc.id)}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                        doc.status === 'APPROVED' ? "bg-amber-50 text-amber-600 hover:bg-amber-100" : "bg-emerald-50 text-emerald-600 hover:bg-emerald-100"
+                      )}
+                    >
+                      {doc.status === 'APPROVED' ? 'Beklet' : 'Onayla'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -283,11 +361,16 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
                   </select>
                   <button 
                     onClick={handleSignAndTransfer}
-                    disabled={!pmToAssign || isHandingOff || selectedContract?.status === 'SIGNED'}
+                    disabled={!pmToAssign || isHandingOff || selectedContract?.status === 'SIGNED' || !allDocsApproved}
                     className="w-full py-3 bg-slate-900 text-white rounded-xl text-sm font-bold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
                   >
                     {isHandingOff ? 'Aktarılıyor...' : <><FileSignature size={18} /> Sözleşmeyi İmzala & Devret</>}
                   </button>
+                  {!allDocsApproved && selectedContract?.status !== 'SIGNED' && (
+                    <p className="text-red-500 text-[10px] font-black text-center mt-3 uppercase tracking-wider leading-relaxed">
+                      ⚠️ Tüm evraklar onaylanmadan devir yapılamaz! (Satış Destek evrak tamamlama süreci aktif)
+                    </p>
+                  )}
                 </div>
               </PermissionGate>
             </div>
