@@ -22,15 +22,39 @@
 - **Robust Port Releasing:** 3000 ve 3002 portlarında asılı kalmış eski süreçleri otomatik tespit edip zorla sonlandıran (taskkill / kill -9) "restart" mekanizması eklendi.
 - **Colored Logging:** Log akışları zümrüt yeşili (`[Frontend]`) ve camgöbeği (`[Backend]`) renk kodlarıyla görselleştirildi, terminal takibi son derece pratikleştirildi.
 
+### 7. Full Build Fix & DB Stabilization (v1.2.3)
+- **TypeScript Clean:** `Opportunity` tipi `types.ts`'e eklendi, `User.tenantId` eklendi, `PresalesModule`/`ContractModule` eksik prop'ları tamamlandı, `handleLogin` imzası düzeltildi.
+- **Icon Imports:** `ShoppingCart` (SpecAnalysis), `Loader2` (TodoModule), `import React` (useShared) eksikleri giderildi.
+- **Mock Data:** `constants.ts`'teki `assignedTo`/`createdBy` → `assignedToId`/`createdById` rename.
+- **Backend Adapter:** `PrismaLibSql` v7.8.0'da `{ url }` Config alıyor. `@libsql/client` kaldırıldı.
+- **Express 5 Cast:** `req.params.id as string` — 20 route'da uygulandı.
+- **DB Migration:** `Workflow`/`WorkflowStep` tabloları schema'da vardı, DB'de yoktu — `add_workflow_tables` migration'ı oluşturuldu.
+- **UnsavedChangesProvider:** Layout root'una taşındı, Sidebar da kapsanıyor.
+- **Sonuç:** `tsc` ✅ `vite build` ✅ Backend `/health` ✅ `/api/workflows` ✅
+
+## Portlar
+- **Frontend:** `http://localhost:3000`
+- **Backend:** `http://localhost:3002`
+
+## Başlatma
+```bash
+# Terminal 1 — proje root
+pnpm dev
+# Terminal 2 — backend
+cd backend && npx tsx src/index.ts
+```
+
 ## Karar Günlüğü
 | Tarih | Karar | Neden |
 |-------|-------|-------|
 | 15.05.2026 | LocalStorage Emekliliği | Veri tutarlılığını sağlamak ve gerçek ERP deneyimi sunmak için. |
 | 15.05.2026 | Centralized Data Fetch | Modül bazlı fetch karmaşasını önlemek ve Single Source of Truth prensibi için. |
-| 15.05.2026 | Tek-UI Standardizasyonu | Gökhan Turhan MASTER standartlarına tam uyum ve premium kullanıcı deneyimi için. |
+| 15.05.2026 | Tek-UI Standardizasyonu | MASTER standartlarına tam uyum ve premium kullanıcı deneyimi için. |
 | 17.05.2026 | Workspace Migration | Proje atlası ve envanter yönetimi için `Management_Panels` altına taşındı. |
-| 17.05.2026 | Favicon & Manifest Entegrasyonu | Kurumsal PWA standartları, "WOW" efekti ve marka bütünlüğü için. |
+| 17.05.2026 | Favicon & Manifest Entegrasyonu | Kurumsal PWA standartları ve marka bütünlüğü için. |
 | 17.05.2026 | Tek Tuşla Başlatıcı (run.js) | Geliştirici üretkenliği ve cross-platform kolaylık için. |
+| 17.05.2026 | PrismaLibSql URL-only | v7.8.0 adapter Client değil Config alıyor. |
+| 17.05.2026 | Workflow Migration | Schema'da tablolar DB'de yoktu, migration oluşturuldu. |
 
 ---
-*Enflow, 17 Mayıs 2026 itibariyle Gökhan Turhan ve Göktuğ Turhan ortaklığında 'Active Production' fazına geçmiştir.*
+*Enflow v1.2.3 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron.*

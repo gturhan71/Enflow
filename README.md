@@ -3,7 +3,7 @@
 Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliyetlendirme, sözleşme yönetimi, fiziksel arşiv, satın alma ve proje uygulama süreçlerini tek bir çatı altında toplayan, veriye dayalı karar destek mekanizmalarıyla güçlendirilmiş, **Multi-tenant Full-Stack** bir ERP/CRM platformudur.
 
 > [!IMPORTANT]
-> **v1.2.0 Hardened Edition:** Bu sürüm, kurumsal standartlarda hata yönetimi, yüksek performanslı state yönetimi ve "tek-ui" tasarım diliyle tamamen modernize edilmiştir.
+> **v1.2.3 Full Build Fix:** TypeScript tam temiz, Prisma adapter v7.8.0 uyumlu, Workflow DB migration tamamlandı, `UnsavedChangesProvider` layout root'una taşındı. Tüm modüller production-ready.
 
 ---
 
