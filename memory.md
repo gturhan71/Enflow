@@ -48,6 +48,14 @@
 - **Mock Integration Terminal:** Renders live, reactive WhatsApp API and MS Exchange Graph API mock payloads for each stage, detailing exactly what notifications are fired, to whom, and why.
 - **Prisma Entity Inspector:** Displays realistic JSON schema models of the records created/mutated in SQLite database at each step.
 
+### 11. Core Inter-Module Flow Synchronization (v1.2.7)
+- **Shared Tasks State Injection:** Resolved `undefined` task creation bug by fully injecting `tasks` and `setTasks` into `ContractModule` inside `App.tsx`, enabling real-time generation of parallel PM and Procurement duties during contract handoff.
+- **Auto-Selection UX Default:** Smart-mapped `selectedContractId` in `ContractModule.tsx` to automatically focus on the first unsigned contract, minimizing friction upon redirection from the CRM.
+- **Project Completion & Physical Archive Handoff:**
+  - Passed `setProjects` and `setActiveTab` to `ProjectManagementModule.tsx`.
+  - Added a state-driven "Geçici Kabulü Onayla & Tamamla (%100)" button in the PM reporting panel that updates project status to `COMPLETED` globally.
+  - Enabled direct transition to the **Fiziksel Arşiv (ArchiveModule)** via a premium "Evrakları Fiziksel Arşive Teslim Et" handoff action upon project closeout.
+
 ## Portlar
 - **Frontend:** `http://localhost:3000`
 - **Backend:** `http://localhost:3002`
@@ -73,6 +81,7 @@ cd backend && npx tsx src/index.ts
 | 17.05.2026 | Workflow Migration | Schema'da tablolar DB'de yoktu, migration oluşturuldu. |
 | 17.05.2026 | Evrak Bazlı Paralel Handoff | Sözleşme güvencesiyle eş zamanlı PM ve Satınalma aktivasyonu için. |
 | 17.05.2026 | E2E Operasyonel Simülatör | Müşterinin fırsattan kapanışa kadar olan tüm akışı görsel olarak deneyimlemesi için. |
+| 18.05.2026 | Uçtan Uca Modül Senkronizasyonu | CRM, Sözleşme, PM, Satınalma ve Fiziksel Arşiv modüllerini kesintisiz bağlamak için. |
 
 ---
-*Enflow v1.2.6 — 17 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, interactive simulation console.*
+*Enflow v1.2.7 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, cross-module flow synchronization.*

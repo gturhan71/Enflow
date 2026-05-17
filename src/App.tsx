@@ -254,10 +254,10 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
       case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
-      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} />;
+      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'archive': return <ArchiveModule />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
-      case 'project-mgmt': return <ProjectManagementModule projects={projects} tasks={tasks} setTasks={setTasks} />;
+      case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;
       default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} onApproveProposal={handleApproveProposal} />;
     }

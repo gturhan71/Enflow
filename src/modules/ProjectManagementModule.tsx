@@ -95,7 +95,13 @@ import { whatsappService } from '../services/whatsappService';
 
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
 
-const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Project[], tasks?: TodoTask[], setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>> }) => {
+const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setActiveTab: setGlobalActiveTab }: { 
+  projects: Project[], 
+  setProjects?: React.Dispatch<React.SetStateAction<Project[]>>, 
+  tasks?: TodoTask[], 
+  setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>,
+  setActiveTab?: (tab: string) => void
+}) => {
   // Assuming current user is cmp5lhehc000259w33zxhyy0p for demo purposes
   const currentUser = 'cmp5lhehc000259w33zxhyy0p';
   const myProjects = projects.filter(p => p.managerId === currentUser);
@@ -124,6 +130,24 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
     console.log('Adding project task:', newTask);
     setShowNewTaskModal(false);
     setNewTask({ status: 'TODO' });
+  };
+
+  const handleCompleteProject = () => {
+    if (!selectedProject || !setProjects) return;
+    if (!window.confirm('Bu projenin saha kurulumlarını ve geçici kabulünü tamamlayıp kapatmak istediğinize emin misiniz?')) return;
+    
+    const updated = projects.map(p => {
+      if (p.id === selectedProject.id) {
+        return {
+          ...p,
+          progress: 100,
+          status: 'COMPLETED' as const
+        };
+      }
+      return p;
+    });
+    setProjects(updated);
+    alert('Tebrikler! Proje başarıyla tamamlandı. Islak imzalı evrakları Fiziksel Arşiv modülünden arşive teslim edebilirsiniz.');
   };
 
   const handleCreateProcurementReq = () => {
@@ -368,6 +392,37 @@ const ProjectManagementModule = ({ projects, tasks, setTasks }: { projects: Proj
                     <p className="text-sm font-bold text-slate-900">{selectedProject?.status}</p>
                   </div>
                 </div>
+
+                {selectedProject && selectedProject.progress < 100 && (
+                  <button 
+                    onClick={handleCompleteProject}
+                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4"
+                  >
+                    <CheckCircle2 size={16} />
+                    Geçici Kabulü Onayla & Tamamla (%100)
+                  </button>
+                )}
+
+                {selectedProject && selectedProject.progress === 100 && (
+                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col gap-3 mt-4">
+                    <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
+                      <CheckCircle2 size={16} className="text-emerald-600" />
+                      Proje Kurulumu ve Geçici Kabul Tamamlandı!
+                    </p>
+                    <p className="text-[10px] text-emerald-600 font-medium leading-relaxed">
+                      Sözleşme ve kabul evraklarını klasörleyip fiziksel arşive teslim edebilirsiniz.
+                    </p>
+                    {setGlobalActiveTab && (
+                      <button 
+                        onClick={() => setGlobalActiveTab('archive')}
+                        className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider"
+                      >
+                        <Archive size={14} />
+                        Evrakları Fiziksel Arşive Teslim Et
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="bg-white rounded-3xl border border-slate-200 p-8">

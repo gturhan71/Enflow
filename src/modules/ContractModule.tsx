@@ -57,7 +57,10 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
   }));
 
   const allContracts = [...contracts, ...generatedContracts];
-  const [selectedContractId, setSelectedContractId] = useState<string | null>(null);
+  const [selectedContractId, setSelectedContractId] = useState<string | null>(() => {
+    const unsigned = allContracts.find(c => c.status !== 'SIGNED');
+    return unsigned ? unsigned.id : (allContracts[0]?.id || null);
+  });
   const [showArchiveAccess, setShowArchiveAccess] = useState(false);
   const [pmToAssign, setPmToAssign] = useState('');
   const [showNewDocReqModal, setShowNewDocReqModal] = useState(false);
