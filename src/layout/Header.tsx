@@ -4,20 +4,48 @@ import {
   Search, 
   Settings,
   HelpCircle,
-  Menu,
-  Zap
+  LogOut
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 
-const Header = ({ title }: { title: string }) => {
+const Header = ({ 
+  title, 
+  activeTab, 
+  onLogout 
+}: { 
+  title?: string, 
+  activeTab?: string, 
+  onLogout?: () => void 
+}) => {
   const { currentUser } = useAuth();
 
+  const getTitle = () => {
+    if (title) return title;
+    switch (activeTab) {
+      case 'dashboard': return 'Dashboard & Yönetici Kokpiti';
+      case 'crm':
+      case 'crm-opportunities': return 'CRM & Satış Fırsatları';
+      case 'crm-customers': return 'Müşteri Portföyü';
+      case 'crm-proposals': return 'Teklif Yönetimi';
+      case 'presales': return 'AI Presales & Teknik Analiz';
+      case 'sales-support': return 'Satış Destek Operasyonları';
+      case 'cost-analysis': return 'Maliyetlendirme & Marj';
+      case 'documents': return 'Kurumsal Belge Yönetimi';
+      case 'contract': return 'Sözleşme Yönetim Modülü';
+      case 'archive': return 'Fiziksel Arşiv Sistemi';
+      case 'procurement': return 'Satın Alma & Tedarik';
+      case 'project-mgmt': return 'Proje Yönetim Paneli';
+      case 'todo': return 'İşlerim & Görev Havuzu';
+      default: return 'Enflow ERP';
+    }
+  };
+
   return (
-    <header className="h-20 bg-white/40 backdrop-blur-xl border-b border-white/20 px-8 flex items-center justify-between sticky top-0 z-10 overflow-hidden">
+    <header className="h-20 bg-white/40 backdrop-blur-xl border-b border-white/20 px-8 flex items-center justify-between sticky top-0 z-10 overflow-hidden font-geist">
       <div className="flex items-center gap-6 flex-1">
         <div>
-          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic leading-none">{title}</h2>
+          <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tighter italic leading-none">{getTitle()}</h2>
           <div className="flex items-center gap-2 mt-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Canlı Sistem Verisi</p>
@@ -46,9 +74,21 @@ const Header = ({ title }: { title: string }) => {
 
         <div className="h-10 w-px bg-white/20 mx-2" />
 
-        <button className="p-3 bg-slate-900 text-white rounded-[20px] hover:bg-slate-800 transition-all shadow-lg shadow-slate-900/10 active:scale-90">
+        <button className="p-3 bg-white/30 border border-white/40 rounded-[20px] text-slate-500 hover:text-primary hover:bg-white/60 transition-all backdrop-blur-md active:scale-90">
           <Settings size={18} />
         </button>
+
+        <div className="h-10 w-px bg-white/20 mx-2" />
+
+        {onLogout && (
+          <button 
+            onClick={onLogout}
+            className="p-3 bg-red-500/10 border border-red-500/20 rounded-[20px] text-red-500 hover:text-white hover:bg-red-600 hover:border-red-600 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all backdrop-blur-md active:scale-90 flex items-center justify-center gap-2 group font-black text-[10px] uppercase tracking-wider pl-4 pr-4"
+          >
+            <LogOut size={16} className="group-hover:scale-110 transition-transform" />
+            <span>Çıkış Yap</span>
+          </button>
+        )}
       </div>
     </header>
   );

@@ -56,6 +56,11 @@
   - Added a state-driven "Geçici Kabulü Onayla & Tamamla (%100)" button in the PM reporting panel that updates project status to `COMPLETED` globally.
   - Enabled direct transition to the **Fiziksel Arşiv (ArchiveModule)** via a premium "Evrakları Fiziksel Arşive Teslim Et" handoff action upon project closeout.
 
+### 12. Global Dynamic Headers & Glassmorphic Logout (v1.2.8)
+- **Dynamic Module Title Resolution:** Added a dynamic lookup function mapping the active layout tab directly to custom localized titles (e.g. CRM & Satış Fırsatları, Sözleşme Yönetim Modülü, Proje Yönetim Paneli), correcting the previous blank page title issue.
+- **Glowing Crimson Glassmorphic Logout:** Engineered a stunning, high-contrast global Logout button within the top header group, styled with red-glowing glassmorphism and animated hover states.
+- **Universal Page Visibility:** Passed the global `onLogout` auth action handler down through `App.tsx` directly into the `Header` component, ensuring instant, one-click logout capability on every page of the application.
+
 ## Portlar
 - **Frontend:** `http://localhost:3000`
 - **Backend:** `http://localhost:3002`
@@ -82,6 +87,7 @@ cd backend && npx tsx src/index.ts
 | 17.05.2026 | Evrak Bazlı Paralel Handoff | Sözleşme güvencesiyle eş zamanlı PM ve Satınalma aktivasyonu için. |
 | 17.05.2026 | E2E Operasyonel Simülatör | Müşterinin fırsattan kapanışa kadar olan tüm akışı görsel olarak deneyimlemesi için. |
 | 18.05.2026 | Uçtan Uca Modül Senkronizasyonu | CRM, Sözleşme, PM, Satınalma ve Fiziksel Arşiv modüllerini kesintisiz bağlamak için. |
+| 18.05.2026 | Global Header Logout & Başlıklar | Tüm ekranlarda güvenli tek-tık çıkış ve dinamik başlık deneyimi sağlamak için. |
 
 ---
-*Enflow v1.2.7 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, cross-module flow synchronization.*
+*Enflow v1.2.8 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, global dynamic headers & glassmorphic logout.*

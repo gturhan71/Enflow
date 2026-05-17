@@ -269,7 +269,7 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
         <HealthBanner />
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} companyLogo={companyLogo} />
         <main className="flex-1 flex flex-col min-w-0 relative">
-          <Header activeTab={activeTab} companyLogo={companyLogo} />
+          <Header activeTab={activeTab} companyLogo={companyLogo} onLogout={onLogout} />
           <div className="flex-1 overflow-hidden relative">
             <AnimatePresence mode="wait">
               <motion.div
