@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 
 export function useSearch<T>(items: T[], searchFields: (keyof T)[]) {
   const [searchQuery, setSearchQuery] = useState('');

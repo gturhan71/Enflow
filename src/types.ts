@@ -20,8 +20,31 @@ export interface User {
   role: UserRole;
   email: string;
   unitId?: string;
-  permissions?: string[]; // Array of permission codes
+  tenantId?: string;
+  permissions?: string[];
   status: 'ACTIVE' | 'INACTIVE';
+}
+
+export interface Opportunity {
+  id: string;
+  title: string;
+  value: number;
+  probability: number;
+  expectedCloseDate?: string;
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+  description?: string;
+  technicalStatus?: string;
+  bomStatus?: string;
+  tenantId?: string;
+  customerId: string;
+  assignedToId: string;
+  createdById?: string;
+  presalesId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  customer?: Customer;
+  assignedTo?: User;
+  bomItems?: BoMItem[];
 }
 
 export interface Customer {

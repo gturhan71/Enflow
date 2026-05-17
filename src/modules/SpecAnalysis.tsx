@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { 
-  FileSearch, 
-  Upload, 
-  FileText, 
-  Loader2, 
-  CheckCircle2, 
-  AlertCircle, 
+  FileSearch,
+  Upload,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
   Download,
   List,
   FileBarChart,
   BarChart3,
-  ChevronRight
+  ChevronRight,
+  ShoppingCart
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';

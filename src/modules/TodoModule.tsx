@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { 
+import {
   Plus,
   Clock,
   CheckCircle2,
@@ -8,7 +8,8 @@ import {
   Briefcase,
   Calendar,
   Filter,
-  Target
+  Target,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';

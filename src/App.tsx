@@ -150,11 +150,11 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
             setTasks={setTasks} 
           />
         );
-      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} />;
+      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} />;
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
       case 'spec-analysis': return <CostAnalysisModule opportunities={opportunities} />;
       case 'documents': return <DocumentsModule />;
-      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} />;
+      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} />;
       case 'archive': return <ArchiveModule />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} tasks={tasks} setTasks={setTasks} />;
@@ -164,28 +164,28 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
   };
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden font-geist">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-      <main className="flex-1 flex flex-col min-w-0 relative">
-        <Header activeTab={activeTab} companyLogo={companyLogo} />
-        <div className="flex-1 overflow-hidden relative">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 1.02 }}
-              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
-              className="h-full"
-            >
-              <UnsavedChangesProvider>
+    <UnsavedChangesProvider>
+      <div className="flex h-screen bg-slate-50 overflow-hidden font-geist">
+        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
+        <main className="flex-1 flex flex-col min-w-0 relative">
+          <Header activeTab={activeTab} companyLogo={companyLogo} />
+          <div className="flex-1 overflow-hidden relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 1.02 }}
+                transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+                className="h-full"
+              >
                 {renderContent()}
-              </UnsavedChangesProvider>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-      </main>
-    </div>
+              </motion.div>
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
+    </UnsavedChangesProvider>
   );
 };
 
@@ -193,10 +193,8 @@ const App = () => {
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => localStorage.getItem('enflow_active_tenant_id'));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('enflow_auth_token'));
 
-  const handleLogin = (tenantId: string, token: string, user: any) => {
+  const handleLogin = (tenantId: string) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
-    localStorage.setItem('enflow_auth_token', token);
-    apiService.setAuth(tenantId, token);
     setActiveTenantId(tenantId);
     setIsAuthenticated(true);
   };

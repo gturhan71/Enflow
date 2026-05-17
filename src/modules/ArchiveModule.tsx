@@ -38,7 +38,7 @@ const ArchiveModule = () => {
   const fetchArchive = async () => {
     setLoading(true);
     try {
-      const data = await apiService.getArchive();
+      const data = await apiService.getArchiveItems();
       setItems(data);
     } catch (err) {
       console.error('Arşiv yüklenemedi');

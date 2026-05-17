@@ -3,15 +3,11 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
-import { createClient } from '@libsql/client';
 
 dotenv.config();
 
 const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
-const libsql = createClient({
-  url: connectionString,
-});
-const adapter = new PrismaLibSql({ client: libsql });
+const adapter = new PrismaLibSql({ url: connectionString });
 const prisma = new PrismaClient({ adapter });
 
 const app = express();
@@ -105,14 +101,14 @@ app.put('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request, re
     data.permissions = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
   }
   const user = await prisma.user.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(user);
 }));
 
 app.delete('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.user.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.user.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Kullanıcı silindi.' });
 }));
 
@@ -129,14 +125,14 @@ app.post('/api/customers', tenantMiddleware, asyncHandler(async (req: Request, r
 
 app.put('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const customer = await prisma.customer.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data: req.body
   });
   res.json(customer);
 }));
 
 app.delete('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.customer.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.customer.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Müşteri silindi.' });
 }));
 
@@ -168,14 +164,14 @@ app.put('/api/opportunities/:id', tenantMiddleware, asyncHandler(async (req: Req
   const data = { ...rest };
   if (expectedCloseDate) data.expectedCloseDate = new Date(expectedCloseDate);
   const opp = await prisma.opportunity.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(opp);
 }));
 
 app.delete('/api/opportunities/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.opportunity.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.opportunity.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Fırsat silindi.' });
 }));
 
@@ -209,14 +205,14 @@ app.put('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Request,
     data.procurementNotes = typeof procurementNotes === 'string' ? procurementNotes : JSON.stringify(procurementNotes);
   }
   const project = await prisma.project.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(project);
 }));
 
 app.delete('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.project.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.project.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Proje silindi.' });
 }));
 
@@ -247,14 +243,14 @@ app.put('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request, re
     data.progressNotes = typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes);
   }
   const task = await prisma.todoTask.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(task);
 }));
 
 app.delete('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.todoTask.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.todoTask.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Görev silindi.' });
 }));
 
@@ -285,14 +281,14 @@ app.put('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Request
   if (endDate) data.endDate = new Date(endDate);
   if (guaranteeExpiry) data.guaranteeExpiry = new Date(guaranteeExpiry);
   const contract = await prisma.contract.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(contract);
 }));
 
 app.delete('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.contract.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.contract.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Sözleşme silindi.' });
 }));
 
@@ -323,14 +319,14 @@ app.put('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Request, 
     data.tags = typeof tags === 'string' ? tags : JSON.stringify(tags);
   }
   const item = await prisma.archiveItem.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(item);
 }));
 
 app.delete('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.archiveItem.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.archiveItem.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Arşiv kaydı silindi.' });
 }));
 
@@ -352,14 +348,14 @@ app.post('/api/notifications', tenantMiddleware, asyncHandler(async (req: Reques
 
 app.put('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const notification = await prisma.notification.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data: req.body
   });
   res.json(notification);
 }));
 
 app.delete('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.notification.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.notification.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Bildirim silindi.' });
 }));
 
@@ -390,14 +386,14 @@ app.put('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Request
     data.tags = typeof tags === 'string' ? tags : JSON.stringify(tags);
   }
   const doc = await prisma.corporateDocument.update({
-    where: { id: req.params.id, tenantId: (req as any).tenantId },
+    where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
     data
   });
   res.json(doc);
 }));
 
 app.delete('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  await prisma.corporateDocument.delete({ where: { id: req.params.id, tenantId: (req as any).tenantId } });
+  await prisma.corporateDocument.delete({ where: { id: (req.params.id as string), tenantId: (req as any).tenantId } });
   res.json({ message: 'Doküman silindi.' });
 }));
 
@@ -437,10 +433,10 @@ app.put('/api/workflows/:id', tenantMiddleware, asyncHandler(async (req: Request
   
   // Simple approach: Delete old steps and create new ones (transactional)
   const updatedWorkflow = await prisma.$transaction(async (tx) => {
-    await tx.workflowStep.deleteMany({ where: { workflowId: req.params.id } });
+    await tx.workflowStep.deleteMany({ where: { workflowId: (req.params.id as string) } });
     
     return tx.workflow.update({
-      where: { id: req.params.id, tenantId: (req as any).tenantId },
+      where: { id: (req.params.id as string), tenantId: (req as any).tenantId },
       data: {
         name,
         description,

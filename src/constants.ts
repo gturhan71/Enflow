@@ -232,8 +232,8 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-05-15',
     status: 'PROPOSAL',
     description: 'Mevcut veri merkezine 4 adet yeni rack kabinet ve soğutma sistemi eklenmesi.',
-    assignedTo: 'user3',
-    createdBy: 'user1',
+    assignedToId: 'user3',
+    createdById: 'user1',
     technicalStatus: 'IN_PROGRESS',
     bomStatus: 'DRAFT',
     presalesId: 'user2'
@@ -247,8 +247,8 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-06-01',
     status: 'QUALIFIED',
     description: 'Yeni açılacak depo için kablosuz ağ ve güvenlik kamera altyapısı.',
-    assignedTo: 'user3',
-    createdBy: 'user2',
+    assignedToId: 'user3',
+    createdById: 'user2',
     technicalStatus: 'PENDING',
     bomStatus: 'DRAFT'
   },
@@ -261,8 +261,8 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-04-30',
     status: 'NEGOTIATION',
     description: 'Yüksek trafikli e-ticaret sitesi için sunucu ve load balancer konfigürasyonu.',
-    assignedTo: 'user3',
-    createdBy: 'user1',
+    assignedToId: 'user3',
+    createdById: 'user1',
     technicalStatus: 'COMPLETED',
     bomStatus: 'APPROVED',
     presalesId: 'user2'
@@ -276,8 +276,8 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     expectedCloseDate: '2026-03-15',
     status: 'WON',
     description: 'Güvenlik duvarı, IPS/IDS ve SIEM çözümleri entegrasyonu.',
-    assignedTo: 'user3',
-    createdBy: 'user1',
+    assignedToId: 'user3',
+    createdById: 'user1',
     technicalStatus: 'COMPLETED',
     bomStatus: 'APPROVED',
     presalesId: 'user2'
