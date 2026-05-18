@@ -61,6 +61,12 @@
 - **Glowing Crimson Glassmorphic Logout:** Engineered a stunning, high-contrast global Logout button within the top header group, styled with red-glowing glassmorphism and animated hover states.
 - **Universal Page Visibility:** Passed the global `onLogout` auth action handler down through `App.tsx` directly into the `Header` component, ensuring instant, one-click logout capability on every page of the application.
 
+### 13. Canlı Pazarlık Kokpiti & Dip Maliyet Koruma Sistemi (v1.3.0)
+- **Canlı Pazarlık Simülatörü:** Müşteri satın alma yetkilisi ile satış yöneticisi arasında geçen gerçekçi, dinamik bir pazarlık/chat simülasyon motoru kuruldu.
+- **Zırhlı Maliyet Koruması (En Dip Rakam):** Pazarlık esnasında girilen teklifler, Maliyet Analiz Modülü verilerinden (BoM Ürün Maliyetleri + Operasyonel Giderler) hesaplanan **En Dip Maliyet (Floor Cost)** ile eş zamanlı denetlenir. Maliyet altına inildiğinde sistem yöneticiyi kırmızı alarm bülteniyle uyarır.
+- **Executive Yetkilendirme Kontrolü:** Pazarlık modülü sadece Satış Birim Yöneticisine (`GENERAL_MANAGER` rolüne) açıldı. Yetkisiz girişlerde zırhlı kilit ekranı gösterilir.
+- **tek-ui Tasarım Bütünlüğü:** Gerçek zamanlı marj göstergesi, interaktif slider/hızlı indirim butonları, anlık bot yazıyor animasyonları ve el sıkışma/masadan kalkma durum panelleri zümrüt yeşili neon detaylarla dizayn edildi.
+
 ## Portlar
 - **Frontend:** `http://localhost:3000`
 - **Backend:** `http://localhost:3002`
@@ -88,6 +94,7 @@ cd backend && npx tsx src/index.ts
 | 17.05.2026 | E2E Operasyonel Simülatör | Müşterinin fırsattan kapanışa kadar olan tüm akışı görsel olarak deneyimlemesi için. |
 | 18.05.2026 | Uçtan Uca Modül Senkronizasyonu | CRM, Sözleşme, PM, Satınalma ve Fiziksel Arşiv modüllerini kesintisiz bağlamak için. |
 | 18.05.2026 | Global Header Logout & Başlıklar | Tüm ekranlarda güvenli tek-tık çıkış ve dinamik başlık deneyimi sağlamak için. |
+| 18.05.2026 | Canlı Pazarlık Simülasyonu | Satış müdürüne özel dip maliyet korumalı interaktif müzakere paneli sunmak için. |
 
 ---
-*Enflow v1.2.8 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, workflow-driven, global dynamic headers & glassmorphic logout.*
+*Enflow v1.3.0 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, live negotiation simulator, dynamic floor cost checks & executive control.*

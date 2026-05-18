@@ -59,7 +59,8 @@ export const NAV_ITEMS = [
     subItems: [
       { id: 'crm-opportunities', label: 'Fırsatlar', requiredPermission: 'CRM_OPPS_VIEW' },
       { id: 'crm-proposals', label: 'Teklifler', requiredPermission: 'CRM_PROPOSALS_VIEW' },
-      { id: 'crm-customers', label: 'Müşteriler', requiredPermission: 'CRM_CUSTOMERS_VIEW' }
+      { id: 'crm-customers', label: 'Müşteriler', requiredPermission: 'CRM_CUSTOMERS_VIEW' },
+      { id: 'crm-negotiation', label: 'Canlı Pazarlıklar', requiredPermission: 'CRM_OPPS_VIEW' }
     ]
   },
   { id: 'presales', label: 'Presales & Dizayn', icon: FileSearch, requiredPermission: 'PRESALES_VIEW' },

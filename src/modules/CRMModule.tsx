@@ -27,6 +27,7 @@ import {
   Customer,
 } from '../types';
 import ProposalEditor from './ProposalEditor';
+import NegotiationModule from './NegotiationModule';
 import { PermissionGate } from '../components/PermissionGate';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -628,7 +629,13 @@ const CRMModule = ({
 
   return (
     <div className="h-full bg-slate-50/50">
-      {activeTab === 'crm-proposals' ? renderProposals() : 
+      {activeTab === 'crm-negotiation' ? (
+        <NegotiationModule 
+          opportunities={opportunities} 
+          setOpportunities={setOpportunities} 
+          setActiveTab={setActiveTab} 
+        />
+      ) : activeTab === 'crm-proposals' ? renderProposals() : 
        activeTab === 'crm-customers' ? renderCustomers() : 
        renderOpportunities()}
 

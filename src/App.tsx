@@ -236,6 +236,7 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       case 'crm-opportunities':
       case 'crm-customers':
       case 'crm-proposals':
+      case 'crm-negotiation':
         return (
           <CRMModule 
             opportunities={opportunities} 
