@@ -357,8 +357,9 @@ const NegotiationModule = ({
     const currentLowest = Math.min(ourLastBid, ...competitors.filter(c => c.isActive).map(c => c.lastBid));
     
     if (ourStatus === 'ACTIVE') {
-      if (ourNewBid > currentLowest - currentMinDecrement && ourRoundLastLowestCheck(currentLowest, ourNewBid)) {
-        alert(`Hata: Bu tur için vermeniz gereken maksimum teklif en fazla $${(currentLowest - currentMinDecrement).toLocaleString()} olmalıdır (Min eksiltme şartı: $${currentMinDecrement.toLocaleString()}).`);
+      const requiredMaxBid = currentLowest - currentMinDecrement;
+      if (ourNewBid > requiredMaxBid) {
+        alert(`Hata: Vermeniz gereken maksimum teklif en fazla $${requiredMaxBid.toLocaleString()} olmalıdır (Mevcut en düşük teklif: $${currentLowest.toLocaleString()} | Min eksiltme adımı: $${currentMinDecrement.toLocaleString()}).`);
         return;
       }
       if (ourNewBid < floorCost) {
@@ -369,30 +370,43 @@ const NegotiationModule = ({
 
     setRoundCalculated(true);
     const newLogs: typeof auctionLog = [];
-    let activeOurBid = ourStatus === 'ACTIVE' ? ourNewBid : ourLastBid;
+    let currentLowestBidTracker = ourStatus === 'ACTIVE' ? ourNewBid : ourLastBid;
     
     if (ourStatus === 'ACTIVE') {
       setOurLastBid(ourNewBid);
-      newLogs.push({ round: auctionRound, text: `Biz (Enflow) teklifimizi $${ourNewBid.toLocaleString()} seviyesine eksilttik.`, type: 'bid' });
+      newLogs.push({ round: auctionRound, text: `Biz (Enflow) teklifimizi bir önceki en düşük tekliften ($${currentLowest.toLocaleString()}) düşerek $${ourNewBid.toLocaleString()} seviyesine eksilttik.`, type: 'bid' });
     } else {
       newLogs.push({ round: auctionRound, text: `Biz (Enflow) müzayededen çekildik. Son teklifimiz: $${ourLastBid.toLocaleString()}`, type: 'alert' });
+      // If we are withdrawn, tracker starts with the lowest active competitor's last bid
+      const activeCompBids = competitors.filter(c => c.isActive).map(c => c.lastBid);
+      if (activeCompBids.length > 0) {
+        currentLowestBidTracker = Math.min(...activeCompBids);
+      }
     }
 
     // Process competitors bidding sequentially
     const updatedCompetitors = competitors.map(comp => {
       if (!comp.isActive) return comp;
 
-      // The new target they need to beat is the lowest bid of the current round so far
-      const targetToBeat = Math.min(activeOurBid, ...competitors.filter(c => c.isActive && c.id !== comp.id).map(c => c.lastBid));
-      const targetBid = targetToBeat - currentMinDecrement;
+      // Each competitor must drop by at least currentMinDecrement from the current lowest bid overall at this moment!
+      const targetBid = currentLowestBidTracker - currentMinDecrement;
 
       if (targetBid < comp.floorPrice) {
         // Competitor drops out because bid falls below their floor
-        newLogs.push({ round: auctionRound, text: `🚨 ${comp.name} müzayededen çekildi! En dip sınırına ulaştı (Son teklifi: $${comp.lastBid.toLocaleString()}).`, type: 'alert' });
+        newLogs.push({ 
+          round: auctionRound, 
+          text: `🚨 ${comp.name} müzayededen çekildi! En dip sınırına ulaştı (En düşük teklif $${currentLowestBidTracker.toLocaleString()} iken vermesi gereken teklif $${targetBid.toLocaleString()} idi, rakip dip limiti: $${comp.floorPrice.toLocaleString()}).`, 
+          type: 'alert' 
+        });
         return { ...comp, isActive: false };
       } else {
-        // Competitor matches and bids
-        newLogs.push({ round: auctionRound, text: `💸 ${comp.name} teklifini $${targetBid.toLocaleString()} seviyesine eksiltti.`, type: 'bid' });
+        // Competitor places the bid, and now the new lowest bid becomes targetBid!
+        newLogs.push({ 
+          round: auctionRound, 
+          text: `💸 ${comp.name} bir önceki en düşük tekliften ($${currentLowestBidTracker.toLocaleString()}) eksiltme miktarı kadar düşerek teklifini $${targetBid.toLocaleString()} yaptı.`, 
+          type: 'bid' 
+        });
+        currentLowestBidTracker = targetBid; // Update the tracking lowest bid immediately!
         return { ...comp, lastBid: targetBid };
       }
     });
