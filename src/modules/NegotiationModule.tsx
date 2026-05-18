@@ -157,6 +157,10 @@ const NegotiationModule = ({
   const [auctionWinner, setAuctionWinner] = useState<{ name: string; price: number; isUs: boolean } | null>(null);
   const [roundCalculated, setRoundCalculated] = useState<boolean>(false);
 
+  // States for manual reverse auction inputs
+  const [manualBids, setManualBids] = useState<Record<string, string>>({});
+  const [withdrawals, setWithdrawals] = useState<Record<string, boolean>>({});
+
   // Auto scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -343,160 +347,181 @@ const NegotiationModule = ({
     setAuctionState('BIDDING');
     setRoundCalculated(false);
     setAuctionWinner(null);
+    setManualBids({});
+    setWithdrawals({});
     setAuctionLog([
       { round: 0, text: `Açık Eksiltme İhalesi Başlatıldı! Toplam ${numCompetitors} Rakip Firma İştirak Ediyor.`, type: 'info' },
       { round: 0, text: `Başlangıç Teklifi: $${initialValue.toLocaleString()} | İlk Tur Minimum Düşüş Şartı: $${initialDecrement.toLocaleString()}`, type: 'info' }
     ]);
   };
 
-  // Live bidding execution for the current round
-  const executeRoundBids = (ourNewBid: number) => {
-    if (auctionState !== 'BIDDING' || roundCalculated) return;
+  // Helper values for current lowest bid in auction
+  const currentLowestBidVal = useMemo(() => {
+    if (competitors.length === 0) return initialValue;
+    const activeBids = competitors.filter(c => c.isActive).map(c => c.lastBid);
+    if (ourStatus === 'ACTIVE') activeBids.push(ourLastBid);
+    return Math.min(...activeBids);
+  }, [competitors, ourLastBid, ourStatus, initialValue]);
 
-    // 1. Validate our bid is at least minimum decrement below current lowest bid
-    const currentLowest = Math.min(ourLastBid, ...competitors.filter(c => c.isActive).map(c => c.lastBid));
-    
+  // Memoized list of active participants in the round
+  const activeParticipants = useMemo(() => {
+    const list: { id: string; name: string; lastBid: number; isUs: boolean; avatarColor?: string }[] = [];
     if (ourStatus === 'ACTIVE') {
-      const requiredMaxBid = currentLowest - currentMinDecrement;
-      if (ourNewBid > requiredMaxBid) {
-        alert(`Hata: Vermeniz gereken maksimum teklif en fazla $${requiredMaxBid.toLocaleString()} olmalıdır (Mevcut en düşük teklif: $${currentLowest.toLocaleString()} | Min eksiltme adımı: $${currentMinDecrement.toLocaleString()}).`);
-        return;
-      }
-      if (ourNewBid < floorCost) {
-        const confirmGoBelow = window.confirm(`KRİTİK UYARI: Gireceğiniz teklif ($${ourNewBid.toLocaleString()}) en dip maliyetinizin ($${floorCost.toLocaleString()}) altındadır! Zarar etmeyi kabul ediyor musunuz?`);
-        if (!confirmGoBelow) return;
-      }
+      list.push({ id: 'us', name: 'Biz (Enflow)', lastBid: ourLastBid, isUs: true });
     }
-
-    setRoundCalculated(true);
-    const newLogs: typeof auctionLog = [];
-    let currentLowestBidTracker = ourStatus === 'ACTIVE' ? ourNewBid : ourLastBid;
-    
-    if (ourStatus === 'ACTIVE') {
-      setOurLastBid(ourNewBid);
-      newLogs.push({ round: auctionRound, text: `Biz (Enflow) teklifimizi bir önceki en düşük tekliften ($${currentLowest.toLocaleString()}) düşerek $${ourNewBid.toLocaleString()} seviyesine eksilttik.`, type: 'bid' });
-    } else {
-      newLogs.push({ round: auctionRound, text: `Biz (Enflow) müzayededen çekildik. Son teklifimiz: $${ourLastBid.toLocaleString()}`, type: 'alert' });
-      // If we are withdrawn, tracker starts with the lowest active competitor's last bid
-      const activeCompBids = competitors.filter(c => c.isActive).map(c => c.lastBid);
-      if (activeCompBids.length > 0) {
-        currentLowestBidTracker = Math.min(...activeCompBids);
+    competitors.forEach(c => {
+      if (c.isActive) {
+        list.push({ id: c.id, name: c.name, lastBid: c.lastBid, isUs: false, avatarColor: c.avatarColor });
       }
-    }
+    });
+    return list;
+  }, [ourStatus, ourLastBid, competitors]);
 
-    // Process competitors bidding sequentially
-    const updatedCompetitors = competitors.map(comp => {
-      if (!comp.isActive) return comp;
+  // Real-time calculation of dynamic decrement caps based on preceding sequential bids
+  const dynamicRequiredMaxes = useMemo(() => {
+    const maxes: Record<string, number> = {};
+    let tracker = currentLowestBidVal;
 
-      // Each competitor must drop by at least currentMinDecrement from the current lowest bid overall at this moment!
-      const targetBid = currentLowestBidTracker - currentMinDecrement;
-
-      if (targetBid < comp.floorPrice) {
-        // Competitor drops out because bid falls below their floor
-        newLogs.push({ 
-          round: auctionRound, 
-          text: `🚨 ${comp.name} müzayededen çekildi! En dip sınırına ulaştı (En düşük teklif $${currentLowestBidTracker.toLocaleString()} iken vermesi gereken teklif $${targetBid.toLocaleString()} idi, rakip dip limiti: $${comp.floorPrice.toLocaleString()}).`, 
-          type: 'alert' 
-        });
-        return { ...comp, isActive: false };
+    activeParticipants.forEach(part => {
+      const isWithdrawn = withdrawals[part.id] === true;
+      if (isWithdrawn) {
+        maxes[part.id] = 0;
       } else {
-        // Competitor places the bid, and now the new lowest bid becomes targetBid!
-        newLogs.push({ 
-          round: auctionRound, 
-          text: `💸 ${comp.name} bir önceki en düşük tekliften ($${currentLowestBidTracker.toLocaleString()}) eksiltme miktarı kadar düşerek teklifini $${targetBid.toLocaleString()} yaptı.`, 
-          type: 'bid' 
-        });
-        currentLowestBidTracker = targetBid; // Update the tracking lowest bid immediately!
-        return { ...comp, lastBid: targetBid };
+        maxes[part.id] = tracker - currentMinDecrement;
+        const enteredVal = parseInt((manualBids[part.id] || '').replace(/\D/g, ''));
+        if (enteredVal && !isNaN(enteredVal) && enteredVal <= tracker - currentMinDecrement) {
+          tracker = enteredVal;
+        } else {
+          tracker = tracker - currentMinDecrement;
+        }
       }
     });
 
+    return maxes;
+  }, [activeParticipants, withdrawals, manualBids, currentLowestBidVal, currentMinDecrement]);
+
+  // Process all manual round bids and withdrawals sequentially
+  const submitRoundBids = () => {
+    if (auctionState !== 'BIDDING') return;
+
+    const logs: typeof auctionLog = [];
+    let precedingBid = currentLowestBidVal;
+    
+    const validatedBids: Record<string, number> = {};
+    const newlyWithdrawn: Record<string, boolean> = {};
+
+    for (let i = 0; i < activeParticipants.length; i++) {
+      const part = activeParticipants[i];
+      const isWithdrawn = withdrawals[part.id] === true;
+
+      if (isWithdrawn) {
+        newlyWithdrawn[part.id] = true;
+        logs.push({ 
+          round: auctionRound, 
+          text: `🚨 ${part.name} ihaleden çekildi! (Son geçerli teklifi: $${part.lastBid.toLocaleString()})`, 
+          type: 'alert' 
+        });
+      } else {
+        const bidStr = manualBids[part.id] || '';
+        const bidVal = parseInt(bidStr.replace(/\D/g, ''));
+
+        if (!bidVal || isNaN(bidVal)) {
+          alert(`Hata: ${part.name} için geçerli bir teklif girilmeli veya "İhaleden Çekildi" olarak işaretlenmelidir.`);
+          return;
+        }
+
+        const requiredMax = precedingBid - currentMinDecrement;
+        if (bidVal > requiredMax) {
+          alert(`Hata: ${part.name} için girilen teklif ($${bidVal.toLocaleString()}) kurallara aykırı!\nBir önceki tekliften ($${precedingBid.toLocaleString()}) en az minimum eksiltme miktarı ($${currentMinDecrement.toLocaleString()}) kadar düşmelidir.\nGirebileceğiniz maksimum teklif: $${requiredMax.toLocaleString()}`);
+          return;
+        }
+
+        if (part.isUs && bidVal < floorCost) {
+          const confirmGoBelow = window.confirm(`KRİTİK UYARI: Bizim (Enflow) için girdiğiniz teklif ($${bidVal.toLocaleString()}) en dip maliyetimizin ($${floorCost.toLocaleString()}) altındadır! Zarar etmeyi kabul ediyor musunuz?`);
+          if (!confirmGoBelow) return;
+        }
+
+        validatedBids[part.id] = bidVal;
+        precedingBid = bidVal; // Set the new tracker for sequential order
+        logs.push({
+          round: auctionRound,
+          text: `💸 ${part.name} teklifini bir önceki en düşük tekliften ($${(precedingBid + (precedingBid === bidVal ? 0 : currentMinDecrement)).toLocaleString()}) düşerek $${bidVal.toLocaleString()} yaptı.`,
+          type: 'bid'
+        });
+      }
+    }
+
+    // Apply state changes
+    if (newlyWithdrawn['us']) {
+      setOurStatus('WITHDRAWN');
+    }
+    if (validatedBids['us']) {
+      setOurLastBid(validatedBids['us']);
+    }
+
+    const updatedCompetitors = competitors.map(c => {
+      if (newlyWithdrawn[c.id]) {
+        return { ...c, isActive: false };
+      }
+      if (validatedBids[c.id]) {
+        return { ...c, lastBid: validatedBids[c.id] };
+      }
+      return c;
+    });
+
     setCompetitors(updatedCompetitors);
-    setAuctionLog(prev => [...prev, ...newLogs]);
+    setAuctionLog(prev => [...prev, ...logs]);
 
     // Check end condition
     const activeCompetitors = updatedCompetitors.filter(c => c.isActive);
-    const totalActive = activeCompetitors.length + (ourStatus === 'ACTIVE' ? 1 : 0);
+    const totalActiveNow = activeCompetitors.length + (newlyWithdrawn['us'] || ourStatus === 'WITHDRAWN' ? 0 : 1);
 
-    if (totalActive <= 1) {
-      // Auction Finished! Let's find the winner
+    if (totalActiveNow <= 1) {
       setAuctionState('FINISHED');
       
       let winnerName = '';
       let winnerPrice = 0;
       let isUsWinner = false;
 
-      if (ourStatus === 'ACTIVE') {
-        const lowestCompPrice = activeCompetitors.length > 0 ? activeCompetitors[0].lastBid : Infinity;
-        if (ourNewBid < lowestCompPrice) {
-          winnerName = 'Biz (Enflow)';
-          winnerPrice = ourNewBid;
-          isUsWinner = true;
-        } else {
-          winnerName = activeCompetitors[0].name;
-          winnerPrice = activeCompetitors[0].lastBid;
-        }
-      } else if (activeCompetitors.length > 0) {
-        winnerName = activeCompetitors[0].name;
-        winnerPrice = activeCompetitors[0].lastBid;
-      } else {
-        // Everyone dropped out, find the absolute lowest bid
-        const allParticipants = [
-          { name: 'Biz (Enflow)', price: ourLastBid, active: false, isUs: true },
-          ...updatedCompetitors.map(c => ({ name: c.name, price: c.lastBid, active: false, isUs: false }))
-        ];
-        const absoluteWinner = [...allParticipants].sort((a, b) => a.price - b.price)[0];
-        winnerName = absoluteWinner.name;
-        winnerPrice = absoluteWinner.price;
-        isUsWinner = absoluteWinner.isUs;
-      }
+      // Compile final bids to find the lowest price (winner)
+      const allParticipants = [
+        { name: 'Biz (Enflow)', price: validatedBids['us'] || ourLastBid, active: !newlyWithdrawn['us'] && ourStatus === 'ACTIVE', isUs: true },
+        ...updatedCompetitors.map(c => ({ name: c.name, price: c.lastBid, active: c.isActive, isUs: false }))
+      ];
+
+      // Sort by price ascending (lowest wins)
+      const sortedParticipants = allParticipants.sort((a, b) => a.price - b.price);
+      const winner = sortedParticipants[0];
+      
+      winnerName = winner.name;
+      winnerPrice = winner.price;
+      isUsWinner = winner.isUs;
 
       setAuctionWinner({ name: winnerName, price: winnerPrice, isUs: isUsWinner });
-      
       setAuctionLog(prev => [
-        ...prev, 
-        { 
-          round: auctionRound, 
-          text: `🏆 AÇIK EKSİLTME TAMAMLANDI! Kazanan: ${winnerName} | Kazanan Fiyat: $${winnerPrice.toLocaleString()}`, 
-          type: isUsWinner ? 'success' : 'alert' 
+        ...prev,
+        {
+          round: auctionRound,
+          text: `🏆 AÇIK EKSİLTME TAMAMLANDI! Kazanan: ${winnerName} | Kazanan Fiyat: $${winnerPrice.toLocaleString()}`,
+          type: isUsWinner ? 'success' : 'alert'
         }
       ]);
     } else {
-      // Progress to next round, calculate next decrement step (reduced by %decrementReductionPct)
+      // Clear inputs for the next round
+      setManualBids({});
+      setWithdrawals({});
+
       const nextRound = auctionRound + 1;
       const reduction = 1 - (decrementReductionPct / 100);
       const nextDecrement = Math.max(500, Math.round(currentMinDecrement * reduction));
       
       setAuctionRound(nextRound);
       setCurrentMinDecrement(nextDecrement);
-      setRoundCalculated(false);
-      
       setAuctionLog(prev => [
         ...prev,
         { round: nextRound, text: `--- Tur ${nextRound} Başladı! Bu tur için gereken Minimum Düşüş: $${nextDecrement.toLocaleString()} ---`, type: 'info' }
       ]);
     }
-  };
-
-  const ourRoundLastLowestCheck = (currentLowest: number, newBid: number) => {
-    // Helper to ensure initial rounds respect initial prices
-    if (newBid >= currentLowest) return true;
-    return false;
-  };
-
-  const handleWithdrawFromAuction = () => {
-    if (window.confirm('Açık eksiltmeden çekilmek istediğinize emin misiniz? Diğer firmalar teklif eksiltmeye devam edecektir.')) {
-      setOurStatus('WITHDRAWN');
-      addAuctionLogEntry(`Biz (Enflow) ihaleden çekildik! Kalan firmalar yarışıyor.`, 'alert');
-      // Execute the round with our withdrawal
-      setTimeout(() => {
-        executeRoundBids(ourLastBid);
-      }, 500);
-    }
-  };
-
-  const addAuctionLogEntry = (text: string, type: 'info' | 'bid' | 'alert' | 'success') => {
-    setAuctionLog(prev => [...prev, { round: auctionRound, text, type }]);
   };
 
   const handleFinalizeAuctionDeal = async () => {
@@ -514,13 +539,7 @@ const NegotiationModule = ({
     }
   };
 
-  // Helper values for current lowest bid in auction
-  const currentLowestBidVal = useMemo(() => {
-    if (competitors.length === 0) return initialValue;
-    const activeBids = competitors.filter(c => c.isActive).map(c => c.lastBid);
-    if (ourStatus === 'ACTIVE') activeBids.push(ourLastBid);
-    return Math.min(...activeBids);
-  }, [competitors, ourLastBid, ourStatus, initialValue]);
+
 
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
@@ -1128,77 +1147,103 @@ const NegotiationModule = ({
               <div className="glass-panel p-8 rounded-[40px] border border-white/60 bg-white/80 backdrop-blur-md space-y-6">
                 <div className="flex items-center justify-between border-b border-slate-100 pb-4">
                   <div>
-                    <h5 className="font-black text-slate-900 uppercase italic tracking-tighter text-sm">Tur Hamleleri</h5>
-                    <p className="text-[10px] text-slate-400 font-bold mt-1">Tur sonu için teklifinizi iletin veya ihaleden çekilin.</p>
+                    <h5 className="font-black text-slate-900 uppercase italic tracking-tighter text-sm">Tur Teklif Kontrol Paneli</h5>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">Katılımcı firmaların bu turdaki tekliflerini manuel girin veya çekilenleri işaretleyin.</p>
                   </div>
-                  <div className="text-xs font-bold text-slate-500">
-                    Gereken Maksimum Teklif: <span className="font-black text-red-500">${(currentLowestBidVal - currentMinDecrement).toLocaleString()}</span>
+                  <div className="text-xs font-black text-slate-500 bg-slate-100 px-3 py-1 rounded-lg">
+                    Tur: <span className="text-primary font-black">{auctionRound}</span>
                   </div>
                 </div>
 
-                {ourStatus === 'ACTIVE' ? (
-                  <div className="space-y-4">
-                    {/* Actions Row */}
-                    <div className="flex flex-wrap gap-3">
-                      {/* Auto calculate bid (Min decrement) */}
-                      <button 
-                        onClick={() => executeRoundBids(currentLowestBidVal - currentMinDecrement)}
-                        className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-widest"
-                      >
-                        <Zap size={14} /> Otomatik Eksilt (-${currentMinDecrement.toLocaleString()})
-                      </button>
-
-                      {/* Drop out button */}
-                      <button 
-                        onClick={handleWithdrawFromAuction}
-                        className="px-6 py-4 border border-red-200 text-red-600 hover:bg-red-50 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-widest ml-auto"
-                      >
-                        <XCircle size={14} /> İhaleden Çekil
-                      </button>
-                    </div>
-
-                    {/* Custom manual bid form */}
-                    <div className="h-px bg-slate-200/50 my-4" />
+                <div className="space-y-4">
+                  {activeParticipants.map(part => {
+                    const isWithdrawn = withdrawals[part.id] === true;
+                    const maxBid = dynamicRequiredMaxes[part.id];
                     
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Manuel Teklif Girişi ($)</label>
-                      <div className="flex gap-4">
-                        <div className="relative flex-1">
-                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                          <input 
-                            type="text" 
-                            value={manualBidInput}
-                            onChange={(e) => setManualBidInput(e.target.value)}
-                            placeholder={`Örn: ${(currentLowestBidVal - currentMinDecrement - 1000).toLocaleString()}`}
-                            className="w-full pl-10 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-slate-900/5 outline-none transition-all"
-                          />
+                    return (
+                      <div 
+                        key={part.id}
+                        className={cn(
+                          "p-4 rounded-2xl border transition-all duration-300 flex flex-col md:flex-row md:items-center justify-between gap-4",
+                          isWithdrawn 
+                            ? "bg-red-500/5 border-red-200/50 opacity-80" 
+                            : "bg-white border-slate-100 hover:border-slate-300 shadow-sm"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div 
+                            className="w-10 h-10 text-white rounded-xl flex items-center justify-center font-black text-xs shadow-sm"
+                            style={{ backgroundColor: part.avatarColor || '#0f172a' }}
+                          >
+                            {part.isUs ? 'Biz' : part.name.replace('Rakip Firma ', '')}
+                          </div>
+                          <div>
+                            <h6 className="font-black text-slate-900 text-xs">{part.name}</h6>
+                            <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
+                              Önceki Teklifi: <span className="text-slate-700 font-black">${part.lastBid.toLocaleString()}</span>
+                            </span>
+                          </div>
                         </div>
-                        <button 
-                          onClick={() => {
-                            const val = parseInt(manualBidInput.replace(/\D/g, ''));
-                            if (!val) return alert('Lütfen geçerli bir teklif girin.');
-                            executeRoundBids(val);
-                            setManualBidInput('');
-                          }}
-                          className="bg-white border border-slate-200 text-slate-800 hover:border-slate-800 px-8 rounded-2xl text-xs font-black transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest shadow-sm"
-                        >
-                          Gönder
-                        </button>
+
+                        <div className="flex items-center gap-3">
+                          {isWithdrawn ? (
+                            <div className="flex-1 md:flex-none">
+                              <span className="px-4 py-3 bg-red-100 text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest block text-center border border-red-200">
+                                🚫 İHALEDEN ÇEKİLDİ
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="relative flex-1 md:flex-none md:w-48">
+                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                              <input 
+                                type="text" 
+                                value={manualBids[part.id] || ''}
+                                onChange={(e) => setManualBids(prev => ({ ...prev, [part.id]: e.target.value }))}
+                                placeholder={`En Fazla: $${maxBid.toLocaleString()}`}
+                                className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black shadow-inner focus:ring-4 focus:ring-slate-900/5 outline-none transition-all text-slate-800"
+                              />
+                            </div>
+                          )}
+
+                          {isWithdrawn ? (
+                            <button
+                              onClick={() => setWithdrawals(prev => ({ ...prev, [part.id]: false }))}
+                              className="px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-xl text-[10px] font-black hover:bg-slate-50 uppercase tracking-widest transition-all active:scale-95 shadow-sm"
+                            >
+                              Dahil Et
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => {
+                                setWithdrawals(prev => ({ ...prev, [part.id]: true }));
+                                setManualBids(prev => {
+                                  const copy = { ...prev };
+                                  delete copy[part.id];
+                                  return copy;
+                                });
+                              }}
+                              className="px-4 py-2.5 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all active:scale-95"
+                            >
+                              Çekildi
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    );
+                  })}
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
+                  <div className="text-[10px] text-slate-400 font-bold max-w-[320px] leading-tight">
+                    * Her turlu teklifte, sıradaki firma bir öncekinden en az <span className="text-amber-500 font-black">${currentMinDecrement.toLocaleString()}</span> düşmek zorundadır.
                   </div>
-                ) : (
-                  <div className="p-6 text-center text-slate-400 font-bold italic border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-2">
-                    <AlertCircle size={20} className="text-slate-300 animate-pulse" />
-                    Müzayededen çekildiğiniz için teklif veremezsiniz. Rakiplerin hamlelerini aşağıdaki canlı akıştan takip edebilirsiniz.
-                    <button 
-                      onClick={() => executeRoundBids(ourLastBid)}
-                      className="mt-4 px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-all flex items-center gap-1.5"
-                    >
-                      Sonraki Tur Hamlelerini Gör <ArrowRight size={12} />
-                    </button>
-                  </div>
-                )}
+                  <button 
+                    onClick={submitRoundBids}
+                    className="w-full md:w-auto px-8 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-[0.1em]"
+                  >
+                    <CheckCircle2 size={14} /> Tur Hamlelerini Kaydet & İlerlet
+                  </button>
+                </div>
               </div>
             )}
 

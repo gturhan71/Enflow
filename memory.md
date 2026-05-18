@@ -105,6 +105,7 @@ cd backend && npx tsx src/index.ts
 | 18.05.2026 | Canlı Pazarlık Simülasyonu | Satış müdürüne özel dip maliyet korumalı interaktif müzakere paneli sunmak için. |
 | 18.05.2026 | Çoklu Açık Eksiltme İhalesi | Rakip firmaların katıldığı turlu, kurallı ve manuel/otomatik eksiltmeli müzayede simülasyonu sunmak için. |
 | 18.05.2026 | Pazarlığa Açık Teklif Koruması | Teklif hazırlama aşamasına 'Pazarlığa Açık' bayrağı ve pazarlık kokpiti seçici entegrasyonu sunmak için. |
+| 18.05.2026 | Sıralı Manuel Açık Eksiltme İhalesi | Rakip firmaların ve Bizim tekliflerin manuel form üzerinden girildiği, ardışık eksiltme kurallarına göre sıralı doğrulanan, çekilme/dahil etme destekli premium ihale motoru entegre etmek için. |
 
 ---
-*Enflow v1.3.2 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator with custom proposal filters, floor cost checks & executive control.*
+*Enflow v1.4.0 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator with custom proposal filters, floor cost checks & executive control, introducing the new sequential manual reverse auction bidding engine.*
