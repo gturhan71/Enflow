@@ -27,24 +27,38 @@ import { motion } from 'motion/react';
 import { Opportunity, Project, TodoTask } from '../types';
 import { cn } from '../lib/utils';
 
-// Sub-component for KPI cards (Memoized for performance)
+// Sub-component for KPI cards (Memoized for performance with high-fidelity glow effects)
 const KPICard = React.memo(({ kpi, index }: { kpi: any, index: number }) => (
   <motion.div 
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 25 }}
     animate={{ opacity: 1, y: 0 }}
-    transition={{ delay: index * 0.1 }}
-    className="glass-panel p-8 rounded-[32px] group relative overflow-hidden shadow-sm hover:shadow-xl transition-all border-white/40"
+    whileHover={{ y: -6, scale: 1.02 }}
+    transition={{ 
+      type: "spring", 
+      stiffness: 300, 
+      damping: 22, 
+      delay: index * 0.06 
+    }}
+    className="glass-panel p-8 rounded-[32px] group relative overflow-hidden shadow-sm hover:shadow-2xl transition-all border border-white/50 bg-gradient-to-br from-white/80 to-white/40 cursor-pointer"
   >
-    <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
+    {/* Dynamic Background Mesh Glow */}
+    <div className={cn(
+      "absolute -right-16 -top-16 w-36 h-36 rounded-full blur-[50px] opacity-10 group-hover:opacity-30 group-hover:scale-125 transition-all duration-700 ease-out",
+      kpi.glowBg
+    )} />
+    
+    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity duration-500">
       <kpi.icon size={80} />
     </div>
-    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110", kpi.bg, kpi.color)}>
+    
+    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110 shadow-lg shadow-black/5", kpi.bg, kpi.color)}>
       <kpi.icon size={28} />
     </div>
+    
     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{kpi.label}</p>
     <div className="flex items-baseline gap-2">
       <h4 className="text-3xl font-black text-slate-900 tracking-tighter">{kpi.value}</h4>
-      <ArrowUpRight size={16} className="text-primary" />
+      <ArrowUpRight size={16} className={cn("transition-transform group-hover:translate-x-1 group-hover:-translate-y-1 duration-300", kpi.color)} />
     </div>
     <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 italic">{kpi.sub}</p>
   </motion.div>
@@ -75,10 +89,10 @@ const Dashboard = ({
     const activeProjects = projects.filter(p => ['IN_PROGRESS', 'NOT_STARTED'].includes(p.status)).length;
 
     return [
-      { label: 'Toplam Pipeline', value: `${(totalPipelineValue / 1000000).toFixed(1)}M $`, sub: 'Aktif Fırsat Değeri', icon: DollarSign, color: 'text-primary', bg: 'bg-primary/10' },
-      { label: 'Kaybedilen Değer', value: `${(lostValue / 1000000).toFixed(1)}M $`, sub: 'Pipedan Düşen', icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
-      { label: 'Aktif Projeler', value: activeProjects, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-50' },
-      { label: 'Ağırlıklı Değer', value: `${(weightedValue / 1000000).toFixed(1)}M $`, sub: 'Olasılık Bazlı Tahmin', icon: Target, color: 'text-blue-600', bg: 'bg-blue-50' },
+      { label: 'Toplam Pipeline', value: `${(totalPipelineValue / 1000000).toFixed(1)}M $`, sub: 'Aktif Fırsat Değeri', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-500/10', glowBg: 'bg-emerald-500' },
+      { label: 'Kaybedilen Değer', value: `${(lostValue / 1000000).toFixed(1)}M $`, sub: 'Pipedan Düşen', icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', glowBg: 'bg-red-500' },
+      { label: 'Aktif Projeler', value: activeProjects, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-500/10', glowBg: 'bg-purple-500' },
+      { label: 'Ağırlıklı Değer', value: `${(weightedValue / 1000000).toFixed(1)}M $`, sub: 'Olasılık Bazlı Tahmin', icon: Target, color: 'text-blue-600', bg: 'bg-blue-500/10', glowBg: 'bg-blue-500' },
     ];
   }, [opportunities, projects, tasks]);
 
@@ -108,7 +122,7 @@ const Dashboard = ({
           description: `"${opp.title}" fırsatı için sözleşme imzalanarak Proje Yönetimine devredildi.`,
           date: contract.signedDate || 'Canlı Güncelleme',
           icon: FileSignature,
-          color: 'text-emerald-600 bg-emerald-50'
+          color: 'text-emerald-600 bg-emerald-500/10'
         });
       }
     });
@@ -123,14 +137,12 @@ const Dashboard = ({
         description: `Birim: ${unitLabel} | Durum: ${task.status === 'COMPLETED' ? 'Tamamlandı' : 'Bekliyor'} | ${task.description || ''}`,
         date: task.dueDate || 'Termin Belirtilmedi',
         icon: icon,
-        color: task.status === 'COMPLETED' ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'
+        color: task.status === 'COMPLETED' ? 'text-emerald-600 bg-emerald-500/10' : 'text-amber-600 bg-amber-500/10'
       });
     });
 
     return list.slice(0, 6);
   }, [opportunities, contracts, tasks]);
-
-  const COLORS = ['hsla(151, 86%, 39%, 0.8)', 'hsla(217, 91%, 60%, 0.8)', 'hsla(271, 91%, 65%, 0.8)', 'hsla(14, 91%, 60%, 0.8)', 'hsla(151, 86%, 39%, 1)'];
 
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
@@ -139,14 +151,15 @@ const Dashboard = ({
           <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Kurumsal Kokpit</h3>
           <p className="text-slate-500 font-medium text-sm">Sistem genelindeki canlı performans ve operasyonel veriler.</p>
         </div>
-        <div className="flex items-center gap-3 glass-card p-3 rounded-2xl bg-white/40 border-white/60">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center animate-pulse">
+        <div className="flex items-center gap-3 glass-card p-3 px-4 rounded-2xl bg-white/40 border border-white/60 shadow-lg">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center animate-pulse">
             <Zap size={20} fill="currentColor" />
           </div>
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sistem Durumu</p>
             <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full bg-primary shadow-sm shadow-primary/40" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 animate-ping absolute" />
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 relative" />
               <p className="text-xs font-bold text-slate-900 italic">Senkronize</p>
             </div>
           </div>
@@ -160,7 +173,7 @@ const Dashboard = ({
 
       {/* Approval Queue Section */}
       {approvalQueue.length > 0 && (
-        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-white/40 border-white/40">
+        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-gradient-to-br from-white/70 to-white/40 border border-white/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Onay Kuyruğu</h4>
@@ -175,20 +188,20 @@ const Dashboard = ({
               <motion.div 
                 layout
                 key={opp.id}
-                className="p-5 rounded-2xl bg-white/60 border border-white hover:border-primary/20 transition-all group"
+                className="p-5 rounded-2xl bg-white/70 border border-white/80 hover:border-emerald-500/30 hover:shadow-lg transition-all group relative overflow-hidden"
               >
                 <div className="flex justify-between items-start mb-4">
                   <div className="min-w-0">
-                    <h5 className="text-sm font-black text-slate-900 truncate">{opp.title}</h5>
+                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-emerald-600 transition-colors duration-200">{opp.title}</h5>
                     <p className="text-[10px] font-bold text-slate-500 uppercase">{opp.customer?.name || 'Müşteri Belirtilmedi'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-black text-primary tracking-tighter">{((opp.value || 0) / 1000).toFixed(1)}k $</p>
+                    <p className="text-sm font-black text-emerald-600 tracking-tighter">{((opp.value || 0) / 1000).toFixed(1)}k $</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => onApproveProposal?.(opp.id)}
-                  className="w-full py-2.5 rounded-xl bg-primary text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary-dark transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 hover:shadow-emerald-500/30 transition-all shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 cursor-pointer active:scale-98"
                 >
                   <ShieldCheck size={14} /> Teklifi Onayla
                 </button>
@@ -200,13 +213,13 @@ const Dashboard = ({
 
       {/* Lost Deals Section */}
       {opportunities.filter(o => o.status === 'LOST').length > 0 && (
-        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-white/40 border-white/40">
+        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-gradient-to-br from-white/70 to-white/40 border border-white/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Kaybedilenler Listesi</h4>
               <p className="text-xs text-slate-500 font-bold">Pipedan düşen kaybedilen teklifler/fırsatlar</p>
             </div>
-            <div className="bg-red-500/10 text-red-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-red-500/20 uppercase tracking-widest animate-pulse">
+            <div className="bg-red-500/10 text-red-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-red-500/20 uppercase tracking-widest">
               {opportunities.filter(o => o.status === 'LOST').length} Kaybedilen
             </div>
           </div>
@@ -215,15 +228,15 @@ const Dashboard = ({
               <motion.div 
                 layout
                 key={opp.id}
-                className="p-5 rounded-2xl bg-white/60 border border-white hover:border-red-500/20 transition-all group"
+                className="p-5 rounded-2xl bg-white/60 border border-white/80 hover:border-red-500/20 transition-all group"
               >
-                <div className="flex justify-between items-start mb-4">
+                <div className="flex justify-between items-start">
                   <div className="min-w-0">
                     <h5 className="text-sm font-black text-slate-900 truncate">{opp.title}</h5>
                     <p className="text-[10px] font-bold text-slate-500 uppercase">{opp.customer?.name || 'Müşteri Belirtilmedi'}</p>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-black text-red-600 tracking-tighter">{((opp.value || 0) / 1000).toFixed(1)}k $</p>
+                    <p className="text-sm font-black text-red-500 tracking-tighter">{((opp.value || 0) / 1000).toFixed(1)}k $</p>
                   </div>
                 </div>
               </motion.div>
@@ -234,20 +247,43 @@ const Dashboard = ({
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
         {/* Sales Pipeline Chart */}
-        <div className="lg:col-span-3 glass-panel p-8 rounded-[32px] flex flex-col min-h-[450px] shadow-sm bg-white/40 border-white/40">
+        <div className="lg:col-span-3 glass-panel p-8 rounded-[32px] flex flex-col min-h-[450px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Satış Boru Hattı</h4>
               <p className="text-xs text-slate-500 font-bold">Fırsatların aşamalara göre dağılımı</p>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-black text-primary uppercase tracking-widest bg-primary/10 px-4 py-1.5 rounded-full border border-primary/20">
+            <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
               <ShieldCheck size={12} /> Doğrulanmış Veri
             </div>
           </div>
-          <div className="flex-1 w-full">
+          <div className="flex-1 w-full min-h-[280px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={pipelineChartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.03)" />
+                {/* Premium Glow & Solid Neon Gradients */}
+                <defs>
+                  <linearGradient id="barPrimary" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(151, 86%, 39%, 1)" />
+                    <stop offset="100%" stopColor="hsla(151, 86%, 39%, 0.15)" />
+                  </linearGradient>
+                  <linearGradient id="barBlue" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(217, 91%, 60%, 1)" />
+                    <stop offset="100%" stopColor="hsla(217, 91%, 60%, 0.15)" />
+                  </linearGradient>
+                  <linearGradient id="barPurple" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(271, 91%, 65%, 1)" />
+                    <stop offset="100%" stopColor="hsla(271, 91%, 65%, 0.15)" />
+                  </linearGradient>
+                  <linearGradient id="barOrange" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(14, 91%, 60%, 1)" />
+                    <stop offset="100%" stopColor="hsla(14, 91%, 60%, 0.15)" />
+                  </linearGradient>
+                  <linearGradient id="barEmerald" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(151, 86%, 39%, 1)" />
+                    <stop offset="100%" stopColor="hsla(151, 86%, 39%, 0.3)" />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.015)" />
                 <XAxis 
                   dataKey="name" 
                   axisLine={false} 
@@ -258,12 +294,20 @@ const Dashboard = ({
                 <YAxis hide />
                 <Tooltip 
                   cursor={{ fill: 'rgba(0,0,0,0.01)' }}
-                  contentStyle={{ borderRadius: '24px', border: 'none', boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.2)', padding: '20px', backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(10px)' }}
+                  contentStyle={{ 
+                    borderRadius: '24px', 
+                    border: '1px solid rgba(255,255,255,0.6)', 
+                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', 
+                    padding: '16px 20px', 
+                    backgroundColor: 'rgba(255,255,255,0.85)', 
+                    backdropFilter: 'blur(16px)' 
+                  }}
                 />
                 <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={45}>
-                  {pipelineChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
+                  {pipelineChartData.map((entry, index) => {
+                    const gradColors = ['url(#barPrimary)', 'url(#barBlue)', 'url(#barPurple)', 'url(#barOrange)', 'url(#barEmerald)'];
+                    return <Cell key={`cell-${index}`} fill={gradColors[index % gradColors.length]} />;
+                  })}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -271,13 +315,13 @@ const Dashboard = ({
         </div>
 
         {/* Recent Projects List */}
-        <div className="lg:col-span-2 glass-panel p-8 rounded-[32px] flex flex-col max-h-[450px] shadow-sm bg-white/40 border-white/40">
+        <div className="lg:col-span-2 glass-panel p-8 rounded-[32px] flex flex-col max-h-[450px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
           <div className="flex items-center justify-between mb-8">
             <div>
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Aktif Projeler</h4>
               <p className="text-xs text-slate-500 font-bold">Kritik uygulama süreçleri</p>
             </div>
-            <button className="text-[10px] font-black text-primary uppercase tracking-widest hover:bg-primary/5 px-4 py-2 rounded-xl transition-all border border-primary/10">Tümünü Gör</button>
+            <button className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-500/5 px-4 py-2 rounded-xl transition-all border border-emerald-500/10 cursor-pointer">Tümünü Gör</button>
           </div>
           <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
             {projects.length === 0 ? (
@@ -290,17 +334,17 @@ const Dashboard = ({
                 <motion.div 
                   layout
                   key={p.id} 
-                  className="flex items-center gap-4 p-4 rounded-2xl hover:bg-white transition-all border border-transparent hover:border-slate-100 group cursor-pointer shadow-none hover:shadow-lg"
+                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/20 hover:bg-white transition-all border border-transparent hover:border-slate-100/50 group cursor-pointer shadow-none hover:shadow-lg"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-primary group-hover:text-white flex items-center justify-center transition-all shrink-0">
+                  <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-all shrink-0">
                     <Briefcase size={18} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-primary transition-colors">{p.name}</h5>
+                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-emerald-600 transition-colors">{p.name}</h5>
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={cn(
                         "text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter",
-                        p.status === 'IN_PROGRESS' ? "bg-primary/10 text-primary" : "bg-slate-100 text-slate-500"
+                        p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-500"
                       )}>
                         {p.status}
                       </span>
@@ -308,11 +352,12 @@ const Dashboard = ({
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-black text-slate-900">{((p.totalValue || 0) / 1000).toFixed(0)}k $</p>
-                    <div className="w-16 h-1 bg-slate-100 rounded-full mt-2 overflow-hidden border border-slate-200/50">
+                    <div className="w-20 h-1.5 bg-slate-100/80 rounded-full mt-2 overflow-hidden border border-slate-200/30">
                       <motion.div 
                         initial={{ width: 0 }}
                         animate={{ width: `${p.progress || 0}%` }}
-                        className="h-full bg-primary rounded-full shadow-sm shadow-primary/40"
+                        transition={{ duration: 1, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]"
                       />
                     </div>
                   </div>
@@ -325,32 +370,52 @@ const Dashboard = ({
 
       {/* Live Developments Section */}
       {developments.length > 0 && (
-        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-white/40 border-white/40">
+        <div className="glass-panel p-8 rounded-[32px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Canlı Operasyon Gelişmeleri</h4>
               <p className="text-xs text-slate-500 font-bold">Proje Yönetimi, Sözleşme ve Satın Alma süreçlerindeki canlı akış</p>
             </div>
-            <div className="bg-primary/10 text-primary text-[10px] font-black px-4 py-1.5 rounded-full border border-primary/20 uppercase tracking-widest animate-pulse">
+            <div className="bg-emerald-500/10 text-emerald-600 text-[10px] font-black px-4 py-1.5 rounded-full border border-emerald-500/20 uppercase tracking-widest animate-pulse">
               {developments.length} Canlı Takip
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {developments.map(dev => (
+            {developments.map((dev, idx) => (
               <motion.div 
                 layout
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                whileHover={{ y: -4 }}
                 key={dev.id}
-                className="p-6 rounded-2xl bg-white/60 border border-white hover:border-slate-200 transition-all group flex items-start gap-4"
+                className="p-6 rounded-3xl bg-gradient-to-br from-white/85 to-white/45 border border-white/60 hover:border-emerald-500/20 hover:shadow-xl transition-all duration-300 group flex items-start gap-4 relative overflow-hidden"
               >
-                <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center shrink-0", dev.color)}>
-                  <dev.icon size={20} />
+                {/* Glowing neon side border on hover */}
+                <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-transparent via-emerald-500/50 to-transparent transform -translate-y-full group-hover:translate-y-full transition-transform duration-1000" />
+                
+                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 shadow-inner relative", dev.color)}>
+                  {/* Ping Animation Indicator for Live Events */}
+                  {dev.id.includes('task') && !dev.title.includes('Tamamlandı') && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                    </span>
+                  )}
+                  {dev.id.includes('contract') && (
+                    <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                    </span>
+                  )}
+                  <dev.icon size={22} />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <h5 className="text-sm font-black text-slate-900 truncate">{dev.title}</h5>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-emerald-600 transition-colors duration-200">{dev.title}</h5>
                   </div>
                   <p className="text-xs text-slate-500 font-medium mb-3 leading-relaxed">{dev.description}</p>
-                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">{dev.date}</p>
+                  <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-100/50 inline-block px-2.5 py-1 rounded-md">{dev.date}</p>
                 </div>
               </motion.div>
             ))}
