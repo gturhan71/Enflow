@@ -61,11 +61,16 @@
 - **Glowing Crimson Glassmorphic Logout:** Engineered a stunning, high-contrast global Logout button within the top header group, styled with red-glowing glassmorphism and animated hover states.
 - **Universal Page Visibility:** Passed the global `onLogout` auth action handler down through `App.tsx` directly into the `Header` component, ensuring instant, one-click logout capability on every page of the application.
 
-### 13. Canlı Pazarlık Kokpiti & Dip Maliyet Koruma Sistemi (v1.3.0)
-- **Canlı Pazarlık Simülatörü:** Müşteri satın alma yetkilisi ile satış yöneticisi arasında geçen gerçekçi, dinamik bir pazarlık/chat simülasyon motoru kuruldu.
-- **Zırhlı Maliyet Koruması (En Dip Rakam):** Pazarlık esnasında girilen teklifler, Maliyet Analiz Modülü verilerinden (BoM Ürün Maliyetleri + Operasyonel Giderler) hesaplanan **En Dip Maliyet (Floor Cost)** ile eş zamanlı denetlenir. Maliyet altına inildiğinde sistem yöneticiyi kırmızı alarm bülteniyle uyarır.
-- **Executive Yetkilendirme Kontrolü:** Pazarlık modülü sadece Satış Birim Yöneticisine (`GENERAL_MANAGER` rolüne) açıldı. Yetkisiz girişlerde zırhlı kilit ekranı gösterilir.
-- **tek-ui Tasarım Bütünlüğü:** Gerçek zamanlı marj göstergesi, interaktif slider/hızlı indirim butonları, anlık bot yazıyor animasyonları ve el sıkışma/masadan kalkma durum panelleri zümrüt yeşili neon detaylarla dizayn edildi.
+### 13. Canlı Pazarlık Kokpiti & Açık Eksiltme Platformu (v1.3.1)
+- **Çift Modlu Pazarlık Seçeneği:** Satış yöneticisine 1v1 Canlı Müzakere veya Çoklu Rakip katılımlı **Açık Eksiltme (Reverse Auction)** arasında geçiş yapabilme imkanı sunan üst düzey tab bar entegre edildi.
+- **Açık Eksiltme Simülatörü:** Çoklu firmaların katıldığı, tur tabanlı teklif eksiltme müzayedesi geliştirildi:
+  - Rakipler ve bizim son tekliflerimizi gösteren canlı katılımcı teklif tablosu.
+  - Dinamik tur kuralları: Katılımcı rakip firma sayısı, ilk tur min eksiltme adımı ve tur başına eksiltme azalma oranı (sıkılaştırma katsayısı) özelleştirilebilir.
+  - Otomatik Teklif Eksiltme butonu veya tamamen **Manuel Teklif Giriş** paneli.
+  - Canlı tur akış logları, rakiplerin dip maliyetlerine ulaşıp teker teker ihaleden çekilme (drop-out) simülasyonu.
+  - Son tek kazanan teklif sahibi kalana kadar devam eden gerçek zamanlı round mantığı.
+- **Zırhlı Maliyet Koruması (En Dip Rakam):** Pazarlık ve açık eksiltme esnasında girilen teklifler, Maliyet Analiz Modülü verilerinden (BoM Ürün Maliyetleri + Giderler) hesaplanan **En Dip Maliyet (Floor Cost)** ile denetlenir. Bizim teklifimiz en dip rakamın altına indiğinde sistem onay uyarısı vererek güvenliği sağlar.
+- **Executive Yetkilendirme Kontrolü:** Pazarlık odası sadece `GENERAL_MANAGER` rolüne açılmıştır, yetkisiz girişler zırhlı kilit ekranıyla korunur.
 
 ## Portlar
 - **Frontend:** `http://localhost:3000`
@@ -95,6 +100,7 @@ cd backend && npx tsx src/index.ts
 | 18.05.2026 | Uçtan Uca Modül Senkronizasyonu | CRM, Sözleşme, PM, Satınalma ve Fiziksel Arşiv modüllerini kesintisiz bağlamak için. |
 | 18.05.2026 | Global Header Logout & Başlıklar | Tüm ekranlarda güvenli tek-tık çıkış ve dinamik başlık deneyimi sağlamak için. |
 | 18.05.2026 | Canlı Pazarlık Simülasyonu | Satış müdürüne özel dip maliyet korumalı interaktif müzakere paneli sunmak için. |
+| 18.05.2026 | Çoklu Açık Eksiltme İhalesi | Rakip firmaların katıldığı turlu, kurallı ve manuel/otomatik eksiltmeli müzayede simülasyonu sunmak için. |
 
 ---
-*Enflow v1.3.0 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, live negotiation simulator, dynamic floor cost checks & executive control.*
+*Enflow v1.3.1 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator, floor cost checks & executive control.*

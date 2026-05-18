@@ -15,16 +15,29 @@ import {
   ArrowRight,
   RefreshCw,
   Zap,
-  Percent
+  Percent,
+  Users,
+  Award,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Opportunity, TodoTask } from '../types';
+import { Opportunity } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { cn } from '../lib/utils';
 
+// Types for Auction Simulation
+interface Competitor {
+  id: string;
+  name: string;
+  lastBid: number;
+  isActive: boolean;
+  floorPrice: number; // Invisible to user, determines when they drop out
+  avatarColor: string;
+}
+
 interface Message {
-  sender: 'customer' | 'manager' | 'system';
+  sender: 'customer' | 'manager' | 'system' | 'competitor';
   text: string;
   time: string;
   price?: number;
@@ -41,49 +54,67 @@ const NegotiationModule = ({
 }) => {
   const { currentUser } = useAuth();
   
-  // Rule: Only Satış Birim Yöneticisi (GENERAL_MANAGER / or specified permissions) can access
+  // Tab control: 'canli' (1v1 Chat) or 'eksiltme' (Reverse Auction)
+  const [activeMode, setActiveMode] = useState<'canli' | 'eksiltme'>('canli');
+
+  // Rule: Only Satış Birim Yöneticisi (GENERAL_MANAGER) can access
   const isAuthorized = useMemo(() => {
     return currentUser?.role === 'GENERAL_MANAGER';
   }, [currentUser]);
 
   const [selectedOppId, setSelectedOppId] = useState('');
-  const [negotiationState, setNegotiationState] = useState<'IDLE' | 'INTRO' | 'NEGOTIATING' | 'AGREED' | 'FAILED'>('IDLE');
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [currentOffer, setCurrentOffer] = useState<number>(0);
-  const [customerOffer, setCustomerOffer] = useState<number>(0);
-  const [customCounter, setCustomCounter] = useState<string>('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [concessionCounter, setConcessionCounter] = useState(0);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-
+  
   // Find selected opportunity
   const selectedOpp = useMemo(() => {
     return opportunities.find(o => o.id === selectedOppId);
   }, [opportunities, selectedOppId]);
 
-  // Calculate absolute floor cost (En Dip Maliyet) from CostAnalysis logic
+  // Calculate absolute floor cost (En Dip Maliyet)
   const floorCost = useMemo(() => {
     if (!selectedOpp) return 0;
     const bomCost = (selectedOpp.bomItems || []).reduce((sum, item) => sum + (item.purchaseCost * item.quantity), 0);
     const otherCost = (selectedOpp.costItems || []).reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
     const total = bomCost + otherCost;
-    // Fallback: If no costs analysis exists, assume floor price is 70% of opportunity value
     return total > 0 ? total : Math.round(selectedOpp.value * 0.7);
   }, [selectedOpp]);
 
-  // Initial pricing targets
   const initialValue = selectedOpp?.value || 0;
   const initialMargin = useMemo(() => {
     if (initialValue === 0) return 0;
     return ((initialValue - floorCost) / initialValue) * 100;
   }, [initialValue, floorCost]);
 
-  // Handle auto-scroll to bottom of chat
+  // --- STATE FOR 1v1 LIVE CHAT NEGOTIATION ---
+  const [chatState, setChatState] = useState<'IDLE' | 'INTRO' | 'NEGOTIATING' | 'AGREED' | 'FAILED'>('IDLE');
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [chatOffer, setChatOffer] = useState<number>(0);
+  const [chatCustomerTarget, setChatCustomerTarget] = useState<number>(0);
+  const [chatCustomCounter, setChatCustomCounter] = useState<string>('');
+  const [chatIsTyping, setChatIsTyping] = useState(false);
+  const [chatConcessions, setChatConcessions] = useState(0);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // --- STATE FOR MULTI-COMPETITOR REVERSE AUCTION ---
+  const [auctionState, setAuctionState] = useState<'IDLE' | 'SETUP' | 'BIDDING' | 'FINISHED'>('IDLE');
+  const [numCompetitors, setNumCompetitors] = useState<number>(3);
+  const [initialDecrement, setInitialDecrement] = useState<number>(5000);
+  const [decrementReductionPct, setDecrementReductionPct] = useState<number>(20); // Decrement shrinks by 20% each round
+  
+  const [auctionRound, setAuctionRound] = useState<number>(1);
+  const [currentMinDecrement, setCurrentMinDecrement] = useState<number>(5000);
+  const [competitors, setCompetitors] = useState<Competitor[]>([]);
+  const [ourLastBid, setOurLastBid] = useState<number>(0);
+  const [ourStatus, setOurStatus] = useState<'ACTIVE' | 'WITHDRAWN' | 'ELIMINATED'>('ACTIVE');
+  const [auctionLog, setAuctionLog] = useState<{ round: number; text: string; type: 'info' | 'bid' | 'alert' | 'success' }[]>([]);
+  const [manualBidInput, setManualBidInput] = useState<string>('');
+  const [auctionWinner, setAuctionWinner] = useState<{ name: string; price: number; isUs: boolean } | null>(null);
+  const [roundCalculated, setRoundCalculated] = useState<boolean>(false);
+
+  // Auto scroll chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+  }, [chatMessages, chatIsTyping]);
 
-  // Access Denied Screen
   if (!isAuthorized) {
     return (
       <div className="p-8 h-full flex flex-col items-center justify-center bg-slate-50/50">
@@ -116,93 +147,80 @@ const NegotiationModule = ({
     );
   }
 
-  const addMessage = (sender: 'customer' | 'manager' | 'system', text: string, price?: number) => {
+  // --- 1v1 CHAT SIMULATION HANDLERS ---
+  const addChatMessage = (sender: 'customer' | 'manager' | 'system', text: string, price?: number) => {
     const time = new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    setMessages(prev => [...prev, { sender, text, time, price }]);
+    setChatMessages(prev => [...prev, { sender, text, time, price }]);
   };
 
-  const startNegotiationSim = () => {
+  const startChatSim = () => {
     if (!selectedOpp) return;
-    setNegotiationState('INTRO');
-    setConcessionCounter(0);
-    setCurrentOffer(initialValue);
+    setChatState('INTRO');
+    setChatConcessions(0);
+    setChatOffer(initialValue);
     
-    // Generates starting customer offer (usually 15-25% below current proposal price but above or close to cost)
-    const idealCustomerOffer = Math.round(initialValue * 0.78);
-    // Make sure customer offer isn't below floorCost immediately, if possible
-    const startingCustomerOffer = Math.max(idealCustomerOffer, Math.round(floorCost * 0.95));
-    setCustomerOffer(startingCustomerOffer);
+    const idealTarget = Math.round(initialValue * 0.78);
+    const startingCustomerOffer = Math.max(idealTarget, Math.round(floorCost * 0.95));
+    setChatCustomerTarget(startingCustomerOffer);
 
-    setMessages([]);
-    setIsTyping(true);
+    setChatMessages([]);
+    setChatIsTyping(true);
 
     setTimeout(() => {
-      setIsTyping(false);
-      addMessage('system', `Pazarlık simülasyonu başlatıldı. Fırsat: ${selectedOpp.title} | En Dip Maliyet Sınırı: $${floorCost.toLocaleString()}`);
+      setChatIsTyping(false);
+      addChatMessage('system', `Pazarlık simülasyonu başlatıldı. Fırsat: ${selectedOpp.title} | En Dip Maliyet Sınırı: $${floorCost.toLocaleString()}`);
       
-      setIsTyping(true);
+      setChatIsTyping(true);
       setTimeout(() => {
-        setIsTyping(false);
-        addMessage('customer', `Merhaba Sayın Yetkili. ${selectedOpp.title} projeniz için hazırladığınız teklifi aldık. Teknik detaylar gayet iyi ancak fiyat bütçemizi epey zorluyor. Bizim bütçemiz en fazla $${startingCustomerOffer.toLocaleString()} seviyesinde. Bu rakama anlaşabilir miyiz?`);
-        setNegotiationState('NEGOTIATING');
+        setChatIsTyping(false);
+        addChatMessage('customer', `Merhaba Sayın Yetkili. ${selectedOpp.title} projeniz için hazırladığınız teklifi aldık. Teknik detaylar gayet iyi ancak fiyat bütçemizi epey zorluyor. Bizim bütçemiz en fazla $${startingCustomerOffer.toLocaleString()} seviyesinde. Bu rakama anlaşabilir miyiz?`);
+        setChatState('NEGOTIATING');
       }, 2000);
     }, 1000);
   };
 
-  // Negotiation Logic AI Core
-  const handleManagerCounter = (offerPrice: number) => {
+  const handleChatCounter = (offerPrice: number) => {
     if (offerPrice <= 0 || isNaN(offerPrice)) return;
     
-    // 1. Log manager counter offer
-    addMessage('manager', `Bizim teklifimiz: $${offerPrice.toLocaleString()}`, offerPrice);
-    setCurrentOffer(offerPrice);
-    setIsTyping(true);
+    addChatMessage('manager', `Bizim teklifimiz: $${offerPrice.toLocaleString()}`, offerPrice);
+    setChatOffer(offerPrice);
+    setChatIsTyping(true);
 
     const marginPercentage = ((offerPrice - floorCost) / offerPrice) * 100;
     
     setTimeout(() => {
-      setIsTyping(false);
+      setChatIsTyping(false);
 
-      // Edge Case: Offer is BELOW floor cost!
       if (offerPrice < floorCost) {
-        addMessage('system', `KRİTİK UYARI: Girilen teklif ($${offerPrice.toLocaleString()}) en dip maliyetin ($${floorCost.toLocaleString()}) altındadır! Şirket bu fiyata zarar edeceği için onay vermemektedir.`);
-        addMessage('customer', `Teklifiniz bütçemize çok uygun ancak şirketinizin bu fiyatla zarar edeceğini düşünüyoruz. İş birliğimizin sağlıklı yürümesi için adil bir fiyatta mutabık kalmalıyız.`);
+        addChatMessage('system', `KRİTİK UYARI: Girilen teklif ($${offerPrice.toLocaleString()}) en dip maliyetin ($${floorCost.toLocaleString()}) altındadır! Şirket bu fiyata zarar edeceği için onay vermemektedir.`);
+        addChatMessage('customer', `Teklifiniz bütçemize çok uygun ancak şirketinizin bu fiyatla zarar edeceğini düşünüyoruz. İş birliğimizin sağlıklı yürümesi için adil bir fiyatta mutabık kalmalıyız.`);
         return;
       }
 
-      // Concession counter check
-      const newConcession = concessionCounter + 1;
-      setConcessionCounter(newConcession);
+      const newConcession = chatConcessions + 1;
+      setChatConcessions(newConcession);
 
-      // Customer Decision Algorithm
-      // Accept condition: offerPrice is within 5% of customer's target budget OR if margin is extremely low and we are at the bottom.
-      const priceDiffPct = ((offerPrice - customerOffer) / customerOffer) * 100;
+      const priceDiffPct = ((offerPrice - chatCustomerTarget) / chatCustomerTarget) * 100;
 
       if (priceDiffPct <= 3 || (offerPrice === floorCost && Math.random() > 0.4)) {
-        // ACCEPT DEAL
-        addMessage('customer', `Harika! $${offerPrice.toLocaleString()} fiyatı bizim için kabul edilebilir bir seviyedir. Bu şartlar altında anlaşmayı sağlamaktan memnuniyet duyuyoruz. Evrak işlerini başlatabiliriz!`);
-        addMessage('system', `MUTABAKAT SAĞLANDI! Anlaşma Fiyatı: $${offerPrice.toLocaleString()} | Brüt Kar: $${(offerPrice - floorCost).toLocaleString()} (%${marginPercentage.toFixed(1)} marj).`);
-        setNegotiationState('AGREED');
+        addChatMessage('customer', `Harika! $${offerPrice.toLocaleString()} fiyatı bizim için kabul edilebilir bir seviyedir. Bu şartlar altında anlaşmayı sağlamaktan memnuniyet duyuyoruz. Evrak işlerini başlatabiliriz!`);
+        addChatMessage('system', `MUTABAKAT SAĞLANDI! Anlaşma Fiyatı: $${offerPrice.toLocaleString()} | Brüt Kar: $${(offerPrice - floorCost).toLocaleString()} (%${marginPercentage.toFixed(1)} marj).`);
+        setChatState('AGREED');
       } else if (newConcession >= 5) {
-        // Customer walks away if negotiation drags too long without progress
-        addMessage('customer', `Üzgünüm, müzakerede ortak bir noktada buluşamadık. Bizim bütçe sınırımız çok net. Masadan kalkmak durumundayız. İyi çalışmalar dileriz.`);
-        addMessage('system', `Pazarlık başarısızlıkla sonuçlandı. Müşteri masadan kalktı.`);
-        setNegotiationState('FAILED');
+        addChatMessage('customer', `Üzgünüm, müzakerede ortak bir noktada buluşamadık. Bizim bütçe sınırımız çok net. Masadan kalkmak durumundayız. İyi çalışmalar dileriz.`);
+        addChatMessage('system', `Pazarlık başarısızlıkla sonuçlandı. Müşteri masadan kalktı.`);
+        setChatState('FAILED');
       } else {
-        // COUNTER-OFFER BY CUSTOMER
-        // Increment customer's budget slightly based on how cooperative the manager is
         let increment = 0;
-        if (offerPrice < currentOffer) {
-          // Manager made a discount concession, customer responds cooperatively
-          const managerConcession = currentOffer - offerPrice;
+        if (offerPrice < chatOffer) {
+          const managerConcession = chatOffer - offerPrice;
           increment = Math.round(managerConcession * 0.45);
         } else {
-          // Manager didn't budge
-          increment = Math.round(customerOffer * 0.02);
+          increment = Math.round(chatCustomerTarget * 0.02);
         }
 
-        const nextCustomerOffer = Math.min(Math.round(customerOffer + increment), offerPrice - 100);
-        setCustomerOffer(nextCustomerOffer);
+        const nextCustomerOffer = Math.min(Math.round(chatCustomerTarget + increment), offerPrice - 100);
+        setChatCustomerTarget(nextCustomerOffer);
 
         const responseTexts = [
           `Fiyatı biraz daha esnettik fakat $${offerPrice.toLocaleString()} hala yüksek. Biz teklifimizi $${nextCustomerOffer.toLocaleString()} seviyesine çıkartabiliriz. Ne dersiniz?`,
@@ -211,70 +229,263 @@ const NegotiationModule = ({
         ];
         
         const randomText = responseTexts[Math.floor(Math.random() * responseTexts.length)];
-        addMessage('customer', randomText);
+        addChatMessage('customer', randomText);
       }
     }, 2000);
   };
 
-  const handleCustomCounterSubmit = (e: React.FormEvent) => {
+  const handleChatCustomCounterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const val = parseInt(customCounter.replace(/\D/g, ''));
+    const val = parseInt(chatCustomCounter.replace(/\D/g, ''));
     if (!val) return;
-    handleManagerCounter(val);
-    setCustomCounter('');
+    handleChatCounter(val);
+    setChatCustomCounter('');
   };
 
-  // Finish Negotiation and Lock in Database
-  const handleFinalizeDeal = async () => {
+  const handleFinalizeChatDeal = async () => {
     if (!selectedOpp) return;
-    
     try {
-      // 1. Update opportunity status to WON, value to negotiated price
-      const updatedOpp = await apiService.updateOpportunity(selectedOpp.id, {
+      await apiService.updateOpportunity(selectedOpp.id, {
         status: 'WON',
-        value: currentOffer
+        value: chatOffer
       });
-
-      // 2. Refresh local state
-      setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: currentOffer } : o));
-
-      alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${currentOffer.toLocaleString()} olarak sisteme işlendi.`);
-      
-      if (setActiveTab) {
-        // Redirect to contract page
-        setActiveTab('contracts');
-      } else {
-        setNegotiationState('IDLE');
-        setSelectedOppId('');
-      }
+      setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: chatOffer } : o));
+      alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${chatOffer.toLocaleString()} olarak sisteme işlendi.`);
+      if (setActiveTab) setActiveTab('contracts');
     } catch (err: any) {
-      alert(err.message || 'Pazarlık tescil edilirken hata oluştu.');
+      alert(err.message || 'Hata oluştu.');
     }
   };
 
+  // --- REVERSE AUCTION SIMULATION HANDLERS ---
+  const startAuctionSetup = () => {
+    if (!selectedOpp) return;
+    setAuctionState('SETUP');
+    // Set default initial decrement to 5% of opportunity value
+    const defaultDec = Math.round(initialValue * 0.05);
+    setInitialDecrement(defaultDec);
+    setCurrentMinDecrement(defaultDec);
+  };
+
+  const launchAuction = () => {
+    if (!selectedOpp) return;
+    
+    // Create competitors with realistic mock floor costs
+    const colorPalettes = ['#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
+    const mockCompetitors: Competitor[] = Array.from({ length: numCompetitors }).map((_, idx) => {
+      const name = `Rakip Firma ${String.fromCharCode(65 + idx)}`;
+      // Competitor floor is randomly set around our floor cost (between 85% to 115% of our floor)
+      const floorMultiplier = 0.85 + (Math.random() * 0.3);
+      const compFloor = Math.round(floorCost * floorMultiplier);
+      
+      return {
+        id: `comp-${idx + 1}`,
+        name,
+        lastBid: initialValue,
+        isActive: true,
+        floorPrice: compFloor,
+        avatarColor: colorPalettes[idx % colorPalettes.length]
+      };
+    });
+
+    setCompetitors(mockCompetitors);
+    setOurLastBid(initialValue);
+    setOurStatus('ACTIVE');
+    setAuctionRound(1);
+    setCurrentMinDecrement(initialDecrement);
+    setAuctionState('BIDDING');
+    setRoundCalculated(false);
+    setAuctionWinner(null);
+    setAuctionLog([
+      { round: 0, text: `Açık Eksiltme İhalesi Başlatıldı! Toplam ${numCompetitors} Rakip Firma İştirak Ediyor.`, type: 'info' },
+      { round: 0, text: `Başlangıç Teklifi: $${initialValue.toLocaleString()} | İlk Tur Minimum Düşüş Şartı: $${initialDecrement.toLocaleString()}`, type: 'info' }
+    ]);
+  };
+
+  // Live bidding execution for the current round
+  const executeRoundBids = (ourNewBid: number) => {
+    if (auctionState !== 'BIDDING' || roundCalculated) return;
+
+    // 1. Validate our bid is at least minimum decrement below current lowest bid
+    const currentLowest = Math.min(ourLastBid, ...competitors.filter(c => c.isActive).map(c => c.lastBid));
+    
+    if (ourStatus === 'ACTIVE') {
+      if (ourNewBid > currentLowest - currentMinDecrement && ourRoundLastLowestCheck(currentLowest, ourNewBid)) {
+        alert(`Hata: Bu tur için vermeniz gereken maksimum teklif en fazla $${(currentLowest - currentMinDecrement).toLocaleString()} olmalıdır (Min eksiltme şartı: $${currentMinDecrement.toLocaleString()}).`);
+        return;
+      }
+      if (ourNewBid < floorCost) {
+        const confirmGoBelow = window.confirm(`KRİTİK UYARI: Gireceğiniz teklif ($${ourNewBid.toLocaleString()}) en dip maliyetinizin ($${floorCost.toLocaleString()}) altındadır! Zarar etmeyi kabul ediyor musunuz?`);
+        if (!confirmGoBelow) return;
+      }
+    }
+
+    setRoundCalculated(true);
+    const newLogs: typeof auctionLog = [];
+    let activeOurBid = ourStatus === 'ACTIVE' ? ourNewBid : ourLastBid;
+    
+    if (ourStatus === 'ACTIVE') {
+      setOurLastBid(ourNewBid);
+      newLogs.push({ round: auctionRound, text: `Biz (Enflow) teklifimizi $${ourNewBid.toLocaleString()} seviyesine eksilttik.`, type: 'bid' });
+    } else {
+      newLogs.push({ round: auctionRound, text: `Biz (Enflow) müzayededen çekildik. Son teklifimiz: $${ourLastBid.toLocaleString()}`, type: 'alert' });
+    }
+
+    // Process competitors bidding sequentially
+    const updatedCompetitors = competitors.map(comp => {
+      if (!comp.isActive) return comp;
+
+      // The new target they need to beat is the lowest bid of the current round so far
+      const targetToBeat = Math.min(activeOurBid, ...competitors.filter(c => c.isActive && c.id !== comp.id).map(c => c.lastBid));
+      const targetBid = targetToBeat - currentMinDecrement;
+
+      if (targetBid < comp.floorPrice) {
+        // Competitor drops out because bid falls below their floor
+        newLogs.push({ round: auctionRound, text: `🚨 ${comp.name} müzayededen çekildi! En dip sınırına ulaştı (Son teklifi: $${comp.lastBid.toLocaleString()}).`, type: 'alert' });
+        return { ...comp, isActive: false };
+      } else {
+        // Competitor matches and bids
+        newLogs.push({ round: auctionRound, text: `💸 ${comp.name} teklifini $${targetBid.toLocaleString()} seviyesine eksiltti.`, type: 'bid' });
+        return { ...comp, lastBid: targetBid };
+      }
+    });
+
+    setCompetitors(updatedCompetitors);
+    setAuctionLog(prev => [...prev, ...newLogs]);
+
+    // Check end condition
+    const activeCompetitors = updatedCompetitors.filter(c => c.isActive);
+    const totalActive = activeCompetitors.length + (ourStatus === 'ACTIVE' ? 1 : 0);
+
+    if (totalActive <= 1) {
+      // Auction Finished! Let's find the winner
+      setAuctionState('FINISHED');
+      
+      let winnerName = '';
+      let winnerPrice = 0;
+      let isUsWinner = false;
+
+      if (ourStatus === 'ACTIVE') {
+        const lowestCompPrice = activeCompetitors.length > 0 ? activeCompetitors[0].lastBid : Infinity;
+        if (ourNewBid < lowestCompPrice) {
+          winnerName = 'Biz (Enflow)';
+          winnerPrice = ourNewBid;
+          isUsWinner = true;
+        } else {
+          winnerName = activeCompetitors[0].name;
+          winnerPrice = activeCompetitors[0].lastBid;
+        }
+      } else if (activeCompetitors.length > 0) {
+        winnerName = activeCompetitors[0].name;
+        winnerPrice = activeCompetitors[0].lastBid;
+      } else {
+        // Everyone dropped out, find the absolute lowest bid
+        const allParticipants = [
+          { name: 'Biz (Enflow)', price: ourLastBid, active: false, isUs: true },
+          ...updatedCompetitors.map(c => ({ name: c.name, price: c.lastBid, active: false, isUs: false }))
+        ];
+        const absoluteWinner = [...allParticipants].sort((a, b) => a.price - b.price)[0];
+        winnerName = absoluteWinner.name;
+        winnerPrice = absoluteWinner.price;
+        isUsWinner = absoluteWinner.isUs;
+      }
+
+      setAuctionWinner({ name: winnerName, price: winnerPrice, isUs: isUsWinner });
+      
+      setAuctionLog(prev => [
+        ...prev, 
+        { 
+          round: auctionRound, 
+          text: `🏆 AÇIK EKSİLTME TAMAMLANDI! Kazanan: ${winnerName} | Kazanan Fiyat: $${winnerPrice.toLocaleString()}`, 
+          type: isUsWinner ? 'success' : 'alert' 
+        }
+      ]);
+    } else {
+      // Progress to next round, calculate next decrement step (reduced by %decrementReductionPct)
+      const nextRound = auctionRound + 1;
+      const reduction = 1 - (decrementReductionPct / 100);
+      const nextDecrement = Math.max(500, Math.round(currentMinDecrement * reduction));
+      
+      setAuctionRound(nextRound);
+      setCurrentMinDecrement(nextDecrement);
+      setRoundCalculated(false);
+      
+      setAuctionLog(prev => [
+        ...prev,
+        { round: nextRound, text: `--- Tur ${nextRound} Başladı! Bu tur için gereken Minimum Düşüş: $${nextDecrement.toLocaleString()} ---`, type: 'info' }
+      ]);
+    }
+  };
+
+  const ourRoundLastLowestCheck = (currentLowest: number, newBid: number) => {
+    // Helper to ensure initial rounds respect initial prices
+    if (newBid >= currentLowest) return true;
+    return false;
+  };
+
+  const handleWithdrawFromAuction = () => {
+    if (window.confirm('Açık eksiltmeden çekilmek istediğinize emin misiniz? Diğer firmalar teklif eksiltmeye devam edecektir.')) {
+      setOurStatus('WITHDRAWN');
+      addAuctionLogEntry(`Biz (Enflow) ihaleden çekildik! Kalan firmalar yarışıyor.`, 'alert');
+      // Execute the round with our withdrawal
+      setTimeout(() => {
+        executeRoundBids(ourLastBid);
+      }, 500);
+    }
+  };
+
+  const addAuctionLogEntry = (text: string, type: 'info' | 'bid' | 'alert' | 'success') => {
+    setAuctionLog(prev => [...prev, { round: auctionRound, text, type }]);
+  };
+
+  const handleFinalizeAuctionDeal = async () => {
+    if (!selectedOpp || !auctionWinner) return;
+    try {
+      await apiService.updateOpportunity(selectedOpp.id, {
+        status: 'WON',
+        value: auctionWinner.price
+      });
+      setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: auctionWinner.price } : o));
+      alert(`Açık eksiltme zaferi tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${auctionWinner.price.toLocaleString()} olarak sisteme işlendi.`);
+      if (setActiveTab) setActiveTab('contracts');
+    } catch (err: any) {
+      alert(err.message || 'Hata oluştu.');
+    }
+  };
+
+  // Helper values for current lowest bid in auction
+  const currentLowestBidVal = useMemo(() => {
+    if (competitors.length === 0) return initialValue;
+    const activeBids = competitors.filter(c => c.isActive).map(c => c.lastBid);
+    if (ourStatus === 'ACTIVE') activeBids.push(ourLastBid);
+    return Math.min(...activeBids);
+  }, [competitors, ourLastBid, ourStatus, initialValue]);
+
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
+      
+      {/* Title & Description Group */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <div className="flex items-center gap-3">
-            <span className="p-3 bg-primary/10 text-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/5">
-              <Gavel size={26} />
-            </span>
-            <div>
-              <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Canlı Pazarlık Kokpiti</h3>
-              <p className="text-slate-500 font-medium text-xs mt-2">Müşteri fırsatları ve teknik maliyetler üzerinden akıllı, dip maliyet korumalı yapay pazarlık simülatörü.</p>
-            </div>
+        <div className="flex items-center gap-3">
+          <span className="p-3 bg-primary/10 text-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/5">
+            <Gavel size={26} />
+          </span>
+          <div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Canlı Pazarlık Kokpiti</h3>
+            <p className="text-slate-500 font-medium text-xs mt-2">Müşteri fırsatları ve teknik maliyetler üzerinden akıllı, dip maliyet korumalı yapay pazarlık ve açık eksiltme simülatörü.</p>
           </div>
         </div>
 
         <div className="flex items-center gap-4">
           <select 
             value={selectedOppId}
-            disabled={negotiationState === 'NEGOTIATING'}
+            disabled={chatState === 'NEGOTIATING' || auctionState === 'BIDDING'}
             onChange={(e) => {
               setSelectedOppId(e.target.value);
-              setNegotiationState('IDLE');
-              setMessages([]);
+              setChatState('IDLE');
+              setChatMessages([]);
+              setAuctionState('IDLE');
+              setAuctionLog([]);
             }}
             className="bg-white border border-slate-100 px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none min-w-[320px] transition-all cursor-pointer disabled:opacity-50"
           >
@@ -289,6 +500,35 @@ const NegotiationModule = ({
         </div>
       </div>
 
+      {selectedOppId && (
+        /* PREMIUM TAB BAR */
+        <div className="flex bg-white/40 border border-slate-200/50 p-1.5 rounded-2xl max-w-md shadow-sm">
+          <button 
+            disabled={chatState === 'NEGOTIATING' || auctionState === 'BIDDING'}
+            onClick={() => setActiveMode('canli')}
+            className={cn(
+              "flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2",
+              activeMode === 'canli' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-800 disabled:opacity-50"
+            )}
+          >
+            <MessageSquare size={14} /> 1v1 Canlı Müzakere
+          </button>
+          <button 
+            disabled={chatState === 'NEGOTIATING' || auctionState === 'BIDDING'}
+            onClick={() => {
+              setActiveMode('eksiltme');
+              if (auctionState === 'IDLE') startAuctionSetup();
+            }}
+            className={cn(
+              "flex-1 py-3 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center justify-center gap-2",
+              activeMode === 'eksiltme' ? "bg-slate-900 text-white shadow-md" : "text-slate-500 hover:text-slate-800 disabled:opacity-50"
+            )}
+          >
+            <Gavel size={14} /> Açık Eksiltme (Müzayede)
+          </button>
+        </div>
+      )}
+
       {!selectedOppId ? (
         <div className="glass-panel p-20 rounded-[40px] border-dashed flex flex-col items-center justify-center text-center">
           <div className="w-24 h-24 bg-slate-50 text-slate-300 rounded-[32px] flex items-center justify-center mb-6">
@@ -297,7 +537,9 @@ const NegotiationModule = ({
           <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">İşlem Yapılacak Fırsatı Seçin</h4>
           <p className="text-sm text-slate-400 font-bold max-w-sm mt-2">Pazarlık odasına girmek ve simülasyonu başlatmak için yukarıdaki listeden aktif bir fırsat seçerek devam edin.</p>
         </div>
-      ) : (
+      ) : activeMode === 'canli' ? (
+        
+        // ==================== MODE 1: 1v1 LIVE CHAT NEGOTIATION ====================
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           
           {/* Müşteri ve Maliyet Analiz Paneli */}
@@ -310,7 +552,7 @@ const NegotiationModule = ({
                   <Sparkles size={16} className="text-emerald-400 animate-pulse" />
                 </div>
                 <div className="w-20 h-20 bg-emerald-500/10 border-2 border-emerald-500/30 text-emerald-400 rounded-full flex items-center justify-center mb-4 shadow-lg">
-                  <Bot size={40} className={cn(isTyping && "animate-bounce")} />
+                  <Bot size={40} className={cn(chatIsTyping && "animate-bounce")} />
                 </div>
                 <h5 className="font-black text-lg tracking-tight leading-none">Müşteri Temsilcisi AI</h5>
                 <p className="text-[10px] text-emerald-400 font-bold uppercase tracking-widest mt-1">Canlı Müzakereci</p>
@@ -342,58 +584,57 @@ const NegotiationModule = ({
                   </div>
                 </div>
 
-                {negotiationState !== 'IDLE' && (
+                {chatState !== 'IDLE' && (
                   <div className="p-6 rounded-[28px] bg-slate-950 text-white space-y-4 shadow-xl">
                     <div className="flex justify-between text-xs font-bold text-slate-400">
                       <span>Pazarlık Süreci</span>
-                      <span>Marj: %{(((currentOffer - floorCost) / currentOffer) * 100).toFixed(1)}</span>
+                      <span>Marj: %{(((chatOffer - floorCost) / chatOffer) * 100).toFixed(1)}</span>
                     </div>
-                    {/* Live negotiation dynamic bar */}
                     <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700/50">
                       <div 
                         className={cn(
                           "h-full rounded-full transition-all duration-500",
-                          (((currentOffer - floorCost) / currentOffer) * 100) >= 15 ? "bg-emerald-500" :
-                          (((currentOffer - floorCost) / currentOffer) * 100) >= 8 ? "bg-amber-500" : "bg-red-500"
+                          (((chatOffer - floorCost) / chatOffer) * 100) >= 15 ? "bg-emerald-500" :
+                          (((chatOffer - floorCost) / chatOffer) * 100) >= 8 ? "bg-amber-500" : "bg-red-500"
                         )}
-                        style={{ width: `${Math.max(5, Math.min(100, (((currentOffer - floorCost) / (initialValue - floorCost)) * 100)))}%` }}
+                        style={{ width: `${Math.max(5, Math.min(100, (((chatOffer - floorCost) / (initialValue - floorCost)) * 100)))}%` }}
                       />
                     </div>
                     <div className="flex justify-between items-end">
                       <div>
                         <span className="text-[9px] text-slate-400 block uppercase font-bold">Mevcut Teklifiniz</span>
-                        <span className="text-xl font-black italic text-emerald-400">${currentOffer.toLocaleString()}</span>
+                        <span className="text-xl font-black italic text-emerald-400">${chatOffer.toLocaleString()}</span>
                       </div>
                       <div className="text-right">
                         <span className="text-[9px] text-slate-400 block uppercase font-bold">Müşteri Hedefi</span>
-                        <span className="text-xl font-black italic text-slate-300">${customerOffer.toLocaleString()}</span>
+                        <span className="text-xl font-black italic text-slate-300">${chatCustomerTarget.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
                 )}
               </div>
 
-              {negotiationState === 'IDLE' && (
+              {chatState === 'IDLE' && (
                 <button 
-                  onClick={startNegotiationSim}
+                  onClick={startChatSim}
                   className="w-full bg-primary text-white py-4 rounded-2xl text-xs font-black shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95"
                 >
                   <Zap size={16} /> Simülasyonu Başlat
                 </button>
               )}
 
-              {negotiationState === 'AGREED' && (
+              {chatState === 'AGREED' && (
                 <button 
-                  onClick={handleFinalizeDeal}
-                  className="w-full bg-emerald-500 text-white py-4 rounded-2xl text-xs font-black shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95 animate-pulse"
+                  onClick={handleFinalizeChatDeal}
+                  className="w-full bg-emerald-500 text-white py-4 rounded-2xl text-xs font-black shadow-xl shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95"
                 >
                   <CheckCircle2 size={18} /> Anlaşmayı Tescil Et (Won)
                 </button>
               )}
 
-              {(negotiationState === 'FAILED' || negotiationState === 'AGREED') && (
+              {(chatState === 'FAILED' || chatState === 'AGREED') && (
                 <button 
-                  onClick={startNegotiationSim}
+                  onClick={startChatSim}
                   className="w-full bg-white text-slate-700 border border-slate-200 py-4 rounded-2xl text-xs font-black hover:bg-slate-50 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95"
                 >
                   <RefreshCw size={14} /> Tekrar Dene
@@ -413,19 +654,19 @@ const NegotiationModule = ({
                 <span className="text-xs font-black text-slate-800 uppercase tracking-widest italic">Müzakere Odası (Canlı)</span>
               </div>
               <div className="px-4 py-1.5 bg-slate-100 text-slate-600 rounded-full text-[10px] font-black uppercase tracking-widest">
-                Adım: {concessionCounter} / 5
+                Adım: {chatConcessions} / 5
               </div>
             </div>
 
             {/* Chat Messages Panel */}
             <div className="flex-1 overflow-y-auto p-8 space-y-6 custom-scrollbar bg-slate-50/20">
-              {messages.length === 0 ? (
+              {chatMessages.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-slate-400 text-center space-y-4">
                   <MessageSquare size={36} className="text-slate-300" />
                   <p className="font-bold text-xs uppercase tracking-widest italic">Simülasyon başlatılmayı bekliyor.</p>
                 </div>
               ) : (
-                messages.map((msg, idx) => (
+                chatMessages.map((msg, idx) => (
                   <motion.div 
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -469,8 +710,7 @@ const NegotiationModule = ({
                 ))
               )}
 
-              {/* Typing indicator */}
-              {isTyping && (
+              {chatIsTyping && (
                 <div className="flex items-start gap-4 max-w-[80%]">
                   <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shrink-0 shadow-md">
                     <Bot size={18} />
@@ -486,31 +726,31 @@ const NegotiationModule = ({
             </div>
 
             {/* Manager Inputs Panel */}
-            {negotiationState === 'NEGOTIATING' && (
+            {chatState === 'NEGOTIATING' && (
               <div className="p-6 border-t border-slate-100 bg-white/80 backdrop-blur-md space-y-4">
                 
                 {/* Quick actions row */}
                 <div className="flex flex-wrap gap-2.5">
                   <button 
-                    onClick={() => handleManagerCounter(Math.round(currentOffer * 0.97))}
+                    onClick={() => handleChatCounter(Math.round(chatOffer * 0.97))}
                     className="px-4 py-2 border border-slate-200 hover:border-slate-800 hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95"
                   >
                     <Percent size={12} /> %3 İndirim
                   </button>
                   <button 
-                    onClick={() => handleManagerCounter(Math.round(currentOffer * 0.95))}
+                    onClick={() => handleChatCounter(Math.round(chatOffer * 0.95))}
                     className="px-4 py-2 border border-slate-200 hover:border-slate-800 hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95"
                   >
                     <Percent size={12} /> %5 İndirim
                   </button>
                   <button 
-                    onClick={() => handleManagerCounter(Math.round(currentOffer * 0.90))}
+                    onClick={() => handleChatCounter(Math.round(chatOffer * 0.90))}
                     className="px-4 py-2 border border-slate-200 hover:border-slate-800 hover:bg-slate-50 text-slate-700 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95"
                   >
                     <Percent size={12} /> %10 İndirim
                   </button>
                   <button 
-                    onClick={() => handleManagerCounter(floorCost)}
+                    onClick={() => handleChatCounter(floorCost)}
                     className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95 ml-auto"
                     title="Maksimum indirim sınırı"
                   >
@@ -518,14 +758,13 @@ const NegotiationModule = ({
                   </button>
                 </div>
 
-                {/* Counter-offer inputs form */}
-                <form onSubmit={handleCustomCounterSubmit} className="flex gap-4">
+                <form onSubmit={handleChatCustomCounterSubmit} className="flex gap-4">
                   <div className="relative flex-1">
                     <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                     <input 
                       type="text" 
-                      value={customCounter}
-                      onChange={(e) => setCustomCounter(e.target.value)}
+                      value={chatCustomCounter}
+                      onChange={(e) => setChatCustomCounter(e.target.value)}
                       placeholder="Karşı teklif fiyatı girin... (Örn: 220000)"
                       className="w-full pl-10 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-slate-900/5 outline-none transition-all"
                     />
@@ -542,14 +781,14 @@ const NegotiationModule = ({
             )}
 
             {/* Agreed Finished Panel */}
-            {negotiationState === 'AGREED' && (
+            {chatState === 'AGREED' && (
               <div className="p-8 border-t border-slate-100 bg-emerald-500/5 flex items-center justify-between">
                 <div>
                   <h6 className="font-black text-slate-900 text-md uppercase italic tracking-tighter">Müzakere Tamamlandı</h6>
                   <p className="text-xs font-medium text-slate-500">Mutabık kalınan bedel ile anlaşma imzalanmaya hazır.</p>
                 </div>
                 <button 
-                  onClick={handleFinalizeDeal}
+                  onClick={handleFinalizeChatDeal}
                   className="bg-emerald-500 text-white px-8 py-4 rounded-2xl text-xs font-black shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
                 >
                   KAZANILDI OLARAK KAYDET <ArrowRight size={14} />
@@ -557,15 +796,14 @@ const NegotiationModule = ({
               </div>
             )}
 
-            {/* Failed Finished Panel */}
-            {negotiationState === 'FAILED' && (
+            {chatState === 'FAILED' && (
               <div className="p-8 border-t border-slate-100 bg-red-500/5 flex items-center justify-between">
                 <div>
                   <h6 className="font-black text-red-600 text-md uppercase italic tracking-tighter">Masa Dağıldı</h6>
                   <p className="text-xs font-medium text-slate-500">Müşteri teklifi reddetti ve müzakereyi sonlandırdı.</p>
                 </div>
                 <button 
-                  onClick={startNegotiationSim}
+                  onClick={startChatSim}
                   className="bg-red-500 text-white px-8 py-4 rounded-2xl text-xs font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
                 >
                   MÜZAKEREYİ YENİDEN BAŞLAT
@@ -576,7 +814,351 @@ const NegotiationModule = ({
           </div>
 
         </div>
+      ) : (
+        
+        // ==================== MODE 2: MULTI-COMPETITOR REVERSE AUCTION ====================
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
+          
+          {/* Auction Settings & Info Panel */}
+          <div className="space-y-6">
+            <div className="glass-panel p-8 rounded-[40px] border border-white/60 bg-white/40 shadow-sm space-y-6">
+              
+              {/* Live Info Banner */}
+              <div className="flex flex-col items-center text-center p-6 bg-slate-900 text-white rounded-[32px] relative overflow-hidden shadow-xl">
+                <div className="absolute top-0 right-0 p-4">
+                  <Gavel size={16} className="text-amber-400 animate-spin" />
+                </div>
+                <div className="w-16 h-16 bg-amber-500/10 border-2 border-amber-500/30 text-amber-400 rounded-2xl flex items-center justify-center mb-3">
+                  <Users size={32} />
+                </div>
+                <h5 className="font-black text-md tracking-tight leading-none">Açık Eksiltme İhalesi</h5>
+                <p className="text-[10px] text-amber-400 font-bold uppercase tracking-widest mt-1">Çoklu Rakip Platformu</p>
+              </div>
+
+              {auctionState === 'SETUP' ? (
+                // Setup Form
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Katılımcı Rakip Firma Sayısı</label>
+                    <input 
+                      type="number" 
+                      min={2} 
+                      max={5} 
+                      value={numCompetitors}
+                      onChange={(e) => setNumCompetitors(parseInt(e.target.value) || 2)}
+                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">İlk Tur Min Eksiltme Adımı ($)</label>
+                    <input 
+                      type="text" 
+                      value={initialDecrement}
+                      onChange={(e) => setInitialDecrement(parseInt(e.target.value.replace(/\D/g, '')) || 1000)}
+                      className="w-full px-5 py-3.5 bg-white border border-slate-200 rounded-2xl text-sm font-bold shadow-sm outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block mb-2">Tur Başı Eksiltme Azalma Oranı (%)</label>
+                    <div className="flex items-center gap-3">
+                      <input 
+                        type="range" 
+                        min={0} 
+                        max={50} 
+                        value={decrementReductionPct}
+                        onChange={(e) => setDecrementReductionPct(parseInt(e.target.value) || 0)}
+                        className="flex-1 accent-slate-900"
+                      />
+                      <span className="text-sm font-black text-slate-900 shrink-0">%{decrementReductionPct}</span>
+                    </div>
+                    <p className="text-[9px] text-slate-400 mt-1.5 leading-normal">Her turda minimum zorunlu teklif düşüş miktarı bu oranda azaltılarak pazarlık sıkılaştırılır.</p>
+                  </div>
+
+                  <div className="p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+                    <span className="text-[9px] font-black text-red-500/70 uppercase tracking-widest block">En Dip Maliyet Sınırımız</span>
+                    <span className="text-lg font-black text-red-600">${floorCost.toLocaleString()}</span>
+                  </div>
+
+                  <button 
+                    onClick={launchAuction}
+                    className="w-full bg-slate-900 text-white py-4 rounded-2xl text-xs font-black shadow-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95 mt-4"
+                  >
+                    İhaleyi Canlı Başlat <ArrowRight size={14} />
+                  </button>
+                </div>
+              ) : (
+                // Active Game Stats
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
+                    <div>
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mevcut En Düşük Teklif</span>
+                      <span className="text-xl font-black text-slate-900">${currentLowestBidVal.toLocaleString()}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Aktif Tur</span>
+                      <span className="text-lg font-black text-primary">Tur {auctionRound}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10">
+                    <div>
+                      <span className="text-[9px] font-black text-amber-500/70 uppercase tracking-widest block">Zorunlu Eksiltme Limiti</span>
+                      <span className="text-lg font-black text-amber-600">-$${currentMinDecrement.toLocaleString()}</span>
+                    </div>
+                    <p className="text-[9px] text-amber-500/80 font-bold uppercase tracking-tighter mt-1 max-w-[120px] text-right leading-none">Bu tur için geçerli en az indirim adımı.</p>
+                  </div>
+
+                  <div className="flex justify-between items-center p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
+                    <div>
+                      <span className="text-[9px] font-black text-red-500/70 uppercase tracking-widest block">En Dip Maliyet Sınırımız</span>
+                      <span className="text-lg font-black text-red-600">${floorCost.toLocaleString()}</span>
+                    </div>
+                    <div className="text-right bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
+                      <ShieldAlert size={10} /> ZIRHLI LİMİT
+                    </div>
+                  </div>
+
+                  {ourStatus === 'ACTIVE' && (
+                    <div className="p-6 rounded-[28px] bg-slate-950 text-white space-y-4 shadow-xl">
+                      <div className="flex justify-between text-xs font-bold text-slate-400">
+                        <span>Zarar Eşiğimiz</span>
+                        <span>Marjımız: %{(((ourLastBid - floorCost) / ourLastBid) * 100).toFixed(1)}</span>
+                      </div>
+                      <div className="w-full bg-slate-800 rounded-full h-3 overflow-hidden p-0.5 border border-slate-700/50">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all duration-500",
+                            (((ourLastBid - floorCost) / ourLastBid) * 100) >= 15 ? "bg-emerald-500" :
+                            (((ourLastBid - floorCost) / ourLastBid) * 100) >= 8 ? "bg-amber-500" : "bg-red-500"
+                          )}
+                          style={{ width: `${Math.max(5, Math.min(100, (((ourLastBid - floorCost) / (initialValue - floorCost)) * 100)))}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <div>
+                          <span className="text-[9px] text-slate-400 block uppercase font-bold">Bizim Son Teklifimiz</span>
+                          <span className="text-xl font-black italic text-emerald-400">${ourLastBid.toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {auctionWinner && (
+                    <div className={cn(
+                      "p-6 rounded-[32px] border-2 flex flex-col items-center justify-center text-center gap-2 shadow-md",
+                      auctionWinner.isUs ? "bg-emerald-500/10 border-emerald-500/20" : "bg-red-500/10 border-red-500/20"
+                    )}>
+                      <Award className={cn("w-10 h-10 mb-1", auctionWinner.isUs ? "text-emerald-500 animate-bounce" : "text-red-500")} />
+                      <h6 className="font-black uppercase tracking-widest text-slate-900 text-sm">{auctionWinner.isUs ? 'İHALEYİ KAZANDIK!' : 'İHALE KAYBEDİLDİ'}</h6>
+                      <p className="text-xs text-slate-500 font-bold max-w-[200px] leading-tight">
+                        {auctionWinner.name} firması **$${auctionWinner.price.toLocaleString()}** teklifi ile işi aldı.
+                      </p>
+                      
+                      {auctionWinner.isUs && (
+                        <button 
+                          onClick={handleFinalizeAuctionDeal}
+                          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest mt-4 shadow-lg shadow-emerald-500/20 transition-all active:scale-95"
+                        >
+                          Anlaşmayı Kazanıldı Olarak Tescil Et
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {auctionState === 'FINISHED' && (
+                    <button 
+                      onClick={startAuctionSetup}
+                      className="w-full bg-white text-slate-700 border border-slate-200 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 transition-all flex items-center justify-center gap-2 active:scale-95"
+                    >
+                      <RefreshCw size={12} /> Yeni İhale Kur
+                    </button>
+                  )}
+                </div>
+              )}
+
+            </div>
+          </div>
+
+          {/* Auction Simulator Main Board */}
+          <div className="lg:col-span-2 space-y-6">
+            
+            {/* Competitors List Panel */}
+            <div className="glass-panel p-8 rounded-[40px] border border-white/60 bg-white/40 shadow-sm">
+              <h4 className="font-black text-slate-900 uppercase italic tracking-widest text-sm mb-6 flex items-center gap-2">
+                <Users size={18} className="text-primary" /> Katılımcı Teklif Tablosu
+              </h4>
+
+              <div className="space-y-4">
+                {/* US row */}
+                <div className={cn(
+                  "flex items-center justify-between p-5 rounded-3xl border transition-all duration-300",
+                  ourStatus === 'ACTIVE' ? "bg-white border-primary/20 shadow-sm" : "bg-slate-100/50 border-slate-200 opacity-60"
+                )}>
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center font-black">
+                      Biz
+                    </div>
+                    <div>
+                      <h5 className="font-black text-slate-900">Biz (Enflow)</h5>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest",
+                        ourStatus === 'ACTIVE' ? "bg-primary/10 text-primary" : "bg-slate-300 text-slate-600"
+                      )}>
+                        {ourStatus === 'ACTIVE' ? 'AKTİF' : 'ÇEKİLDİ'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Verilen Teklif</span>
+                    <span className="text-lg font-black text-slate-900">${ourLastBid.toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {/* Competitors rows */}
+                {competitors.map(comp => (
+                  <div 
+                    key={comp.id}
+                    className={cn(
+                      "flex items-center justify-between p-5 rounded-3xl border transition-all duration-300 bg-white/60",
+                      comp.isActive ? "border-slate-100 shadow-sm" : "bg-slate-100/50 border-slate-200 opacity-60"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div 
+                        className="w-12 h-12 text-white rounded-2xl flex items-center justify-center font-black"
+                        style={{ backgroundColor: comp.avatarColor }}
+                      >
+                        {comp.name.replace('Rakip Firma ', '')}
+                      </div>
+                      <div>
+                        <h5 className="font-black text-slate-900">{comp.name}</h5>
+                        <span className={cn(
+                          "px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest",
+                          comp.isActive ? "bg-amber-500/10 text-amber-600" : "bg-slate-300 text-slate-600"
+                        )}>
+                          {comp.isActive ? 'AKTİF' : 'ÇEKİLDİ (ELENDİ)'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Verilen Teklif</span>
+                      <span className="text-lg font-black text-slate-900">${comp.lastBid.toLocaleString()}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Auction Bidding Panel (Controls) */}
+            {auctionState === 'BIDDING' && (
+              <div className="glass-panel p-8 rounded-[40px] border border-white/60 bg-white/80 backdrop-blur-md space-y-6">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                  <div>
+                    <h5 className="font-black text-slate-900 uppercase italic tracking-tighter text-sm">Tur Hamleleri</h5>
+                    <p className="text-[10px] text-slate-400 font-bold mt-1">Tur sonu için teklifinizi iletin veya ihaleden çekilin.</p>
+                  </div>
+                  <div className="text-xs font-bold text-slate-500">
+                    Gereken Maksimum Teklif: <span className="font-black text-red-500">${(currentLowestBidVal - currentMinDecrement).toLocaleString()}</span>
+                  </div>
+                </div>
+
+                {ourStatus === 'ACTIVE' ? (
+                  <div className="space-y-4">
+                    {/* Actions Row */}
+                    <div className="flex flex-wrap gap-3">
+                      {/* Auto calculate bid (Min decrement) */}
+                      <button 
+                        onClick={() => executeRoundBids(currentLowestBidVal - currentMinDecrement)}
+                        className="px-6 py-4 bg-slate-900 text-white rounded-2xl text-xs font-black shadow-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-widest"
+                      >
+                        <Zap size={14} /> Otomatik Eksilt (-${currentMinDecrement.toLocaleString()})
+                      </button>
+
+                      {/* Drop out button */}
+                      <button 
+                        onClick={handleWithdrawFromAuction}
+                        className="px-6 py-4 border border-red-200 text-red-600 hover:bg-red-50 rounded-2xl text-xs font-black transition-all flex items-center justify-center gap-2 active:scale-95 uppercase tracking-widest ml-auto"
+                      >
+                        <XCircle size={14} /> İhaleden Çekil
+                      </button>
+                    </div>
+
+                    {/* Custom manual bid form */}
+                    <div className="h-px bg-slate-200/50 my-4" />
+                    
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Manuel Teklif Girişi ($)</label>
+                      <div className="flex gap-4">
+                        <div className="relative flex-1">
+                          <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                          <input 
+                            type="text" 
+                            value={manualBidInput}
+                            onChange={(e) => setManualBidInput(e.target.value)}
+                            placeholder={`Örn: ${(currentLowestBidVal - currentMinDecrement - 1000).toLocaleString()}`}
+                            className="w-full pl-10 pr-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-slate-900/5 outline-none transition-all"
+                          />
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const val = parseInt(manualBidInput.replace(/\D/g, ''));
+                            if (!val) return alert('Lütfen geçerli bir teklif girin.');
+                            executeRoundBids(val);
+                            setManualBidInput('');
+                          }}
+                          className="bg-white border border-slate-200 text-slate-800 hover:border-slate-800 px-8 rounded-2xl text-xs font-black transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest shadow-sm"
+                        >
+                          Gönder
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-slate-400 font-bold italic border-2 border-dashed border-slate-100 rounded-2xl flex flex-col items-center justify-center gap-2">
+                    <AlertCircle size={20} className="text-slate-300 animate-pulse" />
+                    Müzayededen çekildiğiniz için teklif veremezsiniz. Rakiplerin hamlelerini aşağıdaki canlı akıştan takip edebilirsiniz.
+                    <button 
+                      onClick={() => executeRoundBids(ourLastBid)}
+                      className="mt-4 px-6 py-3 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-wider hover:bg-slate-800 transition-all flex items-center gap-1.5"
+                    >
+                      Sonraki Tur Hamlelerini Gör <ArrowRight size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Auction Bidding Live Logs */}
+            {auctionLog.length > 0 && (
+              <div className="glass-panel p-8 rounded-[40px] border border-white/60 bg-white/40 shadow-sm max-h-[300px] flex flex-col">
+                <h5 className="font-black text-slate-800 uppercase italic tracking-widest text-xs mb-4 border-b border-slate-200 pb-2">Canlı Tur Gelişmeleri Logu</h5>
+                <div className="flex-1 overflow-y-auto space-y-2.5 custom-scrollbar text-xs font-mono font-bold">
+                  {auctionLog.map((log, idx) => (
+                    <div 
+                      key={idx}
+                      className={cn(
+                        "p-2 rounded-xl flex items-center gap-2",
+                        log.type === 'info' ? "bg-slate-100/50 text-slate-500" :
+                        log.type === 'bid' ? "bg-blue-500/5 text-blue-600 border border-blue-500/10" :
+                        log.type === 'alert' ? "bg-red-500/5 text-red-500 border border-red-500/10" :
+                        "bg-emerald-500/5 text-emerald-600 border border-emerald-500/10 animate-bounce"
+                      )}
+                    >
+                      <span className="opacity-50 shrink-0 font-bold">[{log.round > 0 ? `Tur ${log.round}` : 'Sistem'}]</span>
+                      <span className="truncate">{log.text}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+          </div>
+
+        </div>
       )}
+
     </div>
   );
 };

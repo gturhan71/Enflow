@@ -3,7 +3,7 @@
 Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliyetlendirme, sözleşme yönetimi, fiziksel arşiv, satın alma ve proje uygulama süreçlerini tek bir çatı altında toplayan, veriye dayalı karar destek mekanizmalarıyla güçlendirilmiş, **Multi-tenant Full-Stack** bir ERP/CRM platformudur.
 
 > [!IMPORTANT]
-> **v1.3.0 Live Negotiation Release:** Arayüz tamamen **tek-ui** standartlarında modernize edildi. Maliyet Analiz Modülü verilerinden dynamically beslenen **En Dip Maliyet (Floor Cost)** limitli Canlı Pazarlık Müzakere chatbot simülatörü ve Satış Yöneticisi (`GENERAL_MANAGER`) executive koruma kapısı tamamlandı.
+> **v1.3.1 Auction & Negotiation Release:** Arayüz tamamen **tek-ui** standartlarında modernize edildi. Maliyet Analiz Modülü verilerinden dynamically beslenen **En Dip Maliyet (Floor Cost)** zırhlı Canlı Pazarlık Müzakere chatbot'u ve Çoklu Rakip katılımlı tur/limit kurallı **Açık Eksiltme İhalesi (Reverse Auction)** simülatörü tamamlandı.
 
 ---
 
@@ -28,7 +28,7 @@ Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliye
 1.  **Satış Fırsatları & CRM Modülü:** Kredi limitleri, risk skorları ve fırsat statü takibi (Won/Lost). Kaybedilen fırsatlar otomatik olarak "Kaybedilenler Listesi"ne aktarılır.
 2.  **AI Destekli Satış Öncesi (Presales):** Teknik şartnamelerden Gemini AI API entegrasyonu ile otomatik BoM (Bill of Materials) listesi ve teknik özet çıkartılması.
 3.  **Onay Mekanizması (Approval Queue):** Yönetici paneli üzerinden tek tıkla doğrulanmış teknik teklif onaylama.
-4.  **Canlı Pazarlık Kokpiti (v1.3.0):** Satış Birim Yöneticisine (Genel Müdür) özel, Maliyet Analiz Modülü verilerinden dynamically hesaplanan **En Dip Rakam (Floor Cost)** zırhı ile donatılmış canlı müzakere chatbot simülatörü. Maliyet altına inilmesini engeller, kar marjını canlı takip eder.
+4.  **Canlı Pazarlık & Açık Eksiltme Kokpiti (v1.3.1):** Satış Birim Yöneticisine (Genel Müdür) özel, Maliyet Analiz Modülü verilerinden dynamically hesaplanan **En Dip Rakam (Floor Cost)** korumalı Canlı 1v1 Müzakere chatbot'u ve Çoklu Rakip katılımlı, turlu, kurallı ve manuel/oto teklif girişli **Açık Eksiltme İhale** simülatörü.
 5.  **Sözleşme Modülü & Evrak Kontrolü:** Islak imzalı evrakların yüklenme zorunluluğu olan devlet destekli "Evrak Kontrol Listesi" (Document Checklist). Tüm evraklar tamamlanmadan proje devredilemez.
 6.  **Paralel Süreç Handoff'u:** Sözleşme onaylandığı anda **Proje Yönetimi** (Birim `u4` - Proje Başlatma Planı) ve **Satın Alma** (Birim `u3` - BoM Tedarik Başlatma) birimlerine otomatik yüksek öncelikli görevler (TodoTask) açılır.
 7.  **Proje Yönetimi & Kapanış:** PM paneli üzerinden geçici kabul onayı (%100) ile proje tamamlanır ve otomatik olarak **Fiziksel Arşiv Modülü**'ne (ArchiveModule) devredilir.
@@ -87,4 +87,4 @@ run.bat
 3. `pnpm dev` (3000 portunda Vite ile ayağa kalkar)
 
 ---
-*Enflow v1.3.0 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
+*Enflow v1.3.1 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
