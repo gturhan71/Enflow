@@ -61,7 +61,10 @@
 - **Glowing Crimson Glassmorphic Logout:** Engineered a stunning, high-contrast global Logout button within the top header group, styled with red-glowing glassmorphism and animated hover states.
 - **Universal Page Visibility:** Passed the global `onLogout` auth action handler down through `App.tsx` directly into the `Header` component, ensuring instant, one-click logout capability on every page of the application.
 
-### 13. Canlı Pazarlık Kokpiti & Açık Eksiltme Platformu (v1.3.1)
+### 13. Canlı Pazarlık Kokpiti & Açık Eksiltme Platformu (v1.3.2)
+- **"Pazarlığa Açık" Teklif Seçimi:** Satış teklifi hazırlama/düzenleme (`ProposalEditor.tsx`) aşamasına zırhlı ve glowing "Pazarlığa Açık" toggle switch'i eklendi.
+- **Dinamik Müzakere Filtresi:** Pazarlık modülünde, sadece hazırlık aşamasında "Pazarlığa Açık" olarak işaretlenmiş teklifler listelenir. Seçilen teklifin versiyonu ve net fiyatı baz alınarak müzakere simülasyonu başlatılır.
+- **Otomatik Süreç Handoff'u:** Teklif "Pazarlığa Açık" olarak kaydedildiğinde, backend üzerinde fırsatın statüsü otomatik olarak `'NEGOTIATION'` aşamasına taşınarak satış hunisi (sales pipeline) senkronize edilir.
 - **Çift Modlu Pazarlık Seçeneği:** Satış yöneticisine 1v1 Canlı Müzakere veya Çoklu Rakip katılımlı **Açık Eksiltme (Reverse Auction)** arasında geçiş yapabilme imkanı sunan üst düzey tab bar entegre edildi.
 - **Açık Eksiltme Simülatörü:** Çoklu firmaların katıldığı, tur tabanlı teklif eksiltme müzayedesi geliştirildi:
   - Rakipler ve bizim son tekliflerimizi gösteren canlı katılımcı teklif tablosu.
@@ -101,6 +104,7 @@ cd backend && npx tsx src/index.ts
 | 18.05.2026 | Global Header Logout & Başlıklar | Tüm ekranlarda güvenli tek-tık çıkış ve dinamik başlık deneyimi sağlamak için. |
 | 18.05.2026 | Canlı Pazarlık Simülasyonu | Satış müdürüne özel dip maliyet korumalı interaktif müzakere paneli sunmak için. |
 | 18.05.2026 | Çoklu Açık Eksiltme İhalesi | Rakip firmaların katıldığı turlu, kurallı ve manuel/otomatik eksiltmeli müzayede simülasyonu sunmak için. |
+| 18.05.2026 | Pazarlığa Açık Teklif Koruması | Teklif hazırlama aşamasına 'Pazarlığa Açık' bayrağı ve pazarlık kokpiti seçici entegrasyonu sunmak için. |
 
 ---
-*Enflow v1.3.1 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator, floor cost checks & executive control.*
+*Enflow v1.3.2 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator with custom proposal filters, floor cost checks & executive control.*

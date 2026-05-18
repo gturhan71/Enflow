@@ -46,10 +46,12 @@ interface Message {
 const NegotiationModule = ({
   opportunities = [],
   setOpportunities,
+  proposals = [],
   setActiveTab
 }: {
   opportunities: Opportunity[];
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
+  proposals?: any[];
   setActiveTab?: (tab: string) => void;
 }) => {
   const { currentUser } = useAuth();
@@ -62,8 +64,39 @@ const NegotiationModule = ({
     return currentUser?.role === 'GENERAL_MANAGER';
   }, [currentUser]);
 
+  // Filter proposals marked as "Pazarlığa Açık"
+  const openProposals = useMemo(() => {
+    return proposals.filter(p => {
+      if (p.openForNegotiation === true) return true;
+      if (p.content) {
+        try {
+          const content = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+          return content && content.openForNegotiation === true;
+        } catch (e) {
+          return false;
+        }
+      }
+      return false;
+    });
+  }, [proposals]);
+
+  const [selectedProposalId, setSelectedProposalId] = useState('');
   const [selectedOppId, setSelectedOppId] = useState('');
   
+  // Get currently selected proposal
+  const selectedProposal = useMemo(() => {
+    return openProposals.find(p => p.id === selectedProposalId);
+  }, [openProposals, selectedProposalId]);
+
+  // Auto-sync Opportunity ID when proposal is selected
+  useEffect(() => {
+    if (selectedProposal) {
+      setSelectedOppId(selectedProposal.opportunityId);
+    } else {
+      setSelectedOppId('');
+    }
+  }, [selectedProposal]);
+
   // Find selected opportunity
   const selectedOpp = useMemo(() => {
     return opportunities.find(o => o.id === selectedOppId);
@@ -78,7 +111,21 @@ const NegotiationModule = ({
     return total > 0 ? total : Math.round(selectedOpp.value * 0.7);
   }, [selectedOpp]);
 
-  const initialValue = selectedOpp?.value || 0;
+  // Determine initialValue from selectedProposal total price or fallback to opportunity value
+  const initialValue = useMemo(() => {
+    if (selectedProposal) {
+      if (selectedProposal.totalPrice) return selectedProposal.totalPrice;
+      if (selectedProposal.content) {
+        try {
+          const content = typeof selectedProposal.content === 'string' 
+            ? JSON.parse(selectedProposal.content) 
+            : selectedProposal.content;
+          return content.totalPrice || selectedOpp?.value || 0;
+        } catch (e) {}
+      }
+    }
+    return selectedOpp?.value || 0;
+  }, [selectedProposal, selectedOpp]);
   const initialMargin = useMemo(() => {
     if (initialValue === 0) return 0;
     return ((initialValue - floorCost) / initialValue) * 100;
@@ -478,10 +525,10 @@ const NegotiationModule = ({
 
         <div className="flex items-center gap-4">
           <select 
-            value={selectedOppId}
+            value={selectedProposalId}
             disabled={chatState === 'NEGOTIATING' || auctionState === 'BIDDING'}
             onChange={(e) => {
-              setSelectedOppId(e.target.value);
+              setSelectedProposalId(e.target.value);
               setChatState('IDLE');
               setChatMessages([]);
               setAuctionState('IDLE');
@@ -489,13 +536,24 @@ const NegotiationModule = ({
             }}
             className="bg-white border border-slate-100 px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none min-w-[320px] transition-all cursor-pointer disabled:opacity-50"
           >
-            <option value="">Pazarlık Edilecek Fırsatı Seçin</option>
-            {opportunities
-              .filter(o => o.status === 'NEGOTIATION' || o.status === 'PROPOSAL')
-              .map(opp => (
-                <option key={opp.id} value={opp.id}>{opp.title} (${opp.value?.toLocaleString()})</option>
-              ))
-            }
+            <option value="">Pazarlığa Açık Tekliflerden Seçin</option>
+            {openProposals.map(p => {
+              const opp = opportunities.find(o => o.id === p.opportunityId);
+              const oppTitle = opp ? opp.title : 'Bilinmeyen Fırsat';
+              let priceVal = opp ? opp.value : 0;
+              if (p.totalPrice) priceVal = p.totalPrice;
+              else if (p.content) {
+                try {
+                  const content = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+                  priceVal = content.totalPrice || priceVal;
+                } catch (e) {}
+              }
+              return (
+                <option key={p.id} value={p.id}>
+                  {oppTitle} (V{p.version} - ${priceVal?.toLocaleString()})
+                </option>
+              );
+            })}
           </select>
         </div>
       </div>

@@ -74,6 +74,9 @@ const ProposalEditor = ({ opportunity, bomItems, costItems, customers, version, 
   });
   
   const [globalMargin, setGlobalMargin] = useState(15);
+  const [openForNegotiation, setOpenForNegotiation] = useState(() => {
+    return (initialData as any)?.openForNegotiation || false;
+  });
   const [terms, setTerms] = useState(initialData?.terms || `1. Teklif geçerlilik süresi 30 gündür.
 2. Ödeme vadesi fatura tarihinden itibaren 30 gündür.
 3. Fiyatlara KDV dahil değildir.
@@ -311,7 +314,7 @@ const ProposalEditor = ({ opportunity, bomItems, costItems, customers, version, 
           </button>
 
           <button 
-            onClick={() => onSave({ items, totalPrice: manualTotalPrice, description, terms, version })}
+            onClick={() => onSave({ items, totalPrice: manualTotalPrice, description, terms, version, openForNegotiation })}
             className="px-10 py-3.5 bg-primary text-white rounded-2xl text-xs font-black hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 flex items-center gap-2 active:scale-95 uppercase tracking-widest"
           >
             <Save size={16} />
@@ -454,6 +457,22 @@ const ProposalEditor = ({ opportunity, bomItems, costItems, customers, version, 
                   <div className="flex justify-between items-center text-slate-300 border-b border-slate-800 pb-4">
                     <span className="text-[10px] font-black uppercase tracking-widest">Toplam Girdi Maliyeti</span>
                     <span className="font-mono text-sm font-black">${grandTotalCost.toLocaleString()}</span>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-between bg-white/5 p-4 rounded-2xl border border-white/10 mb-4">
+                    <div>
+                      <span className="text-[10px] font-black text-emerald-400 uppercase tracking-widest block">Pazarlığa Açık</span>
+                      <span className="text-[9px] text-slate-400 block mt-0.5">Yönetici pazarlık simülasyonuna açar</span>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={openForNegotiation}
+                        onChange={(e) => setOpenForNegotiation(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
                   </div>
 
                   <div className="pt-4">

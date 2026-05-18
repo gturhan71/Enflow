@@ -633,6 +633,7 @@ const CRMModule = ({
         <NegotiationModule 
           opportunities={opportunities} 
           setOpportunities={setOpportunities} 
+          proposals={proposals}
           setActiveTab={setActiveTab} 
         />
       ) : activeTab === 'crm-proposals' ? renderProposals() : 

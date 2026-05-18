@@ -763,6 +763,11 @@ app.post('/api/proposals', tenantMiddleware, asyncHandler(async (req: Request, r
       where: { id: opportunityId },
       data: { status: 'PROPOSAL' }
     });
+  } else if (proposalContent && (proposalContent.openForNegotiation === true || proposalContent.openForNegotiation === 'true')) {
+    await prisma.opportunity.update({
+      where: { id: opportunityId },
+      data: { status: 'NEGOTIATION' }
+    });
   }
 
   res.json(proposal);
