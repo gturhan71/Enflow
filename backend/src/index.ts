@@ -51,9 +51,9 @@ app.put('/api/tenants/:id/subscription', tenantMiddleware, asyncHandler(async (r
   }
 
   const subscription = await prisma.subscription.upsert({
-    where: { tenantId },
+    where: { tenantId: tenantId as string },
     update: { plan },
-    create: { tenantId, plan }
+    create: { tenantId: tenantId as string, plan }
   });
 
   res.json(subscription);

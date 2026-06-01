@@ -24,8 +24,7 @@ import {
   User, 
   NextcloudConfig, 
   ExchangeConfig, 
-  WhatsAppConfig,
-  UserRole
+  WhatsAppConfig
 } from '../types';
 import IntegrationWizard from './IntegrationWizard';
 import WorkflowBuilder from './WorkflowBuilder';
@@ -125,7 +124,7 @@ const SettingsModule = ({
     
     const name = formData.get('name') as string;
     const email = formData.get('email') as string;
-    const role = formData.get('role') as UserRole;
+    const role = formData.get('role') as string;
     const unitId = formData.get('unitId') as string;
     const tenantId = formData.get('tenantId') as string;
 
@@ -274,7 +273,7 @@ const SettingsModule = ({
                       <td className="px-6 py-4">
                         <div className="flex flex-col gap-1">
                           <span className="px-2 py-0.5 bg-primary/10 text-primary rounded text-[10px] font-bold uppercase w-fit">{user.role}</span>
-                          <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1"><Building2 size={10} /> {tenants.find(t => t.id === user.tenantId)?.name || 'Bilinmeyen'}</span>
+                          <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1"><Building2 size={10} /> {tenants.find(t => t.id === (user as any).tenantId)?.name || 'Bilinmeyen'}</span>
                         </div>
                       </td>
                       <td className="px-6 py-4 text-slate-600">{units.find(u => u.id === user.unitId)?.name || '-'}</td>
@@ -333,6 +332,22 @@ const SettingsModule = ({
         )}
 
         {activeSubTab === 'workflow' && <WorkflowBuilder units={units} />}
+        {activeSubTab === 'integrations' && (
+          <div className="space-y-6">
+            <div>
+              <h4 className="text-xl font-bold text-slate-900">Entegrasyon Yönetimi</h4>
+              <p className="text-sm text-slate-500 mb-6">T-Ecosystem modülleri ve harici servis bağlantılarını yapılandırın.</p>
+            </div>
+            <IntegrationWizard 
+              ncConfig={{ url: '', username: '', appPassword: '' }}
+              setNcConfig={() => {}}
+              exConfig={{ server: '', email: '', password: '' }}
+              setExConfig={() => {}}
+              waConfig={{ apiKey: '', phoneNumber: '' }}
+              setWaConfig={() => {}}
+            />
+          </div>
+        )}
         {activeSubTab === 'permissions' && (
           <div className="space-y-8">
             <div className="glass-panel p-8 rounded-[32px] border-primary/20 bg-primary/5 flex flex-col md:flex-row md:items-center justify-between gap-6">

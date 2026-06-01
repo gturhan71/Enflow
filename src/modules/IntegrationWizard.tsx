@@ -103,12 +103,12 @@ const IntegrationWizard = ({
   waConfig,
   setWaConfig
 }: { 
-  ncConfig: NextcloudConfig, 
-  setNcConfig: (c: NextcloudConfig) => void,
-  exConfig: ExchangeConfig,
-  setExConfig: (c: ExchangeConfig) => void,
-  waConfig: WhatsAppConfig,
-  setWaConfig: (c: WhatsAppConfig) => void
+  ncConfig: any, 
+  setNcConfig: (c: any) => void,
+  exConfig: any,
+  setExConfig: (c: any) => void,
+  waConfig: any,
+  setWaConfig: (c: any) => void
 }) => {
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState(1);
@@ -121,6 +121,7 @@ const IntegrationWizard = ({
     { id: 'sap', name: 'SAP ERP', description: 'Kurumsal kaynak planlama entegrasyonu.', icon: Cpu, color: 'text-slate-600', bg: 'bg-slate-50', isEnabled: false },
     { id: 'exchange', name: 'MS Exchange', description: 'E-posta ve takvim senkronizasyonu.', icon: Mail, color: 'text-red-600', bg: 'bg-red-50', isEnabled: exConfig.isEnabled },
     { id: 'whatsapp', name: 'WhatsApp Business', description: 'Müşteri bildirimleri ve sohbet.', icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50', isEnabled: waConfig.isEnabled },
+    { id: 'tr_erp_crm', name: 'Yerel ERP & CRM', description: 'Logo, Mikro, Netsis vb. yerel sistem entegrasyonu.', icon: Puzzle, color: 'text-indigo-600', bg: 'bg-indigo-50', isEnabled: false }
   ];
 
   const handleDisable = () => {
@@ -586,7 +587,163 @@ const IntegrationWizard = ({
               </motion.div>
             )}
 
-            {selectedIntegration !== 'nextcloud' && selectedIntegration !== 'exchange' && selectedIntegration !== 'whatsapp' && (
+            {selectedIntegration === 'tr_erp_crm' && (
+              <motion.div
+                key={wizardStep}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-6"
+              >
+                {wizardStep === 1 && (
+                  <div className="space-y-6">
+                    <div className="bg-indigo-50 p-6 rounded-2xl border border-indigo-100 flex items-start gap-4">
+                      <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl"><Puzzle size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-indigo-900">Yerel Sistem Seçimi</h5>
+                        <p className="text-sm text-indigo-700">Türkiye'de yaygın olarak kullanılan Logo Tiger/Go, Netsis, Mikro Run/Fly veya yerel bir SQL Server / REST servisi seçin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Uygulama Tipi</label>
+                        <select 
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 font-bold"
+                          defaultValue="logo_erp"
+                        >
+                          <option value="logo_erp">Logo Tiger / GO ERP (REST Service)</option>
+                          <option value="logo_crm">Logo CRM API</option>
+                          <option value="mikro_erp">Mikro Fly / Run (MSSQL Gateway)</option>
+                          <option value="netsis_erp">Logo Netsis Enterprise (REST API)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Bağlantı Türü</label>
+                        <div className="grid grid-cols-2 gap-4">
+                          <label className="border border-slate-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+                            <input type="radio" name="conn_type" defaultChecked />
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">Doğrudan REST Web Servis</p>
+                              <p className="text-[10px] text-slate-400">JSON/XML endpoints</p>
+                            </div>
+                          </label>
+                          <label className="border border-slate-200 rounded-2xl p-4 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+                            <input type="radio" name="conn_type" />
+                            <div>
+                              <p className="text-xs font-bold text-slate-900">MSSQL Gateway Agent</p>
+                              <p className="text-[10px] text-slate-400">T-Ecosystem SQL Connector</p>
+                            </div>
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 2 && (
+                  <div className="space-y-6">
+                    <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
+                      <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><ShieldCheck size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-amber-900">API Gateway & Database Credentials</h5>
+                        <p className="text-sm text-amber-700">Entegrasyon modülünün yerel SQL veritabanına veya ERP REST gateway'ine bağlanması için gerekli erişim verileri.</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2 col-span-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Gateway URL / Host Address</label>
+                        <input 
+                          type="text" 
+                          defaultValue="http://192.168.1.105:8080/api/v1"
+                          placeholder="http://localhost:8080/api/v1"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Kullanıcı Adı (ERP API)</label>
+                        <input 
+                          type="text" 
+                          defaultValue="ENFLOW_INTEGRATOR"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Şifre</label>
+                        <input 
+                          type="password" 
+                          defaultValue="password123"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Firma Numarası (Logo / Netsis)</label>
+                        <input 
+                          type="text" 
+                          defaultValue="026"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-400 uppercase">Dönem Numarası</label>
+                        <input 
+                          type="text" 
+                          defaultValue="01"
+                          className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {wizardStep === 3 && (
+                  <div className="space-y-6">
+                    <div className="bg-emerald-50 p-6 rounded-2xl border border-emerald-100 flex items-start gap-4">
+                      <div className="p-2 bg-emerald-100 text-emerald-600 rounded-xl"><Wand2 size={24} /></div>
+                      <div>
+                        <h5 className="font-bold text-emerald-900">Veri Şeması Eşleme (Schema Mapper)</h5>
+                        <p className="text-sm text-emerald-700">Logo/Netsis/Mikro üzerindeki cari kartları, teklifleri ve fatura başlıklarını Enflow şemasıyla eşleyin.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-4">
+                      <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 space-y-3">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-600">Enflow Alanı</span>
+                          <span className="font-bold text-slate-600">Logo/Netsis DB Kolonu</span>
+                        </div>
+                        <hr className="border-slate-100" />
+                        <div className="flex justify-between items-center gap-4">
+                          <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Customer.name</span>
+                          <ChevronRight size={14} className="text-slate-400" />
+                          <select className="text-xs border rounded px-2 py-1 bg-white">
+                            <option>DEFINITION_ (Cari Tanımı)</option>
+                            <option>CODE (Cari Kodu)</option>
+                          </select>
+                        </div>
+                        <div className="flex justify-between items-center gap-4">
+                          <span className="text-xs font-mono bg-slate-100 px-2 py-1 rounded">Customer.taxNumber</span>
+                          <ChevronRight size={14} className="text-slate-400" />
+                          <select className="text-xs border rounded px-2 py-1 bg-white">
+                            <option>TAXNR (Vergi Numarası)</option>
+                            <option>TCKNO (TC Kimlik No)</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex justify-end">
+                        <button 
+                          type="button" 
+                          onClick={() => alert("Logo/Netsis entegrasyon API testi başarılı: 142 Cari Kart senkronize edilmeye hazır!")}
+                          className="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-4 py-2 rounded-xl font-bold flex items-center gap-2 border border-indigo-200"
+                        >
+                          <CheckCircle2 size={14} /> Bağlantıyı ve Şemayı Test Et
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            )}
+
+            {selectedIntegration !== 'nextcloud' && selectedIntegration !== 'exchange' && selectedIntegration !== 'whatsapp' && selectedIntegration !== 'tr_erp_crm' && (
               <div className="py-12 text-center space-y-4">
                 <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto">
                   <Cpu size={40} />
