@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
 import { 
-  NAV_ITEMS, 
+  NAV_ITEMS,
+  MOCK_SYSTEM_USERS 
 } from './constants';
 import { 
   Contract,
@@ -10,7 +11,8 @@ import {
   Project,
   TodoTask,
   Unit,
-  User
+  User,
+  CorporateDocument
 } from './types';
 
 import Sidebar from './layout/Sidebar';
@@ -270,7 +272,7 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
         <HealthBanner />
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} companyLogo={companyLogo} />
         <main className="flex-1 flex flex-col min-w-0 relative">
-          <Header activeTab={activeTab} companyLogo={companyLogo} onLogout={onLogout} />
+          <Header activeTab={activeTab} onLogout={onLogout} />
           <div className="flex-1 overflow-hidden relative">
             <AnimatePresence mode="wait">
               <motion.div

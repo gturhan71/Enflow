@@ -1,14 +1,9 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { PrismaClient } from '@prisma/client';
-import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { prisma } from './prismaClient';
 
 dotenv.config();
-
-const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
-const adapter = new PrismaLibSql({ url: connectionString });
-const prisma = new PrismaClient({ adapter });
 
 const app = express();
 const port = 3002;
@@ -45,6 +40,37 @@ app.get('/api/health', (req, res) => {
 app.get('/api/tenants', asyncHandler(async (req: Request, res: Response) => {
   const tenants = await prisma.tenant.findMany({ orderBy: { name: 'asc' } });
   res.json(tenants);
+}));
+
+app.put('/api/tenants/:id/subscription', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = req.params.id;
+  const { plan } = req.body; // STARTER, PROFESSIONAL, ENTERPRISE
+
+  if (!['STARTER', 'PROFESSIONAL', 'ENTERPRISE'].includes(plan)) {
+    return res.status(400).json({ error: 'Geçersiz plan tipi.' });
+  }
+
+  const subscription = await prisma.subscription.upsert({
+    where: { tenantId },
+    update: { plan },
+    create: { tenantId, plan }
+  });
+
+  res.json(subscription);
+}));
+
+app.get('/api/subscription', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const subscription = await prisma.subscription.findUnique({ 
+    where: { tenantId: (req as any).tenantId } 
+  });
+  res.json(subscription || { plan: 'STARTER' });
+}));
+
+app.get('/api/usage', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = (req as any).tenantId;
+  const period = new Date().toISOString().slice(0, 7);
+  const usage = await prisma.usageMetric.findMany({ where: { tenantId, period } });
+  res.json(usage);
 }));
 
 // --- AUTH ---

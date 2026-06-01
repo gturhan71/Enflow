@@ -61,10 +61,31 @@ const SettingsModule = ({
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [showUnitModal, setShowUnitModal] = useState(false);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [usage, setUsage] = useState<any[]>([]);
 
   useEffect(() => {
     fetchTenants();
   }, []);
+
+  useEffect(() => {
+    if (activeSubTab === 'subscription') {
+      fetchSubscriptionData();
+    }
+  }, [activeSubTab]);
+
+  const fetchSubscriptionData = async () => {
+    try {
+      const [sub, use] = await Promise.all([
+        apiService.getSubscription(),
+        apiService.getUsage()
+      ]);
+      setSubscription(sub);
+      setUsage(use);
+    } catch (err) {
+      console.error('Abonelik verileri yüklenemedi');
+    }
+  };
 
   const fetchTenants = async () => {
     try {
@@ -264,6 +285,49 @@ const SettingsModule = ({
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {activeSubTab === 'subscription' && (
+          <div className="space-y-6">
+            <h4 className="text-xl font-bold text-slate-900">Abonelik & Kullanım</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="glass-panel p-6 rounded-3xl">
+                <h5 className="font-bold text-slate-900 mb-2">Mevcut Plan</h5>
+                <p className="text-3xl font-black text-primary mb-4">{subscription?.plan || 'STARTER'}</p>
+                
+                {currentUser?.role === 'GENERAL_MANAGER' && (
+                  <div className="space-y-2">
+                    <select 
+                      onChange={async (e) => {
+                        try {
+                          await apiService.updateTenantSubscription(currentUser.tenantId, e.target.value);
+                          fetchSubscriptionData();
+                          alert('Plan güncellendi.');
+                        } catch (err) {
+                          alert('Plan güncellenemedi.');
+                        }
+                      }}
+                      className="w-full px-4 py-2 border border-slate-200 rounded-xl"
+                      value={subscription?.plan || 'STARTER'}
+                    >
+                      <option value="STARTER">STARTER</option>
+                      <option value="PROFESSIONAL">PROFESSIONAL</option>
+                      <option value="ENTERPRISE">ENTERPRISE</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="glass-panel p-6 rounded-3xl">
+                <h5 className="font-bold text-slate-900 mb-2">Aylık Kullanım</h5>
+                {usage.length > 0 ? usage.map((u: any) => (
+                  <div key={u.feature} className="flex justify-between text-sm py-1">
+                    <span className="text-slate-500">{u.feature}</span>
+                    <span className="font-bold">{u.count}</span>
+                  </div>
+                )) : <p className="text-sm text-slate-400">Henüz kullanım verisi yok.</p>}
+              </div>
             </div>
           </div>
         )}

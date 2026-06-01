@@ -394,6 +394,21 @@ class ApiService {
       body: JSON.stringify(data)
     });
   }
+
+  async getSubscription() {
+    return this.fetchWithAuth('/subscription');
+  }
+
+  async updateTenantSubscription(tenantId: string, plan: string) {
+    return this.fetchWithAuth(`/tenants/${tenantId}/subscription`, {
+      method: 'PUT',
+      body: JSON.stringify({ plan })
+    });
+  }
+
+  async getUsage() {
+    return this.fetchWithAuth('/usage');
+  }
 }
 
 export const apiService = new ApiService();

@@ -11,6 +11,8 @@ model Tenant {
   name          String
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+  subscription  Subscription?
+  usageMetrics  UsageMetric[]
   customers     Customer[]
   opportunities Opportunity[]
   projects      Project[]
@@ -23,6 +25,34 @@ model Tenant {
   workflows     Workflow[]
   costItems     CostItem[]
   proposals     Proposal[]
+}
+
+enum SubscriptionPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+model Subscription {
+  id        String           @id @default(cuid())
+  plan      SubscriptionPlan @default(STARTER)
+  tenantId  String           @unique
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+}
+
+model UsageMetric {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  feature   String   // e.g., "INTEGRATION_SYNC", "STORAGE"
+  count     Int      @default(0)
+  period    String   // e.g., "2026-05"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, feature, period])
 }
 
 model Unit {
