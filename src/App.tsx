@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { CheckCircle2, AlertTriangle, Loader2 } from 'lucide-react';
+import { CheckCircle2, Loader2 } from 'lucide-react';
 import { 
-  NAV_ITEMS,
   MOCK_SYSTEM_USERS 
 } from './constants';
 import { 
@@ -33,6 +32,7 @@ import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { apiService } from './services/apiService';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 // --- HEALTH CHECK BANNER ---
 const HealthBanner = () => {
@@ -97,11 +97,11 @@ const HealthBanner = () => {
 
   return (
     <AnimatePresence>
-      <motion.div 
+      <motion.div
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -50, opacity: 0 }}
-        className="fixed top-4 right-4 z-[9999]"
+        className="fixed top-2 left-8 z-[9999]"
       >
         <div className={`px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 border backdrop-blur-md transition-all ${
           status === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-red-500/10 border-red-500/20 text-red-600 animate-pulse'
@@ -116,7 +116,7 @@ const HealthBanner = () => {
   );
 };
 
-const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: () => void }) => {
+const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string, onLogout: () => void, companyLogo: string | null }) => {
   const { currentUser, setCurrentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
@@ -143,7 +143,6 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
   const [systemUsers, setSystemUsers] = useState<User[]>([]);
   const [documents, setDocuments] = useState<CorporateDocument[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
-  const [companyLogo, setCompanyLogoState] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     if (!tenantId) return;
@@ -170,9 +169,6 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       setSystemUsers(usersData);
       setDocuments(docsData);
       setProposals(propsData);
-      
-      const savedLogo = localStorage.getItem(`enflow_company_logo_${tenantId}`);
-      setCompanyLogoState(savedLogo);
     } catch (error) {
       console.error('Data fetching error:', error);
     } finally {
@@ -184,7 +180,6 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
     try {
       const response = await apiService.approveProposal(opportunityId, { note: 'Dashboard üzerinden onaylandı.' });
       setOpportunities(prev => prev.map(opp => opp.id === opportunityId ? { ...opp, technicalStatus: 'APPROVED', status: 'PROPOSAL' } : opp));
-      // Refresh other data if needed, but for now just update local state
       console.log('Proposal approved:', response);
     } catch (error) {
       console.error('Approval error:', error);
@@ -196,22 +191,13 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
     fetchData();
   }, [fetchData]);
 
-  const setCompanyLogo = (logo: string | null) => {
-    setCompanyLogoState(logo);
-    if (logo) {
-      localStorage.setItem(`enflow_company_logo_${tenantId}`, logo);
-    } else {
-      localStorage.removeItem(`enflow_company_logo_${tenantId}`);
-    }
-  };
-
   const renderContent = () => {
     if (loading) {
       return (
-        <div className="flex-1 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm">
+        <div className="flex-1 flex items-center justify-center bg-background/50 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-6">
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
-            <p className="text-slate-900 font-black uppercase tracking-[0.2em] text-[10px] italic">Veriler Senkronize Ediliyor</p>
+            <p className="text-foreground font-black uppercase tracking-[0.2em] text-[10px] italic">Veriler Senkronize Ediliyor</p>
           </div>
         </div>
       );
@@ -222,7 +208,7 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       return (
         <SettingsModule 
           companyLogo={companyLogo} 
-          setCompanyLogo={setCompanyLogo} 
+          setCompanyLogo={() => {}} // This should be handled in App component now
           activeSubTab={subTab} 
           units={units}
           setUnits={setUnits}
@@ -262,17 +248,16 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;
-      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} onApproveProposal={handleApproveProposal} />;
+      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} onApproveProposal={handleApproveProposal} />;
     }
   };
 
   return (
     <UnsavedChangesProvider>
-      <div className="flex h-screen bg-slate-50 overflow-hidden font-geist">
-        <HealthBanner />
+      <div className="flex h-screen bg-background overflow-hidden font-geist">
         <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} companyLogo={companyLogo} />
         <main className="flex-1 flex flex-col min-w-0 relative">
-          <Header activeTab={activeTab} onLogout={onLogout} />
+          <Header activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
           <div className="flex-1 overflow-hidden relative">
             <AnimatePresence mode="wait">
               <motion.div
@@ -296,6 +281,14 @@ const TenantAppInner = ({ tenantId, onLogout }: { tenantId: string, onLogout: ()
 const App = () => {
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => localStorage.getItem('enflow_active_tenant_id'));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('enflow_auth_token'));
+  const [companyLogo, setCompanyLogoState] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTenantId) {
+      const savedLogo = localStorage.getItem(`enflow_company_logo_${activeTenantId}`);
+      setCompanyLogoState(savedLogo);
+    }
+  }, [activeTenantId]);
 
   const handleLogin = (tenantId: string) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
@@ -310,19 +303,17 @@ const App = () => {
     setIsAuthenticated(false);
   };
 
-  if (!isAuthenticated || !activeTenantId) {
-    return (
-      <>
-        <HealthBanner />
-        <Login onLogin={handleLogin} />
-      </>
-    );
-  }
-
   return (
-    <AuthProvider tenantId={activeTenantId}>
-      <TenantAppInner tenantId={activeTenantId} onLogout={handleLogout} />
-    </AuthProvider>
+    <ThemeProvider>
+      <HealthBanner />
+      {!isAuthenticated || !activeTenantId ? (
+        <Login onLogin={handleLogin} />
+      ) : (
+        <AuthProvider tenantId={activeTenantId}>
+          <TenantAppInner tenantId={activeTenantId} onLogout={handleLogout} companyLogo={companyLogo} />
+        </AuthProvider>
+      )}
+    </ThemeProvider>
   );
 };
 

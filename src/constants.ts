@@ -38,7 +38,8 @@ import {
   TodoTask,
   Opportunity,
   Project,
-  Tenant
+  Tenant,
+  Notification
 } from './types';
 
 export const APP_VERSION = 'v1.2.0';
@@ -277,5 +278,52 @@ export const MOCK_OPPORTUNITIES: Opportunity[] = [
     technicalStatus: 'COMPLETED',
     bomStatus: 'APPROVED',
     presalesId: 'cmp9s29090002h4o37jgwc4we'
+  }
+];
+
+export const MOCK_NOTIFICATIONS: Notification[] = [
+  {
+    id: 'n1',
+    userId: 'cmp5lhehc000259w33zxhyy0p',
+    title: 'Yeni Fırsat Atandı',
+    message: 'Banka Veri Merkezi Genişletme fırsatı size atandı.',
+    type: 'SYSTEM',
+    isRead: false,
+    timestamp: new Date().toISOString(),
+    relatedModule: 'crm-opportunities',
+    relatedItemId: 'opp1'
+  },
+  {
+    id: 'n2',
+    userId: 'cmp5lhehc000259w33zxhyy0p',
+    title: 'Sözleşme Onay Bekliyor',
+    message: 'Veri Merkezi Modernizasyonu sözleşmesi onayınızı bekliyor.',
+    type: 'URGENT',
+    isRead: false,
+    timestamp: new Date().toISOString(),
+    relatedModule: 'contract',
+    relatedItemId: 'con1'
+  },
+  {
+    id: 'n3',
+    userId: 'cmp5lhehc000259w33zxhyy0p',
+    title: 'Proje Tamamlandı',
+    message: 'Kamu Kurumu Siber Güvenlik projesi başarıyla tamamlandı.',
+    type: 'SUCCESS',
+    isRead: true,
+    timestamp: new Date().toISOString(),
+    relatedModule: 'project-mgmt',
+    relatedItemId: 'opp4'
+  },
+  {
+    id: 'n4',
+    userId: 'cmp5lhehc000259w33zxhyy0p',
+    title: 'Zamanlanmış Hatırlatıcı',
+    message: 'Bu bildirim 1 dakika sonrasına zamanlandı.',
+    type: 'WARNING',
+    isRead: false,
+    timestamp: new Date().toISOString(),
+    scheduledAt: new Date(Date.now() + 60000).toISOString(),
+    relatedModule: 'dashboard'
   }
 ];

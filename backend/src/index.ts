@@ -1,6 +1,8 @@
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { prisma } from './prismaClient';
 
 dotenv.config();
@@ -35,6 +37,38 @@ const tenantMiddleware = asyncHandler(async (req: Request, res: Response, next: 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+app.post('/api/logs/notifications', (req, res) => {
+  const { userId, timestamp, action } = req.body;
+  const logMessage = `[${timestamp}] User ${userId} ${action}\n`;
+  const logPath = path.join(process.cwd(), 'notifications_access.log');
+  
+  fs.appendFile(logPath, logMessage, (err) => {
+    if (err) {
+      console.error('Logging failed:', err);
+      return res.status(500).json({ error: 'Logging failed' });
+    }
+    res.json({ success: true });
+  });
+});
+
+app.get('/api/logs/notifications', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  // Only allow if user is an admin (simplified check for this mock env)
+  const logPath = path.join(process.cwd(), 'notifications_access.log');
+  
+  if (!fs.existsSync(logPath)) {
+    return res.json({ logs: [] });
+  }
+
+  fs.readFile(logPath, 'utf8', (err, data) => {
+    if (err) return res.status(500).json({ error: 'Read failed' });
+    const logs = data.split('\n').filter(Boolean).map(line => {
+      const match = line.match(/\[(.*?)\] User (.*?) (.*)/);
+      return match ? { timestamp: match[1], userId: match[2], action: match[3] } : null;
+    }).filter(Boolean);
+    res.json({ logs: logs.reverse() }); // Newest first
+  });
+}));
 
 // --- TENANTS ---
 app.get('/api/tenants', asyncHandler(async (req: Request, res: Response) => {

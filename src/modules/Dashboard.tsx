@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   TrendingUp, 
   DollarSign, 
@@ -11,7 +11,11 @@ import {
   XCircle,
   FileSignature,
   ShoppingCart,
-  Kanban
+  Kanban,
+  BarChart3,
+  History,
+  Loader2,
+  Calendar
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -23,9 +27,11 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { motion } from 'motion/react';
-import { Opportunity, Project, TodoTask } from '../types';
+import { motion, AnimatePresence } from 'motion/react';
+import { Opportunity, Project, TodoTask, Contract } from '../types';
 import { cn } from '../lib/utils';
+import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/apiService';
 
 // Sub-component for KPI cards (Memoized for performance with high-fidelity glow effects)
 const KPICard = React.memo(({ kpi, index }: { kpi: any, index: number }) => (
@@ -74,9 +80,25 @@ const Dashboard = ({
   opportunities: Opportunity[], 
   projects: Project[], 
   tasks: TodoTask[],
-  contracts?: any[],
+  contracts?: Contract[],
   onApproveProposal?: (id: string) => void
 }) => {
+  const { currentUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<'overview' | 'performance'>('overview');
+  const [logs, setLogs] = useState<any[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  const isManager = currentUser?.role === 'GENERAL_MANAGER';
+
+  useEffect(() => {
+    if (activeTab === 'performance' && isManager) {
+      setLoadingLogs(true);
+      apiService.getNotificationLogs()
+        .then(data => setLogs(data.logs || []))
+        .catch(err => console.error('Logs fetch failed:', err))
+        .finally(() => setLoadingLogs(false));
+    }
+  }, [activeTab, isManager]);
   
   // Optimization: useMemo for expensive calculations
   const kpis = useMemo(() => {
@@ -94,7 +116,7 @@ const Dashboard = ({
       { label: 'Aktif Projeler', value: activeProjects, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-500/10', glowBg: 'bg-purple-500' },
       { label: 'Ağırlıklı Değer', value: `${(weightedValue / 1000000).toFixed(1)}M $`, sub: 'Olasılık Bazlı Tahmin', icon: Target, color: 'text-blue-600', bg: 'bg-blue-500/10', glowBg: 'bg-blue-500' },
     ];
-  }, [opportunities, projects, tasks]);
+  }, [opportunities, projects]);
 
   const approvalQueue = useMemo(() => 
     opportunities.filter(o => o.technicalStatus === 'WAITING_APPROVAL'),
@@ -144,23 +166,220 @@ const Dashboard = ({
     return list.slice(0, 6);
   }, [opportunities, contracts, tasks]);
 
+  // Performance Data for Managers
+  const performanceByUnit = useMemo(() => {
+    const units = ['u1', 'u2', 'u3', 'u4'];
+    const unitNames: Record<string, string> = { u1: 'Satış', u2: 'Teknik', u3: 'Lojistik', u4: 'İdari' };
+    
+    return units.map(uId => {
+      const unitTasks = tasks.filter(t => t.unitId === uId);
+      const completed = unitTasks.filter(t => t.status === 'COMPLETED').length;
+      const total = unitTasks.length;
+      return {
+        name: unitNames[uId],
+        tamamlanan: completed,
+        toplam: total,
+        performans: total > 0 ? Math.round((completed / total) * 100) : 0
+      };
+    });
+  }, [tasks]);
+
+  if (activeTab === 'performance' && isManager) {
+    return (
+      <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-geist bg-slate-50/30 custom-scrollbar">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <button 
+              onClick={() => setActiveTab('overview')}
+              className="px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white dark:bg-slate-800 text-slate-400 hover:text-primary transition-all shadow-sm border border-white/40 dark:border-white/10"
+            >
+              ← Genel Bakış
+            </button>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Performans & Raporlar</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="px-4 py-2 bg-primary/10 text-primary border border-primary/20 rounded-xl text-[10px] font-black uppercase tracking-widest">
+              Yönetici Paneli
+            </span>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Unit Performance Chart */}
+          <div className="lg:col-span-2 glass-panel rounded-[32px] p-8 space-y-8 border border-white/50 bg-white/40">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter italic leading-none mb-1">Birim İş Akış Performansı</h4>
+                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Görev Tamamlama Oranları</p>
+              </div>
+              <BarChart3 className="text-primary opacity-50" size={24} />
+            </div>
+
+            <div className="h-80 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={performanceByUnit}>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.1} />
+                  <XAxis dataKey="name" fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                  <YAxis fontSize={10} fontWeight="900" axisLine={false} tickLine={false} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)', fontSize: '10px', fontWeight: '900' }}
+                  />
+                  <Bar dataKey="tamamlanan" name="Tamamlanan" fill="hsl(151 86% 39%)" radius={[6, 6, 0, 0]} />
+                  <Bar dataKey="toplam" name="Toplam Görev" fill="rgba(100, 116, 139, 0.2)" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Performance Stats */}
+          <div className="space-y-6">
+            <div className="glass-panel rounded-[32px] p-6 border-l-4 border-l-primary bg-white/40">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                  <Target size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Genel Verimlilik</p>
+                  <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
+                    {Math.round(performanceByUnit.reduce((a, b) => a + b.performans, 0) / performanceByUnit.length)}%
+                  </h4>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel rounded-[32px] p-6 border-l-4 border-l-amber-500 bg-white/40">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-amber-500/10 rounded-2xl flex items-center justify-center text-amber-500">
+                  <Clock size={24} />
+                </div>
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Bekleyen Görevler</p>
+                  <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
+                    {tasks.filter(t => t.status === 'PENDING').length}
+                  </h4>
+                </div>
+              </div>
+            </div>
+
+            <div className="glass-panel rounded-[32px] p-8 space-y-6 bg-white/40 border border-white/50">
+              <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Birim Bazlı Dağılım</h5>
+              <div className="space-y-4">
+                {performanceByUnit.map(unit => (
+                  <div key={unit.name} className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                      <span className="text-slate-700">{unit.name}</span>
+                      <span className="text-primary">{unit.performans}%</span>
+                    </div>
+                    <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${unit.performans}%` }}
+                        className="h-full bg-primary"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Access Logs Table */}
+        <div className="glass-panel rounded-[32px] p-8 space-y-8 bg-white/40 border border-white/50">
+          <div className="flex items-center justify-between">
+            <div>
+              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tighter italic leading-none mb-1">Bildirim & Sistem Erişim Kayıtları</h4>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Kullanıcı Etkileşim Takibi</p>
+            </div>
+            <History className="text-primary opacity-50" size={24} />
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full border-separate border-spacing-y-3">
+              <thead>
+                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-left">
+                  <th className="px-6 py-2">Kullanıcı ID</th>
+                  <th className="px-6 py-2">İşlem Detayı</th>
+                  <th className="px-6 py-2">Zaman Damgası</th>
+                  <th className="px-6 py-2 text-right">Durum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loadingLogs ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-12">
+                      <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
+                    </td>
+                  </tr>
+                ) : logs.length > 0 ? (
+                  logs.map((log, idx) => (
+                    <tr key={idx} className="glass-panel group hover:scale-[1.01] transition-all cursor-pointer bg-white/60">
+                      <td className="px-6 py-4">
+                        <span className="px-3 py-1 bg-slate-100 text-slate-600 rounded-lg text-[9px] font-black uppercase tracking-widest">
+                          {log.userId}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-xs font-black text-slate-900 uppercase tracking-tight italic">
+                          {log.action}
+                        </p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                          <Calendar size={12} />
+                          {new Date(log.timestamp).toLocaleString('tr-TR')}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="px-3 py-1 bg-emerald-500/10 text-emerald-500 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-500/20">
+                          LOGLANDI
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="text-center py-12 text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      Kayıt bulunamadı.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Kurumsal Kokpit</h3>
-          <p className="text-slate-500 font-medium text-sm">Sistem genelindeki canlı performans ve operasyonel veriler.</p>
+          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Kurumsal Kokpit</h3>
+          <p className="text-slate-500 font-medium text-sm mt-1">Sistem genelindeki canlı performans ve operasyonel veriler.</p>
         </div>
-        <div className="flex items-center gap-3 glass-card p-3 px-4 rounded-2xl bg-white/40 border border-white/60 shadow-lg">
-          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center animate-pulse">
-            <Zap size={20} fill="currentColor" />
-          </div>
-          <div>
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sistem Durumu</p>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 animate-ping absolute" />
-              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 relative" />
-              <p className="text-xs font-bold text-slate-900 italic">Senkronize</p>
+        <div className="flex items-center gap-4">
+          {isManager && (
+            <button 
+              onClick={() => setActiveTab('performance')}
+              className="px-8 py-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3"
+            >
+              <BarChart3 size={16} />
+              Performans & Raporlar
+            </button>
+          )}
+          <div className="flex items-center gap-3 glass-card p-3 px-4 rounded-2xl bg-white/40 border border-white/60 shadow-lg">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center animate-pulse">
+              <Zap size={20} fill="currentColor" />
+            </div>
+            <div>
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Sistem Durumu</p>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 animate-ping absolute" />
+                <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-md shadow-emerald-500/40 relative" />
+                <p className="text-xs font-bold text-slate-900 italic">Senkronize</p>
+              </div>
             </div>
           </div>
         </div>

@@ -312,6 +312,10 @@ class ApiService {
     });
   }
 
+  async getNotificationLogs() {
+    return this.fetchWithAuth('/logs/notifications');
+  }
+
   // --- DOCUMENTS ---
   async getDocuments() {
     return this.fetchWithAuth('/documents');

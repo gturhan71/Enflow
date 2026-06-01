@@ -35,7 +35,7 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, companyLogo }: { activeTab
 
   return (
     <div className="w-72 bg-white/20 backdrop-blur-3xl border-r border-white/20 h-screen flex flex-col sticky top-0 z-20 overflow-hidden">
-      <div className="p-8 flex items-center gap-4 border-b border-white/10 group cursor-pointer">
+      <div className="pt-12 p-8 flex items-center gap-4 border-b border-white/10 group cursor-pointer">
         <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-all duration-500 overflow-hidden">
           {companyLogo ? (
             <img src={companyLogo} alt="Logo" className="w-full h-full object-cover" />

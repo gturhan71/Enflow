@@ -195,3 +195,28 @@ export interface WhatsAppConfig {
   apiKey: string;
   phoneNumber: string;
 }
+
+export interface Notification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'SYSTEM' | 'URGENT' | 'SUCCESS' | 'WARNING';
+  isRead: boolean;
+  timestamp: string;
+  scheduledAt?: string;
+  relatedModule?: string;
+  relatedItemId?: string;
+}
+
+export interface WorkflowLog {
+  id: string;
+  itemId: string;
+  fromUnitId: string;
+  toUnitId: string;
+  assignedBy: string;
+  assignedTo: string;
+  note: string;
+  timestamp: string;
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+}
