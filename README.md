@@ -3,11 +3,11 @@
 Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliyetlendirme, sözleşme yönetimi, fiziksel arşiv, satın alma ve proje uygulama süreçlerini tek bir çatı altında toplayan, veriye dayalı karar destek mekanizmalarıyla güçlendirilmiş, **Multi-tenant Full-Stack** bir ERP/CRM platformudur.
 
 > [!IMPORTANT]
-> **v1.3.2 Proposal Negotiation Filtering Release:** Arayüz tamamen **tek-ui** standartlarında modernize edildi. Teklif hazırlama aşamasına **"Pazarlığa Açık" (openForNegotiation)** bayrağı eklendi. Pazarlık Kokpiti artık sadece bu bayrağa sahip teklifleri süzerek özel simülasyon turları başlatır.
+> **v1.4.1 Local ERP & CRM Integration Wizard Release:** Arayüz tamamen **tek-ui** standartlarında modernize edildi. Türkiye'de en yaygın kullanılan Logo Tiger/GO, Netsis, ve Mikro yazılımları için REST API / MSSQL veritabanı bağlantı sihirbazı ve Enflow veritabanıyla canlı kolon eşleme (Schema Mapper) arayüzü entegre edildi.
 
 ---
 
-## 🏗 Teknik Mimari & Modernizasyon (v1.2.9)
+## 🏗 Teknik Mimari & Modernizasyon (v1.4.1)
 
 ### 🎨 Görsel Standart (tek-ui & Premiumization)
 *   **Design System:** Geist Sans tipografisi, HSL Primary (151 86% 39% - Zümrüt Yeşili) renk paleti.
@@ -25,14 +25,15 @@ Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliye
 
 ## 🔄 Öne Çıkan Modüller ve İş Akışları (Inter-Module Flow)
 
-1.  **Satış Fırsatları & CRM Modülü:** Kredi limitleri, risk skorları ve fırsat statü takibi (Won/Lost). Kaybedilen fırsatlar otomatik olarak "Kaybedilenler Listesi"ne aktarılır.
-2.  **AI Destekli Satış Öncesi (Presales):** Teknik şartnamelerden Gemini AI API entegrasyonu ile otomatik BoM (Bill of Materials) listesi ve teknik özet çıkartılması.
-3.  **Onay Mekanizması (Approval Queue):** Yönetici paneli üzerinden tek tıkla doğrulanmış teknik teklif onaylama.
-4.  **Canlı Pazarlık & Açık Eksiltme Kokpiti (v1.3.2):** Satış Birim Yöneticisine (Genel Müdür) özel, hazırlık aşamasında **"Pazarlığa Açık"** olarak kaydedilmiş teklifler üzerinden başlatılan 1v1 Canlı Müzakere chatbot'u ve Çoklu Rakip katılımlı **Açık Eksiltme Müzayedesi**.
-5.  **Sözleşme Modülü & Evrak Kontrolü:** Islak imzalı evrakların yüklenme zorunluluğu olan devlet destekli "Evrak Kontrol Listesi" (Document Checklist). Tüm evraklar tamamlanmadan proje devredilemez.
-6.  **Paralel Süreç Handoff'u:** Sözleşme onaylandığı anda **Proje Yönetimi** (Birim `u4` - Proje Başlatma Planı) ve **Satın Alma** (Birim `u3` - BoM Tedarik Başlatma) birimlerine otomatik yüksek öncelikli görevler (TodoTask) açılır.
-7.  **Proje Yönetimi & Kapanış:** PM paneli üzerinden geçici kabul onayı (%100) ile proje tamamlanır ve otomatik olarak **Fiziksel Arşiv Modülü**'ne (ArchiveModule) devredilir.
-8.  **E2E Stepper Simulator:** CRM'den fiziksel arşive kadar olan 8 aşamalı ERP akışını mock WhatsApp API & MS Exchange Graph API bildirim yükleriyle (payloads) test eden interaktif simülatör.
+1.  **Yerel ERP & CRM Entegrasyon Sihirbazı (v1.4.1):** Türkiye pazarındaki Logo Tiger/Go, Netsis ve Mikro ERP/CRM sistemleriyle entegrasyon kuran, REST API ve doğrudan MSSQL Connector destekli, görsel veri tabanı kolon eşleme arayüzü sunan sihirbaz.
+2.  **Satış Fırsatları & CRM Modülü:** Kredi limitleri, risk skorları ve fırsat statü takibi (Won/Lost). Kaybedilen fırsatlar otomatik olarak "Kaybedilenler Listesi"ne aktarılır.
+3.  **AI Destekli Satış Öncesi (Presales):** Teknik şartnamelerden Gemini AI API entegrasyonu ile otomatik BoM (Bill of Materials) listesi ve teknik özet çıkartılması.
+4.  **Onay Mekanizması (Approval Queue):** Yönetici paneli üzerinden tek tıkla doğrulanmış teknik teklif onaylama.
+5.  **Canlı Pazarlık & Açık Eksiltme Kokpiti (v1.3.2):** Satış Birim Yöneticisine (Genel Müdür) özel, hazırlık aşamasında **"Pazarlığa Açık"** olarak kaydedilmiş teklifler üzerinden başlatılan 1v1 Canlı Müzakere chatbot'u ve Çoklu Rakip katılımlı **Açık Eksiltme Müzayedesi**.
+6.  **Sözleşme Modülü & Evrak Kontrolü:** Islak imzalı evrakların yüklenme zorunluluğu olan devlet destekli "Evrak Kontrol Listesi" (Document Checklist). Tüm evraklar tamamlanmadan proje devredilemez.
+7.  **Paralel Süreç Handoff'u:** Sözleşme onaylandığı anda **Proje Yönetimi** (Birim `u4` - Proje Başlatma Planı) ve **Satın Alma** (Birim `u3` - BoM Tedarik Başlatma) birimlerine otomatik yüksek öncelikli görevler (TodoTask) açılır.
+8.  **Proje Yönetimi & Kapanış:** PM paneli üzerinden geçici kabul onayı (%100) ile proje tamamlanır ve otomatik olarak **Fiziksel Arşiv Modülü**'ne (ArchiveModule) devredilir.
+9.  **E2E Stepper Simulator:** CRM'den fiziksel arşive kadar olan 8 aşamalı ERP akışını mock WhatsApp API & MS Exchange Graph API bildirim yükleriyle (payloads) test eden interaktif simülatör.
 
 ---
 
@@ -87,4 +88,4 @@ run.bat
 3. `pnpm dev` (3000 portunda Vite ile ayağa kalkar)
 
 ---
-*Enflow v1.3.2 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
+*Enflow v1.4.1 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
