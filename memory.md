@@ -106,6 +106,7 @@ cd backend && npx tsx src/index.ts
 | 18.05.2026 | Çoklu Açık Eksiltme İhalesi | Rakip firmaların katıldığı turlu, kurallı ve manuel/otomatik eksiltmeli müzayede simülasyonu sunmak için. |
 | 18.05.2026 | Pazarlığa Açık Teklif Koruması | Teklif hazırlama aşamasına 'Pazarlığa Açık' bayrağı ve pazarlık kokpiti seçici entegrasyonu sunmak için. |
 | 18.05.2026 | Sıralı Manuel Açık Eksiltme İhalesi | Rakip firmaların ve Bizim tekliflerin manuel form üzerinden girildiği, ardışık eksiltme kurallarına göre sıralı doğrulanan, çekilme/dahil etme destekli premium ihale motoru entegre etmek için. |
+| 01.06.2026 | Yerel ERP & CRM Sihirbazı | Türkiye'de en yaygın kullanılan Logo, Mikro, Netsis sistemleri için veri şeması eşlemeli entegrasyon sihirbazı eklemek için. |
 
 ---
-*Enflow v1.4.0 — 18 Mayıs 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator with custom proposal filters, floor cost checks & executive control, introducing the new sequential manual reverse auction bidding engine.*
+*Enflow v1.4.1 — 1 Haziran 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator, introducing the new Turkish ERP & CRM integration wizard for Logo, Mikro and Netsis.*
