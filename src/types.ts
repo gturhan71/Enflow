@@ -249,6 +249,7 @@ export interface LicenseData {
   model: LicenseModel;
   expiryDate: string;
   issuedAt: string;
+  isTrial?: boolean;
   limits: {
     users: number;
     storage: number;

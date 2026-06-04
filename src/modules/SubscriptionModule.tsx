@@ -111,6 +111,17 @@ const SubscriptionModule: React.FC = () => {
   const currentLimits = activeLicense ? activeLicense.limits : basePlan.limits;
   const currentPlanName = activeLicense ? `${activeLicense.companyName} - ${activeLicense.model}` : basePlan.name;
 
+  const getRemainingDays = () => {
+    if (!activeLicense) return null;
+    const expiry = new Date(activeLicense.expiryDate);
+    const now = new Date();
+    const diffTime = expiry.getTime() - now.getTime();
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays > 0 ? diffDays : 0;
+  };
+
+  const remainingDays = getRemainingDays();
+
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
       {/* Header Section */}
@@ -129,7 +140,15 @@ const SubscriptionModule: React.FC = () => {
           </div>
           <div>
             <div className="text-xs text-slate-500 uppercase font-semibold">Aktif Lisans Modeli</div>
-            <div className="text-white font-bold">{currentPlanName}</div>
+            <div className="flex items-center gap-2">
+              <div className="text-white font-bold">{currentPlanName}</div>
+              {activeLicense?.isTrial && (
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/10 border border-amber-500/20 rounded-md">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span className="text-[9px] font-black text-amber-500 uppercase tracking-tighter">Deneme ({remainingDays} Gün)</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>

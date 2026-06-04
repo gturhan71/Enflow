@@ -9,7 +9,8 @@ import {
   ShieldAlert,
   Hash,
   RefreshCw,
-  Terminal
+  Terminal,
+  Zap
 } from 'lucide-react';
 import { LicenseModel, LicenseData } from '../types';
 
@@ -19,7 +20,8 @@ const LicenseGeneratorModule: React.FC = () => {
     model: 'KOBI' as LicenseModel,
     validMonths: 12,
     userLimit: 5,
-    storageLimit: 10
+    storageLimit: 10,
+    isTrial: false
   });
 
   const [generatedKey, setGeneratedKey] = useState<string | null>(null);
@@ -28,22 +30,26 @@ const LicenseGeneratorModule: React.FC = () => {
   const generateLicenseKey = () => {
     const issuedAt = new Date().toISOString();
     const expiryDate = new Date();
-    expiryDate.setMonth(expiryDate.getMonth() + formData.validMonths);
+    // Deneme ise tam 30 gün, değilse seçilen ay kadar
+    if (formData.isTrial) {
+      expiryDate.setDate(expiryDate.getDate() + 30);
+    } else {
+      expiryDate.setMonth(expiryDate.getMonth() + formData.validMonths);
+    }
 
     const license: LicenseData = {
-      companyName: formData.companyName,
+      companyName: formData.companyName + (formData.isTrial ? ' (DENEME)' : ''),
       model: formData.model,
       expiryDate: expiryDate.toISOString(),
       issuedAt: issuedAt,
+      isTrial: formData.isTrial,
       limits: {
         users: formData.userLimit,
         storage: formData.storageLimit
       },
-      signature: `SIG-${Math.random().toString(36).substring(2, 15).toUpperCase()}`
+      signature: `SIG-${formData.isTrial ? 'TRIAL-' : ''}${Math.random().toString(36).substring(2, 15).toUpperCase()}`
     };
 
-    // Gerçekte burada bir JWT veya RSA imzalama olur. 
-    // Prototip için Base64 encode yapıyoruz.
     const encoded = btoa(JSON.stringify(license));
     setGeneratedKey(encoded);
     setIsCopied(false);
@@ -73,6 +79,24 @@ const LicenseGeneratorModule: React.FC = () => {
         {/* Form Section */}
         <div className="space-y-6 bg-white/5 backdrop-blur-md border border-white/10 p-8 rounded-[32px]">
           <div className="space-y-4">
+            <div className="flex items-center justify-between p-4 bg-white/5 border border-white/10 rounded-2xl mb-6">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${formData.isTrial ? 'bg-amber-500/20 text-amber-500' : 'bg-white/5 text-slate-500'}`}>
+                  <Zap className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="text-sm font-bold text-white">Deneme Lisansı (Trial)</div>
+                  <div className="text-[10px] text-slate-500 italic">30 gün boyunca ücretsiz kullanım sağlar.</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => setFormData({...formData, isTrial: !formData.isTrial})}
+                className={`w-12 h-6 rounded-full transition-all relative ${formData.isTrial ? 'bg-amber-500' : 'bg-white/10'}`}
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${formData.isTrial ? 'left-7' : 'left-1'}`}></div>
+              </button>
+            </div>
+
             <label className="block">
               <span className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Firma Adı</span>
               <div className="mt-2 relative">
@@ -101,15 +125,16 @@ const LicenseGeneratorModule: React.FC = () => {
                 </select>
               </label>
 
-              <label className="block">
+              <label className="block opacity-80">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">Geçerlilik (Ay)</span>
                 <div className="mt-2 relative">
                   <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
                   <input 
                     type="number"
-                    value={formData.validMonths}
+                    disabled={formData.isTrial}
+                    value={formData.isTrial ? 1 : formData.validMonths}
                     onChange={(e) => setFormData({...formData, validMonths: parseInt(e.target.value)})}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-amber-500/50 outline-none transition-all"
+                    className={`w-full bg-black/40 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:border-amber-500/50 outline-none transition-all ${formData.isTrial ? 'cursor-not-allowed opacity-50' : ''}`}
                   />
                 </div>
               </label>

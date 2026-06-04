@@ -115,13 +115,14 @@ cd backend && npx tsx src/index.ts
 - **LICENSE Dosyası:** Kök dizine "All Rights Reserved" ibaresini ve kullanım kısıtlamalarını içeren ticari `LICENSE` dosyası eklendi.
 | 05.06.2026 | Pricing & Subscription Modülü | KOBİ, Pay-As-You-Go ve On-Premise modellerini içeren interaktif aktivasyon paneli eklendi. |
 | 05.06.2026 | Master License Generator | Firmalara özel şifrelenmiş lisans anahtarı üretme ve aktivasyon motoru entegre edildi. |
+| 05.06.2026 | 30 Günlük Deneme Lisansı | Tek tıkla üretilebilen, 30 gün sınırlı deneme (Trial) lisansı altyapısı eklendi. |
 
-### 15. Pricing & Subscription Management (The Profit Core - v1.5.1)
+### 15. Pricing & Subscription Management (The Profit Core - v1.5.2)
 - **Unified Subscription Engine:** KOBİ (SaaS), Pay-As-You-Go (Metrik tabanlı) ve On-Premise (Kurumsal) lisans modelleri tek bir panelde toplandı.
-- **Universal Hybrid AI Model:** Tüm lisans modellerinde (On-Premise dahil) AI servisleri ana paketten bağımsız, bulut tabanlı harici kullanıcı aboneliği ile çalışacak şekilde kurgulandı.
-- **Master License Generator:** Master Admin (Senin için) özel bir panel eklendi. Firma adı, model ve limitleri seçerek **Base64 + Signature** tabanlı aktivasyon kodları üretebilirsin.
-- **Dynamic License Activation:** Müşteri paneli üzerinden girilen lisans anahtarı anlık olarak çözülür (decode), firma adını doğrular ve sistem limitlerini (Kullanıcı & Depolama) kalıcı olarak günceller.
-- **Role-Based Security:** Üretim paneli sadece `GENERAL_MANAGER` rolüne açıldı.
+- **Universal Hybrid AI Model:** AI servisleri tüm modellerde hibrit bulut aboneliği üzerinden çalışacak şekilde ayrıştırıldı.
+- **Master License Generator (Trial Support):** Master panelde **30 Günlük Deneme Modu** eklendi. Bu mod aktif edildiğinde sistem otomatik olarak 30 günlük son kullanma tarihi ve "Trial" bayrağı içeren anahtarlar üretir.
+- **Trial Status Monitoring:** Müşteri panelinde deneme lisansı kullanılıyorsa, "DENEME" badge'i ve anlık olarak **kalan gün sayısı** gösterilmektedir.
+- **Secure Key Activation:** Firma adı, model, limitler ve trial bilgisini içeren Base64 imzalı aktivasyon motoru.
 
 ---
-*Enflow v1.5.1 — 5 Haziran 2026. Full-stack type-safe, proprietary license secured, master license generator & activation engine enabled.*
+*Enflow v1.5.2 — 5 Haziran 2026. Full-stack type-safe, proprietary license secured, trial licensing & remaining days tracking enabled.*

@@ -3,16 +3,15 @@
 Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliyetlendirme, sözleşme yönetimi, fiziksel arşiv, satın alma ve proje uygulama süreçlerini tek bir çatı altında toplayan, veriye dayalı karar destek mekanizmalarıyla güçlendirilmiş, **Multi-tenant Full-Stack** bir ERP/CRM platformudur.
 
 > [!IMPORTANT]
-> **v1.4.1 Local ERP & CRM Integration Wizard Release:** Arayüz tamamen **tek-ui** standartlarında modernize edildi. Türkiye'de en yaygın kullanılan Logo Tiger/GO, Netsis, ve Mikro yazılımları için REST API / MSSQL veritabanı bağlantı sihirbazı ve Enflow veritabanıyla canlı kolon eşleme (Schema Mapper) arayüzü entegre edildi.
+> **v1.5.1 Master License & Activation Release:** Proje ticari lisanslama altyapısına kavuştu. Master Admin için lisans anahtarı üretici ve müşteriler için anlık aktivasyon motoru entegre edildi. Logo, Mikro ve Netsis entegrasyon sihirbazı modernize edildi.
 
 ---
 
-## 🏗 Teknik Mimari & Modernizasyon (v1.4.1)
+## 🏗 Teknik Mimari & Modernizasyon (v1.5.1)
 
 ### 🎨 Görsel Standart (tek-ui & Premiumization)
 *   **Design System:** Geist Sans tipografisi, HSL Primary (151 86% 39% - Zümrüt Yeşili) renk paleti.
 *   **Glow & Blur Efektleri:** Arka plana gömülü dinamik blur mesh'ler, KPI kartlarında hover durumunda canlanan radial renk sızıntıları (`blur-[50px]`).
-*   **Chart Gradients:** Recharts Bar grafiği sütunlarında özel dikey linear gradient renk geçişleri (`#barPrimary`, `#barBlue` vb.).
 *   **Zaman Tüneli & Pulse Animasyonları:** Canlı operasyon gelişmelerinde aktif görevlerin ve imzalanmış sözleşmelerin durumunu anlık gösteren ping animasyonlu sinyal ışıkları.
 *   **Cam Scrollbar:** Arayüze özel minimalist ve modern kaydırma çubukları (`webkit-scrollbar`).
 
@@ -20,21 +19,21 @@ Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliye
 *   **Frontend Core:** `useMemo`, `React.memo` ve özel geliştirilmiş `useSearch`, `useForm` hook'ları ile sıfır gereksiz render performansı.
 *   **Backend Hardening:** Global `asyncHandler` sarmalı, merkezi hata yönetimi (Error Middleware) ve SQLite + Prisma v7.8.0 veritabanı entegrasyonu.
 *   **Universal Hybrid AI:** Tüm kurulum modellerinde (On-Premise dahil) AI servisleri, ana paketten bağımsız harici bulut aboneliği üzerinden hibrit olarak çalışır.
+*   **Secure Licensing:** Base64 + Signature tabanlı şifrelenmiş lisans anahtarı sistemi. Master Admin tarafından üretilen anahtarlar firma adı ve limit bazlı doğrulama sağlar.
 *   **Port & Süreç Yönetimi:** 3000 ve 3002 portlarındaki eski asılı süreçleri otomatik temizleyen port-killer entegreli orkestrasyon sistemi.
 
 ---
 
 ## 🔄 Öne Çıkan Modüller ve İş Akışları (Inter-Module Flow)
 
-1.  **Yerel ERP & CRM Entegrasyon Sihirbazı (v1.4.1):** Türkiye pazarındaki Logo Tiger/Go, Netsis ve Mikro ERP/CRM sistemleriyle entegrasyon kuran, REST API ve doğrudan MSSQL Connector destekli, görsel veri tabanı kolon eşleme arayüzü sunan sihirbaz.
-2.  **Satış Fırsatları & CRM Modülü:** Kredi limitleri, risk skorları ve fırsat statü takibi (Won/Lost). Kaybedilen fırsatlar otomatik olarak "Kaybedilenler Listesi"ne aktarılır.
-3.  **AI Destekli Satış Öncesi (Presales):** Teknik şartnamelerden Gemini AI API entegrasyonu ile otomatik BoM (Bill of Materials) listesi ve teknik özet çıkartılması.
-4.  **Onay Mekanizması (Approval Queue):** Yönetici paneli üzerinden tek tıkla doğrulanmış teknik teklif onaylama.
-5.  **Canlı Pazarlık & Açık Eksiltme Kokpiti (v1.3.2):** Satış Birim Yöneticisine (Genel Müdür) özel, hazırlık aşamasında **"Pazarlığa Açık"** olarak kaydedilmiş teklifler üzerinden başlatılan 1v1 Canlı Müzakere chatbot'u ve Çoklu Rakip katılımlı **Açık Eksiltme Müzayedesi**.
-6.  **Sözleşme Modülü & Evrak Kontrolü:** Islak imzalı evrakların yüklenme zorunluluğu olan devlet destekli "Evrak Kontrol Listesi" (Document Checklist). Tüm evraklar tamamlanmadan proje devredilemez.
-7.  **Paralel Süreç Handoff'u:** Sözleşme onaylandığı anda **Proje Yönetimi** (Birim `u4` - Proje Başlatma Planı) ve **Satın Alma** (Birim `u3` - BoM Tedarik Başlatma) birimlerine otomatik yüksek öncelikli görevler (TodoTask) açılır.
-8.  **Proje Yönetimi & Kapanış:** PM paneli üzerinden geçici kabul onayı (%100) ile proje tamamlanır ve otomatik olarak **Fiziksel Arşiv Modülü**'ne (ArchiveModule) devredilir.
-9.  **E2E Stepper Simulator:** CRM'den fiziksel arşive kadar olan 8 aşamalı ERP akışını mock WhatsApp API & MS Exchange Graph API bildirim yükleriyle (payloads) test eden interaktif simülatör.
+1.  **Lisans Üretici & Aktivasyon (v1.5.1):** Master Admin tarafından üretilen dijital anahtarlarla KOBİ, Pay-As-You-Go veya On-Premise modellerinin saniyeler içinde aktifleştirilmesi.
+2.  **Yerel ERP & CRM Entegrasyon Sihirbazı:** Logo Tiger/Go, Netsis ve Mikro sistemleriyle REST API ve MSSQL Connector destekli canlı veri eşleme arayüzü.
+3.  **Satış Fırsatları & CRM Modülü:** Kredi limitleri, risk skorları ve fırsat statü takibi (Won/Lost). Kaybedilen fırsatlar otomatik olarak "Kaybedilenler Listesi"ne aktarılır.
+4.  **AI Destekli Satış Öncesi (Presales):** Teknik şartnamelerden Gemini AI API entegrasyonu ile otomatik BoM listesi ve teknik özet çıkartılması.
+5.  **Canlı Pazarlık & Açık Eksiltme Kokpiti:** Satış Yöneticisine özel, hazırlık aşamasında "Pazarlığa Açık" olarak kaydedilmiş teklifler üzerinden 1v1 Müzakere ve Çoklu Rakip katılımlı Açık Eksiltme simülatörü.
+6.  **Sözleşme Modülü & Evrak Kontrolü:** Islak imzalı evrakların yüklenme zorunluluğu olan devlet destekli "Evrak Kontrol Listesi". 
+7.  **Paralel Süreç Handoff'u:** Sözleşme onaylandığı anda Proje Yönetimi ve Satın Alma birimlerine otomatik yüksek öncelikli görevlerin atanması.
+8.  **Proje Yönetimi & Kapanış:** PM paneli üzerinden geçici kabul onayı ile proje tamamlanması ve otomatik Fiziksel Arşiv (ArchiveModule) devri.
 
 ---
 
@@ -50,10 +49,10 @@ Enflow/
 │   ├── contexts/       # Auth & UnsavedChanges Management
 │   ├── hooks/          # useSearch, useForm (Optimization Core)
 │   ├── layout/         # tek-ui Sidebar ve Header (Glow Logout)
-│   ├── modules/        # CRM, Dashboard (Kokpit), WorkflowBuilder (Stepper)
-│   └── types/          # v1.2.9 Extended Types (Opportunity, Project)
+│   ├── modules/        # CRM, Dashboard, SubscriptionModule, LicenseGenerator
+│   └── types/          # Extended Types (Opportunity, Project, LicenseData)
+├── LICENSE             # Ticari Lisans Dosyası
 ├── run.sh              # macOS/Linux Tek Tuşla Başlatıcı
-├── run.bat             # Windows Tek Tuşla Başlatıcı
 ├── run.js              # Node.js Port Killer & Orchestrator
 └── README.md           # Güncel Proje Rehberi
 ```
@@ -75,19 +74,6 @@ chmod +x run.sh
 run.bat
 ```
 
-### Manuel Kurulum ve Ayrı Çalıştırma
-
-#### Backend Kurulumu
-1. `cd backend`
-2. `pnpm install`
-3. `npx prisma migrate dev`
-4. `pnpm dev` (3002 portunda nodemon ile ts-node üzerinden ayağa kalkar)
-
-#### Frontend Kurulumu
-1. Proje kök dizininde `pnpm install`
-2. `.env` dosyasına `GEMINI_API_KEY` ekleyin.
-3. `pnpm dev` (3000 portunda Vite ile ayağa kalkar)
-
 ---
 
 ## 📄 Lisans (License)
@@ -97,4 +83,4 @@ Bu yazılım **Ticari (Proprietary)** lisansa tabidir. Tüm hakları saklıdır.
 Copyright (c) 2026 Gökhan Turhan.
 
 ---
-*Enflow v1.5.0 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
+*Enflow v1.5.1 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
