@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { 
   CreditCard, 
   ShieldCheck, 
@@ -12,9 +13,13 @@ import {
   TrendingUp,
   Users,
   HardDrive,
-  Cpu
+  Cpu,
+  Key,
+  Database,
+  Trash2,
+  X
 } from 'lucide-react';
-import { LicenseModel, SubscriptionPlan } from '../types';
+import { LicenseModel, SubscriptionPlan, LicenseData } from '../types';
 
 const PLANS: SubscriptionPlan[] = [
   {
@@ -79,16 +84,34 @@ const SubscriptionModule: React.FC = () => {
   const [installStep, setInstallStep] = useState(0);
   const [licenseKey, setLicenseKey] = useState('');
   const [activeLicense, setActiveLicense] = useState<LicenseData | null>(null);
+  const [showHandoffModal, setShowHandoffModal] = useState(false);
+  const [pendingLicense, setPendingLicense] = useState<LicenseData | null>(null);
 
   const handleActivateLicense = () => {
     try {
-      // Base64 Decode
-      const decoded = JSON.parse(atob(licenseKey));
-      setActiveLicense(decoded);
-      handleInstall(decoded.model);
+      const decoded: LicenseData = JSON.parse(atob(licenseKey));
+      
+      // Eğer mevcut lisans Trial ise ve yeni lisans Gerçek ise sor
+      if (activeLicense?.isTrial && !decoded.isTrial) {
+        setPendingLicense(decoded);
+        setShowHandoffModal(true);
+      } else {
+        applyLicense(decoded);
+      }
     } catch (err) {
       alert('Geçersiz Lisans Anahtarı!');
     }
+  };
+
+  const applyLicense = (license: LicenseData, wipeData: boolean = false) => {
+    setActiveLicense(license);
+    if (wipeData) {
+      console.log('🧹 Tüm tenant verileri temizleniyor (Temiz Kurulum)...');
+      // Burada backend endpoint'i çağrılır: apiService.resetTenantData()
+    }
+    handleInstall(license.model);
+    setLicenseKey('');
+    setShowHandoffModal(false);
   };
 
   const handleInstall = (model: LicenseModel) => {
@@ -123,7 +146,7 @@ const SubscriptionModule: React.FC = () => {
   const remainingDays = getRemainingDays();
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
+    <div className="space-y-8 animate-in fade-in duration-700 h-full relative">
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -299,7 +322,7 @@ const SubscriptionModule: React.FC = () => {
               <div className="mt-4 p-2 bg-white/5 rounded-lg border border-white/5">
                 <p className="text-[9px] text-slate-400 leading-tight">
                   <AlertCircle className="w-3 h-3 inline mr-1 text-[#00f59b]" />
-                  Bulut ve On-Premise kurulumlarda AI servisleri, ana lisanstan bağımsız harici kullanıcı aboneliği üzerinden hibrit olarak çalışır.
+                  Bulut ve On-Premise kurulumlarda AI servisleri, ana lisanstan bağımsız harici kullanici aboneliği üzerinden hibrit olarak çalışır.
                 </p>
               </div>
             </div>
@@ -373,6 +396,84 @@ const SubscriptionModule: React.FC = () => {
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-[#00f59b]/5 blur-[100px] pointer-events-none"></div>
         </div>
       </div>
+
+      {/* Handoff Modal (Trial to Real) */}
+      <AnimatePresence>
+        {showHandoffModal && pendingLicense && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
+              onClick={() => setShowHandoffModal(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-2xl bg-slate-900 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl"
+            >
+              <div className="p-10">
+                <div className="flex justify-between items-start mb-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 flex items-center justify-center">
+                      <Zap className="w-8 h-8 text-amber-500" />
+                    </div>
+                    <div>
+                      <h2 className="text-2xl font-bold text-white tracking-tight italic uppercase">Gerçek Lisans Devri</h2>
+                      <p className="text-slate-400 text-sm mt-1">Deneme sürecinden tam sürüme geçiş algılandı.</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowHandoffModal(false)} className="p-2 hover:bg-white/5 rounded-full text-slate-500 transition-colors">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="p-6 bg-white/5 rounded-3xl border border-white/5 mb-8">
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    Tebrikler! **{pendingLicense.companyName}** için hazırlanan gerçek lisans anahtarı doğrulandı. 
+                    Deneme süresi boyunca oluşturduğunuz verileri saklayarak devam edebilir veya tüm sistemi sıfırlayarak 
+                    tertemiz bir başlangıç yapabilirsiniz.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => applyLicense(pendingLicense, false)}
+                    className="flex flex-col items-center gap-4 p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-[#00f59b]/40 hover:bg-[#00f59b]/5 transition-all group"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-[#00f59b]/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Database className="w-8 h-8 text-[#00f59b]" />
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white font-bold mb-1 italic">Verileri Sakla</div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Deneme verileri korunur</div>
+                    </div>
+                  </button>
+
+                  <button 
+                    onClick={() => applyLicense(pendingLicense, true)}
+                    className="flex flex-col items-center gap-4 p-8 rounded-[32px] bg-white/5 border border-white/10 hover:border-red-500/40 hover:bg-red-500/5 transition-all group"
+                  >
+                    <div className="w-16 h-16 rounded-2xl bg-red-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Trash2 className="w-8 h-8 text-red-500" />
+                    </div>
+                    <div className="text-center">
+                      <div className="text-white font-bold mb-1 italic">Sistemi Sıfırla</div>
+                      <div className="text-[10px] text-slate-500 uppercase tracking-widest font-black">Temiz bir sayfa açılır</div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+              
+              <div className="bg-amber-500/10 p-4 text-center border-t border-white/5">
+                <p className="text-[10px] text-amber-500 font-bold uppercase tracking-[0.2em]">⚠️ Bu işlem geri alınamaz</p>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

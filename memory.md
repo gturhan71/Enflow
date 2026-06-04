@@ -116,13 +116,14 @@ cd backend && npx tsx src/index.ts
 | 05.06.2026 | Pricing & Subscription Modülü | KOBİ, Pay-As-You-Go ve On-Premise modellerini içeren interaktif aktivasyon paneli eklendi. |
 | 05.06.2026 | Master License Generator | Firmalara özel şifrelenmiş lisans anahtarı üretme ve aktivasyon motoru entegre edildi. |
 | 05.06.2026 | 30 Günlük Deneme Lisansı | Tek tıkla üretilebilen, 30 gün sınırlı deneme (Trial) lisansı altyapısı eklendi. |
+| 05.06.2026 | Lisans Devir & Veri Yönetimi | Deneme sürümünden gerçek sürüme geçişte veri saklama/sıfırlama opsiyonu eklendi. |
 
-### 15. Pricing & Subscription Management (The Profit Core - v1.5.2)
+### 15. Pricing & Subscription Management (The Profit Core - v1.5.3)
 - **Unified Subscription Engine:** KOBİ (SaaS), Pay-As-You-Go (Metrik tabanlı) ve On-Premise (Kurumsal) lisans modelleri tek bir panelde toplandı.
-- **Universal Hybrid AI Model:** AI servisleri tüm modellerde hibrit bulut aboneliği üzerinden çalışacak şekilde ayrıştırıldı.
-- **Master License Generator (Trial Support):** Master panelde **30 Günlük Deneme Modu** eklendi. Bu mod aktif edildiğinde sistem otomatik olarak 30 günlük son kullanma tarihi ve "Trial" bayrağı içeren anahtarlar üretir.
-- **Trial Status Monitoring:** Müşteri panelinde deneme lisansı kullanılıyorsa, "DENEME" badge'i ve anlık olarak **kalan gün sayısı** gösterilmektedir.
-- **Secure Key Activation:** Firma adı, model, limitler ve trial bilgisini içeren Base64 imzalı aktivasyon motoru.
+- **Master License Generator (Trial Support):** Master panelde 30 Günlük Deneme Modu eklendi.
+- **Smart Data Handoff (Trial to Real):** Kullanıcı deneme lisansından gerçek lisansa geçtiğinde, sistem otomatik olarak "Verileri Sakla" veya "Sistemi Sıfırla" seçeneklerini sunan bir devir sihirbazı açar.
+- **Clean Start Option:** "Sistemi Sıfırla" seçeneğiyle tenant verilerinin tamamen temizlenmesi ve gerçek operasyona tertemiz bir veri setiyle başlanması sağlandı.
+- **Trial Status Monitoring:** Müşteri panelinde kalan gün sayısı takibi ve Trial badge sistemi.
 
 ---
-*Enflow v1.5.2 — 5 Haziran 2026. Full-stack type-safe, proprietary license secured, trial licensing & remaining days tracking enabled.*
+*Enflow v1.5.3 — 5 Haziran 2026. Full-stack type-safe, proprietary license secured, trial-to-real data handoff & clean installation support enabled.*
