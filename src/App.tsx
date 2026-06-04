@@ -28,6 +28,7 @@ import ProjectManagementModule from './modules/ProjectManagementModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import ArchiveModule from './modules/ArchiveModule';
+import SubscriptionModule from './modules/SubscriptionModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -245,6 +246,7 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'archive': return <ArchiveModule />;
+      case 'subscription': return <SubscriptionModule />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} />;

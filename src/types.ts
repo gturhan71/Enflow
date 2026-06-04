@@ -220,3 +220,26 @@ export interface WorkflowLog {
   timestamp: string;
   status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
 }
+
+export type LicenseModel = 'KOBI' | 'PAY_AS_YOU_GO' | 'ON_PREMISE';
+
+export interface SubscriptionPlan {
+  id: string;
+  name: string;
+  model: LicenseModel;
+  price: number;
+  features: string[];
+  limits: {
+    users: number;
+    storage: number;
+  };
+  isActive: boolean;
+}
+
+export interface UsageMetric {
+  id: string;
+  type: string;
+  count: number;
+  costPerUnit: number;
+  totalCost: number;
+}

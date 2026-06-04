@@ -19,6 +19,7 @@ Enflow, modern bir işletmenin satış öncesi (presales), satış (CRM), maliye
 ### ⚡ Performans ve Mimari
 *   **Frontend Core:** `useMemo`, `React.memo` ve özel geliştirilmiş `useSearch`, `useForm` hook'ları ile sıfır gereksiz render performansı.
 *   **Backend Hardening:** Global `asyncHandler` sarmalı, merkezi hata yönetimi (Error Middleware) ve SQLite + Prisma v7.8.0 veritabanı entegrasyonu.
+*   **Universal Hybrid AI:** Tüm kurulum modellerinde (On-Premise dahil) AI servisleri, ana paketten bağımsız harici bulut aboneliği üzerinden hibrit olarak çalışır.
 *   **Port & Süreç Yönetimi:** 3000 ve 3002 portlarındaki eski asılı süreçleri otomatik temizleyen port-killer entegreli orkestrasyon sistemi.
 
 ---
@@ -88,4 +89,12 @@ run.bat
 3. `pnpm dev` (3000 portunda Vite ile ayağa kalkar)
 
 ---
-*Enflow v1.4.1 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*
+
+## 📄 Lisans (License)
+
+Bu yazılım **Ticari (Proprietary)** lisansa tabidir. Tüm hakları saklıdır. Yazılımın izinsiz kopyalanması, dağıtılması veya kullanılması kesinlikle yasaktır. Detaylar için `LICENSE` dosyasına bakınız.
+
+Copyright (c) 2026 Gökhan Turhan.
+
+---
+*Enflow v1.5.0 — Bu proje Gökhan Turhan'ın MASTER standartlarına uygun olarak modernize, optimize ve senkronize edilmiştir.*

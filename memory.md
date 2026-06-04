@@ -105,8 +105,22 @@ cd backend && npx tsx src/index.ts
 | 18.05.2026 | Canlı Pazarlık Simülasyonu | Satış müdürüne özel dip maliyet korumalı interaktif müzakere paneli sunmak için. |
 | 18.05.2026 | Çoklu Açık Eksiltme İhalesi | Rakip firmaların katıldığı turlu, kurallı ve manuel/otomatik eksiltmeli müzayede simülasyonu sunmak için. |
 | 18.05.2026 | Pazarlığa Açık Teklif Koruması | Teklif hazırlama aşamasına 'Pazarlığa Açık' bayrağı ve pazarlık kokpiti seçici entegrasyonu sunmak için. |
-| 18.05.2026 | Sıralı Manuel Açık Eksiltme İhalesi | Rakip firmaların ve Bizim tekliflerin manuel form üzerinden girildiği, ardışık eksiltme kurallarına göre sıralı doğrulanan, çekilme/dahil etme destekli premium ihale motoru entegre etmek için. |
+- **Sıralı Manuel Açık Eksiltme İhalesi:** Rakip firmaların ve Bizim tekliflerin manuel form üzerinden girildiği, ardışık eksiltme kurallarına göre sıralı doğrulanan, çekilme/dahil etme destekli premium ihale motoru entegre etmek için.
 | 01.06.2026 | Yerel ERP & CRM Sihirbazı | Türkiye'de en yaygın kullanılan Logo, Mikro, Netsis sistemleri için veri şeması eşlemeli entegrasyon sihirbazı eklemek için. |
+| 05.06.2026 | Ticari Lisanslama (Proprietary) | Projenin SaaS potansiyeli ve kurumsal değeri korunmak amacıyla ticari lisans modeline geçildi. |
+| 05.06.2026 | Pricing & Subscription Modülü | KOBİ, Pay-As-You-Go ve On-Premise modellerini içeren interaktif aktivasyon paneli eklendi. |
+
+### 14. Ticari Lisanslama & Fikri Mülkiyet Koruması (v1.5.0)
+- **Proprietary Model:** Proje açık kaynak modelinden tamamen ticari (Proprietary) modele geçirildi.
+- **LICENSE Dosyası:** Kök dizine "All Rights Reserved" ibaresini ve kullanım kısıtlamalarını içeren ticari `LICENSE` dosyası eklendi.
+- **Copyright:** Tüm haklar Gökhan Turhan adına tescillendi.
+
+### 15. Pricing & Subscription Management (The Profit Core - v1.5.0)
+- **Unified Subscription Engine:** KOBİ (SaaS), Pay-As-You-Go (Metrik tabanlı) ve On-Premise (Kurumsal) lisans modelleri tek bir panelde toplandı.
+- **Universal Hybrid AI Model:** Tüm lisans modellerinde (On-Premise dahil) AI servisleri ana paketten bağımsız, bulut tabanlı harici kullanıcı aboneliği ile çalışacak şekilde kurgulandı. Bu sayede yerel sunucu maliyetleri ile bulut AI operasyon bedelleri birbirinden ayrıldı.
+- **Interactive Setup Wizard:** Seçilen lisans modeline göre sistemin teknik parametrelerini (kullanıcı limitleri ve depolama alanları) anlık yapılandıran simüle edilmiş kurulum motoru geliştirildi.
+- **Usage Analytics Dashboard:** AI sistem aktivitesi, aktif kullanıcı sayısı ve arşiv doluluğu gibi metrikleri izleyen canlı takip kartları eklendi.
+- **Role-Based Security:** Modül sadece `GENERAL_MANAGER` rolüne açıldı, kritik model değişiklikleri "Güvenli Mod" ve yetki kilidi ile koruma altına alındı.
 
 ---
-*Enflow v1.4.1 — 1 Haziran 2026. Full-stack type-safe, build clean, DB senkron, dual-mode live negotiation & reverse auction simulator, introducing the new Turkish ERP & CRM integration wizard for Logo, Mikro and Netsis.*
+*Enflow v1.5.0 — 5 Haziran 2026. Full-stack type-safe, proprietary license secured, commercial-ready ERP & CRM platform with full subscription management.*

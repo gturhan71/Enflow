@@ -22,7 +22,8 @@ import {
   Kanban,
   Gavel,
   ListTodo,
-  Calendar
+  Calendar,
+  CreditCard
 } from 'lucide-react';
 
 import { 
@@ -52,6 +53,7 @@ export const MOCK_TENANTS: Tenant[] = [
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
+  { id: 'subscription', label: 'Lisans & Abonelik', icon: CreditCard, requiredPermission: 'GENERAL_MANAGER' },
   { 
     id: 'crm', 
     label: 'CRM & Müşteri', 
