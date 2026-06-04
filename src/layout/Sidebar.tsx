@@ -13,7 +13,21 @@ import {
 } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
-const Sidebar = ({ activeTab, setActiveTab, onLogout, companyLogo }: { activeTab: string, setActiveTab: (id: string) => void, onLogout: () => void, companyLogo?: string | null }) => {
+const Sidebar = ({ 
+  activeTab, 
+  setActiveTab, 
+  onLogout, 
+  companyLogo,
+  isOpen,
+  onClose
+}: { 
+  activeTab: string, 
+  setActiveTab: (id: string) => void, 
+  onLogout: () => void, 
+  companyLogo?: string | null,
+  isOpen?: boolean,
+  onClose?: () => void
+}) => {
   const { handleNavigate } = useUnsavedChanges();
   const { currentUser, hasPermission } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
@@ -34,7 +48,24 @@ const Sidebar = ({ activeTab, setActiveTab, onLogout, companyLogo }: { activeTab
   });
 
   return (
-    <div className="w-72 bg-white/20 backdrop-blur-3xl border-r border-white/20 h-screen flex flex-col sticky top-0 z-20 overflow-hidden">
+    <>
+      {/* Mobile Overlay */}
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
+      <div className={cn(
+        "fixed lg:sticky top-0 left-0 h-screen bg-white/20 backdrop-blur-3xl border-r border-white/20 flex flex-col z-[100] transition-transform duration-500 w-72 lg:translate-x-0 overflow-hidden",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
       <div className="pt-12 p-8 flex items-center gap-4 border-b border-white/10 group cursor-pointer">
         <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-all duration-500 overflow-hidden">
           {companyLogo ? (

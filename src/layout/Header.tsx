@@ -8,7 +8,9 @@ import {
   Moon,
   Sun,
   Monitor,
-  Check
+  Check,
+  Menu,
+  X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -20,12 +22,16 @@ const Header = ({
   title, 
   activeTab, 
   setActiveTab,
-  onLogout 
+  onLogout,
+  onMenuToggle,
+  isSidebarOpen
 }: { 
   title?: string, 
   activeTab?: string, 
   setActiveTab?: (id: string) => void,
-  onLogout?: () => void 
+  onLogout?: () => void,
+  onMenuToggle?: () => void,
+  isSidebarOpen?: boolean
 }) => {
   const { currentUser } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -107,22 +113,30 @@ const Header = ({
       case 'procurement': return 'Satın Alma & Tedarik';
       case 'project-mgmt': return 'Proje Yönetim Paneli';
       case 'todo': return 'İşlerim & Görev Havuzu';
+      case 'subscription': return 'Lisans & Abonelik Yönetimi';
+      case 'license-gen': return 'Master Lisans Üretici';
       default: return 'Enflow ERP';
     }
   };
 
   return (
-    <header className="h-20 glass-header px-8 flex items-center justify-between sticky top-0 z-[100] font-geist">
-      <div className="flex items-center gap-6 flex-1">
-        <div>
-          <h2 className="text-2xl font-black text-foreground uppercase tracking-tighter italic leading-none">{getTitle()}</h2>
+    <header className="h-20 glass-header px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100] font-geist">
+      <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
+        <button 
+          onClick={onMenuToggle}
+          className="p-2.5 bg-white/5 dark:bg-slate-800/30 border border-white/10 rounded-xl text-slate-400 hover:text-primary transition-all lg:hidden"
+        >
+          {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+        <div className="min-w-0">
+          <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tighter italic leading-none truncate">{getTitle()}</h2>
           <div className="flex items-center gap-2 mt-1.5">
             <div className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest">Canlı Sistem Verisi</p>
+            <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest truncate">Canlı Sistem Verisi</p>
           </div>
         </div>
 
-        <div className="hidden md:flex relative group max-w-md w-full ml-8">
+        <div className="hidden lg:flex relative group max-w-md w-full ml-8">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors duration-300" size={18} />
           <input 
             type="text" 
@@ -216,11 +230,11 @@ const Header = ({
           </AnimatePresence>
         </div>
         
-        <button className="p-3 bg-white/30 dark:bg-slate-800/30 border border-white/40 dark:border-white/10 rounded-[20px] text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-white/60 transition-all backdrop-blur-md active:scale-90">
+        <button className="hidden sm:flex p-3 bg-white/30 dark:bg-slate-800/30 border border-white/40 dark:border-white/10 rounded-[20px] text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-white/60 transition-all backdrop-blur-md active:scale-90">
           <HelpCircle size={18} />
         </button>
 
-        <div className="h-10 w-px bg-white/20 mx-2" />
+        <div className="hidden sm:block h-10 w-px bg-white/20 mx-2" />
 
         <div className="relative" ref={settingsRef}>
           <button 
@@ -289,7 +303,7 @@ const Header = ({
           </AnimatePresence>
         </div>
 
-        <div className="h-10 w-px bg-white/20 mx-2" />
+        <div className="hidden sm:block h-10 w-px bg-white/20 mx-2" />
 
         {onLogout && (
           <button 
@@ -297,7 +311,7 @@ const Header = ({
             className="p-3 bg-red-500/10 border border-red-500/20 rounded-[20px] text-red-500 hover:text-white hover:bg-red-600 hover:border-red-600 hover:shadow-[0_0_15px_rgba(239,68,68,0.4)] transition-all backdrop-blur-md active:scale-90 flex items-center justify-center gap-2 group font-black text-[10px] uppercase tracking-wider pl-4 pr-4"
           >
             <LogOut size={16} className="group-hover:scale-110 transition-transform" />
-            <span>Çıkış Yap</span>
+            <span className="hidden sm:inline">Çıkış Yap</span>
           </button>
         )}
       </div>

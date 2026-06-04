@@ -117,3 +117,29 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.7; }
 }
+
+/* Mobile & PWA Optimizations */
+@media (max-width: 1024px) {
+  .p-8 { padding: 1.5rem !important; }
+  .p-10 { padding: 2rem !important; }
+  .grid-cols-3 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+  .grid-cols-2 { grid-template-columns: repeat(1, minmax(0, 1fr)) !important; }
+  .grid-cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  
+  /* Safe area for mobile home indicators */
+  body {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* Responsive table wrapper */
+  .overflow-x-auto {
+    @apply -mx-4 px-4;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Disable hover effects on touch devices */
+@media (hover: none) {
+  .hover\:scale-110:hover { transform: none !important; }
+  .hover\:bg-white\/40:hover { background-color: transparent !important; }
+}

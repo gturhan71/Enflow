@@ -16,6 +16,7 @@ import {
 
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
+import MobileNav from './layout/MobileNav';
 import Dashboard from './modules/Dashboard';
 import PresalesModule from './modules/PresalesModule';
 import SalesSupport from './modules/SalesSupport';
@@ -122,6 +123,12 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
   const { currentUser, setCurrentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [loading, setLoading] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Close sidebar on tab change (mobile)
+  useEffect(() => {
+    setIsSidebarOpen(false);
+  }, [activeTab]);
 
   // Auto-fix for legacy 'user1' IDs in localStorage
   useEffect(() => {
@@ -258,11 +265,24 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
 
   return (
     <UnsavedChangesProvider>
-      <div className="flex h-screen bg-background overflow-hidden font-geist">
-        <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} companyLogo={companyLogo} />
-        <main className="flex-1 flex flex-col min-w-0 relative">
-          <Header activeTab={activeTab} setActiveTab={setActiveTab} onLogout={onLogout} />
-          <div className="flex-1 overflow-hidden relative">
+      <div className="flex h-screen bg-background overflow-hidden font-geist relative">
+        <Sidebar 
+          activeTab={activeTab} 
+          setActiveTab={setActiveTab} 
+          onLogout={onLogout} 
+          companyLogo={companyLogo} 
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+        />
+        <main className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
+          <Header 
+            activeTab={activeTab} 
+            setActiveTab={setActiveTab} 
+            onLogout={onLogout} 
+            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
+            isSidebarOpen={isSidebarOpen}
+          />
+          <div className="flex-1 overflow-y-auto relative custom-scrollbar">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -276,6 +296,7 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
               </motion.div>
             </AnimatePresence>
           </div>
+          <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </main>
       </div>
     </UnsavedChangesProvider>
