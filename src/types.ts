@@ -243,3 +243,15 @@ export interface UsageMetric {
   costPerUnit: number;
   totalCost: number;
 }
+
+export interface LicenseData {
+  companyName: string;
+  model: LicenseModel;
+  expiryDate: string;
+  issuedAt: string;
+  limits: {
+    users: number;
+    storage: number;
+  };
+  signature: string;
+}

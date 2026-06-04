@@ -77,13 +77,25 @@ const SubscriptionModule: React.FC = () => {
   const [activeModel, setActiveModel] = useState<LicenseModel>('KOBI');
   const [isInstalling, setIsInstalling] = useState(false);
   const [installStep, setInstallStep] = useState(0);
+  const [licenseKey, setLicenseKey] = useState('');
+  const [activeLicense, setActiveLicense] = useState<LicenseData | null>(null);
+
+  const handleActivateLicense = () => {
+    try {
+      // Base64 Decode
+      const decoded = JSON.parse(atob(licenseKey));
+      setActiveLicense(decoded);
+      handleInstall(decoded.model);
+    } catch (err) {
+      alert('Geçersiz Lisans Anahtarı!');
+    }
+  };
 
   const handleInstall = (model: LicenseModel) => {
     setActiveModel(model);
     setIsInstalling(true);
     setInstallStep(0);
     
-    // Kurulum simülasyonu
     const intervals = [500, 1500, 2500, 3500];
     intervals.forEach((delay, index) => {
       setTimeout(() => setInstallStep(index + 1), delay);
@@ -94,7 +106,10 @@ const SubscriptionModule: React.FC = () => {
     }, 4500);
   };
 
-  const currentPlan = PLANS.find(p => p.model === activeModel) || PLANS[0];
+  // Dinamik limitleri kullan (lisans varsa oradan, yoksa default plandan)
+  const basePlan = PLANS.find(p => p.model === activeModel) || PLANS[0];
+  const currentLimits = activeLicense ? activeLicense.limits : basePlan.limits;
+  const currentPlanName = activeLicense ? `${activeLicense.companyName} - ${activeLicense.model}` : basePlan.name;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-700">
@@ -114,8 +129,38 @@ const SubscriptionModule: React.FC = () => {
           </div>
           <div>
             <div className="text-xs text-slate-500 uppercase font-semibold">Aktif Lisans Modeli</div>
-            <div className="text-white font-bold">{currentPlan.name}</div>
+            <div className="text-white font-bold">{currentPlanName}</div>
           </div>
+        </div>
+      </div>
+
+      {/* License Activation Bar */}
+      <div className="bg-amber-500/10 border border-amber-500/20 p-6 rounded-3xl flex flex-col md:flex-row items-center gap-6">
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 flex items-center justify-center">
+            <Key className="w-6 h-6 text-amber-500" />
+          </div>
+          <div>
+            <div className="text-white font-bold tracking-tight">Lisans Anahtarı ile Aktifleştir</div>
+            <div className="text-amber-500/60 text-xs">Master Admin tarafından verilen anahtarı girin.</div>
+          </div>
+        </div>
+        
+        <div className="flex-1 w-full relative">
+          <input 
+            type="text"
+            value={licenseKey}
+            onChange={(e) => setLicenseKey(e.target.value)}
+            className="w-full bg-black/40 border border-white/10 rounded-xl py-3 px-4 text-[10px] font-mono text-amber-200 focus:border-amber-500/50 outline-none transition-all pr-32"
+            placeholder="Aktivasyon kodunu buraya yapıştırın..."
+          />
+          <button 
+            onClick={handleActivateLicense}
+            disabled={!licenseKey}
+            className="absolute right-2 top-2 bottom-2 px-6 bg-amber-500 hover:bg-amber-400 disabled:bg-white/5 disabled:text-slate-600 text-black text-xs font-bold rounded-lg transition-all"
+          >
+            Uygula
+          </button>
         </div>
       </div>
 
@@ -204,12 +249,12 @@ const SubscriptionModule: React.FC = () => {
             <div className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-[#00f59b]/20 transition-all group">
               <div className="flex justify-between items-start mb-4">
                 <Users className="w-6 h-6 text-blue-400" />
-                <span className="text-xs text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full">%{Math.round((3/currentPlan.limits.users)*100)} Dolu</span>
+                <span className="text-xs text-blue-400 bg-blue-400/10 px-2 py-0.5 rounded-full">%{Math.round((3/currentLimits.users)*100)} Dolu</span>
               </div>
-              <div className="text-2xl font-bold text-white mb-1">3 / {currentPlan.limits.users}</div>
+              <div className="text-2xl font-bold text-white mb-1">3 / {currentLimits.users}</div>
               <div className="text-sm text-slate-500">Aktif Kullanıcı</div>
               <div className="mt-4 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-blue-400 transition-all duration-1000" style={{ width: `${(3/currentPlan.limits.users)*100}%` }}></div>
+                <div className="h-full bg-blue-400 transition-all duration-1000" style={{ width: `${(3/currentLimits.users)*100}%` }}></div>
               </div>
             </div>
 
@@ -218,10 +263,10 @@ const SubscriptionModule: React.FC = () => {
                 <HardDrive className="w-6 h-6 text-purple-400" />
                 <span className="text-xs text-purple-400 bg-purple-400/10 px-2 py-0.5 rounded-full">1.2 GB</span>
               </div>
-              <div className="text-2xl font-bold text-white mb-1">%{Math.round((1.2/currentPlan.limits.storage)*100)}</div>
+              <div className="text-2xl font-bold text-white mb-1">%{Math.round((1.2/currentLimits.storage)*100)}</div>
               <div className="text-sm text-slate-500">Arşiv Doluluğu</div>
               <div className="mt-4 h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                <div className="h-full bg-purple-400 transition-all duration-1000" style={{ width: `${(1.2/currentPlan.limits.storage)*100}%` }}></div>
+                <div className="h-full bg-purple-400 transition-all duration-1000" style={{ width: `${(1.2/currentLimits.storage)*100}%` }}></div>
               </div>
             </div>
 
