@@ -93,6 +93,8 @@ import { exchangeService } from '../services/exchangeService';
 import { whatsappService } from '../services/whatsappService';
 
 
+import { HandOffModal } from '../components/HandOffModal';
+import { workflowService } from '../services/workflowService';
 import { TaskProgressTracker } from '../components/TaskProgressTracker';
 
 const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setActiveTab: setGlobalActiveTab }: { 
@@ -103,10 +105,27 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
   setActiveTab?: (tab: string) => void
 }) => {
   // Assuming current user is cmp5lhehc000259w33zxhyy0p for demo purposes
-  const currentUser = 'cmp5lhehc000259w33zxhyy0p';
-  const myProjects = projects.filter(p => p.managerId === currentUser);
+  const currentUser = { id: 'cmp5lhehc000259w33zxhyy0p', name: 'Gökhan Turhan' };
+  const myProjects = projects.filter(p => p.managerId === currentUser.id);
   const [selectedProjectId, setSelectedProjectId] = useState(myProjects[0]?.id || projects[0]?.id);
   const [activeTab, setActiveTab] = useState<'KANBAN' | 'PROCUREMENT' | 'REPORTING' | 'TASKS'>('KANBAN');
+  const [showHandOffModal, setShowHandOffModal] = useState(false);
+  const [handOffTarget, setHandOffTarget] = useState<TodoTask | null>(null);
+
+  const handleHandOff = async (data: { toUnit: string; toUser: any; note: string }) => {
+    if (!handOffTarget) return;
+    await workflowService.triggerHandOff({
+      itemId: handOffTarget.id,
+      itemTitle: handOffTarget.title,
+      fromUnit: 'unit_pm', // Demo: Proje Yönetimi
+      toUnit: data.toUnit,
+      fromUser: currentUser,
+      toUser: data.toUser,
+      note: data.note
+    });
+    setShowHandOffModal(false);
+    setHandOffTarget(null);
+  };
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
   const [newTask, setNewTask] = useState<Partial<ProjectTask>>({
     status: 'TODO'
@@ -181,7 +200,7 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
               ))}
             </optgroup>
             <optgroup label="Tüm Projeler">
-              {projects.filter(p => p.managerId !== currentUser).map(p => (
+              {projects.filter(p => p.managerId !== currentUser.id).map(p => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
             </optgroup>
@@ -254,12 +273,15 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
                               {MOCK_SYSTEM_USERS.find(u => u.id === task.assignedTo)?.name.split(' ').map(n => n[0]).join('')}
                             </div>
                           </div>
-                          {task.dueDate && (
-                            <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1">
-                              <Calendar size={12} />
-                              {task.dueDate}
-                            </span>
-                          )}
+                          <button 
+                            onClick={() => {
+                              setHandOffTarget(task);
+                              setShowHandOffModal(true);
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
+                          >
+                            Aktar
+                          </button>
                         </div>
                       </motion.div>
                     ))}
@@ -453,6 +475,14 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
 
       {/* New Project Task Modal */}
       <AnimatePresence>
+        {showHandOffModal && handOffTarget && (
+          <HandOffModal 
+            isOpen={showHandOffModal}
+            onClose={() => setShowHandOffModal(false)}
+            onConfirm={handleHandOff}
+            itemTitle={handOffTarget.title}
+          />
+        )}
         {showNewTaskModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
             <motion.div 

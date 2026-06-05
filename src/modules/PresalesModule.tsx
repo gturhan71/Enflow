@@ -19,6 +19,7 @@ import {
 import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
+import { CostAnalysisModule } from '../components/CostAnalysisModule';
 import { 
   MOCK_BOM_ITEMS,
 } from '../constants';
@@ -317,14 +318,37 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
                     Excel / XML Yükle
                   </button>
                 </div>
-                <div className="flex items-center gap-4">
+import { SaveButton } from '../components/SaveButton';
+// ... mevcut importlar ...
+// ...
+
+// ... render içerisinde ...
+              <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-[10px] text-slate-400 font-bold uppercase">Toplam Maliyet</p>
                     <p className="text-sm font-mono font-bold text-slate-900">${bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0).toLocaleString()}</p>
                   </div>
-                  <button onClick={handleRequestApproval} className="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-emerald-100">Kaydet</button>
+                  <SaveButton onClick={handleRequestApproval} loading={loading} />
                 </div>
              </div>
+             
+             {/* Manual BoM Item Form */}
+             <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-12 gap-2">
+                <input type="text" placeholder="P/N" className="col-span-3 p-2 text-xs border rounded-lg" value={newItem.pn} onChange={(e) => setNewItem({...newItem, pn: e.target.value})} />
+                <input type="text" placeholder="Açıklama" className="col-span-5 p-2 text-xs border rounded-lg" value={newItem.desc} onChange={(e) => setNewItem({...newItem, desc: e.target.value})} />
+                <input type="number" placeholder="Adet" className="col-span-1 p-2 text-xs border rounded-lg" value={newItem.qty} onChange={(e) => setNewItem({...newItem, qty: parseInt(e.target.value) || 1})} />
+                <input type="number" placeholder="Maliyet" className="col-span-2 p-2 text-xs border rounded-lg" value={newItem.cost} onChange={(e) => setNewItem({...newItem, cost: parseFloat(e.target.value) || 0})} />
+                <button 
+                  className="col-span-1 bg-primary text-white rounded-lg"
+                  onClick={() => {
+                    setBomItems([...bomItems, newItem]);
+                    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15 });
+                  }}
+                >
+                  <Plus size={16} />
+                </button>
+             </div>
+
              <div className="flex-1 overflow-y-auto p-4 space-y-3">
                {bomItems.map((item, i) => (
                  <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
@@ -335,6 +359,10 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
                     <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
                  </div>
                ))}
+             </div>
+             
+             <div className="border-t border-slate-100">
+               <CostAnalysisModule />
              </div>
           </div>
         </div>

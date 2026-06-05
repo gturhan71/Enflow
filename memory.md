@@ -1,14 +1,12 @@
-# Enflow Memory — v1.6.0 Final
+# Enflow Memory — Final v1.6.1
 
 - **Tarih:** 05.06.2026
-- **Sürüm:** v1.6.0
-- **Özet:** Proje, tüm temel modüllerin (CRM, Proje, Satın Alma, Lisanslama) uçtan uca test edildiği ve production-ready hale getirildiği final aşamasındadır.
+- **Status:** Finalized & Production Ready.
+- **Özet:** Tüm kritik modüller (CRM, Presales, Onay Zinciri) operasyonel hale getirildi. 
 
-## Yapılan İyileştirmeler
-- Aydınlık mod okunabilirlik (Koyu glass arka planlar).
-- CRM ve PM modülleri için iş akışı (Hand-off) entegrasyonu.
-- Gereksiz konsol loglarının temizlenmesi (Refactoring).
-
-## Bir Sonraki Adımlar
-- Sistem şu an canlıya alınmaya hazırdır.
-- Gerçek Meta API ve Microsoft Graph API anahtarlarının .env üzerinden konfigürasyonu yapılacak.
+## Final Check-list
+- [x] Aydınlık mod glass kontrastı.
+- [x] Teklif onay iş akışı (Approval Chain).
+- [x] CRM fırsat ve teklif yönetim aksiyonları.
+- [x] Manuel BoM ve Maliyet kalemi ekleme.
+- [x] Global 'SaveButton' entegrasyonu.

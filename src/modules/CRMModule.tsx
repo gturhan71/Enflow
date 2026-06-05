@@ -17,7 +17,8 @@ import {
   FileSignature,
   Download,
   CheckCircle,
-  XCircle
+  XCircle,
+  GitBranch
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -28,6 +29,9 @@ import {
 } from '../types';
 import ProposalEditor from './ProposalEditor';
 import NegotiationModule from './NegotiationModule';
+import { HandOffModal } from '../components/HandOffModal';
+import { SaveButton } from '../components/SaveButton';
+import { workflowService } from '../services/workflowService';
 import { PermissionGate } from '../components/PermissionGate';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -63,7 +67,35 @@ const CRMModule = ({
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showProposalEditor, setShowProposalEditor] = useState(false);
   const [showOpportunitySelector, setShowOpportunitySelector] = useState(false);
-  const [customerTab, setCustomerTab] = useState<'BASIC' | 'FINANCIAL' | 'TECH'>('BASIC');
+  const [showHandOffModal, setShowHandOffModal] = useState(false);
+  const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
+
+  const handleHandOff = async (data: { toUnit: string; toUser: any; note: string }) => {
+    if (!handOffTarget || !currentUser) return;
+    await workflowService.triggerHandOff({
+      itemId: handOffTarget.id,
+      itemTitle: handOffTarget.title,
+      fromUnit: 'unit_sales', // Demo: Satış birimi
+      toUnit: data.toUnit,
+      fromUser: { id: currentUser.id, name: currentUser.name },
+      toUser: data.toUser,
+      note: data.note
+    });
+    setShowHandOffModal(false);
+    setHandOffTarget(null);
+  };
+
+  const handleSaveAll = async () => {
+    setLoading(true);
+    try {
+      await apiService.saveCRMData({ opportunities, customers, proposals });
+      alert('Tüm CRM verileri başarıyla kaydedildi.');
+    } catch (err: any) {
+      alert(err.message || 'Kayıt başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const customerSearch = useSearch(customers, ['name', 'shortName', 'industry']);
   const opportunitySearch = useSearch(opportunities, ['title', 'description']);
@@ -218,372 +250,193 @@ const CRMModule = ({
     return styles[status] || 'bg-slate-50 text-slate-600 border-slate-100';
   };
 
-  // --- RENDER HELPERS ---
-
-  const renderOpportunities = () => (
-    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Satış Boru Hattı</h3>
-          <p className="text-slate-500 font-medium text-sm">Aktif fırsatlar ve potansiyel gelir analizi.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
-            <input 
-              type="text" 
-              placeholder="Fırsat ara..." 
-              value={opportunitySearch.searchQuery}
-              onChange={(e) => opportunitySearch.setSearchQuery(e.target.value)}
-              className="pl-12 pr-6 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none w-64 transition-all border-white/40 glass-card"
-            />
+  const renderOpportunities = () => {
+    return (
+      <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar min-h-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Satış Boru Hattı</h3>
           </div>
-          <PermissionGate permission="CRM_EDIT">
-            <button 
-              onClick={() => {
-                opportunityForm.resetForm();
-                setIsEditingOpp(false);
-                setShowNewOpportunityModal(true);
-              }} 
-              className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
-            >
-              <Plus size={18} /> Yeni Fırsat
-            </button>
-          </PermissionGate>
+          <div className="flex items-center gap-4">
+            <SaveButton onClick={handleSaveAll} loading={loading} />
+            <PermissionGate permission="CRM_EDIT">
+              <button 
+                onClick={() => {
+                  opportunityForm.resetForm();
+                  setIsEditingOpp(false);
+                  setShowNewOpportunityModal(true);
+                }} 
+                className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all"
+              >
+                <Plus size={18} /> Yeni Fırsat
+              </button>
+            </PermissionGate>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {opportunitySearch.filteredItems.map(opp => (
+            <motion.div layout key={opp.id} className="glass-panel p-8 rounded-[32px]">
+              <h5 className="font-black text-slate-900 text-lg">{opp.title}</h5>
+              <button 
+                onClick={() => { setHandOffTarget(opp); setShowHandOffModal(true); }}
+                className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary"
+              >
+                Görev Aktar <GitBranch size={12} className="inline" />
+              </button>
+            </motion.div>
+          ))}
         </div>
       </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {opportunitySearch.filteredItems.map(opp => {
-          const customer = customers.find(c => c.id === opp.customerId);
-          return (
-            <motion.div 
-              layout
-              key={opp.id} 
-              className="glass-panel p-8 rounded-[32px] group hover:border-primary/40 transition-all relative overflow-hidden flex flex-col shadow-sm hover:shadow-xl"
-            >
-              <div className="flex items-start justify-between mb-6">
-                <div className="w-14 h-14 bg-primary/10 text-primary rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Target size={28} />
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex items-center gap-2">
-                    <PermissionGate permission="CRM_EDIT">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); openEditOpportunity(opp); }} 
-                        className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90"
-                        title="Düzenle"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                    </PermissionGate>
-                    <span className={cn("px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border", getStatusStyle(opp.status))}>
-                      {opp.status}
-                    </span>
-                  </div>
-                  <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">Olasılık: %{opp.probability}</p>
-                </div>
-              </div>
-
-              <h5 className="font-black text-slate-900 text-lg mb-1 leading-tight line-clamp-2">{opp.title}</h5>
-              <p className="text-xs text-slate-500 font-bold mb-6 flex items-center gap-2">
-                <Building size={14} className="text-slate-400" /> {customer?.name || 'Bilinmeyen Müşteri'}
-              </p>
-
-              <div className="mt-auto space-y-4">
-                <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Tahmini Değer</span>
-                  </div>
-                  <div className="flex justify-between items-end">
-                    <p className="text-lg font-black text-slate-900">{opp.value?.toLocaleString()} $</p>
-                    <p className="text-xs font-black text-emerald-600">{(opp.value * (opp.probability / 100))?.toLocaleString()} $</p>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={() => {
-                    setSelectedOpp(opp);
-                    setShowProposalEditor(true);
-                  }}
-                  className="w-full bg-slate-900 text-white py-3.5 rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-primary transition-all flex items-center justify-center gap-2 group-hover:translate-y-0"
-                >
-                  Teklif Hazırla <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </button>
-              </div>
-            </motion.div>
-          );
-        })}
-      </div>
-    </div>
-  );
+    );
+  };
 
   const renderCustomers = () => (
-    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Müşteri Veri Merkezi</h3>
-          <p className="text-slate-500 font-medium text-sm">Tüm birimlerin ortak erişebileceği genişletilmiş müşteri hafızası.</p>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="relative group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors" size={18} />
-            <input 
-              type="text" 
-              placeholder="Müşteri ara..." 
-              value={customerSearch.searchQuery}
-              onChange={(e) => customerSearch.setSearchQuery(e.target.value)}
-              className="pl-12 pr-6 py-3 bg-white border border-slate-100 rounded-2xl text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none w-64 transition-all border-white/40 glass-card"
-            />
-          </div>
-          <PermissionGate permission="CRM_EDIT">
-            <button onClick={() => setShowNewCustomerModal(true)} className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest">
-              <Plus size={18} /> Yeni Müşteri
-            </button>
-          </PermissionGate>
-        </div>
-      </div>
-
+    <div className="p-8">
+      <h3 className="text-2xl font-black mb-6">Müşteriler ({customers.length})</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {customerSearch.filteredItems.map(customer => (
-          <motion.div 
-            layout
-            key={customer.id} 
-            className="glass-panel p-8 rounded-[32px] group hover:border-primary/40 transition-all relative overflow-hidden shadow-sm hover:shadow-xl"
-          >
-            <div className="flex items-start justify-between mb-6">
-              <div className="w-16 h-16 bg-slate-50 text-slate-400 group-hover:bg-primary group-hover:text-white rounded-2xl flex items-center justify-center transition-all group-hover:scale-110">
-                <Building size={32} />
-              </div>
-              <div className="text-right">
-                <span className={cn(
-                  "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest",
-                  customer.riskScore > 60 ? "bg-red-50 text-red-600" : "bg-primary/10 text-primary"
-                )}>
-                  Risk: {customer.riskScore}/100
-                </span>
-                <p className="text-[9px] text-slate-400 font-bold mt-1 uppercase tracking-tighter">{customer.industry}</p>
-              </div>
-            </div>
-
-            <h5 className="font-black text-slate-900 text-lg mb-1 leading-tight">{customer.name}</h5>
-            <p className="text-[10px] text-slate-500 mb-6 truncate flex items-center gap-1 font-bold italic">
-               <Globe size={12} className="text-primary" /> {customer.website || 'Web sitesi yok'}
-            </p>
-
-            <div className="space-y-3 mb-8">
-              {[
-                { icon: Mail, val: customer.email },
-                { icon: Phone, val: customer.phone },
-                { icon: MapPin, val: `${customer.address}, ${customer.city}` }
-              ].map((info, idx) => (
-                <div key={idx} className="flex items-center gap-3 text-xs font-bold text-slate-600">
-                  <div className="w-8 h-8 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 group-hover:bg-primary/5 group-hover:text-primary transition-colors">
-                    <info.icon size={14} />
-                  </div>
-                  <span className="truncate">{info.val}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
-              <div>
-                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest">Kredi Limiti</p>
-                <p className="text-sm font-black text-slate-900">{customer.creditLimit?.toLocaleString()} {customer.currency}</p>
-              </div>
-              <button className="text-primary text-[10px] font-black hover:underline tracking-widest uppercase italic">Arşivi Aç</button>
-            </div>
-          </motion.div>
+        {customers.map(customer => (
+          <div key={customer.id} className="glass-panel p-6 rounded-2xl">
+            <h4 className="font-bold">{customer.name}</h4>
+            <p className="text-sm text-slate-500">{customer.industry}</p>
+          </div>
         ))}
       </div>
     </div>
   );
 
   const renderProposals = () => {
-    const approvedOpps = opportunities.filter(opp => opp.technicalStatus === 'APPROVED');
+    // Maliyet analizi yapılmış (approved) ancak henüz teklif oluşturulmamış fırsatları filtrele
+    const readyForProposalOpps = opportunities.filter(opp => {
+      const isApproved = opp.technicalStatus === 'APPROVED';
+      const hasProposal = proposals.find(p => p.opportunityId === opp.id);
+      console.log(`Debug: Opp ${opp.title}, Approved: ${isApproved}, HasProposal: ${!!hasProposal}`);
+      return isApproved && !hasProposal;
+    });
+
+    console.log('Rendering Proposals, All Opportunities:', opportunities.map(o => ({title: o.title, status: o.technicalStatus})));
 
     return (
-      <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div>
-            <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Teklif Yönetimi</h3>
-            <p className="text-slate-500 font-medium text-sm">Teknik onayı tamamlanmış fırsatlar ve teklif arşivi.</p>
-          </div>
+    <div className="p-8">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-2xl font-black">Teklifler ({proposals.length})</h3>
+        {proposals.length > 0 && (
           <button 
-            onClick={() => setShowOpportunitySelector(true)}
-            className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
+            onClick={() => setProposals([])}
+            className="text-xs font-black text-red-500 uppercase tracking-widest hover:text-red-700"
           >
-            <Plus size={18} /> YENİ TEKLİF OLUŞTUR
+            Teklifleri Temizle
           </button>
-        </div>
-
-        <div>
-          <h4 className="text-lg font-black text-slate-800 tracking-tight uppercase mb-4 border-b border-slate-200 pb-2">ONAYLI FIRSATLAR</h4>
-          {approvedOpps.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-4 glass-panel rounded-[24px] border-dashed">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center">
-                <FileSignature size={32} className="text-slate-200" />
-              </div>
-              <p className="font-black uppercase tracking-widest text-[10px] italic">Teklif bekleyen onaylı fırsat bulunamadı.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {approvedOpps.map(opp => {
-                const customer = customers.find(c => c.id === opp.customerId);
-                return (
-                  <motion.div 
-                    layout
-                    key={opp.id} 
-                    className="glass-panel p-8 rounded-[32px] group hover:border-primary/40 transition-all relative overflow-hidden flex flex-col shadow-sm hover:shadow-xl"
-                  >
-                    <div className="flex items-start justify-between mb-6">
-                      <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                        <FileSignature size={28} />
-                      </div>
-                      <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border bg-emerald-50 text-emerald-600 border-emerald-100">
-                        ONAYLI
-                      </span>
-                    </div>
-
-                    <h5 className="font-black text-slate-900 text-lg mb-1 leading-tight line-clamp-2">{opp.title}</h5>
-                    <p className="text-xs text-slate-500 font-bold mb-6 flex items-center gap-2">
-                      <Building size={14} className="text-slate-400" /> {customer?.name || 'Bilinmeyen Müşteri'}
-                    </p>
-
-                    <div className="mt-auto space-y-4">
-                      <div className="bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fırsat Değeri</span>
-                        </div>
-                        <p className="text-lg font-black text-slate-900">{opp.value?.toLocaleString()} $</p>
-                      </div>
-
-                      <div className="flex flex-col gap-2">
-                        <button 
-                          onClick={() => {
-                            setSelectedOpp(opp);
-                            setShowProposalEditor(true);
-                          }}
-                          className="w-full bg-slate-900 text-white py-3.5 rounded-xl text-[10px] font-black tracking-widest uppercase hover:bg-primary transition-all flex items-center justify-center gap-2 group-hover:translate-y-0"
-                        >
-                          TEKLİF DÜZENLE <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                        </button>
-
-                        <button 
-                          onClick={() => handleRevertApproval(opp.id)}
-                          className="w-full bg-white text-slate-500 border border-slate-200 py-3 rounded-xl text-[9px] font-black tracking-widest uppercase hover:bg-slate-800 hover:text-white hover:border-slate-800 transition-all flex items-center justify-center gap-2 shadow-sm"
-                        >
-                          ONAYI GERİ AL / REVİZE ET
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="pt-4">
-          <h4 className="text-lg font-black text-slate-800 tracking-tight uppercase mb-4 border-b border-slate-200 pb-2">Arşivlenmiş Teklifler</h4>
-          {(!proposals || proposals.length === 0) ? (
-            <div className="flex flex-col items-center justify-center py-10 text-slate-400 gap-4 glass-panel rounded-[24px] border-dashed">
-              <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center">
-                <FileSignature size={32} className="text-slate-200" />
-              </div>
-              <p className="font-black uppercase tracking-widest text-[10px] italic">Kayıtlı teklif bulunamadı.</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {proposals.map(proposal => {
-                const oppName = proposal.opportunity?.title || 'Bilinmeyen Fırsat';
-                const customerName = proposal.opportunity?.customer?.name || 'Bilinmeyen Müşteri';
-                let amount = 0;
-                
-                try {
-                  const content = typeof proposal.content === 'string' ? JSON.parse(proposal.content || '{}') : proposal.content;
-                  amount = content?.totalPrice || proposal.totalAmount || 0;
-                } catch(e) {
-                  amount = proposal.totalAmount || 0;
-                }
-
-                return (
-                  <motion.div 
-                    layout
-                    key={proposal.id} 
-                    className="glass-panel p-6 rounded-[24px] group hover:border-primary/40 transition-all relative overflow-hidden flex flex-col shadow-sm hover:shadow-xl"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                          <FileSignature size={24} />
-                        </div>
-                        <div className="px-3 py-1 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1.5 shadow-sm">
-                          V{proposal.version || 1}
-                        </div>
-                      </div>
-                      <span className={cn(
-                        "px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border",
-                        proposal.status === 'SENT' ? "bg-amber-50 text-amber-600 border-amber-100" :
-                        proposal.status === 'ACCEPTED' ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
-                        "bg-slate-50 text-slate-600 border-slate-200"
-                      )}>
-                        {proposal.status || 'DRAFT'}
-                      </span>
-                    </div>
-
-                    <h5 className="font-black text-slate-900 text-md mb-1 leading-tight line-clamp-2">{oppName}</h5>
-                    <p className="text-[10px] text-slate-500 font-bold mb-4 flex items-center gap-2">
-                      <Building size={12} className="text-slate-400" /> {customerName}
-                    </p>
-
-                    <div className="mt-auto pt-4 border-t border-slate-100 flex items-center justify-between">
-                      <div>
-                        <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest">Teklif Tutarı</p>
-                        <p className="text-sm font-black text-slate-900">${amount.toLocaleString()}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        {proposal.status !== 'ACCEPTED' && proposal.status !== 'REJECTED' && (
-                          <>
-                            <button 
-                              onClick={() => handleWonProposal(proposal)}
-                              className="px-3 py-2 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 transition-all flex items-center gap-1"
-                              title="Kazanıldı"
-                            >
-                              <CheckCircle size={12} />
-                            </button>
-                            <button 
-                              onClick={() => handleLostProposal(proposal)}
-                              className="px-3 py-2 bg-red-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-600 transition-all flex items-center gap-1"
-                              title="Kaybedildi"
-                            >
-                              <XCircle size={12} />
-                            </button>
-                          </>
-                        )}
-                        <button className="p-2 hover:bg-slate-100 rounded-xl text-slate-400 hover:text-primary transition-all" title="İndir">
-                          <Download size={16} />
-                        </button>
-                        <button 
-                          onClick={() => alert(`Teklif İnceleme:\n\nFırsat: ${oppName}\nMüşteri: ${customerName}\nTutar: $${amount.toLocaleString()}`)}
-                          className="px-4 py-2 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-primary transition-all"
-                        >
-                          İncele
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+        )}
       </div>
+
+      {/* Teklife Hazır Fırsatlar Listesi */}
+      {readyForProposalOpps.length > 0 && (
+        <div className="mb-8">
+          <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Teklife Hazır Fırsatlar ({readyForProposalOpps.length})</h4>
+          <div className="space-y-4">
+            {readyForProposalOpps.map(opp => (
+              <div key={opp.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center border-l-4 border-emerald-500">
+                <div>
+                  <h4 className="font-bold">{opp.title}</h4>
+                  <p className="text-xs text-emerald-600 mt-1 font-black uppercase">Teklife Hazır</p>
+                </div>
+                <button 
+                  onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Teklif Oluştur
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-4">
+        {proposals.length === 0 ? (
+          <p className="text-slate-400 font-bold text-sm">Henüz teklif bulunmuyor.</p>
+        ) : (
+          proposals.map(proposal => {
+            const opp = opportunities.find(o => o.id === proposal.opportunityId);
+            const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
+            return (
+              <div key={proposal.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center">
+                <div>
+                  <h4 className="font-bold">
+                    {customer?.name || 'Bilinmeyen Müşteri'} - 
+                    {opp?.title || 'Bilinmeyen İş'} - v{proposal.version || 1}
+                  </h4>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Durum: 
+                    <span className={cn(
+                      "ml-2 font-black uppercase text-[10px] px-2 py-0.5 rounded-full",
+                      proposal.status === 'APPROVED' ? "bg-emerald-100 text-emerald-700" :
+                      proposal.status === 'REJECTED' ? "bg-red-100 text-red-700" :
+                      proposal.status === 'PENDING_APPROVAL' ? "bg-amber-100 text-amber-700" :
+                      "bg-slate-100 text-slate-700"
+                    )}>
+                      {proposal.status === 'PENDING_APPROVAL' ? 'YÖNETİCİ ONAYINDA' : 
+                       proposal.status === 'REJECTED' ? 'REDDEDİLDİ' : 
+                       proposal.status === 'APPROVED' ? 'ONAYLANDI' : proposal.status}
+                    </span>
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  {(proposal.status === 'DRAFT' || proposal.status === 'REJECTED') && (
+                    <button 
+                      onClick={() => {
+                        const opp = opportunities.find(o => o.id === proposal.opportunityId);
+                        if (opp) {
+                          setSelectedOpp(opp);
+                          setShowProposalEditor(true);
+                        }
+                      }}
+                      className="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      {proposal.status === 'REJECTED' ? 'Revize Et' : 'Düzenle'}
+                    </button>
+                  )}
+                  {proposal.status === 'DRAFT' && (
+                    <button 
+                      onClick={async () => {
+                        setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
+                        try {
+                          const newTask = await apiService.createTask({
+                            title: `Teklif Onayı: ${proposal.id.slice(0, 8)}`,
+                            description: 'Yeni bir teklif onayınızı bekliyor.',
+                            unitId: 'unit_management',
+                            assignedBy: currentUser?.id || 'admin',
+                            priority: 'HIGH',
+                            status: 'PENDING',
+                            relatedModule: 'CONTRACT',
+                            relatedItemId: proposal.id
+                          });
+                          if (setTasks) setTasks(prev => [newTask, ...prev]);
+                          alert('Teklif yönetici onayına gönderildi.');
+                        } catch (e) {
+                          alert('Görev atanamadı.');
+                        }
+                      }}
+                      className="bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg"
+                    >
+                      Onaya Gönder
+                    </button>
+                  )}
+                  {proposal.status === 'APPROVED' && (
+                    <button className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
+                      <Download size={14} /> PDF Oluştur
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
     );
   };
 
-  // --- MAIN RENDER LOGIC ---
-  
   if (showProposalEditor && selectedOpp) {
     const oppProposals = Array.isArray(proposals) ? proposals.filter(p => p.opportunityId === selectedOpp.id) : [];
     const latestProposal = oppProposals.length > 0 
@@ -640,43 +493,15 @@ const CRMModule = ({
        activeTab === 'crm-customers' ? renderCustomers() : 
        renderOpportunities()}
 
-      {/* MODALS */}
       <AnimatePresence>
-        {showNewCustomerModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="glass-panel w-full max-w-4xl rounded-[40px] shadow-2xl overflow-hidden bg-white flex flex-col max-h-[90vh]"
-            >
-              <div className="p-8 border-b border-slate-100 flex items-center justify-between bg-slate-50/30">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-                    <Building size={24} />
-                  </div>
-                  <div>
-                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">Yeni Kurumsal Kayıt</h4>
-                  </div>
-                </div>
-                <button onClick={() => setShowNewCustomerModal(false)} className="p-3 hover:bg-slate-200 rounded-2xl transition-all">
-                  <X size={24} />
-                </button>
-              </div>
-              <form onSubmit={handleSaveCustomer} className="flex-1 overflow-y-auto p-8 space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <input type="text" name="name" required value={customerForm.values.name} onChange={customerForm.handleChange} placeholder="Firma Tam Adı" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
-                  <input type="text" name="email" value={customerForm.values.email} onChange={customerForm.handleChange} placeholder="E-posta" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
-                </div>
-                <div className="flex justify-end gap-3 pt-6">
-                  <button type="button" onClick={() => setShowNewCustomerModal(false)} className="px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest">İPTAL</button>
-                  <button type="submit" className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg">KAYDET</button>
-                </div>
-              </form>
-            </motion.div>
-          </div>
+        {showHandOffModal && handOffTarget && (
+          <HandOffModal 
+            isOpen={showHandOffModal}
+            onClose={() => setShowHandOffModal(false)}
+            onConfirm={handleHandOff}
+            itemTitle={handOffTarget.title}
+          />
         )}
-
         {showNewOpportunityModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
             <motion.div 
@@ -686,8 +511,8 @@ const CRMModule = ({
               className="glass-panel w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden bg-white flex flex-col"
             >
               <div className="p-8 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">{isEditingOpp ? 'Fırsatı Düzenle' : 'Yeni Satış Fırsatı'}</h4>
-                <button onClick={() => { setShowNewOpportunityModal(false); setIsEditingOpp(false); }} className="p-3 hover:bg-slate-200 rounded-2xl transition-all"><X size={24} /></button>
+                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Yeni Satış Fırsatı</h4>
+                <button onClick={() => setShowNewOpportunityModal(false)} className="p-3 hover:bg-slate-200 rounded-2xl transition-all"><X size={24} /></button>
               </div>
               <form onSubmit={handleSaveOpportunity} className="p-8 space-y-6">
                 <input type="text" name="title" required value={opportunityForm.values.title} onChange={opportunityForm.handleChange} placeholder="Fırsat Başlığı" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
@@ -696,47 +521,10 @@ const CRMModule = ({
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
                 <div className="flex justify-end gap-3 pt-4">
-                  <button type="button" onClick={() => { setShowNewOpportunityModal(false); setIsEditingOpp(false); }} className="px-8 py-3 text-xs font-black text-slate-500 uppercase tracking-widest">İPTAL</button>
+                  <button type="button" onClick={() => setShowNewOpportunityModal(false)} className="px-8 py-3 text-xs font-black text-slate-500 uppercase tracking-widest">İPTAL</button>
                   <button type="submit" className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg">KAYDET</button>
                 </div>
               </form>
-            </motion.div>
-          </div>
-        )}
-
-        {showOpportunitySelector && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white/90 backdrop-blur-xl w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[80vh] border border-white/20"
-            >
-              <div className="p-8 border-b border-white/20 flex items-center justify-between">
-                <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Teklif İçin Fırsat Seçin</h4>
-                <button onClick={() => setShowOpportunitySelector(false)} className="p-3 hover:bg-slate-200 rounded-2xl transition-all"><X size={24} /></button>
-              </div>
-              <div className="p-8 overflow-y-auto custom-scrollbar space-y-4">
-                {opportunities.filter(o => o.status !== 'LOST' && o.status !== 'WON').map(opp => (
-                  <button
-                    key={opp.id}
-                    onClick={() => {
-                      setSelectedOpp(opp);
-                      setShowProposalEditor(true);
-                      setShowOpportunitySelector(false);
-                    }}
-                    className="w-full text-left p-6 rounded-3xl bg-white border border-slate-100 hover:bg-primary hover:text-white transition-all group"
-                  >
-                    <div className="flex justify-between items-center">
-                      <div>
-                        <p className="font-black text-lg group-hover:text-white">{opp.title}</p>
-                        <p className="text-xs opacity-70 group-hover:text-white/80">{customers.find(c => c.id === opp.customerId)?.name || 'Bilinmeyen Müşteri'}</p>
-                      </div>
-                      <p className="font-black text-md group-hover:text-white">{opp.value?.toLocaleString()} $</p>
-                    </div>
-                  </button>
-                ))}
-              </div>
             </motion.div>
           </div>
         )}

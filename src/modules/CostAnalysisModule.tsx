@@ -86,7 +86,7 @@ const CostAnalysisModule = ({
     setLoading(true);
     try {
       // Save both Cost Items and updated BoM Items
-      const [savedCosts, savedBoM] = await Promise.all([
+      await Promise.all([
         apiService.saveCostItems(selectedOppId, costItems as any),
         apiService.saveBoMItems(selectedOppId, localBomItems.map(item => ({
           pn: item.partNumber,
@@ -98,14 +98,19 @@ const CostAnalysisModule = ({
         })))
       ]);
 
+      // Update status to APPROVED to trigger "Ready for Proposal"
+      const updatedOpp = await apiService.updateOpportunity(selectedOppId, {
+        technicalStatus: 'APPROVED'
+      });
+
       // UPDATE GLOBAL STATE to prevent stale data when switching
       setOpportunities(prev => prev.map(o => 
         o.id === selectedOppId 
-          ? { ...o, costItems: savedCosts, bomItems: savedBoM } 
+          ? { ...o, ...updatedOpp, costItems: costItems as any, bomItems: localBomItems } 
           : o
       ));
 
-      alert('Analiz ve güncellenmiş BoM kalemleri başarıyla kaydedildi.');
+      alert('Analiz başarıyla kaydedildi ve teklif aşamasına aktarıldı.');
     } catch (err: any) {
       alert(err.message || 'Kaydedilemedi.');
     } finally {

@@ -70,39 +70,56 @@ app.get('/api/logs/notifications', tenantMiddleware, asyncHandler(async (req: Re
   });
 }));
 
+// Helper: Retry logic for DB operations
+const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 500): Promise<T> => {
+  try {
+    return await fn();
+  } catch (error: any) {
+    if (error.code === 'P2028' || error.code === 'P2034' || (error.message && error.message.includes('database is locked'))) {
+      if (retries > 0) {
+        console.warn(`[DB Lock] Retrying operation... ${retries} attempts left.`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return withRetry(fn, retries - 1, delay * 2);
+      }
+    }
+    throw error;
+  }
+};
+
 // --- SYNC ENGINE ---
 app.post('/api/sync', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = (req as any).tenantId;
   const { tasks, opportunities } = req.body;
 
   // Transaction: Gelen verileri işleyip sisteme yansıt
-  const result = await prisma.$transaction(async (tx) => {
-    // 1. Task Güncellemeleri
-    for (const task of (tasks || [])) {
-      if (task.id) {
-        await tx.todoTask.upsert({
-          where: { id: task.id },
-          update: { status: task.status, progressNotes: task.progressNotes },
-          create: { ...task, tenantId }
-        });
+  const result = await withRetry(async () => {
+    return await prisma.$transaction(async (tx) => {
+      // 1. Task Güncellemeleri
+      for (const task of (tasks || [])) {
+        if (task.id) {
+          await tx.todoTask.upsert({
+            where: { id: task.id },
+            update: { status: task.status, progressNotes: task.progressNotes },
+            create: { ...task, tenantId }
+          });
+        }
       }
-    }
-    
-    // 2. Opportunity Güncellemeleri
-    for (const opp of (opportunities || [])) {
-      if (opp.id) {
-        await tx.opportunity.update({
-          where: { id: opp.id },
-          data: { status: opp.status, technicalStatus: opp.technicalStatus }
-        });
+
+      // 2. Opportunity Güncellemeleri
+      for (const opp of (opportunities || [])) {
+        if (opp.id) {
+          await tx.opportunity.update({
+            where: { id: opp.id },
+            data: { status: opp.status, technicalStatus: opp.technicalStatus }
+          });
+        }
       }
-    }
-    return { success: true };
+      return { success: true };
+    });
   });
 
   res.json(result);
 }));
-
 // --- TENANTS ---
 app.get('/api/tenants', asyncHandler(async (req: Request, res: Response) => {
   const tenants = await prisma.tenant.findMany({ orderBy: { name: 'asc' } });

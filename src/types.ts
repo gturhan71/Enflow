@@ -1,3 +1,28 @@
+export interface WorkflowStep {
+  id: string;
+  unitId: string;
+  type: 'AUTO' | 'MANUAL';
+  description: string;
+  order: number;
+  nextStepId: string | null;
+}
+
+export interface ApprovalStage {
+  id: string;
+  role: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approverId?: string;
+  note?: string;
+}
+
+export interface Workflow {
+  id: string;
+  name: string;
+  description: string;
+  steps: WorkflowStep[];
+  stages: ApprovalStage[];
+}
+
 export interface User {
   id: string;
   name: string;

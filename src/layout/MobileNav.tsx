@@ -19,7 +19,7 @@ const MobileNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTa
 
   return (
     <div className="lg:hidden fixed bottom-6 left-6 right-6 z-50">
-      <div className="bg-slate-900/80 backdrop-blur-2xl border border-white/10 rounded-[32px] p-2 flex items-center justify-between shadow-2xl shadow-black/40">
+      <div className="glass-panel rounded-[32px] p-2 flex items-center justify-between shadow-2xl">
         {items.map((item) => {
           const isActive = activeTab === item.id || (item.id === 'crm' && activeTab.startsWith('crm-'));
           return (
@@ -28,7 +28,7 @@ const MobileNav = ({ activeTab, setActiveTab }: { activeTab: string, setActiveTa
               onClick={() => setActiveTab(item.id)}
               className={cn(
                 "flex flex-col items-center gap-1 flex-1 py-3 transition-all relative",
-                isActive ? "text-primary" : "text-slate-500"
+                isActive ? "text-primary" : "text-white/70"
               )}
             >
               <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={cn(

@@ -163,9 +163,21 @@ const TodoModule = ({
           </div>
         ) : (
           filteredTodos.map((todo) => (
-            <motion.div layout key={todo.id} className="glass-panel p-8 rounded-[40px] bg-white border border-slate-100 flex flex-col md:flex-row md:items-center gap-8 group hover:border-indigo-200 transition-all">
+            <motion.div 
+              layout 
+              key={todo.id} 
+              className={cn(
+                "glass-panel p-8 rounded-[40px] bg-white border border-slate-100 flex flex-col md:flex-row md:items-center gap-8 group transition-all",
+                (todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY') && todo.status === 'PENDING' ? "border-amber-300 shadow-amber-50/20" : "hover:border-indigo-200"
+              )}
+            >
               <div className="flex-1 space-y-4">
                 <div className="flex items-center gap-4">
+                  {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY') && todo.status === 'PENDING' && (
+                    <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
+                      <AlertCircle className="text-amber-500" size={20} />
+                    </motion.div>
+                  )}
                   <span className={cn("text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest", getPriorityColor(todo.priority))}>
                     {todo.priority}
                   </span>
@@ -178,14 +190,48 @@ const TodoModule = ({
                     {units?.find(u => u.id === todo.unitId)?.name}
                   </div>
                   {todo.relatedModule && todo.relatedModule !== 'GENERAL' && (
-                    <div className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">
-                      <Target size={14} className="shrink-0" />
-                      <span>
-                        {todo.relatedModule === 'PROJECT' && `Proje: ${getRelatedItemName(todo)}`}
-                        {todo.relatedModule === 'OPPORTUNITY' && `Fırsat: ${getRelatedItemName(todo)}`}
-                        {todo.relatedModule === 'CONTRACT' && `Sözleşme: ${getRelatedItemName(todo)}`}
-                        {todo.relatedModule === 'PROCUREMENT' && `Satın Alma: ${getRelatedItemName(todo)}`}
-                      </span>
+                    <div className="flex flex-col gap-2">
+                      <button 
+                        onClick={() => alert(`Teklif/İşlem İçeriği: ${getRelatedItemName(todo)} - Detaylar yüklendi.`)}
+                        className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
+                      >
+                        <Target size={14} className="shrink-0" />
+                        <span>
+                          {todo.relatedModule === 'PROJECT' && `Proje: ${getRelatedItemName(todo)}`}
+                          {todo.relatedModule === 'OPPORTUNITY' && `Fırsat: ${getRelatedItemName(todo)}`}
+                          {todo.relatedModule === 'CONTRACT' && `Sözleşme: ${getRelatedItemName(todo)}`}
+                        </span>
+                      </button>
+                      
+                      {/* Yönetici Onay/Red Butonları */}
+                      {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY') && todo.status === 'PENDING' && (
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={async () => {
+                                // 1. Görevi tamamla
+                                await handleStatusChange(todo.id, 'COMPLETED');
+                                // 2. Teklifi 'APPROVED' statüsüne çek
+                                await apiService.updateProposal(todo.relatedItemId!, { status: 'APPROVED' });
+                                alert('Teklif Onaylandı.');
+                            }}
+                            className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700"
+                          >
+                            Onayla
+                          </button>
+                          <button 
+                            onClick={async () => {
+                                // Teklifi reddetme mantığı
+                                await handleStatusChange(todo.id, 'CANCELLED');
+                                // CRM modülündeki ilgili teklifi REDDEDILDI statüsüne çek
+                                await apiService.updateProposal(todo.relatedItemId!, { status: 'REJECTED' });
+                                alert('Teklif Reddedildi ve CRM\'e yansıtıldı.');
+                            }}
+                            className="bg-red-500 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-600"
+                          >
+                            Reddet
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest">

@@ -1,13 +1,16 @@
+
+
+
 import React, { useState, useEffect } from 'react';
-import { 
-  Building, 
-  Users, 
-  Plus, 
-  ShieldCheck, 
-  Settings, 
-  Trash2, 
-  Edit3, 
-  Save, 
+import {
+  Building,
+  Users,
+  Plus,
+  ShieldCheck,
+  Settings,
+  Trash2,
+  Edit3,
+  Save,
   X,
   Mail,
   Smartphone,
@@ -19,11 +22,11 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { NAV_ITEMS } from '../constants';
-import { 
-  Unit, 
-  User, 
-  NextcloudConfig, 
-  ExchangeConfig, 
+import {
+  Unit,
+  User,
+  NextcloudConfig,
+  ExchangeConfig,
   WhatsAppConfig
 } from '../types';
 import IntegrationWizard from './IntegrationWizard';
@@ -44,9 +47,9 @@ interface SettingsModuleProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
-const SettingsModule = ({ 
-  companyLogo, 
-  setCompanyLogo, 
+const SettingsModule = ({
+  companyLogo,
+  setCompanyLogo,
   activeSubTab = 'company',
   units,
   setUnits,
@@ -121,7 +124,7 @@ const SettingsModule = ({
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
     const formData = new FormData(e.target as HTMLFormElement);
-    
+
     const name = formData.get('name') as string;
     const email = formData.get('email') as string;
     const role = formData.get('role') as string;
@@ -200,27 +203,27 @@ const SettingsModule = ({
       <div className="flex-1">
         {activeSubTab === 'company' && (
           <div className="max-w-2xl bg-white border border-slate-100 rounded-3xl p-8 space-y-8 shadow-sm">
-             <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
-                {companyLogo ? (
-                  <div className="relative group">
-                    <img src={companyLogo} alt="Logo" className="h-24 w-auto mb-4 object-contain" />
-                    <button onClick={() => setCompanyLogo(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} /></button>
-                  </div>
-                ) : (
-                  <Building size={48} className="text-slate-300 mb-4" />
-                )}
-                <h4 className="font-bold text-slate-900">Kurumsal Logo</h4>
-                <p className="text-sm text-slate-500 mb-6 text-center">Tüm evraklarda ve PDF tekliflerde kullanılacaktır.</p>
-                <input type="file" id="logo-upload" className="hidden" onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (ev) => setCompanyLogo(ev.target?.result as string);
-                    reader.readAsDataURL(file);
-                  }
-                }} />
-                <label htmlFor="logo-upload" className="bg-white border border-slate-200 px-6 py-2 rounded-xl text-sm font-bold cursor-pointer hover:bg-slate-50 shadow-sm transition-all">Logo Yükle</label>
-             </div>
+            <div className="flex flex-col items-center justify-center p-12 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+              {companyLogo ? (
+                <div className="relative group">
+                  <img src={companyLogo} alt="Logo" className="h-24 w-auto mb-4 object-contain" />
+                  <button onClick={() => setCompanyLogo(null)} className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><X size={12} /></button>
+                </div>
+              ) : (
+                <Building size={48} className="text-slate-300 mb-4" />
+              )}
+              <h4 className="font-bold text-slate-900">Kurumsal Logo</h4>
+              <p className="text-sm text-slate-500 mb-6 text-center">Tüm evraklarda ve PDF tekliflerde kullanılacaktır.</p>
+              <input type="file" id="logo-upload" className="hidden" onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setCompanyLogo(ev.target?.result as string);
+                  reader.readAsDataURL(file);
+                }
+              }} />
+              <label htmlFor="logo-upload" className="bg-white border border-slate-200 px-6 py-2 rounded-xl text-sm font-bold cursor-pointer hover:bg-slate-50 shadow-sm transition-all">Logo Yükle</label>
+            </div>
           </div>
         )}
 
@@ -295,10 +298,10 @@ const SettingsModule = ({
               <div className="glass-panel p-6 rounded-3xl">
                 <h5 className="font-bold text-slate-900 mb-2">Mevcut Plan</h5>
                 <p className="text-3xl font-black text-primary mb-4">{subscription?.plan || 'STARTER'}</p>
-                
+
                 {currentUser?.role === 'GENERAL_MANAGER' && (
                   <div className="space-y-2">
-                    <select 
+                    <select
                       onChange={async (e) => {
                         try {
                           await apiService.updateTenantSubscription(currentUser.tenantId, e.target.value);
@@ -338,13 +341,13 @@ const SettingsModule = ({
               <h4 className="text-xl font-bold text-slate-900">Entegrasyon Yönetimi</h4>
               <p className="text-sm text-slate-500 mb-6">T-Ecosystem modülleri ve harici servis bağlantılarını yapılandırın.</p>
             </div>
-            <IntegrationWizard 
+            <IntegrationWizard
               ncConfig={{ url: '', username: '', appPassword: '' }}
-              setNcConfig={() => {}}
+              setNcConfig={() => { }}
               exConfig={{ server: '', email: '', password: '' }}
-              setExConfig={() => {}}
+              setExConfig={() => { }}
               waConfig={{ apiKey: '', phoneNumber: '' }}
-              setWaConfig={() => {}}
+              setWaConfig={() => { }}
             />
           </div>
         )}
@@ -357,8 +360,8 @@ const SettingsModule = ({
               </div>
               <div className="flex items-center gap-4">
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Düzenlenecek Kullanıcı:</p>
-                <select 
-                  value={editingUser?.id || ''} 
+                <select
+                  value={editingUser?.id || ''}
                   onChange={(e) => {
                     const user = users.find(u => u.id === e.target.value);
                     setEditingUser(user || null);
@@ -386,21 +389,21 @@ const SettingsModule = ({
                             <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Erişim Kodu: {item.requiredPermission}</p>
                           </div>
                         </div>
-                        <div 
+                        <div
                           onClick={() => {
                             const currentPerms = editingUser.permissions || [];
                             const newPerms = currentPerms.includes(item.requiredPermission)
                               ? currentPerms.filter(p => p !== item.requiredPermission)
                               : [...currentPerms, item.requiredPermission];
                             setEditingUser({ ...editingUser, permissions: newPerms });
-                          }} 
+                          }}
                           className={cn(
-                            "w-14 h-7 rounded-full relative cursor-pointer transition-all duration-300 shadow-inner", 
+                            "w-14 h-7 rounded-full relative cursor-pointer transition-all duration-300 shadow-inner",
                             editingUser.permissions?.includes(item.requiredPermission) ? "bg-primary" : "bg-slate-200"
                           )}
                         >
                           <div className={cn(
-                            "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm flex items-center justify-center", 
+                            "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm flex items-center justify-center",
                             editingUser.permissions?.includes(item.requiredPermission) ? "right-1" : "left-1"
                           )}>
                             {editingUser.permissions?.includes(item.requiredPermission) && <ShieldCheck size={10} className="text-primary" />}
@@ -413,13 +416,13 @@ const SettingsModule = ({
                 </div>
 
                 <div className="flex justify-end gap-4 pt-6">
-                  <button 
+                  <button
                     onClick={() => setEditingUser(null)}
                     className="px-8 py-4 text-xs font-black text-slate-500 uppercase tracking-widest hover:text-slate-800 transition-colors"
                   >
                     Vazgeç
                   </button>
-                  <button 
+                  <button
                     onClick={async () => {
                       setLoading(true);
                       try {
@@ -479,11 +482,11 @@ const SettingsModule = ({
               <h4 className="text-xl font-bold text-slate-900 mb-6">Yeni Kullanıcı & Firma Ataması</h4>
               <form onSubmit={handleSaveUser} className="space-y-4">
                 <div className="space-y-2">
-                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dahil Edilecek Şirket</label>
-                   <select name="tenantId" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500">
-                      <option value="">Şirket Seçin</option>
-                      {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                   </select>
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Dahil Edilecek Şirket</label>
+                  <select name="tenantId" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500">
+                    <option value="">Şirket Seçin</option>
+                    {tenants.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                 </div>
                 <input name="name" placeholder="Kullanıcı Tam İsim" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500" />
                 <input name="email" type="email" placeholder="Kurumsal E-posta" required className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500" />
@@ -499,8 +502,8 @@ const SettingsModule = ({
                 </select>
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setShowUserModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
-                  <button 
-                    type="submit" 
+                  <button
+                    type="submit"
                     disabled={loading}
                     className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
                   >

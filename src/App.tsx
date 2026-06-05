@@ -180,6 +180,7 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
       setProposals(propsData);
     } catch (error) {
       console.error('Data fetching error:', error);
+      alert('Veri yüklenirken hata oluştu: ' + JSON.stringify(error));
     } finally {
       setLoading(false);
     }
@@ -201,6 +202,7 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
   }, [fetchData]);
 
   const renderContent = () => {
+    console.log('Rendering content for activeTab:', activeTab);
     if (loading) {
       return (
         <div className="flex-1 flex items-center justify-center bg-background/50 backdrop-blur-sm">
@@ -252,7 +254,7 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
       case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
-      case 'contract': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
+      case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'archive': return <ArchiveModule />;
       case 'subscription': return <SubscriptionModule />;
       case 'license-gen': return <LicenseGeneratorModule />;

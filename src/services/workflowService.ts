@@ -2,9 +2,58 @@ import { whatsappService } from './whatsappService';
 import { exchangeService } from './exchangeService';
 import { WorkflowLog, Notification } from '../types';
 
+interface ApprovalStage {
+  id: string;
+  role: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approverId?: string;
+  note?: string;
+}
+
+interface ApprovalChain {
+  id: string;
+  entityId: string; // e.g., proposalId
+  stages: ApprovalStage[];
+  status: 'PENDING' | 'COMPLETED' | 'REJECTED';
+}
+
 class WorkflowService {
   private logs: WorkflowLog[] = [];
   private notifications: Notification[] = [];
+  private approvalChains: ApprovalChain[] = [];
+
+  // Approval Chain Methods
+  createApprovalChain(entityId: string, stages: Omit<ApprovalStage, 'status'>[]) {
+    const chain: ApprovalChain = {
+      id: `chain-${Date.now()}`,
+      entityId,
+      stages: stages.map(s => ({ ...s, status: 'PENDING' })),
+      status: 'PENDING'
+    };
+    this.approvalChains.push(chain);
+    return chain;
+  }
+
+  getChainForEntity(entityId: string) {
+    return this.approvalChains.find(c => c.entityId === entityId);
+  }
+
+  approveStage(entityId: string, stageId: string, approverId: string, note?: string) {
+    const chain = this.getChainForEntity(entityId);
+    if (!chain) throw new Error('Chain not found');
+    
+    const stage = chain.stages.find(s => s.id === stageId);
+    if (!stage) throw new Error('Stage not found');
+    
+    stage.status = 'APPROVED';
+    stage.approverId = approverId;
+    stage.note = note;
+
+    if (chain.stages.every(s => s.status === 'APPROVED')) {
+      chain.status = 'COMPLETED';
+    }
+    return chain;
+  }
 
   async triggerHandOff(params: {
     itemId: string;
