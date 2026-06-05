@@ -82,3 +82,9 @@ Sistem şu an "Ready to Deploy" iskeletine sahiptir:
 ---
 
 *Bu doküman Enflow v1.2.5 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
+
+---
+## v1.6.0 Güncelleme Notları
+- **Mobile-First Navigation:** Mobil cihazlar için özel alt navigasyon barı (Bottom Nav) eklendi.
+- **Workflow Hand-off:** Birimler arası görev aktarımında otomatik WhatsApp ve E-posta bildirim entegrasyonu (WorkflowService) canlıya alındı.
+- **Accessibility:** Aydınlık modda kontrast ve okunabilirlik iyileştirmeleri (High-Contrast Glass UI).

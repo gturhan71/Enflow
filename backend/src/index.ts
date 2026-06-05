@@ -70,6 +70,39 @@ app.get('/api/logs/notifications', tenantMiddleware, asyncHandler(async (req: Re
   });
 }));
 
+// --- SYNC ENGINE ---
+app.post('/api/sync', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = (req as any).tenantId;
+  const { tasks, opportunities } = req.body;
+
+  // Transaction: Gelen verileri işleyip sisteme yansıt
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Task Güncellemeleri
+    for (const task of (tasks || [])) {
+      if (task.id) {
+        await tx.todoTask.upsert({
+          where: { id: task.id },
+          update: { status: task.status, progressNotes: task.progressNotes },
+          create: { ...task, tenantId }
+        });
+      }
+    }
+    
+    // 2. Opportunity Güncellemeleri
+    for (const opp of (opportunities || [])) {
+      if (opp.id) {
+        await tx.opportunity.update({
+          where: { id: opp.id },
+          data: { status: opp.status, technicalStatus: opp.technicalStatus }
+        });
+      }
+    }
+    return { success: true };
+  });
+
+  res.json(result);
+}));
+
 // --- TENANTS ---
 app.get('/api/tenants', asyncHandler(async (req: Request, res: Response) => {
   const tenants = await prisma.tenant.findMany({ orderBy: { name: 'asc' } });
