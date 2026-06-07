@@ -1,0 +1,81 @@
+/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:859
+    return new TSError(diagnosticText, diagnosticCodes, diagnostics);
+           ^
+TSError: ⨯ Unable to compile TypeScript:
+src/index.ts(33,7): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(91,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(175,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(181,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(204,69): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(211,57): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(217,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(261,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(272,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(282,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(300,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(312,77): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(317,86): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(322,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(336,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(349,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(363,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(388,43): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(390,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(422,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(507,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(558,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(584,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(599,19): error TS2339: Property 'userId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(610,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(622,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(630,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(649,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(661,73): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(672,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(680,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(699,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(711,77): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(723,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(731,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(749,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(761,76): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(772,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(780,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(799,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(812,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(820,40): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(826,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(840,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(852,81): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(863,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(871,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(890,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(903,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(911,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(957,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(977,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(990,28): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(1002,21): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+src/index.ts(1020,24): error TS2339: Property 'tenantId' does not exist on type 'Request<ParamsDictionary, any, any, ParsedQs, Record<string, any>>'.
+
+    at createTSError (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:859:12)
+    at reportTSError (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:863:19)
+    at getOutput (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:1077:36)
+    at Object.compile (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:1433:41)
+    at Module.m._compile (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:1617:30)
+    at node:internal/modules/cjs/loader:1943:10
+    at Object.require.extensions.<computed> [as .ts] (/Users/gokhan_turhan/Projects/04_Web_Platforms/Enflow/backend/node_modules/.pnpm/ts-node@10.9.2_@types+node@25.7.0_typescript@6.0.3/node_modules/ts-node/src/index.ts:1621:12)
+    at Module.load (node:internal/modules/cjs/loader:1533:32)
+    at Module._load (node:internal/modules/cjs/loader:1335:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19) {
+  diagnosticCodes: [
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339, 2339,
+    2339, 2339, 2339, 2339, 2339, 2339
+  ]
+}

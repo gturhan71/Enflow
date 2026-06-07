@@ -46,6 +46,23 @@ import {
 
 export const APP_VERSION = 'v1.2.0';
 
+export const ROLE_LABELS: Record<string, string> = {
+  ADMIN: 'Sistem Yöneticisi',
+  GENERAL_MANAGER: 'Genel Müdür',
+  SALES_MGR: 'Satış Müdürü',
+  SALES_REP: 'Satış Temsilcisi',
+  SALES_SUPPORT: 'Satış Destek',
+  PRESALES_MGR: 'Presales Müdürü',
+  PRESALES_ENG: 'Presales Mühendisi',
+  TECHNICAL_SPEC: 'Teknik Uzman',
+  PROJECT_MGR: 'Proje Yöneticisi',
+  OPERATIONS_MGR: 'Operasyon Müdürü',
+  PROCUREMENT_MGR: 'Satın Alma Müdürü',
+  FINANCE_MGR: 'Finans Müdürü',
+  HR_MGR: 'İnsan Kaynakları Müdürü',
+  AUDITOR: 'Denetçi / Auditor'
+};
+
 export const MOCK_TENANTS: Tenant[] = [
   { id: 'tenant-1', name: 'TechCorp A.Ş.' },
   { id: 'tenant-2', name: 'Global Endüstri A.Ş.' },
@@ -150,9 +167,9 @@ export const MOCK_PERMISSIONS: Permission[] = [
 ];
 
 export const MOCK_SYSTEM_USERS: User[] = [
-  { id: 'cmp5lhehc000259w33zxhyy0p', name: 'Gökhan Turhan', email: 'gokhan@t-ecosystem.com', role: 'GENERAL_MANAGER', unitId: 'u4', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW', 'OFFER_APPROVE', 'DOC_DELETE'] },
-  { id: 'cmp9s29090002h4o37jgwc4we', name: 'GOKTUG TURHAN', email: 'goktugturhan74@gmail.com', role: 'PRESALES_ENG', unitId: 'u2', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW'] },
-  { id: 'cmp9uzx6e0007erw3ki7ym0cv', name: 'Ali Veli', email: 'aliveli@enflow.com', role: 'SALES_SUPPORT', unitId: 'u1', status: 'ACTIVE', permissions: ['PROJECT_CREATE'] },
+  { id: 'cmp5lhehc000259w33zxhyy0p', name: 'Gökhan Turhan', email: 'gokhan@t-ecosystem.com', role: 'GENERAL_MANAGER', unitId: 'u4', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW', 'OFFER_APPROVE', 'DOC_DELETE', 'PRESALES_VIEW', 'PRESALES_EDIT', 'DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'SETTINGS_VIEW', 'PROCUREMENT_VIEW', 'ARCHIVE_VIEW', 'DOCUMENTS_VIEW', 'COST_ANALYSIS_VIEW', 'CONTRACTS_VIEW', 'PROJECT_MGMT_VIEW', 'TODO_VIEW', 'SALES_SUPPORT_VIEW'] },
+  { id: 'cmp9s29090002h4o37jgwc4we', name: 'GOKTUG TURHAN', email: 'goktugturhan74@gmail.com', role: 'PRESALES_ENG', unitId: 'u2', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'COST_VIEW', 'PRESALES_VIEW', 'PRESALES_EDIT', 'DASHBOARD_VIEW'] },
+  { id: 'cmp9uzx6e0007erw3ki7ym0cv', name: 'Ali Veli', email: 'aliveli@enflow.com', role: 'SALES_SUPPORT', unitId: 'u1', status: 'ACTIVE', permissions: ['PROJECT_CREATE', 'DASHBOARD_VIEW', 'SALES_SUPPORT_VIEW'] },
 ];
 
 export const MOCK_BOM_ITEMS: BoMItem[] = [

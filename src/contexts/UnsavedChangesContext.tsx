@@ -20,26 +20,6 @@ export const UnsavedChangesProvider = ({ children }: { children: ReactNode }) =>
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
-    const handleInput = (e: Event) => {
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') {
-        if (target.getAttribute('type') !== 'search') {
-          setHasUnsavedChanges(true);
-        }
-      }
-    };
-    
-    // Capture phase to ensure we catch all inputs before they might stop propagation
-    document.addEventListener('input', handleInput, true);
-    document.addEventListener('change', handleInput, true);
-
-    return () => {
-      document.removeEventListener('input', handleInput, true);
-      document.removeEventListener('change', handleInput, true);
-    };
-  }, []);
-
-  useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       if (hasUnsavedChanges) {
         e.preventDefault();

@@ -1,28 +1,18 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
   LayoutDashboard, 
   FileSearch, 
-  FileText, 
   Plus, 
   ArrowUpRight, 
   CheckCircle2, 
   AlertCircle, 
-  History, 
-  MoreVertical,
-  X,
-  ShoppingCart,
-  Loader2,
-  Users,
-  FileDown,
+  X, 
+  Loader2, 
   Upload
 } from 'lucide-react';
-import * as XLSX from 'xlsx';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { CostAnalysisModule } from '../components/CostAnalysisModule';
-import { 
-  MOCK_BOM_ITEMS,
-} from '../constants';
 import { 
   Opportunity,
   Unit,
@@ -32,7 +22,9 @@ import SpecAnalysis from './SpecAnalysis';
 import { workflowService } from '../services/workflowService';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
-import { apiService } from '../services/apiService';
+import { useBoM } from '../hooks/useBoM';
+import { parseBoMFile } from '../utils/bomParser';
+import { SaveButton } from '../components/SaveButton';
 
 interface PresalesModuleProps {
   opportunities: Opportunity[];
@@ -45,36 +37,34 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
-  const [step, setStep] = useState(1);
   const [selectedOppId, setSelectedOppId] = useState<string>('');
-  const [inputMode, setInputMode] = useState<'MANUAL' | 'IMPORT'>('IMPORT');
-  const [showMatchModal, setShowMatchModal] = useState(false);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [isHandingOff, setIsHandingOff] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<any>(null);
-  const [bomItems, setBomItems] = useState<any[]>([]);
 
   // Workflow Hand-off state
   const [targetUnitId, setTargetUnitId] = useState('');
   const [targetUserId, setTargetUserId] = useState('');
   const [handOffNote, setHandOffNote] = useState('');
 
-  useEffect(() => {
-    if (selectedOppId) {
-      const items = MOCK_BOM_ITEMS
-        .filter(item => item.opportunityId === selectedOppId)
-        .map(item => ({
-          pn: item.partNumber,
-          desc: item.description,
-          qty: item.quantity,
-          cost: item.purchaseCost,
-          margin: item.marginPercentage
-        }));
-      setBomItems(items.length > 0 ? items : []);
-    } else {
-      setBomItems([]);
-    }
-  }, [selectedOppId]);
+  // BoM Hook integration
+  const {
+    bomItems,
+    setBomItems,
+    addBoMItem,
+    isSubmitting,
+    handleFinalApproval,
+    totalCost
+  } = useBoM(selectedOppId, setOpportunities);
+
+  const [newItem, setNewItem] = useState({
+    pn: '',
+    desc: '',
+    qty: 1,
+    cost: 0,
+    margin: 15
+  });
+
+  const [showApprovalPreview, setShowApprovalPreview] = useState(false);
 
   const handleHandOff = async () => {
     if (!selectedOppId || !targetUnitId || !targetUserId) return;
@@ -104,17 +94,6 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
     alert(`İş başarıyla ${targetUnit?.name} birimine (${targetUser?.name}) aktarıldı.`);
   };
 
-  const [newItem, setNewItem] = useState({
-    pn: '',
-    desc: '',
-    qty: 1,
-    cost: 0,
-    margin: 15
-  });
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showApprovalPreview, setShowApprovalPreview] = useState(false);
-
   const handleRequestApproval = () => {
     if (!selectedOppId) return;
     if (bomItems.length === 0) {
@@ -124,126 +103,37 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
     setShowApprovalPreview(true);
   };
 
-  const handleFinalApproval = async () => {
-    setIsSubmitting(true);
-    try {
-      // 1. Önce BoM kalemlerini veritabanına kaydet
-      const savedBoM = await apiService.saveBoMItems(selectedOppId, bomItems);
-      
-      // 2. Onay sürecini başlat
-      await apiService.requestProposalApproval(selectedOppId, {
-        note: 'Teknik çalışma tamamlandı, fiyat teklifi onaya sunulmuştur.',
-        managerId: 'cmp5lhehc000259w33zxhyy0p' // Gökhan Turhan (General Manager)
-      });
-
-      alert('Teklif başarıyla yönetici onayına sunuldu.');
-      
-      // UPDATE GLOBAL STATE WITH NEW BoM ITEMS AND STATUS
-      setOpportunities(prev => prev.map(o => 
-        o.id === selectedOppId 
-          ? { ...o, technicalStatus: 'WAITING_APPROVAL', bomItems: savedBoM } 
-          : o
-      ));
-      
+  const handleConfirmApproval = async () => {
+    const success = await handleFinalApproval();
+    if (success) {
       setShowApprovalPreview(false);
-    } catch (err: any) {
-      alert(err.message || 'Onay sürecinde hata oluştu.');
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    const isXML = file.name.toLowerCase().endsWith('.xml');
-
-    reader.onload = (evt) => {
-      const content = evt.target?.result;
-      let mappedItems: any[] = [];
-
-      if (isXML) {
-        // XML Parsing Logic
-        try {
-          const parser = new DOMParser();
-          const xmlDoc = parser.parseFromString(content as string, "text/xml");
-          const items = xmlDoc.querySelectorAll("Item, product, row, item"); // Common tags
-          
-          mappedItems = Array.from(items).map(item => {
-            const getVal = (selectors: string[]) => {
-              for (const s of selectors) {
-                const el = item.querySelector(s);
-                if (el) return el.textContent;
-              }
-              return '';
-            };
-
-            const pn = getVal(['PN', 'PartNumber', 'Part_Number', 'product_code', 'id']);
-            const desc = getVal(['Description', 'Desc', 'product_name', 'name', 'aciklama']);
-            const qty = parseInt(getVal(['Quantity', 'Qty', 'amount', 'adet', 'miktar']) || '1');
-            const cost = parseFloat(getVal(['Cost', 'Price', 'unit_price', 'maliyet', 'fiyat']) || '0');
-
-            return {
-              pn: String(pn || ''),
-              desc: String(desc || ''),
-              qty: isNaN(qty) ? 1 : qty,
-              cost: isNaN(cost) ? 0 : cost,
-              margin: 15
-            };
-          }).filter(item => item.pn || item.desc);
-        } catch (err) {
-          console.error('XML parse error:', err);
-          alert('XML dosyası ayrıştırılamadı.');
-          return;
-        }
-      } else {
-        // Excel/CSV Parsing Logic (using xlsx)
-        const bstr = content;
-        const wb = XLSX.read(bstr, { type: 'binary' });
-        const wsname = wb.SheetNames[0];
-        const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
-
-        mappedItems = data.map((row: any) => {
-          const pn = row['PN'] || row['Part Number'] || row['Ürün Kodu'] || row['Model'] || '';
-          const desc = row['Description'] || row['Açıklama'] || row['Ürün Adı'] || '';
-          const qty = parseInt(row['Quantity'] || row['Adet'] || row['Miktar'] || '1');
-          const cost = parseFloat(row['Cost'] || row['Maliyet'] || row['Birim Fiyat'] || '0');
-          
-          return {
-            pn: String(pn),
-            desc: String(desc),
-            qty: isNaN(qty) ? 1 : qty,
-            cost: isNaN(cost) ? 0 : cost,
-            margin: 15
-          };
-        }).filter(item => item.pn || item.desc);
-      }
-
-      if (mappedItems.length > 0) {
-        setBomItems(prev => [...mappedItems, ...prev]);
-        alert(`${mappedItems.length} kalem başarıyla içe aktarıldı.`);
+    try {
+      const parsedItems = await parseBoMFile(file);
+      if (parsedItems.length > 0) {
+        setBomItems(prev => [...parsedItems, ...prev]);
+        alert(`${parsedItems.length} kalem başarıyla içe aktarıldı.`);
       } else {
         alert('Dosyada uygun veri bulunamadı. Lütfen formatı kontrol edin.');
       }
-    };
-
-    if (isXML) {
-      reader.readAsText(file);
-    } else {
-      reader.readAsBinaryString(file);
+    } catch (err: any) {
+      alert(err.message || 'Dosya yükleme hatası.');
     }
     
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
-    <div className="p-8 h-[calc(100vh-80px)] overflow-hidden flex flex-col">
+    <div className="p-8 h-[calc(100vh-80px)] overflow-hidden flex flex-col font-sans">
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h3 className="text-2xl font-bold text-slate-900">Presales & Dizayn</h3>
+          <h3 className="text-2xl font-bold text-slate-900 font-sans">Presales & Dizayn</h3>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-slate-500 whitespace-nowrap">BoM listesini fırsata bağlayın:</p>
             <select 
@@ -289,7 +179,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
       {moduleView === 'BOM' ? (
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-8 overflow-hidden">
           {/* Left Side: Requirements */}
-          <div className="glass-panel rounded-3xl flex flex-col overflow-hidden">
+          <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
             <div className="p-6 border-b border-slate-100 bg-slate-50/50">
               <h4 className="font-bold text-slate-900 flex items-center gap-2"><FileSearch size={20} className="text-indigo-600" />Şartname Maddeleri</h4>
             </div>
@@ -299,10 +189,10 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
           </div>
 
           {/* Right Side: BoM Table */}
-          <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white">
+          <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <h4 className="font-bold text-slate-900">BoM Listesi</h4>
+                  <h4 className="font-bold text-slate-900 font-sans">BoM Listesi</h4>
                   <input 
                     type="file" 
                     ref={fileInputRef} 
@@ -318,30 +208,26 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
                     Excel / XML Yükle
                   </button>
                 </div>
-import { SaveButton } from '../components/SaveButton';
-// ... mevcut importlar ...
-// ...
-
-// ... render içerisinde ...
-              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4">
                   <div className="text-right">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase">Toplam Maliyet</p>
-                    <p className="text-sm font-mono font-bold text-slate-900">${bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0).toLocaleString()}</p>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase font-sans">Toplam Maliyet</p>
+                    <p className="text-sm font-mono font-bold text-slate-900">${totalCost.toLocaleString()}</p>
                   </div>
-                  <SaveButton onClick={handleRequestApproval} loading={loading} />
+                  <SaveButton onClick={handleRequestApproval} loading={isSubmitting} />
                 </div>
              </div>
              
              {/* Manual BoM Item Form */}
              <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-12 gap-2">
-                <input type="text" placeholder="P/N" className="col-span-3 p-2 text-xs border rounded-lg" value={newItem.pn} onChange={(e) => setNewItem({...newItem, pn: e.target.value})} />
-                <input type="text" placeholder="Açıklama" className="col-span-5 p-2 text-xs border rounded-lg" value={newItem.desc} onChange={(e) => setNewItem({...newItem, desc: e.target.value})} />
-                <input type="number" placeholder="Adet" className="col-span-1 p-2 text-xs border rounded-lg" value={newItem.qty} onChange={(e) => setNewItem({...newItem, qty: parseInt(e.target.value) || 1})} />
-                <input type="number" placeholder="Maliyet" className="col-span-2 p-2 text-xs border rounded-lg" value={newItem.cost} onChange={(e) => setNewItem({...newItem, cost: parseFloat(e.target.value) || 0})} />
-                <button 
-                  className="col-span-1 bg-primary text-white rounded-lg"
+                <input type="text" placeholder="P/N" className="col-span-3 p-2 text-xs border rounded-lg bg-white" value={newItem.pn} onChange={(e) => setNewItem({...newItem, pn: e.target.value})} />
+                <input type="text" placeholder="Açıklama" className="col-span-5 p-2 text-xs border rounded-lg bg-white" value={newItem.desc} onChange={(e) => setNewItem({...newItem, desc: e.target.value})} />
+                <input type="number" placeholder="Adet" className="col-span-1 p-2 text-xs border rounded-lg bg-white" value={newItem.qty} onChange={(e) => setNewItem({...newItem, qty: parseInt(e.target.value) || 1})} />
+                <input type="number" placeholder="Maliyet" className="col-span-2 p-2 text-xs border rounded-lg bg-white" value={newItem.cost} onChange={(e) => setNewItem({...newItem, cost: parseFloat(e.target.value) || 0})} />
+                <button
+                  className="col-span-1 bg-primary text-white rounded-lg flex items-center justify-center hover:bg-primary/90 transition-all"
                   onClick={() => {
-                    setBomItems([...bomItems, newItem]);
+                    if (!newItem.pn && !newItem.desc) return;
+                    addBoMItem(newItem);
                     setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15 });
                   }}
                 >
@@ -349,12 +235,12 @@ import { SaveButton } from '../components/SaveButton';
                 </button>
              </div>
 
-             <div className="flex-1 overflow-y-auto p-4 space-y-3">
+             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
                {bomItems.map((item, i) => (
-                 <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
+                 <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 font-sans">
                     <div className="flex justify-between items-center">
                       <span className="font-mono text-xs font-bold text-indigo-600">{item.pn}</span>
-                      <span className="text-sm font-bold">${item.cost} x {item.qty}</span>
+                      <span className="text-sm font-bold text-slate-800">${item.cost} x {item.qty}</span>
                     </div>
                     <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
                  </div>
@@ -382,21 +268,21 @@ import { SaveButton } from '../components/SaveButton';
               <div className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Hedef Birim</label>
-                  <select value={targetUnitId} onChange={(e) => setTargetUnitId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500">
+                  <select value={targetUnitId} onChange={(e) => setTargetUnitId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 bg-white">
                     <option value="">Birim Seçin</option>
                     {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Sorumlu Personel</label>
-                  <select value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500">
+                  <select value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 bg-white">
                     <option value="">Personel Seçin</option>
                     {users.filter(u => !targetUnitId || u.unitId === targetUnitId).map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
                   </select>
                 </div>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Not / Talimat</label>
-                  <textarea value={handOffNote} onChange={(e) => setHandOffNote(e.target.value)} rows={3} placeholder="İşi devralacak kişiye notunuz..." className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none" />
+                  <textarea value={handOffNote} onChange={(e) => setHandOffNote(e.target.value)} rows={3} placeholder="İşi devralacak kişiye notunuz..." className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none bg-white" />
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-6">
@@ -466,10 +352,10 @@ import { SaveButton } from '../components/SaveButton';
                       ))}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-slate-900 text-white">
+                      <tr className="bg-slate-900 text-white font-sans">
                         <td colSpan={4} className="px-6 py-4 text-xs font-black uppercase tracking-widest">Genel Toplam</td>
                         <td className="px-6 py-4 text-lg font-black text-right">
-                          ${bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0).toLocaleString()}
+                          ${totalCost.toLocaleString()}
                         </td>
                       </tr>
                     </tfoot>
@@ -498,7 +384,7 @@ import { SaveButton } from '../components/SaveButton';
                   Vazgeç
                 </button>
                 <button 
-                  onClick={handleFinalApproval}
+                  onClick={handleConfirmApproval}
                   disabled={isSubmitting}
                   className="bg-primary text-white px-10 py-3 rounded-2xl text-xs font-black shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-3 disabled:opacity-50 uppercase tracking-[0.2em]"
                 >

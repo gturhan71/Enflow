@@ -30,7 +30,7 @@ const tenantMiddleware = asyncHandler(async (req: Request, res: Response, next: 
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
   if (!tenant) return res.status(404).json({ error: 'Tenant not found' });
   
-  (req as any).tenantId = tenantId;
+  req.tenantId = tenantId;
   next();
 });
 
@@ -88,7 +88,7 @@ const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 500): Pro
 
 // --- SYNC ENGINE ---
 app.post('/api/sync', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const { tasks, opportunities } = req.body;
 
   // Transaction: Gelen verileri işleyip sisteme yansıt
@@ -126,6 +126,33 @@ app.get('/api/tenants', asyncHandler(async (req: Request, res: Response) => {
   res.json(tenants);
 }));
 
+app.post('/api/tenants', asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.body;
+  if (!name) return res.status(400).json({ error: 'Şirket adı zorunludur.' });
+  
+  const tenant = await prisma.$transaction(async (tx) => {
+    const newTenant = await tx.tenant.create({ data: { name } });
+    await tx.subscription.create({
+      data: {
+        tenantId: newTenant.id,
+        plan: 'STARTER'
+      }
+    });
+    return newTenant;
+  });
+  
+  res.json(tenant);
+}));
+
+app.put('/api/tenants/:id', asyncHandler(async (req: Request, res: Response) => {
+  const { name } = req.body;
+  const tenant = await prisma.tenant.update({
+    where: { id: req.params.id as string },
+    data: { name }
+  });
+  res.json(tenant);
+}));
+
 app.put('/api/tenants/:id/subscription', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.params.id;
   const { plan } = req.body; // STARTER, PROFESSIONAL, ENTERPRISE
@@ -145,13 +172,13 @@ app.put('/api/tenants/:id/subscription', tenantMiddleware, asyncHandler(async (r
 
 app.get('/api/subscription', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const subscription = await prisma.subscription.findUnique({ 
-    where: { tenantId: (req as any).tenantId } 
+    where: { tenantId: req.tenantId } 
   });
   res.json(subscription || { plan: 'STARTER' });
 }));
 
 app.get('/api/usage', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const period = new Date().toISOString().slice(0, 7);
   const usage = await prisma.usageMetric.findMany({ where: { tenantId, period } });
   res.json(usage);
@@ -174,22 +201,64 @@ app.post('/api/auth/forgot-password', asyncHandler(async (req: Request, res: Res
 
 // --- UNITS ---
 app.get('/api/units', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const units = await prisma.unit.findMany({ where: { tenantId: (req as any).tenantId }, include: { users: true } });
+  const units = await prisma.unit.findMany({ where: { tenantId: req.tenantId }, include: { users: true } });
   res.json(units);
 }));
 
 app.post('/api/units', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { name, description, managerId } = req.body;
   const unit = await prisma.unit.create({
-    data: { name, description, managerId, tenantId: (req as any).tenantId }
+    data: { name, description, managerId, tenantId: req.tenantId }
   });
   res.json(unit);
+}));
+
+app.delete('/api/units/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = req.tenantId;
+  const id = req.params.id as string;
+  const { transferToUnitId } = req.body;
+
+  const unit = await prisma.unit.findFirst({ 
+    where: { id, tenantId },
+    include: { 
+      _count: {
+        select: { users: true, steps: true }
+      }
+    } 
+  });
+
+  if (!unit) return res.status(404).json({ error: 'Birim bulunamadı.' });
+
+  // Eğer kullanıcı varsa ve transfer ID'si verilmemişse hata döndür
+  if (unit._count.users > 0 && !transferToUnitId) {
+    return res.status(400).json({ 
+      error: 'TRANSFER_REQUIRED', 
+      message: `Bu birime kayıtlı ${unit._count.users} kullanıcı var. Silmeden önce kullanıcıları başka bir birime taşımalısınız.` 
+    });
+  }
+
+  if (unit._count.steps > 0) {
+    return res.status(400).json({ error: 'Bu birim bir iş akışında kullanılıyor. Önce iş akışından çıkarın.' });
+  }
+
+  // Transaction ile taşıma ve silme işlemini yap
+  await prisma.$transaction(async (tx) => {
+    if (transferToUnitId && unit._count.users > 0) {
+      await tx.user.updateMany({
+        where: { unitId: id, tenantId },
+        data: { unitId: transferToUnitId }
+      });
+    }
+    await tx.unit.delete({ where: { id } });
+  });
+
+  res.json({ message: 'Kullanıcılar başarıyla taşındı ve birim silindi.' });
 }));
 
 // --- USERS ---
 app.get('/api/users', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({ 
-    where: { tenantId: (req as any).tenantId },
+    where: { tenantId: req.tenantId },
     include: { unit: true }
   });
   res.json(users);
@@ -200,7 +269,7 @@ app.post('/api/users', tenantMiddleware, asyncHandler(async (req: Request, res: 
   const user = await prisma.user.create({
     data: {
       name, email, role, unitId: unitId || null,
-      tenantId: (req as any).tenantId,
+      tenantId: req.tenantId,
       permissions: typeof permissions === 'string' ? permissions : JSON.stringify(permissions || ['DASHBOARD_VIEW']),
       status: 'ACTIVE'
     }
@@ -210,7 +279,7 @@ app.post('/api/users', tenantMiddleware, asyncHandler(async (req: Request, res: 
 
 app.put('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { name, email, role, unitId, permissions, status } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.user.findFirst({ where: { id, tenantId } });
@@ -228,7 +297,7 @@ app.put('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request, re
 }));
 
 app.delete('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.user.findFirst({ where: { id, tenantId } });
@@ -240,17 +309,17 @@ app.delete('/api/users/:id', tenantMiddleware, asyncHandler(async (req: Request,
 
 // --- CUSTOMERS ---
 app.get('/api/customers', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const customers = await prisma.customer.findMany({ where: { tenantId: (req as any).tenantId }, orderBy: { name: 'asc' } });
+  const customers = await prisma.customer.findMany({ where: { tenantId: req.tenantId }, orderBy: { name: 'asc' } });
   res.json(customers);
 }));
 
 app.post('/api/customers', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const customer = await prisma.customer.create({ data: { ...req.body, tenantId: (req as any).tenantId } });
+  const customer = await prisma.customer.create({ data: { ...req.body, tenantId: req.tenantId } });
   res.json(customer);
 }));
 
 app.put('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.customer.findFirst({ where: { id, tenantId } });
@@ -264,7 +333,7 @@ app.put('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Request
 }));
 
 app.delete('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.customer.findFirst({ where: { id, tenantId } });
@@ -277,7 +346,7 @@ app.delete('/api/customers/:id', tenantMiddleware, asyncHandler(async (req: Requ
 // --- OPPORTUNITIES ---
 app.get('/api/opportunities', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opps = await prisma.opportunity.findMany({ 
-    where: { tenantId: (req as any).tenantId }, 
+    where: { tenantId: req.tenantId }, 
     include: { 
       customer: true, 
       assignedTo: true, 
@@ -291,7 +360,7 @@ app.get('/api/opportunities', tenantMiddleware, asyncHandler(async (req: Request
 
 app.post('/api/opportunities/:id/costs', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const { items } = req.body;
 
   const result = await prisma.$transaction(async (tx) => {
@@ -316,9 +385,9 @@ app.post('/api/opportunities/:id/costs', tenantMiddleware, asyncHandler(async (r
 
 app.post('/api/opportunities', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   console.log('[Backend] New Opportunity Request Body:', JSON.stringify(req.body, null, 2));
-  console.log('[Backend] Tenant ID:', (req as any).tenantId);
+  console.log('[Backend] Tenant ID:', req.tenantId);
   const { title, value, probability, customerId, assignedToId, description, expectedCloseDate, status } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   
   if (!title || !customerId) {
     return res.status(400).json({ error: 'Başlık ve Müşteri seçimi zorunludur.' });
@@ -350,7 +419,7 @@ app.post('/api/opportunities', tenantMiddleware, asyncHandler(async (req: Reques
 }));
 app.put('/api/opportunities/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { title, value, probability, customerId, description, status, expectedCloseDate, updatedBy } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
 
   const oldOpp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
@@ -435,7 +504,7 @@ app.post('/api/opportunities/:id/bom', tenantMiddleware, asyncHandler(async (req
 // --- WORKFLOW & APPROVALS ---
 app.post('/api/opportunities/:id/request-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const { note, managerId } = req.body;
 
   const record = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
@@ -486,7 +555,7 @@ app.post('/api/opportunities/:id/request-approval', tenantMiddleware, asyncHandl
 
 app.post('/api/opportunities/:id/approve', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const { note } = req.body;
 
   const record = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
@@ -512,7 +581,7 @@ app.post('/api/opportunities/:id/approve', tenantMiddleware, asyncHandler(async 
 // --- PROJECTS ---
 app.post('/api/opportunities/:id/revert-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
 
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },
@@ -527,7 +596,7 @@ app.post('/api/opportunities/:id/revert-approval', tenantMiddleware, asyncHandle
       action: 'REVERT_APPROVAL',
       entityType: 'OPPORTUNITY',
       entityId: opportunityId,
-      userId: (req as any).userId || 'system',
+      userId: req.userId || 'system',
       tenantId,
       details: JSON.stringify({ message: 'Teknik onay kullanıcı tarafından geri çekildi.' })
     }
@@ -538,7 +607,7 @@ app.post('/api/opportunities/:id/revert-approval', tenantMiddleware, asyncHandle
 
 app.get('/api/projects', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const projects = await prisma.project.findMany({ 
-    where: { tenantId: (req as any).tenantId }
+    where: { tenantId: req.tenantId }
   });
   res.json(projects);
 }));
@@ -550,7 +619,7 @@ app.post('/api/projects', tenantMiddleware, asyncHandler(async (req: Request, re
       ...rest,
       deadline: new Date(deadline),
       procurementNotes: typeof procurementNotes === 'string' ? procurementNotes : JSON.stringify(procurementNotes || []),
-      tenantId: (req as any).tenantId
+      tenantId: req.tenantId
     }
   });
   res.json(project);
@@ -558,7 +627,7 @@ app.post('/api/projects', tenantMiddleware, asyncHandler(async (req: Request, re
 
 app.put('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { deadline, procurementNotes, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.project.findFirst({ where: { id, tenantId } });
@@ -577,7 +646,7 @@ app.put('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Request,
 }));
 
 app.delete('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.project.findFirst({ where: { id, tenantId } });
@@ -589,7 +658,7 @@ app.delete('/api/projects/:id', tenantMiddleware, asyncHandler(async (req: Reque
 
 // --- TODO TASKS ---
 app.get('/api/tasks', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tasks = await prisma.todoTask.findMany({ where: { tenantId: (req as any).tenantId } });
+  const tasks = await prisma.todoTask.findMany({ where: { tenantId: req.tenantId } });
   res.json(tasks);
 }));
 
@@ -600,7 +669,7 @@ app.post('/api/tasks', tenantMiddleware, asyncHandler(async (req: Request, res: 
       ...rest,
       dueDate: dueDate ? new Date(dueDate) : null,
       progressNotes: typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes || []),
-      tenantId: (req as any).tenantId
+      tenantId: req.tenantId
     }
   });
   res.json(task);
@@ -608,7 +677,7 @@ app.post('/api/tasks', tenantMiddleware, asyncHandler(async (req: Request, res: 
 
 app.put('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { dueDate, progressNotes, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.todoTask.findFirst({ where: { id, tenantId } });
@@ -627,7 +696,7 @@ app.put('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request, re
 }));
 
 app.delete('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.todoTask.findFirst({ where: { id, tenantId } });
@@ -639,7 +708,7 @@ app.delete('/api/tasks/:id', tenantMiddleware, asyncHandler(async (req: Request,
 
 // --- CONTRACTS ---
 app.get('/api/contracts', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const contracts = await prisma.contract.findMany({ where: { tenantId: (req as any).tenantId } });
+  const contracts = await prisma.contract.findMany({ where: { tenantId: req.tenantId } });
   res.json(contracts);
 }));
 
@@ -651,7 +720,7 @@ app.post('/api/contracts', tenantMiddleware, asyncHandler(async (req: Request, r
       signedDate: signedDate ? new Date(signedDate) : null,
       endDate: endDate ? new Date(endDate) : null,
       guaranteeExpiry: guaranteeExpiry ? new Date(guaranteeExpiry) : null,
-      tenantId: (req as any).tenantId
+      tenantId: req.tenantId
     }
   });
   res.json(contract);
@@ -659,7 +728,7 @@ app.post('/api/contracts', tenantMiddleware, asyncHandler(async (req: Request, r
 
 app.put('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { signedDate, endDate, guaranteeExpiry, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.contract.findFirst({ where: { id, tenantId } });
@@ -677,7 +746,7 @@ app.put('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Request
 }));
 
 app.delete('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.contract.findFirst({ where: { id, tenantId } });
@@ -689,7 +758,7 @@ app.delete('/api/contracts/:id', tenantMiddleware, asyncHandler(async (req: Requ
 
 // --- ARCHIVE ITEMS ---
 app.get('/api/archive', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const items = await prisma.archiveItem.findMany({ where: { tenantId: (req as any).tenantId } });
+  const items = await prisma.archiveItem.findMany({ where: { tenantId: req.tenantId } });
   res.json(items);
 }));
 
@@ -700,7 +769,7 @@ app.post('/api/archive', tenantMiddleware, asyncHandler(async (req: Request, res
       ...rest,
       date: date ? new Date(date) : new Date(),
       tags: typeof tags === 'string' ? tags : JSON.stringify(tags || []),
-      tenantId: (req as any).tenantId
+      tenantId: req.tenantId
     }
   });
   res.json(item);
@@ -708,7 +777,7 @@ app.post('/api/archive', tenantMiddleware, asyncHandler(async (req: Request, res
 
 app.put('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { date, tags, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.archiveItem.findFirst({ where: { id, tenantId } });
@@ -727,7 +796,7 @@ app.put('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Request, 
 }));
 
 app.delete('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.archiveItem.findFirst({ where: { id, tenantId } });
@@ -740,7 +809,7 @@ app.delete('/api/archive/:id', tenantMiddleware, asyncHandler(async (req: Reques
 // --- NOTIFICATIONS ---
 app.get('/api/notifications', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const notifications = await prisma.notification.findMany({ 
-    where: { tenantId: (req as any).tenantId },
+    where: { tenantId: req.tenantId },
     orderBy: { timestamp: 'desc' }
   });
   res.json(notifications);
@@ -748,13 +817,13 @@ app.get('/api/notifications', tenantMiddleware, asyncHandler(async (req: Request
 
 app.post('/api/notifications', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const notification = await prisma.notification.create({
-    data: { ...req.body, tenantId: (req as any).tenantId }
+    data: { ...req.body, tenantId: req.tenantId }
   });
   res.json(notification);
 }));
 
 app.put('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.notification.findFirst({ where: { id, tenantId } });
@@ -768,7 +837,7 @@ app.put('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: Req
 }));
 
 app.delete('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.notification.findFirst({ where: { id, tenantId } });
@@ -780,7 +849,7 @@ app.delete('/api/notifications/:id', tenantMiddleware, asyncHandler(async (req: 
 
 // --- CORPORATE DOCUMENTS ---
 app.get('/api/documents', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const docs = await prisma.corporateDocument.findMany({ where: { tenantId: (req as any).tenantId } });
+  const docs = await prisma.corporateDocument.findMany({ where: { tenantId: req.tenantId } });
   res.json(docs);
 }));
 
@@ -791,7 +860,7 @@ app.post('/api/documents', tenantMiddleware, asyncHandler(async (req: Request, r
       ...rest,
       expiryDate: expiryDate ? new Date(expiryDate) : null,
       tags: typeof tags === 'string' ? tags : JSON.stringify(tags || []),
-      tenantId: (req as any).tenantId
+      tenantId: req.tenantId
     }
   });
   res.json(doc);
@@ -799,7 +868,7 @@ app.post('/api/documents', tenantMiddleware, asyncHandler(async (req: Request, r
 
 app.put('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { expiryDate, tags, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.corporateDocument.findFirst({ where: { id, tenantId } });
@@ -818,7 +887,7 @@ app.put('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Request
 }));
 
 app.delete('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.corporateDocument.findFirst({ where: { id, tenantId } });
@@ -831,7 +900,7 @@ app.delete('/api/documents/:id', tenantMiddleware, asyncHandler(async (req: Requ
 // --- PROPOSALS ---
 app.get('/api/proposals', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const proposals = await prisma.proposal.findMany({ 
-    where: { tenantId: (req as any).tenantId },
+    where: { tenantId: req.tenantId },
     include: { opportunity: { include: { customer: true } } }
   });
   res.json(proposals);
@@ -839,7 +908,7 @@ app.get('/api/proposals', tenantMiddleware, asyncHandler(async (req: Request, re
 
 app.post('/api/proposals', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { opportunityId, status, content, ...rest } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
 
   if (!opportunityId) {
     return res.status(400).json({ error: 'Fırsat seçimi zorunludur.' });
@@ -885,7 +954,7 @@ app.post('/api/proposals', tenantMiddleware, asyncHandler(async (req: Request, r
 
 app.put('/api/proposals/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { content, status } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.proposal.findFirst({ where: { id, tenantId } });
@@ -905,7 +974,7 @@ app.put('/api/proposals/:id', tenantMiddleware, asyncHandler(async (req: Request
 }));
 
 app.delete('/api/proposals/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.proposal.findFirst({ where: { id, tenantId } });
@@ -918,7 +987,7 @@ app.delete('/api/proposals/:id', tenantMiddleware, asyncHandler(async (req: Requ
 // --- WORKFLOWS ---
 app.get('/api/workflows', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const workflows = await prisma.workflow.findMany({ 
-    where: { tenantId: (req as any).tenantId },
+    where: { tenantId: req.tenantId },
     include: { steps: { orderBy: { order: 'asc' } } }
   });
   res.json(workflows);
@@ -930,7 +999,7 @@ app.post('/api/workflows', tenantMiddleware, asyncHandler(async (req: Request, r
     data: {
       name,
       description,
-      tenantId: (req as any).tenantId,
+      tenantId: req.tenantId,
       steps: {
         create: steps.map((step: any, index: number) => ({
           unitId: step.unitId,
@@ -948,7 +1017,7 @@ app.post('/api/workflows', tenantMiddleware, asyncHandler(async (req: Request, r
 
 app.put('/api/workflows/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { name, description, steps } = req.body;
-  const tenantId = (req as any).tenantId;
+  const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.workflow.findFirst({ where: { id, tenantId } });

@@ -1,6 +1,23 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Toaster, toast } from 'sonner';
+
+// Global alert interceptor mapping alert() to Sonner toasts
+if (typeof window !== 'undefined') {
+  window.alert = (message: any) => {
+    const msgStr = String(message);
+    const msg = msgStr.toLowerCase();
+    if (msg.includes('hata') || msg.includes('fail') || msg.includes('başarısız') || msg.includes('geçersiz') || msg.includes('olmadı') || msg.includes('silinemedi')) {
+      toast.error(msgStr);
+    } else if (msg.includes('başarı') || msg.includes('tebrikler') || msg.includes('ok') || msg.includes('onaylandı') || msg.includes('kazanıldı') || msg.includes('tamamlandı')) {
+      toast.success(msgStr);
+    } else {
+      toast(msgStr);
+    }
+  };
+}
 import { 
   MOCK_SYSTEM_USERS 
 } from './constants';
@@ -37,6 +54,26 @@ import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { apiService } from './services/apiService';
 import { ThemeProvider } from './contexts/ThemeContext';
 
+import {
+  useOpportunities,
+  useCustomers,
+  useProjects,
+  useContracts,
+  useTasks,
+  useUnits,
+  useUsers,
+  useDocuments,
+  useProposals
+} from './hooks/useEnflowQueries';
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
+
 // --- HEALTH CHECK BANNER ---
 const HealthBanner = () => {
   const [status, setStatus] = useState<'checking' | 'ok' | 'error'>('checking');
@@ -50,17 +87,15 @@ const HealthBanner = () => {
         const res = await fetch('/api/health');
         if (res.ok) {
           setStatus('ok');
-          restartTriggered.current = false; // Reset on success
+          restartTriggered.current = false;
         } else {
           throw new Error();
         }
       } catch {
         if (retryCount < 1) {
-          // First fail, wait and check again
           console.log('⚠️ Backend check 1 failed, retrying in 2s...');
           setTimeout(() => check(1), 2000);
         } else {
-          // Second fail, trigger restart if not already done
           setStatus('error');
           if (!restartTriggered.current) {
             triggerRestart();
@@ -77,10 +112,9 @@ const HealthBanner = () => {
       console.log('🔄 Backend ulaşılamaz durumda, restart tetikleniyor...');
       try {
         await fetch('http://localhost:3005/restart');
-        // Restart sonrası sisteme kendine gelmesi için zaman tanı
         setTimeout(() => {
           setIsRestarting(false);
-          check(); // Check again after cooldown
+          check();
         }, 30000); 
       } catch (err) {
         console.error('Restart servisine ulaşılamadı.');
@@ -92,7 +126,7 @@ const HealthBanner = () => {
     };
 
     check();
-    const interval = setInterval(() => check(), 15000); // Check every 15s
+    const interval = setInterval(() => check(), 15000);
     return () => clearInterval(interval);
   }, [isRestarting]);
 
@@ -110,7 +144,7 @@ const HealthBanner = () => {
           status === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-red-500/10 border-red-500/20 text-red-600 animate-pulse'
         }`}>
           {status === 'ok' ? <CheckCircle2 size={14} /> : <Loader2 size={14} className="animate-spin" />}
-          <span className="text-[10px] font-black uppercase tracking-widest italic">
+          <span className="text-[10px] font-black uppercase tracking-widest italic font-sans">
             {status === 'ok' ? 'System Online' : isRestarting ? 'Sistem Yeniden Başlatılıyor...' : 'System Offline'}
           </span>
         </div>
@@ -119,18 +153,25 @@ const HealthBanner = () => {
   );
 };
 
-const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string, onLogout: () => void, companyLogo: string | null }) => {
+const TenantAppInner = ({ 
+  tenantId, 
+  setTenantId,
+  onLogout, 
+  companyLogo 
+}: { 
+  tenantId: string, 
+  setTenantId: (id: string) => void,
+  onLogout: () => void, 
+  companyLogo: string | null 
+}) => {
   const { currentUser, setCurrentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Close sidebar on tab change (mobile)
   useEffect(() => {
     setIsSidebarOpen(false);
   }, [activeTab]);
 
-  // Auto-fix for legacy 'user1' IDs in localStorage
   useEffect(() => {
     if (currentUser?.id === 'user1') {
       console.log('🧹 Legacy user ID detected, updating to default...');
@@ -153,38 +194,67 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
   const [documents, setDocuments] = useState<CorporateDocument[]>([]);
   const [proposals, setProposals] = useState<any[]>([]);
 
-  const fetchData = useCallback(async () => {
-    if (!tenantId) return;
-    setLoading(true);
-    try {
-      const [oppsData, custData, projData, contrData, tasksData, unitsData, usersData, docsData, propsData] = await Promise.all([
-        apiService.getOpportunities(),
-        apiService.getCustomers(),
-        apiService.getProjects(),
-        apiService.getContracts(),
-        apiService.getTasks(),
-        apiService.getUnits(),
-        apiService.getUsers(),
-        apiService.getDocuments(),
-        apiService.getProposals()
-      ]);
+  // Lazy load enabled flags based on active tab
+  const isCrmActive = activeTab.startsWith('crm');
+  const isDashboardActive = activeTab === 'dashboard';
+  const isPresalesActive = activeTab === 'presales';
+  const isSettingsActive = activeTab.startsWith('settings-');
+  const isProjectActive = activeTab === 'project-mgmt' || activeTab === 'procurement';
+  const isTodoActive = activeTab === 'todo';
+  const isDocsActive = activeTab === 'documents';
+  const isContractsActive = activeTab === 'contracts';
+  const isCostActive = activeTab === 'cost-analysis';
 
-      setOpportunities(oppsData);
-      setCustomers(custData);
-      setProjects(projData);
-      setContracts(contrData);
-      setTasks(tasksData);
-      setUnits(unitsData);
-      setSystemUsers(usersData);
-      setDocuments(docsData);
-      setProposals(propsData);
-    } catch (error) {
-      console.error('Data fetching error:', error);
-      alert('Veri yüklenirken hata oluştu: ' + JSON.stringify(error));
-    } finally {
-      setLoading(false);
-    }
-  }, [tenantId]);
+  const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
+    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive
+  });
+  const { data: customersData, isLoading: customersLoading } = useCustomers(tenantId, {
+    enabled: isCrmActive
+  });
+  const { data: projectsData, isLoading: projectsLoading } = useProjects(tenantId, {
+    enabled: isDashboardActive || isProjectActive || isContractsActive || isTodoActive
+  });
+  const { data: contractsData, isLoading: contractsLoading } = useContracts(tenantId, {
+    enabled: isDashboardActive || isContractsActive || isTodoActive
+  });
+  const { data: tasksData, isLoading: tasksLoading } = useTasks(tenantId, {
+    enabled: isDashboardActive || isCrmActive || isProjectActive || isContractsActive || isTodoActive
+  });
+  const { data: unitsData, isLoading: unitsLoading } = useUnits(tenantId, {
+    enabled: isSettingsActive || isPresalesActive
+  });
+  const { data: systemUsersData, isLoading: systemUsersLoading } = useUsers(tenantId, {
+    enabled: isSettingsActive || isPresalesActive
+  });
+  const { data: documentsData, isLoading: documentsLoading } = useDocuments(tenantId, {
+    enabled: isDocsActive
+  });
+  const { data: proposalsData, isLoading: proposalsLoading } = useProposals(tenantId, {
+    enabled: isCrmActive
+  });
+
+  // Sync React Query data to local state for compatibility
+  useEffect(() => { if (opportunitiesData) setOpportunities(opportunitiesData); }, [opportunitiesData]);
+  useEffect(() => { if (customersData) setCustomers(customersData); }, [customersData]);
+  useEffect(() => { if (projectsData) setProjects(projectsData); }, [projectsData]);
+  useEffect(() => { if (contractsData) setContracts(contractsData); }, [contractsData]);
+  useEffect(() => { if (tasksData) setTasks(tasksData); }, [tasksData]);
+  useEffect(() => { if (unitsData) setUnits(unitsData); }, [unitsData]);
+  useEffect(() => { if (systemUsersData) setSystemUsers(systemUsersData); }, [systemUsersData]);
+  useEffect(() => { if (documentsData) setDocuments(documentsData); }, [documentsData]);
+  useEffect(() => { if (proposalsData) setProposals(proposalsData); }, [proposalsData]);
+
+  // Combined Loading state based on active tab
+  const loading = 
+    (isCrmActive && (opportunitiesLoading || customersLoading || tasksLoading || proposalsLoading)) ||
+    (isDashboardActive && (opportunitiesLoading || projectsLoading || tasksLoading || contractsLoading)) ||
+    (isPresalesActive && (opportunitiesLoading || unitsLoading || systemUsersLoading)) ||
+    (isSettingsActive && (unitsLoading || systemUsersLoading)) ||
+    (isProjectActive && (projectsLoading || tasksLoading)) ||
+    (isTodoActive && (tasksLoading || projectsLoading || opportunitiesLoading || contractsLoading)) ||
+    (isDocsActive && documentsLoading) ||
+    (isContractsActive && (contractsLoading || opportunitiesLoading || projectsLoading || tasksLoading)) ||
+    (isCostActive && opportunitiesLoading);
 
   const handleApproveProposal = async (opportunityId: string) => {
     try {
@@ -197,15 +267,11 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
     }
   };
 
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
   const renderContent = () => {
     console.log('Rendering content for activeTab:', activeTab);
     if (loading) {
       return (
-        <div className="flex-1 flex items-center justify-center bg-background/50 backdrop-blur-sm">
+        <div className="flex-1 flex items-center justify-center bg-background/50 backdrop-blur-sm h-full">
           <div className="flex flex-col items-center gap-6">
             <Loader2 className="w-12 h-12 text-primary animate-spin" />
             <p className="text-foreground font-black uppercase tracking-[0.2em] text-[10px] italic">Veriler Senkronize Ediliyor</p>
@@ -219,12 +285,14 @@ const TenantAppInner = ({ tenantId, onLogout, companyLogo }: { tenantId: string,
       return (
         <SettingsModule 
           companyLogo={companyLogo} 
-          setCompanyLogo={() => {}} // This should be handled in App component now
+          setCompanyLogo={() => {}} 
           activeSubTab={subTab} 
           units={units}
           setUnits={setUnits}
           users={systemUsers}
           setUsers={setSystemUsers}
+          activeTenantId={tenantId}
+          setActiveTenantId={setTenantId}
         />
       );
     }
@@ -331,16 +399,24 @@ const App = () => {
   };
 
   return (
-    <ThemeProvider>
-      <HealthBanner />
-      {!isAuthenticated || !activeTenantId ? (
-        <Login onLogin={handleLogin} />
-      ) : (
-        <AuthProvider tenantId={activeTenantId}>
-          <TenantAppInner tenantId={activeTenantId} onLogout={handleLogout} companyLogo={companyLogo} />
-        </AuthProvider>
-      )}
-    </ThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider>
+        <HealthBanner />
+        <Toaster position="top-right" richColors />
+        {!isAuthenticated || !activeTenantId ? (
+          <Login onLogin={handleLogin} />
+        ) : (
+          <AuthProvider tenantId={activeTenantId}>
+            <TenantAppInner 
+              tenantId={activeTenantId} 
+              setTenantId={setActiveTenantId}
+              onLogout={handleLogout} 
+              companyLogo={companyLogo} 
+            />
+          </AuthProvider>
+        )}
+      </ThemeProvider>
+    </QueryClientProvider>
   );
 };
 

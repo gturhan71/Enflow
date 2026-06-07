@@ -1,5 +1,6 @@
 export interface WorkflowStep {
   id: string;
+  workflowId?: string;
   unitId: string;
   type: 'AUTO' | 'MANUAL';
   description: string;
@@ -31,6 +32,7 @@ export interface User {
   permissions: string[];
   unitId?: string;
   status: 'ACTIVE' | 'INACTIVE';
+  tenantId?: string;
 }
 
 export interface Permission {
@@ -112,18 +114,18 @@ export interface CostRequirement {
 
 export interface BoMItem {
   id: string;
-  opportunityId: string;
+  opportunityId?: string;
   projectId?: string;
   partNumber: string;
   description: string;
   quantity: number;
   purchaseCost: number;
   marginPercentage: number;
-  unitSalePrice: number;
-  totalSalePrice: number;
-  vendor: string;
-  source: 'API' | 'EXCEL' | 'MANUAL';
-  status: 'PENDING_MATCH' | 'MATCHED';
+  unitSalePrice?: number;
+  totalSalePrice?: number;
+  vendor?: string;
+  source?: 'API' | 'EXCEL' | 'MANUAL';
+  status?: 'PENDING_MATCH' | 'MATCHED';
 }
 
 export interface CostItem {
@@ -132,6 +134,24 @@ export interface CostItem {
   category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' | 'OTHER';
   amount: number;
   opportunityId: string;
+  tenantId?: string;
+}
+
+export type SubscriptionPlanType = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
+
+export interface Subscription {
+  id: string;
+  plan: SubscriptionPlanType;
+  tenantId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProcurementNote {
+  id: string;
+  date: string;
+  note: string;
+  author: string;
 }
 
 export interface Project {
@@ -146,6 +166,7 @@ export interface Project {
   managerId?: string;
   progress?: number;
   opportunityId?: string;
+  procurementNotes?: ProcurementNote[];
 }
 
 export interface Contract {
@@ -163,8 +184,12 @@ export interface Contract {
 export interface ContractDocumentRequirement {
   id: string;
   contractId: string;
-  type: string;
-  status: 'PENDING' | 'UPLOADED' | 'VERIFIED';
+  type?: string;
+  name?: string;
+  description?: string;
+  status: 'PENDING' | 'UPLOADED' | 'VERIFIED' | 'APPROVED';
+  dueDate?: string;
+  fileUrl?: string;
 }
 
 export interface ProjectTask {
@@ -173,8 +198,8 @@ export interface ProjectTask {
   title: string;
   description: string;
   assignedTo: string;
-  status: 'TODO' | 'DOING' | 'DONE';
-  dueDate: string;
+  status: 'TODO' | 'DOING' | 'DONE' | 'IN_PROGRESS';
+  dueDate?: string;
 }
 
 export interface TodoTask {
@@ -183,11 +208,12 @@ export interface TodoTask {
   description?: string;
   unitId: string;
   assignedBy: string;
-  priority: 'LOW' | 'MEDIUM' | 'HIGH';
-  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate?: string;
   relatedModule?: string;
   relatedItemId?: string;
+  createdAt?: string;
 }
 
 export interface Tenant {
@@ -206,19 +232,35 @@ export interface CorporateDocument {
 
 export interface NextcloudConfig {
   url: string;
-  username: string;
-  appPassword: string;
+  adminUser?: string;
+  adminPass?: string;
+  username?: string;
+  appPassword?: string;
+  basePath?: string;
+  isEnabled?: boolean;
 }
 
 export interface ExchangeConfig {
-  server: string;
-  email: string;
+  serverUrl?: string;
+  server?: string;
+  domain?: string;
+  email?: string;
+  adminEmail?: string;
   password?: string;
+  adminPass?: string;
+  isEnabled?: boolean;
+  syncEmails?: boolean;
+  syncCalendar?: boolean;
 }
 
 export interface WhatsAppConfig {
-  apiKey: string;
-  phoneNumber: string;
+  phoneNumberId?: string;
+  apiKey?: string;
+  phoneNumber?: string;
+  accessToken?: string;
+  businessAccountId?: string;
+  webhookVerifyToken?: string;
+  isEnabled?: boolean;
 }
 
 export interface Notification {
@@ -243,7 +285,7 @@ export interface WorkflowLog {
   assignedTo: string;
   note: string;
   timestamp: string;
-  status: 'PENDING' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'COMPLETED' | 'CANCELLED' | 'APPROVED';
 }
 
 export type LicenseModel = 'KOBI' | 'PAY_AS_YOU_GO' | 'ON_PREMISE';
@@ -280,4 +322,32 @@ export interface LicenseData {
     storage: number;
   };
   signature: string;
+}
+
+export interface ArchiveItem {
+  id: string;
+  boxNo: string;
+  shelfNo: string;
+  category: string;
+  description?: string;
+  owner: string;
+  date: string;
+  status: string;
+  tags?: string;
+  tenantId: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface AnalysisResultProduct {
+  pn: string;
+  description: string;
+  quantity: number;
+}
+
+export interface AnalysisResult {
+  title: string;
+  summary: string;
+  specDetails: string;
+  extractedProducts: AnalysisResultProduct[];
 }
