@@ -1,61 +1,45 @@
-# Enflow — Commercial Enterprise Process OS
+# Enflow Memory Repository
 
-Enflow, modern işletmelerin satış öncesi süreçlerden proje kapanışına ve fiziksel arşivlemeye kadar olan tüm kurumsal süreçlerini dijitalleştiren, **proprietary (ticari)** bir İşletim Sistemidir.
+Bu klasör, Enflow projesinin tüm bellek, doküman ve geçmiş kayıtlarını içerir.
 
-Enflow, karmaşık süreçleri otomatize etmek, insan hatasını minimize etmek ve uçtan uca veri bütünlüğü sağlamak amacıyla tasarlanmış kurumsal düzeyde bir platformdur.
+## Dosyalar
 
----
+| Dosya | Açıklama |
+|-------|----------|
+| `memory.md` | Güncel proje durumu, check-list ve kararlar |
+| `walkthrough.md` | Teknik mimari, modüller ve güncelleme notları |
+| `readme.md` | Bu dosya — bellek deposu kılavuzu |
 
-## 🛠 Temel Modüller ve İşlevsellik
+## Sürüm Takibi
 
-Enflow, birbirine entegre çalışan modüler bir mimariye sahiptir:
+- **v1.6.2 (08.06.2026):** Backend TypeScript derleme sorunu giderildi. Express `Request` typing pattern normalize edildi. Backend 3002, Frontend 5173 portları stabilize.
+- **v1.6.1 (05.06.2026):** Teklif onay akışı, Approval Chain, SaveButton entegrasyonu.
+- **v1.6.0:** Workflow Hand-off canlıya alındı, mobil navigasyon eklendi.
 
-### 1. CRM & Müşteri Yönetimi
-- **Satış Boru Hattı:** Fırsatların (Opportunities) nitelikli hale getirilmesi ve teknik analize sunulması.
-- **Müşteri Veri Merkezi:** Genişletilmiş müşteri kartları, risk skorları ve kredi limitleri yönetimi.
-- **Teklif Yönetimi:** Onay mekanizmasına sahip, versiyon kontrollü teklif hazırlama ve PDF üretimi.
+## Frontend Komutları
 
-### 2. Presales (Satış Öncesi) Dizayn
-- **AI Şartname Analizi:** Yapay zeka destekli teknik şartname analizi.
-- **BoM Yönetimi:** Otomatik veya manuel ürün ağacı (BoM) oluşturma ve maliyetlendirme.
-- **Ek Maliyet Analizi:** İşçilik, lojistik ve diğer operasyonel giderlerin (Cost Analysis) fırsat bazlı takibi.
+```bash
+# Frontend (Vite) — kendi bağımlı olduğu backend 3002 ile konuşur
+pnpm install
+pnpm dev --port 3000 --host
 
-### 3. İş Akışı (Workflow) Motoru
-- **Tasarımcı:** Sürükle-bırak mantığına yakın, birimler arası devir (Hand-off) kurgulama.
-- **Onay Zinciri:** Yönetici onay mekanizması (Satış -> Teknik -> GM Onayı).
-- **Simülasyon:** Süreçlerin sahaya inmeden önce dijital simülasyonu.
-- **Bildirimler:** Süreç değişimlerinde otomatik WhatsApp ve Exchange e-posta bildirimleri.
+# docker-compose.yml ile de çalıştırılabilir
+docker-compose up -d
+```
 
-### 4. Proje Yönetimi & Satın Alma
-- **Kanban Operasyon:** Görevlerin birim bazlı takibi.
-- **Satın Alma:** BoM kalemlerinin distribütör bazlı takibi ve tedarik süreçleri.
+## Backend Komutları
 
-### 5. Sözleşme & Fiziksel Arşiv
-- **DMS Entegrasyonu:** İmzalı sözleşmelerin dijital yönetimi.
-- **Fiziksel Arşiv:** Sözleşmelerin hangi oda/raf/kutuda saklandığının takibi.
+```bash
+cd backend
+pnpm install
+pnpm dev        # Port 3002
+# veya
+docker compose up -d  # Port 3001
+```
 
----
+## Memory Güncelleme Kuralları
 
-## 🏢 İşleyiş Mantığı (Business Flow)
-
-Enflow, veriyi "Fırsat" statüsünde alır ve "Arşiv" statüsünde sonlandırır:
-1. **Fırsat** tanımlanır.
-2. **Teknik Analiz** (Presales) yapılır.
-3. **Maliyetler** onaylanır.
-4. **Teklif** oluşturulur ve yönetici onayına gider.
-5. **Sözleşme** imzalanır.
-6. **Proje** başlatılır ve operasyon süreçleri (Satın alma, Kurulum, UAT) çalıştırılır.
-7. **Kapanış ve Fiziksel Arşivleme** ile süreç tamamlanır.
-
----
-
-## 💼 Ticari Bilgilendirme
-
-Bu proje, **T-Ecosystem** bünyesinde geliştirilen **ticari bir üründür**.
-- **Lisanslama:** Proprietary Lisans Anahtarı sistemi ile korunmaktadır.
-- **Multi-tenant:** Kurumsal müşteri bazlı veri izolasyonu sağlanmıştır.
-- **Kullanım:** Sadece yetkili organizasyonlar için geliştirilmiştir.
-
-*Bu doküman Enflow v1.6.1 sürümü için hazırlanmıştır.*
-EOF
-,file_path:
+1. Her milestone sonrası `memory.md` ve `walkthrough.md` güncellenmeli.
+2. Versiyon numarası `v1.minor.patch` formatında artırılır.
+3. Güncelleme notları, yapılan değişiklikleri izah etmelidir.
+4. Commit mesajı formatı: `docs: v1.x.x — [kısa açıklama]`
