@@ -1,6 +1,10 @@
+[2m12:30:21 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
 
-  [32m[1mVITE[22m v6.4.2[39m  [2mready in [0m[1m254[22m[2m[0m ms[22m
+  [32m[1mVITE[22m v6.4.2[39m  [2mready in [0m[1m405[22m[2m[0m ms[22m
 
   [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
   [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.1.154:[1m3000[22m/[39m
-  [32m➜[39m  [1mNetwork[22m: [36mhttp://100.74.163.24:[1m3000[22m/[39m
+[2m12:33:35 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mmemory.md[22m
+[2m12:33:55 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mwalkthrough.md[22m
+[2m12:34:16 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mREADME.md[22m
+[2m12:34:50 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m [32mpage reload [39m[2mREADME.md[22m
