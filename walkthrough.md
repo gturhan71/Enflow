@@ -81,17 +81,17 @@ Sistem şu an "Ready to Deploy" iskeletine sahiptir:
 
 ---
 
-*Bu doküman Enflow v1.2.5 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
+*Bu doküman Enflow v1.6.2 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
 
 ---
-## v1.6.0 Güncelleme Notları
-- **Mobile-First Navigation:** Mobil cihazlar için özel alt navigasyon barı (Bottom Nav) eklendi.
-- **Workflow Hand-off:** Birimler arası görev aktarımında otomatik WhatsApp ve E-posta bildirim entegrasyonu (WorkflowService) canlıya alındı.
-- **Accessibility:** Aydınlık modda kontrast ve okunabilirlik iyileştirmeleri (High-Contrast Glass UI).
 
----
 ## v1.6.1 Final Güncelleme (05.06.2026)
 - **UI/UX:** Tüm modüllerde aydınlık modda okunabilirlik için Glass-morphism kontrast iyileştirmesi yapıldı.
 - **Teklif Yönetimi:** Yönetici onay mekanizması, 'Reddet/Onayla' aksiyonları ve revizyon akışı (Draft -> Pending -> Approved/Rejected) entegre edildi.
 - **Workflow:** Onay zinciri (Approval Chain) altyapısı kuruldu.
 - **Veri Yönetimi:** Tüm veri girişi yapılan modüllere merkezi 'SaveButton' bileşeni eklendi.
+
+## v1.6.2 Güncelleme (08.06.2026)
+- **Backend Derleme:** TypeScript triple-slash reference ve express namespace augmentation çakışması giderildi. `express.d.ts` doğrudan `Request` extend eden pattern'a çevrildi.
+- **Servis Stabilizasyonu:** Backend port 3002, frontend port 5173 olarak stabilize edildi ve Vite proxy yapılandırması doğrulandı.
+- **Multi-tenant:** `x-tenant-id` header yapısı ile veri izolasyonu her endpoint'te doğru şekilde uygulanıyor.
