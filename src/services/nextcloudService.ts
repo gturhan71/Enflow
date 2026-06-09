@@ -1,4 +1,5 @@
 import { User, NextcloudConfig } from '../types';
+import { logger } from '../utils/logger';
 
 /**
  * Nextcloud Integration Service
@@ -18,7 +19,7 @@ class NextcloudService {
    * If the user doesn't exist, it creates them with the appropriate group/permissions.
    */
   async syncUser(user: User): Promise<boolean> {
-    console.log(`[Nextcloud] Syncing user: ${user.email} with role ${user.role}`);
+    logger.debug(`[Nextcloud] Syncing user: ${user.email} with role ${user.role}`);
     // Real implementation would use Nextcloud OCS API:
     // POST /ocs/v1.php/cloud/users
     return true;
@@ -42,10 +43,10 @@ class NextcloudService {
    */
   async uploadFile(file: File, moduleName: string, projectName?: string): Promise<string> {
     const path = this.getFolderPath(moduleName, projectName);
-    console.log(`[Nextcloud] Creating directory structure: ${path}`);
+    logger.debug(`[Nextcloud] Creating directory structure: ${path}`);
     // Real implementation would use WebDAV MKCOL for each segment
-    
-    console.log(`[Nextcloud] Uploading file ${file.name} to ${path}`);
+
+    logger.debug(`[Nextcloud] Uploading file ${file.name} to ${path}`);
     // Real implementation would use WebDAV PUT
     
     return `${this.config.url}/remote.php/dav/files/${this.config.adminUser}${path}/${file.name}`;
@@ -56,7 +57,7 @@ class NextcloudService {
    */
   updateConfig(newConfig: Partial<NextcloudConfig>) {
     this.config = { ...this.config, ...newConfig };
-    console.log('[Nextcloud] Configuration updated');
+    logger.debug('[Nextcloud] Configuration updated');
   }
 
   getConfig(): NextcloudConfig {

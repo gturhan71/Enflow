@@ -1,20 +1,13 @@
 import { whatsappService } from './whatsappService';
 import { exchangeService } from './exchangeService';
-import { WorkflowLog, Notification } from '../types';
+import { WorkflowLog, Notification, ApprovalStage, ApprovalChain } from '../types';
+import { logger } from '../utils/logger';
 
-interface ApprovalStage {
+interface HandOffParticipant {
   id: string;
-  role: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
-  approverId?: string;
-  note?: string;
-}
-
-interface ApprovalChain {
-  id: string;
-  entityId: string; // e.g., proposalId
-  stages: ApprovalStage[];
-  status: 'PENDING' | 'COMPLETED' | 'REJECTED';
+  name: string;
+  email?: string;
+  phone?: string;
 }
 
 class WorkflowService {
@@ -60,8 +53,8 @@ class WorkflowService {
     itemTitle: string;
     fromUnit: string;
     toUnit: string;
-    fromUser: any;
-    toUser: any;
+    fromUser: HandOffParticipant;
+    toUser: HandOffParticipant;
     note: string;
   }) {
     const { itemId, itemTitle, fromUnit, toUnit, fromUser, toUser, note } = params;
@@ -109,7 +102,7 @@ class WorkflowService {
     };
     this.notifications.push(sysNotification);
 
-    console.log(`[Workflow] Hand-off completed for ${itemTitle} from ${fromUnit} to ${toUnit}`);
+    logger.debug(`[Workflow] Hand-off completed for ${itemTitle} from ${fromUnit} to ${toUnit}`);
     return newLog;
   }
 

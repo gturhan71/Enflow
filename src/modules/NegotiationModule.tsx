@@ -21,7 +21,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Opportunity } from '../types';
+import { Opportunity, Proposal } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { cn } from '../lib/utils';
@@ -51,7 +51,7 @@ const NegotiationModule = ({
 }: {
   opportunities: Opportunity[];
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
-  proposals?: any[];
+  proposals?: Proposal[];
   setActiveTab?: (tab: string) => void;
 }) => {
   const { currentUser } = useAuth();
@@ -303,8 +303,8 @@ const NegotiationModule = ({
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: chatOffer } : o));
       alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${chatOffer.toLocaleString()} olarak sisteme işlendi.`);
       if (setActiveTab) setActiveTab('contracts');
-    } catch (err: any) {
-      alert(err.message || 'Hata oluştu.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Hata oluştu.');
     }
   };
 
@@ -534,8 +534,8 @@ const NegotiationModule = ({
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: auctionWinner.price } : o));
       alert(`Açık eksiltme zaferi tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${auctionWinner.price.toLocaleString()} olarak sisteme işlendi.`);
       if (setActiveTab) setActiveTab('contracts');
-    } catch (err: any) {
-      alert(err.message || 'Hata oluştu.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Hata oluştu.');
     }
   };
 

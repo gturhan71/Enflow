@@ -73,19 +73,7 @@ import {
   MOCK_TODO_TASKS,
   MOCK_OPPORTUNITIES
 } from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
-  TodoTask,
-  Opportunity,
-  Project,
+import {
   NextcloudConfig,
   ExchangeConfig,
   WhatsAppConfig
@@ -102,13 +90,13 @@ const IntegrationWizard = ({
   setExConfig,
   waConfig,
   setWaConfig
-}: { 
-  ncConfig: any, 
-  setNcConfig: (c: any) => void,
-  exConfig: any,
-  setExConfig: (c: any) => void,
-  waConfig: any,
-  setWaConfig: (c: any) => void
+}: {
+  ncConfig: NextcloudConfig,
+  setNcConfig: (c: NextcloudConfig) => void,
+  exConfig: ExchangeConfig,
+  setExConfig: (c: ExchangeConfig) => void,
+  waConfig: WhatsAppConfig,
+  setWaConfig: (c: WhatsAppConfig) => void
 }) => {
   const [selectedIntegration, setSelectedIntegration] = useState<string | null>(null);
   const [wizardStep, setWizardStep] = useState(1);

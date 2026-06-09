@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { logger } from '../utils/logger';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   GitBranch, ArrowRight, Plus, Trash2, Settings2, Activity, CheckCircle2, 
@@ -12,7 +13,6 @@ import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { SIMULATION_STEPS } from '../constants/simulationSteps';
 
 const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
-  console.log('WorkflowBuilder rendered with units:', units);
   const { setHasUnsavedChanges } = useUnsavedChanges();
   const [workflows, setWorkflows] = useState<Workflow[]>([]);
   const [activeWorkflow, setActiveWorkflow] = useState<Workflow | null>(null);
@@ -24,12 +24,11 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
 
   useEffect(() => {
-    console.log('Fetching workflows...');
     fetchWorkflows();
   }, []);
 
   useEffect(() => {
-    let interval: any;
+    let interval: ReturnType<typeof setInterval> | undefined;
     if (isAutoPlaying) {
       interval = setInterval(() => {
         setCurrentSimStep(prev => (prev === SIMULATION_STEPS.length - 1 ? 0 : prev + 1));
@@ -42,7 +41,6 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     setLoading(true);
     try {
       const data = await apiService.getWorkflows();
-      console.log('Workflows loaded:', data);
       const safeData = Array.isArray(data) ? data : [];
       setWorkflows(safeData);
       if (safeData.length > 0) {
@@ -51,7 +49,7 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
         setActiveWorkflow(null);
       }
     } catch (error) {
-      console.error('Workflows could not be loaded', error);
+      logger.error('Workflows could not be loaded', error);
       setWorkflows([]);
       setActiveWorkflow(null);
     } finally {
@@ -138,7 +136,7 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
         setActiveWorkflow(saved);
       }
       alert('İş akışı başarıyla kaydedildi.');
-    } catch (error: any) {
+    } catch (error) {
       alert(error.message || 'Kayıt sırasında hata oluştu.');
     } finally {
       setSaving(false);

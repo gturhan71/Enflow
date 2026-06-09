@@ -28,6 +28,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
   role: string;
   permissions: string[];
   unitId?: string;
@@ -274,6 +275,31 @@ export interface Notification {
   scheduledAt?: string;
   relatedModule?: string;
   relatedItemId?: string;
+}
+
+export interface Proposal {
+  id: string;
+  opportunityId: string;
+  customerId?: string;
+  createdById?: string;
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ACCEPTED';
+  version?: number;
+  openForNegotiation?: boolean;
+  content?: string | Record<string, unknown>;
+  items?: BoMItem[];
+  totalPrice?: number;
+  description?: string;
+  terms?: string;
+  tenantId?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ApprovalChain {
+  id: string;
+  entityId: string;
+  stages: ApprovalStage[];
+  status: 'PENDING' | 'COMPLETED' | 'REJECTED';
 }
 
 export interface WorkflowLog {

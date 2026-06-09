@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import { Opportunity, BoMItem, CostItem } from '../types';
+import { Opportunity, BoMItem, CostItem, Customer, Proposal } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 
@@ -29,15 +29,15 @@ interface ProposalEditorProps {
   opportunity: Opportunity;
   bomItems: BoMItem[];
   costItems: CostItem[];
-  customers: any[];
+  customers: Customer[];
   version: number;
   initialData?: {
-    items?: any[];
+    items?: BoMItem[];
     terms?: string;
     description?: string;
     totalPrice?: number;
   };
-  onSave: (proposal: any) => void;
+  onSave: (proposal: Omit<Proposal, 'id'>) => void;
   onCancel: () => void;
 }
 
@@ -314,7 +314,7 @@ const ProposalEditor = ({ opportunity, bomItems, costItems, customers, version, 
           </button>
 
           <button 
-            onClick={() => onSave({ items, totalPrice: manualTotalPrice, description, terms, version, openForNegotiation })}
+            onClick={() => onSave({ opportunityId: opportunity.id, status: 'DRAFT', items, totalPrice: manualTotalPrice, description, terms, version, openForNegotiation })}
             className="px-10 py-3.5 bg-primary text-white rounded-2xl text-xs font-black hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 flex items-center gap-2 active:scale-95 uppercase tracking-widest"
           >
             <Save size={16} />

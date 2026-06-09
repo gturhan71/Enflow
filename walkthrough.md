@@ -81,7 +81,7 @@ Sistem şu an "Ready to Deploy" iskeletine sahiptir:
 
 ---
 
-*Bu doküman Enflow v1.6.2 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
+*Bu doküman Enflow v1.6.3 mimarisini ve Gökhan Turhan'ın MASTER standartlarını temsil eder.*
 
 ---
 
@@ -93,5 +93,14 @@ Sistem şu an "Ready to Deploy" iskeletine sahiptir:
 
 ## v1.6.2 Güncelleme (08.06.2026)
 - **Backend Derleme:** TypeScript triple-slash reference ve express namespace augmentation çakışması giderildi. `express.d.ts` doğrudan `Request` extend eden pattern'a çevrildi.
-- **Servis Stabilizasyonu:** Backend port 3002, frontend port 5173 olarak stabilize edildi ve Vite proxy yapılandırması doğrulandı.
+- **Servis Stabilizasyonu:** Backend port 3002, frontend port 3000 olarak stabilize edildi ve Vite proxy yapılandırması doğrulandı.
 - **Multi-tenant:** `x-tenant-id` header yapısı ile veri izolasyonu her endpoint'te doğru şekilde uygulanıyor.
+
+## v1.6.3 Güncelleme (09.06.2026)
+- **TypeScript Strict Refactoring:** Tüm `any` tip kullanımları (128 adet) kaldırılarak `types.ts`'deki proper interface'lere bağlandı. `Omit<T,'id'>` create, `Partial<T>` update pattern'ı benimsendi.
+- **Logger Utility:** `src/utils/logger.ts` oluşturuldu. Tüm `console.log` çağrıları (27 adet) `import.meta.env.DEV` korumalı `logger.debug/info/warn/error`'a dönüştürüldü. `tsconfig.json`'a `"types": ["vite/client"]` eklendi.
+- **Tip Genişletmeleri:** `Proposal` interface'e eksik alanlar eklendi (`customerId, createdById, openForNegotiation, content, items, totalPrice, description, terms`). `ApprovalChain` ve `Proposal` `types.ts`'e taşındı.
+- **Backend Modülarizasyon:** `backend/src/index.ts` (1064 satır) 17 ayrı router dosyasına bölündü:
+  - `backend/src/middleware.ts` — `asyncHandler`, `tenantMiddleware`, `withRetry`
+  - `backend/src/routes/` — auth, tenants, subscription, units, users, customers, opportunities, sync, projects, tasks, contracts, archive, notifications, documents, proposals, workflows, logs
+- **Sıfır Derleme Hatası:** Frontend `tsc --noEmit` ✅ Backend `tsc --noEmit` ✅

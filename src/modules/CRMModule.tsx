@@ -26,6 +26,7 @@ import {
   TodoTask,
   Opportunity,
   Customer,
+  Proposal,
 } from '../types';
 import ProposalEditor from './ProposalEditor';
 import NegotiationModule from './NegotiationModule';
@@ -53,8 +54,8 @@ const CRMModule = ({
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
   customers: Customer[],
   setCustomers: React.Dispatch<React.SetStateAction<Customer[]>>,
-  proposals: any[],
-  setProposals: React.Dispatch<React.SetStateAction<any[]>>,
+  proposals: Proposal[],
+  setProposals: React.Dispatch<React.SetStateAction<Proposal[]>>,
   activeTab?: string,
   tasks?: TodoTask[],
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>,
@@ -70,7 +71,7 @@ const CRMModule = ({
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
 
-  const handleHandOff = async (data: { toUnit: string; toUser: any; note: string }) => {
+  const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
     if (!handOffTarget || !currentUser) return;
     await workflowService.triggerHandOff({
       itemId: handOffTarget.id,
@@ -90,8 +91,8 @@ const CRMModule = ({
     try {
       await apiService.saveCRMData({ opportunities, customers, proposals });
       alert('Tüm CRM verileri başarıyla kaydedildi.');
-    } catch (err: any) {
-      alert(err.message || 'Kayıt başarısız.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Kayıt başarısız.');
     } finally {
       setLoading(false);
     }
@@ -100,7 +101,7 @@ const CRMModule = ({
   const customerSearch = useSearch(customers, ['name', 'shortName', 'industry']);
   const opportunitySearch = useSearch(opportunities, ['title', 'description']);
 
-  const handleSaveProposal = async (proposalData: any) => {
+  const handleSaveProposal = async (proposalData: Omit<Proposal, 'id'>) => {
     if (!selectedOpp) return;
     setLoading(true);
     try {
@@ -113,8 +114,8 @@ const CRMModule = ({
       setProposals(prev => [...(prev || []), saved]);
       setShowProposalEditor(false);
       setSelectedOpp(null);
-    } catch (err: any) {
-      alert(err.message || 'Teklif kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Teklif kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -136,8 +137,8 @@ const CRMModule = ({
     try {
       await apiService.revertOpportunityApproval(oppId);
       setOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, technicalStatus: 'PENDING' } : o));
-    } catch (err: any) {
-      alert(err.message || 'İşlem başarısız.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
       setLoading(false);
     }
@@ -151,14 +152,14 @@ const CRMModule = ({
       setCustomers(prev => [...prev, saved]);
       setShowNewCustomerModal(false);
       customerForm.resetForm();
-    } catch (err: any) {
-      alert(err.message || 'Müşteri kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Müşteri kaydedilemedi.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleWonProposal = async (proposal: any) => {
+  const handleWonProposal = async (proposal: Proposal) => {
     if (!window.confirm('Bu teklifi KAZANILDI olarak işaretlemek istediğinize emin misiniz?')) return;
     setLoading(true);
     try {
@@ -170,14 +171,14 @@ const CRMModule = ({
       
       alert('Tebrikler! Teklif kazanıldı. Sözleşme yönetimi modülüne yönlendiriliyorsunuz.');
       if (setActiveTab) setActiveTab('contract');
-    } catch (err: any) {
-      alert(err.message || 'İşlem başarısız.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLostProposal = async (proposal: any) => {
+  const handleLostProposal = async (proposal: Proposal) => {
     if (!window.confirm('Bu teklifi KAYBEDİLDİ olarak işaretlemek istediğinize emin misiniz?')) return;
     setLoading(true);
     try {
@@ -186,8 +187,8 @@ const CRMModule = ({
       
       setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED' } : p));
       setOpportunities(prev => prev.map(o => o.id === proposal.opportunityId ? { ...o, status: 'LOST' } : o));
-    } catch (err: any) {
-      alert(err.message || 'İşlem başarısız.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
       setLoading(false);
     }
@@ -217,8 +218,8 @@ const CRMModule = ({
       setShowNewOpportunityModal(false);
       setIsEditingOpp(false);
       opportunityForm.resetForm();
-    } catch (err: any) {
-      alert(err.message || 'Fırsat kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Fırsat kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -309,11 +310,8 @@ const CRMModule = ({
     const readyForProposalOpps = opportunities.filter(opp => {
       const isApproved = opp.technicalStatus === 'APPROVED';
       const hasProposal = proposals.find(p => p.opportunityId === opp.id);
-      console.log(`Debug: Opp ${opp.title}, Approved: ${isApproved}, HasProposal: ${!!hasProposal}`);
       return isApproved && !hasProposal;
     });
-
-    console.log('Rendering Proposals, All Opportunities:', opportunities.map(o => ({title: o.title, status: o.technicalStatus})));
 
     return (
     <div className="p-8">

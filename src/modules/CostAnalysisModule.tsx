@@ -111,8 +111,8 @@ const CostAnalysisModule = ({
       ));
 
       alert('Analiz başarıyla kaydedildi ve teklif aşamasına aktarıldı.');
-    } catch (err: any) {
-      alert(err.message || 'Kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Kaydedilemedi.');
     } finally {
       setLoading(false);
     }

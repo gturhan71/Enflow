@@ -57,8 +57,8 @@ export const useBoM = (
       ));
       
       return true;
-    } catch (err: any) {
-      alert(err.message || 'Onay sürecinde hata oluştu.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Onay sürecinde hata oluştu.');
       return false;
     } finally {
       setIsSubmitting(false);

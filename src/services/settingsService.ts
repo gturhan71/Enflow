@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { Unit, User, Notification, Workflow } from '../types';
 
 export const settingsService = {
   // --- TENANTS ---
@@ -25,7 +26,7 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/units');
   },
 
-  async createUnit(unitData: any) {
+  async createUnit(unitData: Omit<Unit, 'id'>) {
     return apiClient.fetchWithAuth('/units', {
       method: 'POST',
       body: JSON.stringify(unitData)
@@ -44,14 +45,14 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/users');
   },
 
-  async createUser(userData: any) {
+  async createUser(userData: Omit<User, 'id'>) {
     return apiClient.fetchWithAuth('/users', {
       method: 'POST',
       body: JSON.stringify(userData)
     });
   },
 
-  async updateUser(id: string, userData: any) {
+  async updateUser(id: string, userData: Partial<User>) {
     return apiClient.fetchWithAuth(`/users/${id}`, {
       method: 'PUT',
       body: JSON.stringify(userData)
@@ -85,14 +86,14 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/notifications');
   },
 
-  async createNotification(data: any) {
+  async createNotification(data: Omit<Notification, 'id'>) {
     return apiClient.fetchWithAuth('/notifications', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateNotification(id: string, data: any) {
+  async updateNotification(id: string, data: Partial<Notification>) {
     return apiClient.fetchWithAuth(`/notifications/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -114,14 +115,14 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/workflows');
   },
 
-  async createWorkflow(data: any) {
+  async createWorkflow(data: Omit<Workflow, 'id'>) {
     return apiClient.fetchWithAuth('/workflows', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateWorkflow(id: string, data: any) {
+  async updateWorkflow(id: string, data: Partial<Workflow>) {
     return apiClient.fetchWithAuth(`/workflows/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)

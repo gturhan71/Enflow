@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { logger } from './utils/logger';
 import { motion, AnimatePresence } from 'motion/react';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -6,7 +7,7 @@ import { Toaster, toast } from 'sonner';
 
 // Global alert interceptor mapping alert() to Sonner toasts
 if (typeof window !== 'undefined') {
-  window.alert = (message: any) => {
+  window.alert = (message: unknown) => {
     const msgStr = String(message);
     const msg = msgStr.toLowerCase();
     if (msg.includes('hata') || msg.includes('fail') || msg.includes('başarısız') || msg.includes('geçersiz') || msg.includes('olmadı') || msg.includes('silinemedi')) {
@@ -21,8 +22,9 @@ if (typeof window !== 'undefined') {
 import { 
   MOCK_SYSTEM_USERS 
 } from './constants';
-import { 
+import {
   Contract,
+  Customer,
   Opportunity,
   Project,
   TodoTask,
@@ -93,7 +95,7 @@ const HealthBanner = () => {
         }
       } catch {
         if (retryCount < 1) {
-          console.log('⚠️ Backend check 1 failed, retrying in 2s...');
+          logger.warn('⚠️ Backend check 1 failed, retrying in 2s...');
           setTimeout(() => check(1), 2000);
         } else {
           setStatus('error');
@@ -109,7 +111,7 @@ const HealthBanner = () => {
       restartTriggered.current = true;
       setIsRestarting(true);
       
-      console.log('🔄 Backend ulaşılamaz durumda, restart tetikleniyor...');
+      logger.warn('🔄 Backend ulaşılamaz durumda, restart tetikleniyor...');
       try {
         await fetch('http://localhost:3005/restart');
         setTimeout(() => {
@@ -117,7 +119,7 @@ const HealthBanner = () => {
           check();
         }, 30000); 
       } catch (err) {
-        console.error('Restart servisine ulaşılamadı.');
+        logger.error('Restart servisine ulaşılamadı.');
         setTimeout(() => {
           setIsRestarting(false);
           restartTriggered.current = false;
@@ -174,7 +176,7 @@ const TenantAppInner = ({
 
   useEffect(() => {
     if (currentUser?.id === 'user1') {
-      console.log('🧹 Legacy user ID detected, updating to default...');
+      logger.debug('🧹 Legacy user ID detected, updating to default...');
       setCurrentUser(MOCK_SYSTEM_USERS[0]);
     }
   }, [currentUser, setCurrentUser]);
@@ -185,7 +187,7 @@ const TenantAppInner = ({
   }, [tenantId]);
 
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
-  const [customers, setCustomers] = useState<any[]>([]);
+  const [customers, setCustomers] = useState<Customer[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [tasks, setTasks] = useState<TodoTask[]>([]);
@@ -258,17 +260,15 @@ const TenantAppInner = ({
 
   const handleApproveProposal = async (opportunityId: string) => {
     try {
-      const response = await apiService.approveProposal(opportunityId, { note: 'Dashboard üzerinden onaylandı.' });
-      setOpportunities(prev => prev.map(opp => opp.id === opportunityId ? { ...opp, technicalStatus: 'APPROVED', status: 'PROPOSAL' } : opp));
-      console.log('Proposal approved:', response);
+      await apiService.approveProposal(opportunityId, { note: 'Dashboard üzerinden onaylandı.' });
+      setOpportunities(prev => prev.map(opp => opp.id === opportunityId ? { ...opp, technicalStatus: 'APPROVED' as const, status: 'PROPOSAL' as const } : opp));
     } catch (error) {
-      console.error('Approval error:', error);
+      logger.error('Approval error:', error);
       alert('Onay işlemi sırasında bir hata oluştu.');
     }
   };
 
   const renderContent = () => {
-    console.log('Rendering content for activeTab:', activeTab);
     if (loading) {
       return (
         <div className="flex-1 flex items-center justify-center bg-background/50 backdrop-blur-sm h-full">

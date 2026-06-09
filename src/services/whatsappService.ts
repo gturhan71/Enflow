@@ -1,4 +1,5 @@
 import { WhatsAppConfig } from '../types';
+import { logger } from '../utils/logger';
 
 class WhatsAppService {
   private config: WhatsAppConfig = {
@@ -15,7 +16,7 @@ class WhatsAppService {
 
   updateConfig(newConfig: WhatsAppConfig) {
     this.config = { ...newConfig, isEnabled: true };
-    console.log('WhatsApp Config Updated:', this.config);
+    logger.debug('WhatsApp Config Updated:', this.config);
   }
 
   testConnection(): Promise<boolean> {
@@ -29,7 +30,7 @@ class WhatsAppService {
       console.warn('WhatsApp service is not enabled.');
       return false;
     }
-    console.log(`[WhatsApp] Sending message to ${to}: ${text}`);
+    logger.debug(`[WhatsApp] Sending message to ${to}: ${text}`);
     // Real Meta API call would happen here
     return new Promise((resolve) => setTimeout(() => resolve(true), 800));
   }

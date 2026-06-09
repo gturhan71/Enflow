@@ -122,8 +122,8 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
       } else {
         alert('Dosyada uygun veri bulunamadı. Lütfen formatı kontrol edin.');
       }
-    } catch (err: any) {
-      alert(err.message || 'Dosya yükleme hatası.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Dosya yükleme hatası.');
     }
     
     if (fileInputRef.current) fileInputRef.current.value = '';

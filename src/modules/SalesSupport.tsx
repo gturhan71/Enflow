@@ -109,13 +109,11 @@ const SalesSupport = () => {
   });
 
   const handleCreateBid = () => {
-    console.log('Creating new bid:', newBid);
     setShowNewBidModal(false);
     setNewBid({ name: '', deadline: '', budget: 0, description: '' });
   };
 
   const handleCreatePetition = () => {
-    console.log('Creating petition:', newPetition);
     setShowPetitionModal(false);
     setNewPetition({ projectId: '', notes: '' });
   };

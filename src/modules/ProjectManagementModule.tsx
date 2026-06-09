@@ -112,7 +112,7 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<TodoTask | null>(null);
 
-  const handleHandOff = async (data: { toUnit: string; toUser: any; note: string }) => {
+  const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
     if (!handOffTarget) return;
     await workflowService.triggerHandOff({
       itemId: handOffTarget.id,
@@ -146,7 +146,6 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
   const relatedTasks = tasks?.filter(t => t.relatedModule === 'PROJECT' && t.relatedItemId === selectedProject?.id) || [];
 
   const handleAddTask = () => {
-    console.log('Adding project task:', newTask);
     setShowNewTaskModal(false);
     setNewTask({ status: 'TODO' });
   };
@@ -170,13 +169,11 @@ const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setAc
   };
 
   const handleCreateProcurementReq = () => {
-    console.log('Creating procurement req:', newProcurementReq);
     setShowNewProcurementReqModal(false);
     setNewProcurementReq({ title: '', description: '', priority: 'MEDIUM' });
   };
 
   const handleSendReport = () => {
-    console.log('Sending report:', newReport);
     setShowNewReportModal(false);
     setNewReport({ notes: '' });
   };

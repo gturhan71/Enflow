@@ -1,13 +1,21 @@
 import * as XLSX from 'xlsx';
 
-export const parseBoMFile = (file: File): Promise<any[]> => {
+interface ParsedBoMItem {
+  pn: string;
+  desc: string;
+  qty: number;
+  cost: number;
+  margin: number;
+}
+
+export const parseBoMFile = (file: File): Promise<ParsedBoMItem[]> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     const isXML = file.name.toLowerCase().endsWith('.xml');
 
     reader.onload = (evt) => {
       const content = evt.target?.result;
-      let mappedItems: any[] = [];
+      let mappedItems: ParsedBoMItem[] = [];
 
       if (isXML) {
         try {
@@ -49,15 +57,16 @@ export const parseBoMFile = (file: File): Promise<any[]> => {
           const ws = wb.Sheets[wsname];
           const data = XLSX.utils.sheet_to_json(ws);
 
-          mappedItems = data.map((row: any) => {
-            const pn = row['PN'] || row['Part Number'] || row['Ürün Kodu'] || row['Model'] || '';
-            const desc = row['Description'] || row['Açıklama'] || row['Ürün Adı'] || '';
-            const qty = parseInt(row['Quantity'] || row['Adet'] || row['Miktar'] || '1');
-            const cost = parseFloat(row['Cost'] || row['Maliyet'] || row['Birim Fiyat'] || '0');
+          const str = (v: unknown) => (v != null ? String(v) : '');
+          mappedItems = (data as Record<string, unknown>[]).map((row) => {
+            const pn = str(row['PN'] || row['Part Number'] || row['Ürün Kodu'] || row['Model']);
+            const desc = str(row['Description'] || row['Açıklama'] || row['Ürün Adı']);
+            const qty = parseInt(str(row['Quantity'] || row['Adet'] || row['Miktar']) || '1');
+            const cost = parseFloat(str(row['Cost'] || row['Maliyet'] || row['Birim Fiyat']) || '0');
             
             return {
-              pn: String(pn),
-              desc: String(desc),
+              pn,
+              desc,
               qty: isNaN(qty) ? 1 : qty,
               cost: isNaN(cost) ? 0 : cost,
               margin: 15

@@ -3,7 +3,7 @@ import { apiService } from '../services/apiService';
 
 // --- QUERY HOOKS ---
 
-export const useOpportunities = (tenantId: string, options: any = {}) => {
+export const useOpportunities = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['opportunities', tenantId],
     queryFn: () => apiService.getOpportunities(),
@@ -13,7 +13,7 @@ export const useOpportunities = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useCustomers = (tenantId: string, options: any = {}) => {
+export const useCustomers = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['customers', tenantId],
     queryFn: () => apiService.getCustomers(),
@@ -23,7 +23,7 @@ export const useCustomers = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useProjects = (tenantId: string, options: any = {}) => {
+export const useProjects = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['projects', tenantId],
     queryFn: () => apiService.getProjects(),
@@ -33,7 +33,7 @@ export const useProjects = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useContracts = (tenantId: string, options: any = {}) => {
+export const useContracts = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['contracts', tenantId],
     queryFn: () => apiService.getContracts(),
@@ -43,7 +43,7 @@ export const useContracts = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useTasks = (tenantId: string, options: any = {}) => {
+export const useTasks = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['tasks', tenantId],
     queryFn: () => apiService.getTasks(),
@@ -53,7 +53,7 @@ export const useTasks = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useUnits = (tenantId: string, options: any = {}) => {
+export const useUnits = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['units', tenantId],
     queryFn: () => apiService.getUnits(),
@@ -63,7 +63,7 @@ export const useUnits = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useUsers = (tenantId: string, options: any = {}) => {
+export const useUsers = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['users', tenantId],
     queryFn: () => apiService.getUsers(),
@@ -73,7 +73,7 @@ export const useUsers = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useDocuments = (tenantId: string, options: any = {}) => {
+export const useDocuments = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['documents', tenantId],
     queryFn: () => apiService.getDocuments(),
@@ -83,7 +83,7 @@ export const useDocuments = (tenantId: string, options: any = {}) => {
   });
 };
 
-export const useProposals = (tenantId: string, options: any = {}) => {
+export const useProposals = (tenantId: string, options: { enabled?: boolean; staleTime?: number; retry?: boolean | number } = {}) => {
   return useQuery({
     queryKey: ['proposals', tenantId],
     queryFn: () => apiService.getProposals(),

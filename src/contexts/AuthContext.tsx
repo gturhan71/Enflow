@@ -3,8 +3,8 @@ import { MOCK_SYSTEM_USERS } from '../constants';
 import { User } from '../types';
 
 interface AuthContextType {
-  currentUser: User | any;
-  setCurrentUser: (user: any) => void;
+  currentUser: User;
+  setCurrentUser: (user: User) => void;
   hasPermission: (permission: string) => boolean;
   logout: () => void;
 }
@@ -12,7 +12,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children, tenantId }: { children: ReactNode, tenantId: string }) => {
-  const [currentUser, setCurrentUserState] = useState<any>(() => {
+  const [currentUser, setCurrentUserState] = useState<User>(() => {
     const saved = localStorage.getItem(`enflow_current_user_${tenantId}`);
     return saved ? JSON.parse(saved) : MOCK_SYSTEM_USERS[0];
   });
@@ -28,7 +28,7 @@ export const AuthProvider = ({ children, tenantId }: { children: ReactNode, tena
     return currentUser.permissions?.includes(permission) || false;
   };
 
-  const setCurrentUser = (user: any) => {
+  const setCurrentUser = (user: User) => {
     setCurrentUserState(user);
   };
 

@@ -133,7 +133,6 @@ const ProcurementModule = ({ projects, setProjects, tasks, setTasks }: { project
   };
 
   const handleCreateOrder = () => {
-    console.log('Creating order:', newOrder);
     setShowNewOrderModal(false);
     setNewOrder({ vendor: '', expectedDate: '', notes: '' });
   };

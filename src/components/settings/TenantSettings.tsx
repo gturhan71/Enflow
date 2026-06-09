@@ -1,13 +1,14 @@
 import React from 'react';
 import { Building, X, ShieldCheck } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { Tenant } from '../../types';
 
 interface TenantSettingsProps {
   companyLogo: string | null;
   setCompanyLogo: (logo: string | null) => void;
   activeTenantId: string;
   setActiveTenantId: (id: string) => void;
-  tenants: any[];
+  tenants: Tenant[];
   newTenantName: string;
   setNewTenantName: (name: string) => void;
   handleCreateTenant: () => void;

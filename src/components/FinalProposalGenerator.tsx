@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { workflowService } from '../services/workflowService';
+import { ApprovalChain, ApprovalStage } from '../types';
 import { motion } from 'motion/react';
 import { CheckCircle2, XCircle, Loader2, FileText } from 'lucide-react';
 
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export const FinalProposalGenerator: React.FC<Props> = ({ entityId, onFinalized }) => {
-  const [chain, setChain] = useState<any>(null);
+  const [chain, setChain] = useState<ApprovalChain | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export const FinalProposalGenerator: React.FC<Props> = ({ entityId, onFinalized 
     <div className="glass-panel p-6 rounded-2xl bg-white space-y-4">
       <h3 className="font-bold text-lg">Yönetici Onay Paneli</h3>
       <div className="space-y-2">
-        {chain.stages.map((stage: any) => (
+        {chain.stages.map((stage: ApprovalStage) => (
           <div key={stage.id} className="flex justify-between items-center p-3 border rounded-lg">
             <span>{stage.role}</span>
             {stage.status === 'APPROVED' ? (

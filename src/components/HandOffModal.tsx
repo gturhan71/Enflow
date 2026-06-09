@@ -5,7 +5,7 @@ import { X, ArrowRight, User, GitBranch } from 'lucide-react';
 interface HandOffModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (data: { toUnit: string; toUser: any; note: string }) => void;
+  onConfirm: (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => void;
   itemTitle: string;
 }
 

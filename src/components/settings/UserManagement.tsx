@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
-import { UserPlus, Building2, Trash2, X, Loader2 } from 'lucide-react';
+import { UserPlus, Building2, Trash2, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '../../lib/utils';
-import { User, Unit } from '../../types';
+import { User, Unit, Tenant } from '../../types';
 import { ROLE_LABELS } from '../../constants';
 import { apiService } from '../../services/apiService';
 
@@ -10,9 +9,9 @@ interface UserManagementProps {
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
   units: Unit[];
-  tenants: any[];
+  tenants: Tenant[];
   activeTenantId: string;
-  currentUser: any;
+  currentUser: User;
 }
 
 export const UserManagement = ({
@@ -44,9 +43,10 @@ export const UserManagement = ({
       name,
       email,
       role,
-      unitId: unitId === '' ? null : unitId,
+      unitId: unitId === '' ? undefined : unitId,
       tenantId: activeTenantId,
-      permissions: ['DASHBOARD_VIEW']
+      permissions: ['DASHBOARD_VIEW'],
+      status: 'ACTIVE' as const
     };
 
     setLoading(true);
@@ -59,8 +59,8 @@ export const UserManagement = ({
       setUsers(prev => [...prev, formattedUser]);
       setShowUserModal(false);
       alert('Kullanıcı başarıyla oluşturuldu ve veritabanına eklendi.');
-    } catch (err: any) {
-      alert(err.message || 'Kullanıcı kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Kullanıcı kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -77,8 +77,8 @@ export const UserManagement = ({
         await apiService.deleteUser(id);
         setUsers(prev => prev.filter(u => u.id !== id));
         alert('Kullanıcı sistemden uçuruldu.');
-      } catch (err: any) {
-        alert(err.message || 'Silme işlemi başarısız.');
+      } catch (err) {
+        alert(err instanceof Error ? err.message : 'Silme işlemi başarısız.');
       }
     }
   };

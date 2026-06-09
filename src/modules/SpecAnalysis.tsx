@@ -90,7 +90,7 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item: any) => item.str).join(' ');
+        fullText += textContent.items.map((item) => (item as { str: string }).str).join(' ');
       }
       return fullText;
     } else {
@@ -162,9 +162,9 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
 
       const analysisData = JSON.parse(response.text || '{}');
       setResult(analysisData);
-    } catch (err: any) {
+    } catch (err) {
       console.error('Analysis error:', err);
-      setError('Analiz sırasında bir hata oluştu: ' + err.message);
+      setError('Analiz sırasında bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
     } finally {
       setIsAnalyzing(false);
     }

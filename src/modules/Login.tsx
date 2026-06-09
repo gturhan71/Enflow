@@ -34,8 +34,8 @@ const Login = ({ onLogin }: LoginProps) => {
           setSuccessMessage('');
         }, 3000);
       }
-    } catch (err: any) {
-      setError(err.message || 'İşlem yapılamadı. Sunucunun açık olduğundan emin olun.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'İşlem yapılamadı. Sunucunun açık olduğundan emin olun.');
     } finally {
       setLoading(false);
     }

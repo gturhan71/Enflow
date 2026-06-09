@@ -29,12 +29,32 @@ import {
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
 import { Opportunity, Project, TodoTask, Contract } from '../types';
+
+interface KPI {
+  label: string;
+  value: string | number;
+  sub?: string;
+  icon: React.ElementType;
+  bg: string;
+  color: string;
+  glowBg?: string;
+}
+
+interface DevelopmentItem {
+  id: string;
+  title: string;
+  description: string;
+  type?: string;
+  date?: string;
+  icon?: React.ElementType;
+  color?: string;
+}
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 
 // Sub-component for KPI cards (Memoized for performance with high-fidelity glow effects)
-const KPICard = React.memo(({ kpi, index }: { kpi: any, index: number }) => (
+const KPICard = React.memo(({ kpi, index }: { kpi: KPI, index: number }) => (
   <motion.div 
     initial={{ opacity: 0, y: 25 }}
     animate={{ opacity: 1, y: 0 }}
@@ -132,7 +152,7 @@ const Dashboard = ({
   ], [opportunities]);
 
   const developments = useMemo(() => {
-    const list: any[] = [];
+    const list: DevelopmentItem[] = [];
     
     // Add signed contracts
     opportunities.forEach(opp => {

@@ -1,4 +1,5 @@
 import { ExchangeConfig } from '../types';
+import { logger } from '../utils/logger';
 
 class ExchangeService {
   private config: ExchangeConfig = {
@@ -17,7 +18,7 @@ class ExchangeService {
 
   updateConfig(newConfig: ExchangeConfig) {
     this.config = { ...newConfig, isEnabled: true };
-    console.log('Exchange Config Updated:', this.config);
+    logger.debug('Exchange Config Updated:', this.config);
     // Actual integration logic would go here (e.g., EWS or Microsoft Graph API)
   }
 
@@ -27,15 +28,15 @@ class ExchangeService {
     });
   }
 
-  async sendEmail(to: string, subject: string, body: string): Promise<boolean> {
+  async sendEmail(to: string, subject: string, _body: string): Promise<boolean> {
     if (!this.config.isEnabled) return false;
-    console.log(`[Exchange] Sending email to ${to} | Subject: ${subject}`);
+    logger.debug(`[Exchange] Sending email to ${to} | Subject: ${subject}`);
     return new Promise((resolve) => setTimeout(() => resolve(true), 1000));
   }
 
   async syncCalendar(userId: string): Promise<boolean> {
     if (!this.config.isEnabled || !this.config.syncCalendar) return false;
-    console.log(`[Exchange] Syncing calendar for user: ${userId}`);
+    logger.debug(`[Exchange] Syncing calendar for user: ${userId}`);
     return new Promise((resolve) => setTimeout(() => resolve(true), 2000));
   }
 }

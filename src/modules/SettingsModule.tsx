@@ -78,9 +78,9 @@ const SettingsModule = ({
       setTenants(prev => [...prev, tenant]);
       setNewTenantName('');
       alert('Şirket başarıyla tanımlandı.');
-    } catch (err: any) {
+    } catch (err) {
       console.error('Tenant creation error:', err);
-      alert('Şirket oluşturulamadı: ' + (err.message || 'Bilinmeyen hata'));
+      alert('Şirket oluşturulamadı: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
     }
   };
 

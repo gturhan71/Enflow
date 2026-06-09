@@ -61,8 +61,8 @@ const TodoModule = ({
       setTasks([task, ...tasks]);
       setShowNewTaskModal(false);
       setNewTask({ priority: 'MEDIUM', status: 'PENDING', relatedModule: 'GENERAL' });
-    } catch (err: any) {
-      alert(err.message || 'Görev atanamadı.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Görev atanamadı.');
     } finally {
       setLoading(false);
     }
@@ -72,7 +72,7 @@ const TodoModule = ({
     try {
       const updated = await apiService.updateTask(taskId, { status: newStatus });
       setTasks(tasks.map(t => t.id === taskId ? updated : t));
-    } catch (err: any) {
+    } catch (err) {
       alert('Durum güncellenemedi.');
     }
   };

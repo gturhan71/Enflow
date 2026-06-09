@@ -104,8 +104,8 @@ export const PermissionSettings = ({
                   const updated = await apiService.updateUser(editingUser.id, { permissions: editingUser.permissions });
                   setUsers(prev => prev.map(u => u.id === updated.id ? { ...u, permissions: updated.permissions } : u));
                   alert('Yetkiler başarıyla güncellendi.');
-                } catch (err: any) {
-                  alert(err.message || 'Hata oluştu.');
+                } catch (err) {
+                  alert(err instanceof Error ? err.message : 'Hata oluştu.');
                 } finally {
                   setLoading(false);
                 }

@@ -1,10 +1,11 @@
 import React from 'react';
 import { apiService } from '../../services/apiService';
+import { Subscription, UsageMetric, User } from '../../types';
 
 interface SubscriptionSettingsProps {
-  subscription: any;
-  usage: any[];
-  currentUser: any;
+  subscription: Subscription | null;
+  usage: UsageMetric[];
+  currentUser: User;
   fetchSubscriptionData: () => void;
 }
 
@@ -46,9 +47,9 @@ export const SubscriptionSettings = ({
         </div>
         <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-100 shadow-sm">
           <h5 className="font-bold text-slate-900 mb-2">Aylık Kullanım</h5>
-          {usage.length > 0 ? usage.map((u: any) => (
-            <div key={u.feature} className="flex justify-between text-sm py-1 border-b border-slate-50 last:border-0 font-sans">
-              <span className="text-slate-500 font-medium">{u.feature}</span>
+          {usage.length > 0 ? usage.map((u) => (
+            <div key={u.id} className="flex justify-between text-sm py-1 border-b border-slate-50 last:border-0 font-sans">
+              <span className="text-slate-500 font-medium">{u.type}</span>
               <span className="font-bold text-slate-800">{u.count}</span>
             </div>
           )) : (

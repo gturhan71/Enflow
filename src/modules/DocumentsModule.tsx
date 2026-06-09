@@ -58,8 +58,8 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
       setDocuments(prev => [docWithTagsArray, ...prev]);
       setShowNewDocModal(false);
       setNewDoc({ name: '', category: 'LEGAL', expiryDate: '', tags: [] });
-    } catch (err: any) {
-      alert(err.message || 'Belge kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Belge kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -70,8 +70,8 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
     try {
       await apiService.deleteDocument(id);
       setDocuments(prev => prev.filter(d => d.id !== id));
-    } catch (err: any) {
-      alert(err.message || 'Belge silinemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Belge silinemedi.');
     }
   };
 

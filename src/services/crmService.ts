@@ -1,4 +1,5 @@
 import { apiClient } from './apiClient';
+import { Customer, Opportunity, BoMItem, CostItem, Proposal } from '../types';
 
 export const crmService = {
   // --- CUSTOMERS ---
@@ -6,14 +7,14 @@ export const crmService = {
     return apiClient.fetchWithAuth('/customers');
   },
 
-  async createCustomer(data: any) {
+  async createCustomer(data: Omit<Customer, 'id'>) {
     return apiClient.fetchWithAuth('/customers', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateCustomer(id: string, data: any) {
+  async updateCustomer(id: string, data: Partial<Customer>) {
     return apiClient.fetchWithAuth(`/customers/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -31,14 +32,14 @@ export const crmService = {
     return apiClient.fetchWithAuth('/opportunities');
   },
 
-  async createOpportunity(data: any) {
+  async createOpportunity(data: Omit<Opportunity, 'id'>) {
     return apiClient.fetchWithAuth('/opportunities', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateOpportunity(id: string, data: any) {
+  async updateOpportunity(id: string, data: Partial<Opportunity>) {
     return apiClient.fetchWithAuth(`/opportunities/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)
@@ -51,14 +52,14 @@ export const crmService = {
     });
   },
 
-  async saveBoMItems(opportunityId: string, items: any[]) {
+  async saveBoMItems(opportunityId: string, items: BoMItem[]) {
     return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/bom`, {
       method: 'POST',
       body: JSON.stringify({ items })
     });
   },
 
-  async saveCostItems(opportunityId: string, items: any[]) {
+  async saveCostItems(opportunityId: string, items: CostItem[]) {
     return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/costs`, {
       method: 'POST',
       body: JSON.stringify({ items })
@@ -90,14 +91,14 @@ export const crmService = {
     return apiClient.fetchWithAuth('/proposals');
   },
 
-  async createProposal(data: any) {
+  async createProposal(data: Omit<Proposal, 'id'>) {
     return apiClient.fetchWithAuth('/proposals', {
       method: 'POST',
       body: JSON.stringify(data)
     });
   },
 
-  async updateProposal(id: string, data: any) {
+  async updateProposal(id: string, data: Partial<Proposal>) {
     return apiClient.fetchWithAuth(`/proposals/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data)

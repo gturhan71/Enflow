@@ -12,7 +12,8 @@ Bu klasör, Enflow projesinin tüm bellek, doküman ve geçmiş kayıtlarını i
 
 ## Sürüm Takibi
 
-- **v1.6.2 (08.06.2026):** Backend TypeScript derleme sorunu giderildi. Express `Request` typing pattern normalize edildi. Backend 3002, Frontend 5173 portları stabilize.
+- **v1.6.3 (09.06.2026):** TypeScript strict-mode refactoring — 128 `any` temizlendi, 27 `console.log` → logger, backend `index.ts` 17 router'a bölündü. tsc frontend+backend sıfır hata.
+- **v1.6.2 (08.06.2026):** Backend TypeScript derleme sorunu giderildi. Express `Request` typing pattern normalize edildi. Backend 3002, Frontend 3000 portları stabilize.
 - **v1.6.1 (05.06.2026):** Teklif onay akışı, Approval Chain, SaveButton entegrasyonu.
 - **v1.6.0:** Workflow Hand-off canlıya alındı, mobil navigasyon eklendi.
 

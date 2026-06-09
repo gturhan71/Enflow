@@ -53,8 +53,8 @@ export const UnitManagement = ({
       setShowUnitModal(false);
       setEditingUnit(null);
       alert('Birim başarıyla oluşturuldu.');
-    } catch (err: any) {
-      alert(err.message || 'Birim kaydedilemedi.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Birim kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -69,15 +69,16 @@ export const UnitManagement = ({
       setUnitToDelete(null);
       setTransferTargetId('');
       alert('Birim ve kullanıcı transferi başarıyla tamamlandı.');
-    } catch (err: any) {
-      if (err.message.includes('TRANSFER_REQUIRED')) {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('TRANSFER_REQUIRED')) {
         const unit = units.find(u => u.id === id);
         if (unit) {
           setUnitToDelete(unit);
           setShowTransferModal(true);
         }
       } else {
-        alert(err.message || 'Birim silinemedi.');
+        alert(msg || 'Birim silinemedi.');
       }
     } finally {
       setLoading(false);

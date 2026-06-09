@@ -106,7 +106,6 @@ const SubscriptionModule: React.FC = () => {
   const applyLicense = (license: LicenseData, wipeData: boolean = false) => {
     setActiveLicense(license);
     if (wipeData) {
-      console.log('🧹 Tüm tenant verileri temizleniyor (Temiz Kurulum)...');
       // Burada backend endpoint'i çağrılır: apiService.resetTenantData()
     }
     handleInstall(license.model);
