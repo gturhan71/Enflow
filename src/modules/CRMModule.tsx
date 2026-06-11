@@ -18,7 +18,8 @@ import {
   Download,
   CheckCircle,
   XCircle,
-  GitBranch
+  GitBranch,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -37,6 +38,7 @@ import { PermissionGate } from '../components/PermissionGate';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearch, useForm } from '../hooks/useShared';
+import { CustomerImportWizard } from '../components/CustomerImportWizard';
 
 const CRMModule = ({
   opportunities = [],
@@ -64,6 +66,7 @@ const CRMModule = ({
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
+  const [showImportWizard, setShowImportWizard] = useState(false);
   const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showProposalEditor, setShowProposalEditor] = useState(false);
@@ -124,7 +127,8 @@ const CRMModule = ({
   const customerForm = useForm<Partial<Customer>>({
     name: '', shortName: '', industry: '', website: '', email: '', phone: '',
     address: '', city: '', country: 'Türkiye', taxOffice: '', taxNumber: '',
-    riskScore: 0, creditLimit: 0, currency: 'USD', techStack: '', notes: ''
+    riskScore: 0, creditLimit: 0, currency: 'USD', techStack: '', notes: '',
+    status: 'ACTIVE'
   });
 
   const opportunityForm = useForm<Partial<Opportunity>>({
@@ -292,16 +296,98 @@ const CRMModule = ({
   };
 
   const renderCustomers = () => (
-    <div className="p-8">
-      <h3 className="text-2xl font-black mb-6">Müşteriler ({customers.length})</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {customers.map(customer => (
-          <div key={customer.id} className="glass-panel p-6 rounded-2xl">
-            <h4 className="font-bold">{customer.name}</h4>
-            <p className="text-sm text-slate-500">{customer.industry}</p>
+    <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar min-h-0">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Müşteriler</h3>
+          <p className="text-slate-400 text-sm font-medium mt-1">{customers.length} kayıtlı müşteri</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Müşteri ara..."
+              value={customerSearch.searchQuery}
+              onChange={e => customerSearch.setSearchQuery(e.target.value)}
+              className="pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary w-56"
+            />
           </div>
-        ))}
+          <PermissionGate permission="CRM_EDIT">
+            <button
+              onClick={() => setShowImportWizard(true)}
+              className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 px-5 py-3 rounded-2xl text-xs font-black hover:bg-slate-50 transition-all active:scale-95"
+            >
+              <FileSpreadsheet size={15} /> Excel'den Aktar
+            </button>
+            <button
+              onClick={() => { customerForm.resetForm(); setShowNewCustomerModal(true); }}
+              className="flex items-center gap-2 bg-primary text-white px-6 py-3 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all active:scale-95"
+            >
+              <Plus size={16} /> Yeni Müşteri Ekle
+            </button>
+          </PermissionGate>
+        </div>
       </div>
+
+      {customerSearch.filteredItems.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+          <Building size={48} className="mb-4 opacity-30" />
+          <p className="font-black text-sm uppercase tracking-widest">Müşteri bulunamadı</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          {customerSearch.filteredItems.map(customer => (
+            <motion.div
+              layout
+              key={customer.id}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="glass-panel p-7 rounded-[28px] hover:shadow-xl transition-all group border border-white/60 bg-gradient-to-br from-white/80 to-white/40"
+            >
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center">
+                  <Building size={22} className="text-primary" />
+                </div>
+                <span className={cn(
+                  "text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border",
+                  customer.status === 'ACTIVE'
+                    ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                )}>
+                  {customer.status === 'ACTIVE' ? 'Aktif' : 'Pasif'}
+                </span>
+              </div>
+              <h4 className="font-black text-slate-900 text-base leading-snug">{customer.name}</h4>
+              {customer.shortName && <p className="text-xs text-primary font-bold mt-0.5">{customer.shortName}</p>}
+              {customer.industry && <p className="text-xs text-slate-500 font-medium mt-1">{customer.industry}</p>}
+              <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4">
+                {customer.email && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Mail size={12} className="shrink-0" />{customer.email}
+                  </div>
+                )}
+                {customer.phone && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <Phone size={12} className="shrink-0" />{customer.phone}
+                  </div>
+                )}
+                {customer.city && (
+                  <div className="flex items-center gap-2 text-xs text-slate-500">
+                    <MapPin size={12} className="shrink-0" />{customer.city}{customer.country ? `, ${customer.country}` : ''}
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 flex items-center justify-between text-xs">
+                <span className="text-slate-400 font-medium">Kredi Limiti</span>
+                <span className="font-black text-slate-700">
+                  {customer.creditLimit?.toLocaleString('tr-TR')} {customer.currency}
+                </span>
+              </div>
+            </motion.div>
+          ))}
+        </div>
+      )}
     </div>
   );
 
@@ -492,8 +578,17 @@ const CRMModule = ({
        renderOpportunities()}
 
       <AnimatePresence>
+        {showImportWizard && (
+          <CustomerImportWizard
+            onClose={() => setShowImportWizard(false)}
+            onImported={(newCustomers) => {
+              setCustomers(prev => [...prev, ...newCustomers]);
+              setShowImportWizard(false);
+            }}
+          />
+        )}
         {showHandOffModal && handOffTarget && (
-          <HandOffModal 
+          <HandOffModal
             isOpen={showHandOffModal}
             onClose={() => setShowHandOffModal(false)}
             onConfirm={handleHandOff}
@@ -502,7 +597,7 @@ const CRMModule = ({
         )}
         {showNewOpportunityModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -523,6 +618,202 @@ const CRMModule = ({
                   <button type="submit" className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg">KAYDET</button>
                 </div>
               </form>
+            </motion.div>
+          </div>
+        )}
+        {showNewCustomerModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="glass-panel w-full max-w-3xl rounded-[40px] shadow-2xl bg-white flex flex-col max-h-[90vh]"
+            >
+              <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                  <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Yeni Müşteri</h4>
+                  <p className="text-xs text-slate-400 font-medium mt-0.5">Müşteri bilgilerini doldurun</p>
+                </div>
+                <button onClick={() => setShowNewCustomerModal(false)} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <form id="customer-form" onSubmit={handleSaveCustomer} className="overflow-y-auto custom-scrollbar flex-1">
+                <div className="p-8 space-y-6">
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Temel Bilgiler</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="text" name="name" required
+                        value={customerForm.values.name ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Müşteri Adı *"
+                        className="col-span-2 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="text" name="shortName"
+                        value={customerForm.values.shortName ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Kısa Ad"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="text" name="industry"
+                        value={customerForm.values.industry ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Sektör"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">İletişim</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="email" name="email"
+                        value={customerForm.values.email ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="E-posta"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="tel" name="phone"
+                        value={customerForm.values.phone ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Telefon"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="url" name="website"
+                        value={customerForm.values.website ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Web Sitesi"
+                        className="col-span-2 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Adres</p>
+                    <div className="grid grid-cols-2 gap-4">
+                      <input
+                        type="text" name="address"
+                        value={customerForm.values.address ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Adres"
+                        className="col-span-2 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="text" name="city"
+                        value={customerForm.values.city ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Şehir"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="text" name="country"
+                        value={customerForm.values.country ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Ülke"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Finansal & Vergi</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <input
+                        type="text" name="taxOffice"
+                        value={customerForm.values.taxOffice ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Vergi Dairesi"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="text" name="taxNumber"
+                        value={customerForm.values.taxNumber ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Vergi No"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <select
+                        name="currency"
+                        value={customerForm.values.currency ?? 'USD'}
+                        onChange={customerForm.handleChange}
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      >
+                        <option value="TRY">TRY ₺</option>
+                        <option value="USD">USD $</option>
+                        <option value="EUR">EUR €</option>
+                      </select>
+                      <input
+                        type="number" name="creditLimit" min={0}
+                        value={customerForm.values.creditLimit ?? 0}
+                        onChange={customerForm.handleChange}
+                        placeholder="Kredi Limiti"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <input
+                        type="number" name="riskScore" min={0} max={100}
+                        value={customerForm.values.riskScore ?? 0}
+                        onChange={customerForm.handleChange}
+                        placeholder="Risk Skoru (0-100)"
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <select
+                        name="status"
+                        value={customerForm.values.status ?? 'ACTIVE'}
+                        onChange={customerForm.handleChange}
+                        className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      >
+                        <option value="ACTIVE">Aktif</option>
+                        <option value="PASSIVE">Pasif</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Ek Bilgiler</p>
+                    <div className="space-y-4">
+                      <input
+                        type="text" name="techStack"
+                        value={customerForm.values.techStack ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Teknoloji Altyapısı (ör: React, SAP, Oracle)"
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                      />
+                      <textarea
+                        name="notes"
+                        value={customerForm.values.notes ?? ''}
+                        onChange={customerForm.handleChange}
+                        placeholder="Notlar..."
+                        rows={3}
+                        className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary resize-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </form>
+              <div className="p-8 border-t border-slate-100 flex justify-end gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowNewCustomerModal(false)}
+                  className="px-8 py-3 text-xs font-black text-slate-500 uppercase tracking-widest hover:bg-slate-100 rounded-2xl transition-all"
+                >
+                  İPTAL
+                </button>
+                <button
+                  form="customer-form"
+                  type="submit"
+                  disabled={loading}
+                  className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+                  KAYDET
+                </button>
+              </div>
             </motion.div>
           </div>
         )}
