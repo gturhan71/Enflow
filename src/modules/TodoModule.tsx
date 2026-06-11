@@ -10,7 +10,11 @@ import {
   Filter,
   Target,
   Loader2,
-  DollarSign
+  DollarSign,
+  Eye,
+  FileText,
+  Package,
+  TrendingUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -49,6 +53,7 @@ const TodoModule = ({
   const [filterUnit, setFilterUnit] = useState<string>('all');
   const [showNewTaskModal, setShowNewTaskModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [previewTask, setPreviewTask] = useState<TodoTask | null>(null);
   const [newTask, setNewTask] = useState<Partial<TodoTask>>({
     priority: 'MEDIUM',
     status: 'PENDING',
@@ -146,11 +151,55 @@ const TodoModule = ({
     }
   };
 
-  const getProposalDetail = (todo: TodoTask): { price: string } | null => {
+  interface ProposalDetail {
+    price: string;
+    totalPrice: number;
+    items: Array<{ partNumber: string; description: string; quantity: number; unitSalePrice?: number; totalSalePrice?: number; marginPercentage?: number }>;
+    description: string;
+    terms: string;
+    version: number;
+    opportunityTitle: string;
+    customerName: string;
+  }
+
+  const getProposalDetail = (todo: TodoTask): ProposalDetail | null => {
     if (!todo.relatedItemId) return null;
     const proposal = proposals?.find(p => p.id === todo.relatedItemId);
-    if (!proposal || proposal.totalPrice == null) return null;
-    return { price: proposal.totalPrice.toLocaleString('tr-TR') };
+    if (!proposal) return null;
+
+    let totalPrice: number | undefined = proposal.totalPrice;
+    let items: ProposalDetail['items'] = proposal.items || [];
+    let description = proposal.description || '';
+    let terms = proposal.terms || '';
+
+    // totalPrice is stored inside content JSON — parse it
+    if (proposal.content) {
+      try {
+        const parsed = typeof proposal.content === 'string'
+          ? JSON.parse(proposal.content)
+          : proposal.content;
+        if (totalPrice == null) totalPrice = parsed.totalPrice;
+        if (!items.length && Array.isArray(parsed.items)) items = parsed.items;
+        if (!description) description = parsed.description || '';
+        if (!terms) terms = parsed.terms || '';
+      } catch { /* ignore parse errors */ }
+    }
+
+    if (totalPrice == null) return null;
+
+    const opp = opportunities?.find(o => o.id === proposal.opportunityId);
+    const customer = opp ? undefined : undefined; // customer name from opportunity title for now
+
+    return {
+      price: totalPrice.toLocaleString('tr-TR'),
+      totalPrice,
+      items,
+      description,
+      terms,
+      version: proposal.version || 1,
+      opportunityTitle: opp?.title || getRelatedItemName(todo),
+      customerName: opp?.customerId || '',
+    };
   };
 
   return (
@@ -208,6 +257,12 @@ const TodoModule = ({
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
+                    <button
+                      onClick={() => setPreviewTask(todo)}
+                      className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-600 px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-100 transition-all active:scale-95"
+                    >
+                      <Eye size={15} /> İncele
+                    </button>
                     <button
                       onClick={async () => {
                         await handleStatusChange(todo.id, 'COMPLETED');
@@ -382,6 +437,171 @@ const TodoModule = ({
           </div>
         </div>
       )}
+
+      {/* Proposal Preview Modal */}
+      <AnimatePresence>
+        {previewTask && (() => {
+          const detail = getProposalDetail(previewTask);
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white w-full max-w-4xl rounded-[40px] shadow-2xl flex flex-col max-h-[92vh]"
+              >
+                {/* Header */}
+                <div className="p-8 border-b border-slate-100 flex items-start justify-between shrink-0">
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <span className="text-[10px] font-black bg-amber-100 text-amber-700 border border-amber-200 px-3 py-1 rounded-full uppercase tracking-widest">
+                        Onay Bekliyor
+                      </span>
+                      {detail && (
+                        <span className="text-[10px] font-black bg-slate-100 text-slate-500 px-3 py-1 rounded-full">
+                          v{detail.version}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">{previewTask.title}</h3>
+                    {detail && (
+                      <p className="text-sm text-slate-500 font-medium mt-1">
+                        Fırsat: {detail.opportunityTitle}
+                      </p>
+                    )}
+                  </div>
+                  <button onClick={() => setPreviewTask(null)} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto custom-scrollbar p-8 space-y-8">
+                  {!detail ? (
+                    <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                      <FileText size={40} className="mb-3 opacity-30" />
+                      <p className="font-bold text-sm">Teklif detayı yüklenemedi.</p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Kalemler */}
+                      {detail.items.length > 0 && (
+                        <div>
+                          <div className="flex items-center gap-2 mb-4">
+                            <Package size={16} className="text-slate-400" />
+                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Teklif Kalemleri</h4>
+                          </div>
+                          <div className="overflow-x-auto rounded-2xl border border-slate-200">
+                            <table className="min-w-full text-xs">
+                              <thead className="bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                  <th className="px-5 py-3 text-left font-black text-slate-500 whitespace-nowrap">Parça No</th>
+                                  <th className="px-5 py-3 text-left font-black text-slate-500">Açıklama</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500">Adet</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500 whitespace-nowrap">Birim Satış</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500">Marj</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500">Toplam</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100">
+                                {detail.items.map((item, i) => (
+                                  <tr key={i} className="hover:bg-slate-50/50">
+                                    <td className="px-5 py-3 font-bold text-slate-600 whitespace-nowrap">{item.partNumber}</td>
+                                    <td className="px-5 py-3 text-slate-600">{item.description}</td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-600">{item.quantity}</td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-600 whitespace-nowrap">
+                                      {item.unitSalePrice != null ? item.unitSalePrice.toLocaleString('tr-TR') : '—'}
+                                    </td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-600">
+                                      {item.marginPercentage != null ? `%${item.marginPercentage}` : '—'}
+                                    </td>
+                                    <td className="px-5 py-3 text-right font-black text-slate-800 whitespace-nowrap">
+                                      {item.totalSalePrice != null
+                                        ? item.totalSalePrice.toLocaleString('tr-TR')
+                                        : item.unitSalePrice != null
+                                          ? (item.unitSalePrice * item.quantity).toLocaleString('tr-TR')
+                                          : '—'}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Toplam */}
+                      <div className="flex justify-end">
+                        <div className="bg-slate-900 text-white px-8 py-5 rounded-2xl flex items-center gap-4">
+                          <div>
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Teklif Toplamı</p>
+                            <p className="text-3xl font-black tracking-tight">{detail.price}</p>
+                          </div>
+                          <TrendingUp size={32} className="text-emerald-400" />
+                        </div>
+                      </div>
+
+                      {/* Açıklama */}
+                      {detail.description && (
+                        <div className="p-6 bg-blue-50 border border-blue-100 rounded-2xl">
+                          <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-2">Açıklama</p>
+                          <p className="text-sm text-slate-700 font-medium leading-relaxed">{detail.description}</p>
+                        </div>
+                      )}
+
+                      {/* Şartlar */}
+                      {detail.terms && (
+                        <div className="p-6 bg-slate-50 border border-slate-200 rounded-2xl">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Şartlar & Koşullar</p>
+                          <p className="text-sm text-slate-600 font-medium leading-relaxed whitespace-pre-line">{detail.terms}</p>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                {/* Footer — Approve / Reject */}
+                <div className="p-8 border-t border-slate-100 flex items-center justify-between shrink-0">
+                  <button
+                    onClick={() => setPreviewTask(null)}
+                    className="px-6 py-3 text-xs font-black text-slate-500 hover:bg-slate-100 rounded-2xl transition-all uppercase tracking-widest"
+                  >
+                    Kapat
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={async () => {
+                        await handleStatusChange(previewTask.id, 'CANCELLED');
+                        await apiService.updateProposal(previewTask.relatedItemId!, { status: 'REJECTED' });
+                        setProposals?.(prev => prev.map(p =>
+                          p.id === previewTask.relatedItemId ? { ...p, status: 'REJECTED' } : p
+                        ));
+                        setPreviewTask(null);
+                      }}
+                      className="flex items-center gap-2 bg-white border border-red-200 text-red-500 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-red-50 transition-all active:scale-95"
+                    >
+                      <X size={15} /> Reddet
+                    </button>
+                    <button
+                      onClick={async () => {
+                        await handleStatusChange(previewTask.id, 'COMPLETED');
+                        await apiService.updateProposal(previewTask.relatedItemId!, { status: 'APPROVED' });
+                        setProposals?.(prev => prev.map(p =>
+                          p.id === previewTask.relatedItemId ? { ...p, status: 'APPROVED' } : p
+                        ));
+                        setPreviewTask(null);
+                      }}
+                      className="flex items-center gap-2 bg-emerald-600 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-100"
+                    >
+                      <CheckCircle2 size={15} /> Onayla
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+      </AnimatePresence>
 
       {/* New Task Modal */}
       <AnimatePresence>
