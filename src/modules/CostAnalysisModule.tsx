@@ -17,6 +17,7 @@ import {
   X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem } from '../types';
 import { apiService } from '../services/apiService';
@@ -25,11 +26,14 @@ const CostAnalysisModule = ({
   opportunities,
   setOpportunities,
   setActiveTab,
+  tenantId,
 }: {
   opportunities: Opportunity[],
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
   setActiveTab?: (tab: string) => void,
+  tenantId?: string,
 }) => {
+  const queryClient = useQueryClient();
   const [selectedOppId, setSelectedOppId] = useState('');
   const [costItems, setCostItems] = useState<Partial<CostItem>[]>([]);
   const [localBomItems, setLocalBomItems] = useState<BoMItem[]>([]);
@@ -101,19 +105,31 @@ const CostAnalysisModule = ({
         apiService.updateOpportunity(selectedOppId, { technicalStatus: 'APPROVED' }),
       ]);
 
-      // API sonucundan bağımsız olarak yerel state'i güncelle.
-      // technicalStatus + costItems + bomItems → CRMModule'deki filtre hemen tetiklenir.
-      setOpportunities(prev => prev.map(o =>
-        o.id === selectedOppId
-          ? { ...o, technicalStatus: 'APPROVED', costItems: costItems as any, bomItems: localBomItems }
-          : o
-      ));
+      // Güncellenmiş fırsatı oluştur
+      const updatedOpp = (prev: Opportunity) => ({
+        ...prev,
+        technicalStatus: 'APPROVED',
+        costItems: costItems as any,
+        bomItems: localBomItems,
+      });
+
+      // 1) React Query cache'i güncelle — App.tsx sync effect'i tetikler ve local state'i yazar
+      queryClient.setQueryData(
+        ['opportunities', tenantId ?? ''],
+        (old: Opportunity[] | undefined) =>
+          old ? old.map(o => (o.id === selectedOppId ? updatedOpp(o) : o)) : old
+      );
+
+      // 2) Local state'i de doğrudan güncelle (cache güncellenmeden önce render için)
+      setOpportunities(prev =>
+        prev.map(o => (o.id === selectedOppId ? updatedOpp(o) : o))
+      );
 
       alert('Analiz başarıyla kaydedildi ve teklif aşamasına aktarıldı.');
 
       // Kaydet sonrası doğrudan "Teklife Hazır" listesine yönlendir
       if (setActiveTab) {
-        setTimeout(() => setActiveTab('crm-proposals'), 800);
+        setTimeout(() => setActiveTab('crm-proposals'), 600);
       }
     } finally {
       setLoading(false);
