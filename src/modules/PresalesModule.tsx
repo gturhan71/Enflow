@@ -14,7 +14,9 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { CostAnalysisModule } from '../components/CostAnalysisModule';
 import {
+  BoMItem,
   Opportunity,
+  Proposal,
   TodoTask,
   Unit,
   User
@@ -33,10 +35,12 @@ interface PresalesModuleProps {
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
   units: Unit[];
   users: User[];
+  proposals?: Proposal[];
+  setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>;
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>;
 }
 
-const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks }: PresalesModuleProps) => {
+const PresalesModule = ({ opportunities, setOpportunities, units, users, proposals, setProposals, setTasks }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
@@ -107,25 +111,63 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   };
 
   const handleConfirmApproval = async () => {
+    const opp = opportunities.find(o => o.id === selectedOppId);
+    if (!opp) return;
+
     const success = await handleFinalApproval();
-    if (success) {
-      setShowApprovalPreview(false);
-      const opp = opportunities.find(o => o.id === selectedOppId);
-      if (opp) {
-        try {
-          const task = await apiService.createTask({
-            title: `BoM Onayı: ${opp.title}`,
-            description: 'Presales tarafından hazırlanan BoM listesi yönetici onayını bekliyor.',
-            unitId: 'unit_management',
-            assignedBy: currentUser?.id || 'system',
-            priority: 'HIGH',
-            status: 'PENDING',
-            relatedModule: 'PROPOSAL',
-            relatedItemId: opp.id,
-          });
-          if (setTasks) setTasks(prev => [task, ...prev]);
-        } catch { /* task creation failure is non-blocking */ }
-      }
+    if (!success) return;
+
+    setShowApprovalPreview(false);
+
+    // Versiyon: bu fırsat için kaç teklif var + 1
+    const version = (proposals?.filter(p => p.opportunityId === selectedOppId) ?? []).length + 1;
+
+    // Abbreviated bomItems → proper BoMItem
+    const properItems: BoMItem[] = bomItems.map((item: any, idx: number) => ({
+      id: item.id ?? item.pn ?? String(idx),
+      partNumber: item.pn,
+      description: item.desc,
+      quantity: item.qty,
+      purchaseCost: item.cost,
+      marginPercentage: item.margin,
+      unitSalePrice: item.cost * (1 + item.margin / 100),
+      totalSalePrice: item.cost * (1 + item.margin / 100) * item.qty,
+    }));
+
+    const totalPrice = properItems.reduce((s, i) => s + (i.totalSalePrice ?? 0), 0);
+
+    try {
+      // 1. Proposal oluştur (PENDING_APPROVAL, yeni versiyon)
+      const newProposal = await apiService.createProposal({
+        opportunityId: selectedOppId,
+        customerId: opp.customerId,
+        createdById: currentUser?.id,
+        status: 'PENDING_APPROVAL',
+        version,
+        totalPrice,
+        items: properItems,
+        content: JSON.stringify({
+          items: properItems,
+          totalPrice,
+          description: `BoM bazlı maliyet teklifi — v${version}`,
+        }),
+      });
+      if (setProposals) setProposals(prev => [newProposal, ...prev]);
+
+      // 2. Yönetici onay görevi — relatedItemId = proposal.id
+      const task = await apiService.createTask({
+        title: `BoM Onayı v${version}: ${opp.title}`,
+        description: `Presales tarafından hazırlanan v${version} BoM listesi onayınızı bekliyor. Toplam: ${totalPrice.toLocaleString('tr-TR')} ${opp.customer?.currency ?? ''}`,
+        unitId: 'unit_management',
+        assignedBy: currentUser?.id || 'system',
+        priority: 'HIGH',
+        status: 'PENDING',
+        relatedModule: 'PROPOSAL',
+        relatedItemId: newProposal.id,
+      });
+      if (setTasks) setTasks(prev => [task, ...prev]);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Onay süreci başlatılamadı.');
     }
   };
 

@@ -318,7 +318,7 @@ const TenantAppInner = ({
             setActiveTab={setActiveTab}
           />
         );
-      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} setTasks={setTasks} />;
+      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} />;
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
       case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;

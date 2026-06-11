@@ -158,15 +158,25 @@ const TodoModule = ({
     }
   };
 
+  interface ProposalDetailItem {
+    partNumber: string;
+    description: string;
+    quantity: number;
+    purchaseCost?: number;
+    unitSalePrice?: number;
+    totalSalePrice?: number;
+    marginPercentage?: number;
+  }
+
   interface ProposalDetail {
     price: string;
     totalPrice: number;
-    items: Array<{ partNumber: string; description: string; quantity: number; unitSalePrice?: number; totalSalePrice?: number; marginPercentage?: number }>;
+    totalCost: number;
+    items: ProposalDetailItem[];
     description: string;
     terms: string;
     version: number;
     opportunityTitle: string;
-    customerName: string;
   }
 
   const getProposalDetail = (todo: TodoTask): ProposalDetail | null => {
@@ -175,37 +185,40 @@ const TodoModule = ({
     if (!proposal) return null;
 
     let totalPrice: number | undefined = proposal.totalPrice;
-    let items: ProposalDetail['items'] = proposal.items || [];
+    let items: ProposalDetailItem[] = (proposal.items as ProposalDetailItem[]) || [];
     let description = proposal.description || '';
     let terms = proposal.terms || '';
 
-    // totalPrice is stored inside content JSON — parse it
     if (proposal.content) {
       try {
         const parsed = typeof proposal.content === 'string'
           ? JSON.parse(proposal.content)
           : proposal.content;
-        if (totalPrice == null) totalPrice = parsed.totalPrice;
-        if (!items.length && Array.isArray(parsed.items)) items = parsed.items;
-        if (!description) description = parsed.description || '';
-        if (!terms) terms = parsed.terms || '';
-      } catch { /* ignore parse errors */ }
+        if (totalPrice == null) totalPrice = parsed.totalPrice as number | undefined;
+        if (!items.length && Array.isArray(parsed.items)) items = parsed.items as ProposalDetailItem[];
+        if (!description) description = (parsed.description as string) || '';
+        if (!terms) terms = (parsed.terms as string) || '';
+      } catch { /* ignore */ }
     }
 
     if (totalPrice == null) return null;
 
+    const totalCost = items.reduce(
+      (s, i) => s + (i.purchaseCost ?? 0) * (i.quantity ?? 1),
+      0
+    );
+
     const opp = opportunities?.find(o => o.id === proposal.opportunityId);
-    const customer = opp ? undefined : undefined; // customer name from opportunity title for now
 
     return {
       price: totalPrice.toLocaleString('tr-TR'),
       totalPrice,
+      totalCost,
       items,
       description,
       terms,
       version: proposal.version || 1,
       opportunityTitle: opp?.title || getRelatedItemName(todo),
-      customerName: opp?.customerId || '',
     };
   };
 
@@ -543,9 +556,10 @@ const TodoModule = ({
                                   <th className="px-5 py-3 text-left font-black text-slate-500 whitespace-nowrap">Parça No</th>
                                   <th className="px-5 py-3 text-left font-black text-slate-500">Açıklama</th>
                                   <th className="px-5 py-3 text-right font-black text-slate-500">Adet</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500 whitespace-nowrap">Birim Maliyet</th>
                                   <th className="px-5 py-3 text-right font-black text-slate-500 whitespace-nowrap">Birim Satış</th>
                                   <th className="px-5 py-3 text-right font-black text-slate-500">Marj</th>
-                                  <th className="px-5 py-3 text-right font-black text-slate-500">Toplam</th>
+                                  <th className="px-5 py-3 text-right font-black text-slate-500">Satış Toplamı</th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-slate-100">
@@ -554,10 +568,13 @@ const TodoModule = ({
                                     <td className="px-5 py-3 font-bold text-slate-600 whitespace-nowrap">{item.partNumber}</td>
                                     <td className="px-5 py-3 text-slate-600">{item.description}</td>
                                     <td className="px-5 py-3 text-right font-medium text-slate-600">{item.quantity}</td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-400 whitespace-nowrap">
+                                      {item.purchaseCost != null ? item.purchaseCost.toLocaleString('tr-TR') : '—'}
+                                    </td>
                                     <td className="px-5 py-3 text-right font-medium text-slate-600 whitespace-nowrap">
                                       {item.unitSalePrice != null ? item.unitSalePrice.toLocaleString('tr-TR') : '—'}
                                     </td>
-                                    <td className="px-5 py-3 text-right font-medium text-slate-600">
+                                    <td className="px-5 py-3 text-right font-medium text-emerald-600">
                                       {item.marginPercentage != null ? `%${item.marginPercentage}` : '—'}
                                     </td>
                                     <td className="px-5 py-3 text-right font-black text-slate-800 whitespace-nowrap">
@@ -575,14 +592,31 @@ const TodoModule = ({
                         </div>
                       )}
 
-                      {/* Toplam */}
-                      <div className="flex justify-end">
-                        <div className="bg-slate-900 text-white px-8 py-5 rounded-2xl flex items-center gap-4">
-                          <div>
-                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Teklif Toplamı</p>
-                            <p className="text-3xl font-black tracking-tight">{detail.price}</p>
-                          </div>
-                          <TrendingUp size={32} className="text-emerald-400" />
+                      {/* Maliyet Özeti */}
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl text-center">
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Maliyet</p>
+                          <p className="text-xl font-black text-slate-700">{detail.totalCost.toLocaleString('tr-TR')}</p>
+                        </div>
+                        <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-2xl text-center">
+                          <p className="text-[10px] font-black text-emerald-500 uppercase tracking-widest mb-1">Teklif Tutarı</p>
+                          <p className="text-xl font-black text-emerald-700">{detail.price}</p>
+                        </div>
+                        <div className={cn(
+                          "p-5 border rounded-2xl text-center",
+                          detail.totalCost > 0 && detail.totalPrice > detail.totalCost
+                            ? "bg-blue-50 border-blue-100"
+                            : "bg-red-50 border-red-100"
+                        )}>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Tahmini Marj</p>
+                          <p className={cn(
+                            "text-xl font-black",
+                            detail.totalCost > 0 && detail.totalPrice > detail.totalCost ? "text-blue-700" : "text-red-600"
+                          )}>
+                            {detail.totalCost > 0
+                              ? `%${(((detail.totalPrice - detail.totalCost) / detail.totalPrice) * 100).toFixed(1)}`
+                              : '—'}
+                          </p>
                         </div>
                       </div>
 
