@@ -232,7 +232,7 @@ const TenantAppInner = ({
     enabled: isDocsActive
   });
   const { data: proposalsData, isLoading: proposalsLoading } = useProposals(tenantId, {
-    enabled: isCrmActive
+    enabled: isCrmActive || isTodoActive
   });
 
   // Sync React Query data to local state for compatibility
@@ -253,7 +253,7 @@ const TenantAppInner = ({
     (isPresalesActive && (opportunitiesLoading || unitsLoading || systemUsersLoading)) ||
     (isSettingsActive && (unitsLoading || systemUsersLoading)) ||
     (isProjectActive && (projectsLoading || tasksLoading)) ||
-    (isTodoActive && (tasksLoading || projectsLoading || opportunitiesLoading || contractsLoading)) ||
+    (isTodoActive && (tasksLoading || projectsLoading || opportunitiesLoading || contractsLoading || proposalsLoading)) ||
     (isDocsActive && documentsLoading) ||
     (isContractsActive && (contractsLoading || opportunitiesLoading || projectsLoading || tasksLoading)) ||
     (isCostActive && opportunitiesLoading);
