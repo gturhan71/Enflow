@@ -83,11 +83,16 @@ const TodoModule = ({
     }
   };
 
-  const proposalTasks = tasks.filter(t => t.relatedModule === 'PROPOSAL');
+  // 'PROPOSAL' yeni format; 'CONTRACT' eski format — her ikisini de yakala
+  const isProposalApprovalTask = (t: TodoTask) =>
+    t.relatedModule === 'PROPOSAL' ||
+    (t.relatedModule === 'CONTRACT' && proposals?.some(p => p.id === t.relatedItemId));
+
+  const proposalTasks = tasks.filter(isProposalApprovalTask);
   const pendingApprovals = proposalTasks.filter(t => t.status === 'PENDING');
   const resolvedApprovals = proposalTasks.filter(t => t.status === 'COMPLETED' || t.status === 'CANCELLED');
 
-  const regularTasks = tasks.filter(t => t.relatedModule !== 'PROPOSAL');
+  const regularTasks = tasks.filter(t => !isProposalApprovalTask(t));
   const filteredTodos = filterUnit === 'all'
     ? regularTasks
     : regularTasks.filter(t => t.unitId === filterUnit);
@@ -119,6 +124,13 @@ const TodoModule = ({
       case 'OPPORTUNITY':
         return opportunities?.find(o => o.id === todo.relatedItemId)?.title || 'Bilinmeyen Fırsat';
       case 'CONTRACT': {
+        // Eski teklif onay görevleri relatedModule:'CONTRACT' ile kaydedildi
+        // relatedItemId bir proposal id'si olabilir — önce proposal'da ara
+        const proposalMatch = proposals?.find(p => p.id === todo.relatedItemId);
+        if (proposalMatch) {
+          const opp = opportunities?.find(o => o.id === proposalMatch.opportunityId);
+          return opp?.title || 'Bilinmeyen Fırsat';
+        }
         const contract = contracts?.find(c => c.id === todo.relatedItemId);
         const proj = projects?.find(p => p.id === contract?.projectId);
         return proj?.name || contract?.id || 'Bilinmeyen Sözleşme';
@@ -135,7 +147,7 @@ const TodoModule = ({
   };
 
   const getProposalDetail = (todo: TodoTask): { price: string } | null => {
-    if (todo.relatedModule !== 'PROPOSAL' || !todo.relatedItemId) return null;
+    if (!todo.relatedItemId) return null;
     const proposal = proposals?.find(p => p.id === todo.relatedItemId);
     if (!proposal || proposal.totalPrice == null) return null;
     return { price: proposal.totalPrice.toLocaleString('tr-TR') };
