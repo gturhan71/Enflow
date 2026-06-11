@@ -1,20 +1,21 @@
 import React, { useState, useRef } from 'react';
-import { 
-  LayoutDashboard, 
-  FileSearch, 
-  Plus, 
-  ArrowUpRight, 
-  CheckCircle2, 
-  AlertCircle, 
-  X, 
-  Loader2, 
+import {
+  LayoutDashboard,
+  FileSearch,
+  Plus,
+  ArrowUpRight,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Loader2,
   Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { CostAnalysisModule } from '../components/CostAnalysisModule';
-import { 
+import {
   Opportunity,
+  TodoTask,
   Unit,
   User
 } from '../types';
@@ -25,15 +26,17 @@ import { PermissionGate } from '../components/PermissionGate';
 import { useBoM } from '../hooks/useBoM';
 import { parseBoMFile } from '../utils/bomParser';
 import { SaveButton } from '../components/SaveButton';
+import { apiService } from '../services/apiService';
 
 interface PresalesModuleProps {
   opportunities: Opportunity[];
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
   units: Unit[];
   users: User[];
+  setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>;
 }
 
-const PresalesModule = ({ opportunities, setOpportunities, units, users }: PresalesModuleProps) => {
+const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
@@ -107,6 +110,22 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users }: Presa
     const success = await handleFinalApproval();
     if (success) {
       setShowApprovalPreview(false);
+      const opp = opportunities.find(o => o.id === selectedOppId);
+      if (opp) {
+        try {
+          const task = await apiService.createTask({
+            title: `BoM Onayı: ${opp.title}`,
+            description: 'Presales tarafından hazırlanan BoM listesi yönetici onayını bekliyor.',
+            unitId: 'unit_management',
+            assignedBy: currentUser?.id || 'system',
+            priority: 'HIGH',
+            status: 'PENDING',
+            relatedModule: 'PROPOSAL',
+            relatedItemId: opp.id,
+          });
+          if (setTasks) setTasks(prev => [task, ...prev]);
+        } catch { /* task creation failure is non-blocking */ }
+      }
     }
   };
 
