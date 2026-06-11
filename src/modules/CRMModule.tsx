@@ -211,11 +211,37 @@ const CRMModule = ({
   };
 
   const handleMarkDelivered = async (proposal: Proposal, delivered: boolean) => {
-    const c = getContentJson(proposal);
-    const newContent = { ...c, deliveredToCustomer: delivered };
+    const contentJson = getContentJson(proposal);
+    const newContent = { ...contentJson, deliveredToCustomer: delivered };
     try {
       await apiService.updateProposal(proposal.id, { content: JSON.stringify(newContent) });
       setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, content: newContent } : p));
+
+      // İletildi olarak işaretlendiğinde birim yöneticisine bildirim oluştur
+      if (delivered) {
+        const opp = opportunities.find(o => o.id === proposal.opportunityId);
+        const cust = customers.find(cu => cu.id === (opp?.customerId ?? proposal.customerId));
+        const totalPrice = contentJson.totalPrice as number | undefined;
+        const currency = cust?.currency ?? 'TRY';
+        const priceLabel = totalPrice != null
+          ? `${totalPrice.toLocaleString('tr-TR')} ${currency}`
+          : '';
+        const newTask = await apiService.createTask({
+          title: `Teklif Müşteriye İletildi: ${opp?.title ?? 'Fırsat'}`,
+          description: [
+            `Müşteri: ${cust?.name ?? 'Bilinmiyor'}`,
+            priceLabel ? `Tutar: ${priceLabel}` : '',
+            `İletilme: ${new Date().toLocaleString('tr-TR')}`,
+          ].filter(Boolean).join(' · '),
+          unitId: 'unit_management',
+          assignedBy: currentUser?.id || 'system',
+          priority: 'MEDIUM',
+          status: 'PENDING',
+          relatedModule: 'DELIVERY',
+          relatedItemId: proposal.id,
+        });
+        if (setTasks) setTasks(prev => [newTask, ...prev]);
+      }
     } catch {
       alert('Güncelleme başarısız.');
     }
