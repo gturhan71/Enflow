@@ -587,6 +587,9 @@ const CRMModule = ({
                       {proposal.status === 'DRAFT' && (
                         <button
                           onClick={async () => {
+                            try {
+                              await apiService.updateProposal(proposal.id, { status: 'PENDING_APPROVAL' });
+                            } catch { /* persist failure is non-blocking */ }
                             setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
                             try {
                               const o = opportunities.find(o => o.id === proposal.opportunityId);

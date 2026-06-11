@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MOCK_BOM_ITEMS } from '../constants';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
+import type { BoMItem } from '../types';
 
 export const useBoM = (
   selectedOppId: string,
@@ -37,25 +38,36 @@ export const useBoM = (
     if (!selectedOppId) return;
     setIsSubmitting(true);
     try {
-      // 1. Önce BoM kalemlerini veritabanına kaydet
-      const savedBoM = await apiService.saveBoMItems(selectedOppId, bomItems);
-      
+      // Abbreviated format → proper BoMItem for API and opportunity state
+      const properItems: BoMItem[] = bomItems.map((item, idx) => ({
+        id: item.id ?? item.pn ?? String(idx),
+        partNumber: item.pn,
+        description: item.desc,
+        quantity: item.qty,
+        purchaseCost: item.cost,
+        marginPercentage: item.margin,
+        unitSalePrice: item.cost * (1 + item.margin / 100),
+        totalSalePrice: item.cost * (1 + item.margin / 100) * item.qty,
+      }));
+
+      // 1. BoM kalemlerini veritabanına kaydet
+      await apiService.saveBoMItems(selectedOppId, properItems);
+
       // 2. Onay sürecini başlat
       await apiService.requestProposalApproval(selectedOppId, {
         note: 'Teknik çalışma tamamlandı, fiyat teklifi onaya sunulmuştur.',
-        managerId: 'cmp5lhehc000259w33zxhyy0p' // Gökhan Turhan (General Manager)
+        managerId: 'cmp5lhehc000259w33zxhyy0p'
       });
 
       alert('Teklif başarıyla yönetici onayına sunuldu.');
       setHasUnsavedChanges(false);
 
-      // Global state güncellemesi
-      setOpportunities(prev => prev.map(o => 
-        o.id === selectedOppId 
-          ? { ...o, technicalStatus: 'WAITING_APPROVAL', bomItems: savedBoM } 
+      setOpportunities(prev => prev.map(o =>
+        o.id === selectedOppId
+          ? { ...o, technicalStatus: 'APPROVED', bomItems: properItems }
           : o
       ));
-      
+
       return true;
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Onay sürecinde hata oluştu.');
@@ -65,7 +77,7 @@ export const useBoM = (
     }
   };
 
-  const totalCost = bomItems.reduce((acc, curr) => acc + (curr.cost * curr.qty), 0);
+  const totalCost = bomItems.reduce((acc: number, curr) => acc + (curr.cost * curr.qty), 0);
 
   return {
     bomItems,

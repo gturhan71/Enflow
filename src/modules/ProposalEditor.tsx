@@ -313,8 +313,30 @@ const ProposalEditor = ({ opportunity, bomItems, costItems, customers, version, 
             PDF ÇIKTISI AL
           </button>
 
-          <button 
-            onClick={() => onSave({ opportunityId: opportunity.id, status: 'DRAFT', items, totalPrice: manualTotalPrice, description, terms, version, openForNegotiation })}
+          <button
+            onClick={() => {
+              const cleanItems: BoMItem[] = items.map(item => ({
+                id: item.id,
+                partNumber: item.partNumber,
+                description: item.description,
+                quantity: item.quantity,
+                purchaseCost: item.purchaseCost,
+                marginPercentage: item.marginPercentage,
+                unitSalePrice: item.unitSalePrice ?? (item.purchaseCost * (1 + item.marginPercentage / 100)),
+                totalSalePrice: item.totalSalePrice ?? (item.purchaseCost * (1 + item.marginPercentage / 100) * item.quantity),
+                vendor: item.vendor,
+                source: item.source,
+              }));
+              onSave({
+                opportunityId: opportunity.id,
+                status: 'DRAFT',
+                version,
+                openForNegotiation,
+                totalPrice: manualTotalPrice,
+                items: cleanItems,
+                content: JSON.stringify({ items: cleanItems, totalPrice: manualTotalPrice, description, terms }),
+              });
+            }}
             className="px-10 py-3.5 bg-primary text-white rounded-2xl text-xs font-black hover:bg-primary/90 transition-all shadow-xl shadow-primary/20 flex items-center gap-2 active:scale-95 uppercase tracking-widest"
           >
             <Save size={16} />
