@@ -21,12 +21,14 @@ import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem } from '../types';
 import { apiService } from '../services/apiService';
 
-const CostAnalysisModule = ({ 
-  opportunities, 
-  setOpportunities 
-}: { 
+const CostAnalysisModule = ({
+  opportunities,
+  setOpportunities,
+  setActiveTab,
+}: {
   opportunities: Opportunity[],
-  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>
+  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
+  setActiveTab?: (tab: string) => void,
 }) => {
   const [selectedOppId, setSelectedOppId] = useState('');
   const [costItems, setCostItems] = useState<Partial<CostItem>[]>([]);
@@ -108,6 +110,11 @@ const CostAnalysisModule = ({
       ));
 
       alert('Analiz başarıyla kaydedildi ve teklif aşamasına aktarıldı.');
+
+      // Kaydet sonrası doğrudan "Teklife Hazır" listesine yönlendir
+      if (setActiveTab) {
+        setTimeout(() => setActiveTab('crm-proposals'), 800);
+      }
     } finally {
       setLoading(false);
     }
