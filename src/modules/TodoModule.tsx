@@ -9,35 +9,39 @@ import {
   Calendar,
   Filter,
   Target,
-  Loader2
+  Loader2,
+  DollarSign
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { 
+import {
   TodoTask,
   Opportunity,
   Project,
   Contract,
-  Unit
+  Unit,
+  Proposal
 } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 
 
-const TodoModule = ({ 
-  tasks, 
+const TodoModule = ({
+  tasks,
   setTasks,
   projects,
   opportunities,
   contracts,
-  units
-}: { 
-  tasks: TodoTask[], 
+  units,
+  proposals
+}: {
+  tasks: TodoTask[],
   setTasks: React.Dispatch<React.SetStateAction<TodoTask[]>>,
   projects?: Project[],
   opportunities?: Opportunity[],
   contracts?: Contract[],
-  units?: Unit[]
+  units?: Unit[],
+  proposals?: Proposal[]
 }) => {
   const { currentUser } = useAuth();
   const [filterUnit, setFilterUnit] = useState<string>('all');
@@ -107,13 +111,27 @@ const TodoModule = ({
         return projects?.find(p => p.id === todo.relatedItemId)?.name || 'Bilinmeyen Proje';
       case 'OPPORTUNITY':
         return opportunities?.find(o => o.id === todo.relatedItemId)?.title || 'Bilinmeyen Fırsat';
-      case 'CONTRACT':
+      case 'CONTRACT': {
         const contract = contracts?.find(c => c.id === todo.relatedItemId);
         const proj = projects?.find(p => p.id === contract?.projectId);
         return proj?.name || contract?.id || 'Bilinmeyen Sözleşme';
+      }
+      case 'PROPOSAL': {
+        const proposal = proposals?.find(p => p.id === todo.relatedItemId);
+        if (!proposal) return 'Bilinmeyen Teklif';
+        const opp = opportunities?.find(o => o.id === proposal.opportunityId);
+        return opp?.title || 'Bilinmeyen Fırsat';
+      }
       default:
         return '';
     }
+  };
+
+  const getProposalDetail = (todo: TodoTask): { price: string } | null => {
+    if (todo.relatedModule !== 'PROPOSAL' || !todo.relatedItemId) return null;
+    const proposal = proposals?.find(p => p.id === todo.relatedItemId);
+    if (!proposal || proposal.totalPrice == null) return null;
+    return { price: proposal.totalPrice.toLocaleString('tr-TR') };
   };
 
   return (
@@ -172,8 +190,8 @@ const TodoModule = ({
               )}
             >
               <div className="flex-1 space-y-4">
-                <div className="flex items-center gap-4">
-                  {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY') && todo.status === 'PENDING' && (
+                <div className="flex items-center gap-4 flex-wrap">
+                  {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY' || todo.relatedModule === 'PROPOSAL') && todo.status === 'PENDING' && (
                     <motion.div animate={{ scale: [1, 1.2, 1] }} transition={{ repeat: Infinity, duration: 2 }}>
                       <AlertCircle className="text-amber-500" size={20} />
                     </motion.div>
@@ -182,6 +200,16 @@ const TodoModule = ({
                     {todo.priority}
                   </span>
                   <h4 className="font-black text-slate-900 text-xl tracking-tight">{todo.title}</h4>
+                  {(() => {
+                    const detail = getProposalDetail(todo);
+                    if (!detail) return null;
+                    return (
+                      <span className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 text-emerald-700 px-3 py-1 rounded-full text-xs font-black">
+                        <DollarSign size={12} />
+                        {detail.price}
+                      </span>
+                    );
+                  })()}
                 </div>
                 <p className="text-sm text-slate-500 leading-relaxed font-medium">{todo.description}</p>
                 <div className="flex flex-wrap items-center gap-6 pt-2">
@@ -191,40 +219,34 @@ const TodoModule = ({
                   </div>
                   {todo.relatedModule && todo.relatedModule !== 'GENERAL' && (
                     <div className="flex flex-col gap-2">
-                      <button 
-                        onClick={() => alert(`Teklif/İşlem İçeriği: ${getRelatedItemName(todo)} - Detaylar yüklendi.`)}
-                        className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg hover:bg-indigo-100 transition-colors"
-                      >
+                      <div className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">
                         <Target size={14} className="shrink-0" />
                         <span>
                           {todo.relatedModule === 'PROJECT' && `Proje: ${getRelatedItemName(todo)}`}
                           {todo.relatedModule === 'OPPORTUNITY' && `Fırsat: ${getRelatedItemName(todo)}`}
                           {todo.relatedModule === 'CONTRACT' && `Sözleşme: ${getRelatedItemName(todo)}`}
+                          {todo.relatedModule === 'PROPOSAL' && `Fırsat: ${getRelatedItemName(todo)}`}
                         </span>
-                      </button>
-                      
+                      </div>
+
                       {/* Yönetici Onay/Red Butonları */}
-                      {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY') && todo.status === 'PENDING' && (
+                      {(todo.relatedModule === 'CONTRACT' || todo.relatedModule === 'OPPORTUNITY' || todo.relatedModule === 'PROPOSAL') && todo.status === 'PENDING' && (
                         <div className="flex gap-2">
-                          <button 
+                          <button
                             onClick={async () => {
-                                // 1. Görevi tamamla
-                                await handleStatusChange(todo.id, 'COMPLETED');
-                                // 2. Teklifi 'APPROVED' statüsüne çek
-                                await apiService.updateProposal(todo.relatedItemId!, { status: 'APPROVED' });
-                                alert('Teklif Onaylandı.');
+                              await handleStatusChange(todo.id, 'COMPLETED');
+                              await apiService.updateProposal(todo.relatedItemId!, { status: 'APPROVED' });
+                              alert('Teklif Onaylandı.');
                             }}
                             className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700"
                           >
                             Onayla
                           </button>
-                          <button 
+                          <button
                             onClick={async () => {
-                                // Teklifi reddetme mantığı
-                                await handleStatusChange(todo.id, 'CANCELLED');
-                                // CRM modülündeki ilgili teklifi REDDEDILDI statüsüne çek
-                                await apiService.updateProposal(todo.relatedItemId!, { status: 'REJECTED' });
-                                alert('Teklif Reddedildi ve CRM\'e yansıtıldı.');
+                              await handleStatusChange(todo.id, 'CANCELLED');
+                              await apiService.updateProposal(todo.relatedItemId!, { status: 'REJECTED' });
+                              alert('Teklif Reddedildi ve CRM\'e yansıtıldı.');
                             }}
                             className="bg-red-500 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-600"
                           >

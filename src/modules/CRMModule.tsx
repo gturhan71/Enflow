@@ -485,14 +485,20 @@ const CRMModule = ({
                       onClick={async () => {
                         setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
                         try {
+                          const opp = opportunities.find(o => o.id === proposal.opportunityId);
+                          const customer = customers.find(c => c.id === proposal.customerId);
+                          const currency = customer?.currency || 'TRY';
+                          const priceLabel = proposal.totalPrice != null
+                            ? proposal.totalPrice.toLocaleString('tr-TR') + ' ' + currency
+                            : '';
                           const newTask = await apiService.createTask({
-                            title: `Teklif Onayı: ${proposal.id.slice(0, 8)}`,
-                            description: 'Yeni bir teklif onayınızı bekliyor.',
+                            title: `Teklif Onayı: ${opp?.title ?? 'Fırsat'}`,
+                            description: priceLabel ? `Toplam Tutar: ${priceLabel}` : 'Yeni bir teklif onayınızı bekliyor.',
                             unitId: 'unit_management',
                             assignedBy: currentUser?.id || 'admin',
                             priority: 'HIGH',
                             status: 'PENDING',
-                            relatedModule: 'CONTRACT',
+                            relatedModule: 'PROPOSAL',
                             relatedItemId: proposal.id
                           });
                           if (setTasks) setTasks(prev => [newTask, ...prev]);
