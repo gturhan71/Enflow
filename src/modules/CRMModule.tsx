@@ -39,6 +39,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearch, useForm } from '../hooks/useShared';
 import { CustomerImportWizard } from '../components/CustomerImportWizard';
+import { generateProposalPDF } from '../utils/generateProposalPDF';
 
 const CRMModule = ({
   opportunities = [],
@@ -67,6 +68,7 @@ const CRMModule = ({
   const [loading, setLoading] = useState(false);
   const [showNewCustomerModal, setShowNewCustomerModal] = useState(false);
   const [showImportWizard, setShowImportWizard] = useState(false);
+  const [generatingPdfId, setGeneratingPdfId] = useState<string | null>(null);
   const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showProposalEditor, setShowProposalEditor] = useState(false);
@@ -513,8 +515,27 @@ const CRMModule = ({
                     </button>
                   )}
                   {proposal.status === 'APPROVED' && (
-                    <button className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2">
-                      <Download size={14} /> PDF Oluştur
+                    <button
+                      disabled={generatingPdfId === proposal.id}
+                      onClick={async () => {
+                        setGeneratingPdfId(proposal.id);
+                        try {
+                          const opp = opportunities.find(o => o.id === proposal.opportunityId);
+                          const cust = customers.find(c => c.id === (opp?.customerId ?? proposal.customerId));
+                          if (!opp) { alert('Fırsat bulunamadı.'); return; }
+                          await generateProposalPDF(proposal, opp, cust);
+                        } catch (err) {
+                          alert('PDF oluşturulamadı: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
+                        } finally {
+                          setGeneratingPdfId(null);
+                        }
+                      }}
+                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-60"
+                    >
+                      {generatingPdfId === proposal.id
+                        ? <Loader2 size={14} className="animate-spin" />
+                        : <Download size={14} />}
+                      PDF Oluştur
                     </button>
                   )}
                 </div>
