@@ -385,8 +385,9 @@ const App = () => {
     }
   }, [activeTenantId]);
 
-  const handleLogin = (tenantId: string) => {
+  const handleLogin = (tenantId: string, token: string) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
+    localStorage.setItem('enflow_auth_token', token);
     setActiveTenantId(tenantId);
     setIsAuthenticated(true);
   };

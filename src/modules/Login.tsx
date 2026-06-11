@@ -5,7 +5,7 @@ import { APP_VERSION } from '../constants';
 import { apiService } from '../services/apiService';
 
 interface LoginProps {
-  onLogin: (tenantId: string) => void;
+  onLogin: (tenantId: string, token: string) => void;
 }
 
 const Login = ({ onLogin }: LoginProps) => {
@@ -25,7 +25,7 @@ const Login = ({ onLogin }: LoginProps) => {
       if (view === 'LOGIN') {
         const data = await apiService.login(email);
         apiService.setAuth(data.user.tenantId, data.token);
-        onLogin(data.user.tenantId);
+        onLogin(data.user.tenantId, data.token);
       } else {
         const data = await apiService.forgotPassword(email);
         setSuccessMessage(data.message);

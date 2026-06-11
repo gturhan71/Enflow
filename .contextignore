@@ -15,3 +15,7 @@ vendor/
 *_pb.*
 *.min.js
 *.min.css
+backend/src/generated/
+backend/dev.db
+*.log
+*.jsonl
