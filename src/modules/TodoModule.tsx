@@ -33,7 +33,8 @@ const TodoModule = ({
   opportunities,
   contracts,
   units,
-  proposals
+  proposals,
+  setProposals
 }: {
   tasks: TodoTask[],
   setTasks: React.Dispatch<React.SetStateAction<TodoTask[]>>,
@@ -41,7 +42,8 @@ const TodoModule = ({
   opportunities?: Opportunity[],
   contracts?: Contract[],
   units?: Unit[],
-  proposals?: Proposal[]
+  proposals?: Proposal[],
+  setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>
 }) => {
   const { currentUser } = useAuth();
   const [filterUnit, setFilterUnit] = useState<string>('all');
@@ -236,6 +238,9 @@ const TodoModule = ({
                             onClick={async () => {
                               await handleStatusChange(todo.id, 'COMPLETED');
                               await apiService.updateProposal(todo.relatedItemId!, { status: 'APPROVED' });
+                              setProposals?.(prev => prev.map(p =>
+                                p.id === todo.relatedItemId ? { ...p, status: 'APPROVED' } : p
+                              ));
                               alert('Teklif Onaylandı.');
                             }}
                             className="bg-emerald-600 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-700"
@@ -246,6 +251,9 @@ const TodoModule = ({
                             onClick={async () => {
                               await handleStatusChange(todo.id, 'CANCELLED');
                               await apiService.updateProposal(todo.relatedItemId!, { status: 'REJECTED' });
+                              setProposals?.(prev => prev.map(p =>
+                                p.id === todo.relatedItemId ? { ...p, status: 'REJECTED' } : p
+                              ));
                               alert('Teklif Reddedildi ve CRM\'e yansıtıldı.');
                             }}
                             className="bg-red-500 text-white px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-red-600"

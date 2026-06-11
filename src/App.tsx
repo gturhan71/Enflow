@@ -328,7 +328,7 @@ const TenantAppInner = ({
       case 'license-gen': return <LicenseGeneratorModule />;
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
-      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} />;
+      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} setProposals={setProposals} />;
       default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} onApproveProposal={handleApproveProposal} />;
     }
   };
