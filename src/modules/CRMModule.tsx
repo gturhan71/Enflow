@@ -19,7 +19,9 @@ import {
   CheckCircle,
   XCircle,
   GitBranch,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Send,
+  Package
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -197,6 +199,25 @@ const CRMModule = ({
       alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const getContentJson = (proposal: Proposal): Record<string, unknown> => {
+    if (!proposal.content) return {};
+    if (typeof proposal.content === 'string') {
+      try { return JSON.parse(proposal.content); } catch { return {}; }
+    }
+    return proposal.content as Record<string, unknown>;
+  };
+
+  const handleMarkDelivered = async (proposal: Proposal, delivered: boolean) => {
+    const c = getContentJson(proposal);
+    const newContent = { ...c, deliveredToCustomer: delivered };
+    try {
+      await apiService.updateProposal(proposal.id, { content: JSON.stringify(newContent) });
+      setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, content: newContent } : p));
+    } catch {
+      alert('Güncelleme başarısız.');
     }
   };
 
@@ -394,157 +415,241 @@ const CRMModule = ({
   );
 
   const renderProposals = () => {
-    // Maliyet analizi yapılmış (approved) ancak henüz teklif oluşturulmamış fırsatları filtrele
     const readyForProposalOpps = opportunities.filter(opp => {
       const isApproved = opp.technicalStatus === 'APPROVED';
       const hasProposal = proposals.find(p => p.opportunityId === opp.id);
       return isApproved && !hasProposal;
     });
 
+    // SENT statüsündekiler ayrı listeye; kalanlar APPROVED önde gelecek şekilde sıralanır
+    const activeProposals = [...proposals.filter(p => p.status !== 'SENT')].sort((a, b) => {
+      if (a.status === 'APPROVED' && b.status !== 'APPROVED') return -1;
+      if (a.status !== 'APPROVED' && b.status === 'APPROVED') return 1;
+      return 0;
+    });
+    const sentProposals = proposals.filter(p => p.status === 'SENT');
+
+    const statusLabel = (s: string) => {
+      if (s === 'PENDING_APPROVAL') return 'YÖNETİCİ ONAYINDA';
+      if (s === 'REJECTED') return 'REDDEDİLDİ';
+      if (s === 'APPROVED') return 'ONAYLANDI';
+      return s;
+    };
+    const statusCls = (s: string) =>
+      s === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+      s === 'REJECTED' ? 'bg-red-100 text-red-700' :
+      s === 'PENDING_APPROVAL' ? 'bg-amber-100 text-amber-700' :
+      'bg-slate-100 text-slate-700';
+
     return (
-    <div className="p-8">
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="text-2xl font-black">Teklifler ({proposals.length})</h3>
-        {proposals.length > 0 && (
-          <button 
-            onClick={() => setProposals([])}
-            className="text-xs font-black text-red-500 uppercase tracking-widest hover:text-red-700"
-          >
-            Teklifleri Temizle
-          </button>
-        )}
-      </div>
-
-      {/* Teklife Hazır Fırsatlar Listesi */}
-      {readyForProposalOpps.length > 0 && (
-        <div className="mb-8">
-          <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">Teklife Hazır Fırsatlar ({readyForProposalOpps.length})</h4>
-          <div className="space-y-4">
-            {readyForProposalOpps.map(opp => (
-              <div key={opp.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center border-l-4 border-emerald-500">
-                <div>
-                  <h4 className="font-bold">{opp.title}</h4>
-                  <p className="text-xs text-emerald-600 mt-1 font-black uppercase">Teklife Hazır</p>
-                </div>
-                <button 
-                  onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
-                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                >
-                  Teklif Oluştur
-                </button>
-              </div>
-            ))}
-          </div>
+      <div className="p-8">
+        <div className="flex justify-between items-center mb-6">
+          <h3 className="text-2xl font-black">Teklifler</h3>
         </div>
-      )}
 
-      <div className="space-y-4">
-        {proposals.length === 0 ? (
+        {/* Teklife Hazır Fırsatlar */}
+        {readyForProposalOpps.length > 0 && (
+          <div className="mb-8">
+            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">
+              Teklife Hazır Fırsatlar ({readyForProposalOpps.length})
+            </h4>
+            <div className="space-y-4">
+              {readyForProposalOpps.map(opp => (
+                <div key={opp.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center border-l-4 border-emerald-500">
+                  <div>
+                    <h4 className="font-bold">{opp.title}</h4>
+                    <p className="text-xs text-emerald-600 mt-1 font-black uppercase">Teklife Hazır</p>
+                  </div>
+                  <button
+                    onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
+                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                  >
+                    Teklif Oluştur
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Aktif Teklifler */}
+        {activeProposals.length > 0 && (
+          <div className="mb-8">
+            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">
+              Aktif Teklifler ({activeProposals.length})
+            </h4>
+            <div className="space-y-4">
+              {activeProposals.map(proposal => {
+                const opp = opportunities.find(o => o.id === proposal.opportunityId);
+                const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
+                return (
+                  <div key={proposal.id} className={cn(
+                    "glass-panel p-6 rounded-2xl flex justify-between items-center",
+                    proposal.status === 'APPROVED' && "border-l-4 border-emerald-400"
+                  )}>
+                    <div>
+                      <h4 className="font-bold">
+                        {customer?.name || 'Bilinmeyen Müşteri'} · {opp?.title || 'Bilinmeyen İş'} · v{proposal.version || 1}
+                      </h4>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Durum:
+                        <span className={cn("ml-2 font-black uppercase text-[10px] px-2 py-0.5 rounded-full", statusCls(proposal.status))}>
+                          {statusLabel(proposal.status)}
+                        </span>
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      {(proposal.status === 'DRAFT' || proposal.status === 'REJECTED') && (
+                        <button
+                          onClick={() => {
+                            const o = opportunities.find(o => o.id === proposal.opportunityId);
+                            if (o) { setSelectedOpp(o); setShowProposalEditor(true); }
+                          }}
+                          className="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                        >
+                          {proposal.status === 'REJECTED' ? 'Revize Et' : 'Düzenle'}
+                        </button>
+                      )}
+                      {proposal.status === 'DRAFT' && (
+                        <button
+                          onClick={async () => {
+                            setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
+                            try {
+                              const o = opportunities.find(o => o.id === proposal.opportunityId);
+                              const cust = customers.find(c => c.id === proposal.customerId);
+                              const currency = cust?.currency || 'TRY';
+                              const c = getContentJson(proposal);
+                              const totalPrice = c.totalPrice as number ?? proposal.totalPrice;
+                              const priceLabel = totalPrice != null
+                                ? totalPrice.toLocaleString('tr-TR') + ' ' + currency
+                                : '';
+                              const newTask = await apiService.createTask({
+                                title: `Teklif Onayı: ${o?.title ?? 'Fırsat'}`,
+                                description: priceLabel ? `Toplam Tutar: ${priceLabel}` : 'Yeni bir teklif onayınızı bekliyor.',
+                                unitId: 'unit_management',
+                                assignedBy: currentUser?.id || 'admin',
+                                priority: 'HIGH',
+                                status: 'PENDING',
+                                relatedModule: 'PROPOSAL',
+                                relatedItemId: proposal.id
+                              });
+                              if (setTasks) setTasks(prev => [newTask, ...prev]);
+                              alert('Teklif yönetici onayına gönderildi.');
+                            } catch {
+                              alert('Görev atanamadı.');
+                            }
+                          }}
+                          className="bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg"
+                        >
+                          Onaya Gönder
+                        </button>
+                      )}
+                      {proposal.status === 'APPROVED' && (
+                        <button
+                          disabled={generatingPdfId === proposal.id}
+                          onClick={async () => {
+                            setGeneratingPdfId(proposal.id);
+                            try {
+                              const o = opportunities.find(o => o.id === proposal.opportunityId);
+                              const cust = customers.find(c => c.id === (o?.customerId ?? proposal.customerId));
+                              if (!o) { alert('Fırsat bulunamadı.'); return; }
+                              await generateProposalPDF(proposal, o, cust);
+                              // PDF oluşturulunca SENT statüsüne geç ve tarihi kaydet
+                              const c = getContentJson(proposal);
+                              const newContent = { ...c, pdfGeneratedAt: new Date().toISOString(), deliveredToCustomer: false };
+                              await apiService.updateProposal(proposal.id, { status: 'SENT', content: JSON.stringify(newContent) });
+                              setProposals(prev => prev.map(p =>
+                                p.id === proposal.id ? { ...p, status: 'SENT', content: newContent } : p
+                              ));
+                            } catch (err) {
+                              alert('PDF oluşturulamadı: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
+                            } finally {
+                              setGeneratingPdfId(null);
+                            }
+                          }}
+                          className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-60"
+                        >
+                          {generatingPdfId === proposal.id
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <Download size={14} />}
+                          PDF Oluştur
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {activeProposals.length === 0 && sentProposals.length === 0 && readyForProposalOpps.length === 0 && (
           <p className="text-slate-400 font-bold text-sm">Henüz teklif bulunmuyor.</p>
-        ) : (
-          proposals.map(proposal => {
-            const opp = opportunities.find(o => o.id === proposal.opportunityId);
-            const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
-            return (
-              <div key={proposal.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center">
-                <div>
-                  <h4 className="font-bold">
-                    {customer?.name || 'Bilinmeyen Müşteri'} - 
-                    {opp?.title || 'Bilinmeyen İş'} - v{proposal.version || 1}
-                  </h4>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Durum: 
-                    <span className={cn(
-                      "ml-2 font-black uppercase text-[10px] px-2 py-0.5 rounded-full",
-                      proposal.status === 'APPROVED' ? "bg-emerald-100 text-emerald-700" :
-                      proposal.status === 'REJECTED' ? "bg-red-100 text-red-700" :
-                      proposal.status === 'PENDING_APPROVAL' ? "bg-amber-100 text-amber-700" :
-                      "bg-slate-100 text-slate-700"
-                    )}>
-                      {proposal.status === 'PENDING_APPROVAL' ? 'YÖNETİCİ ONAYINDA' : 
-                       proposal.status === 'REJECTED' ? 'REDDEDİLDİ' : 
-                       proposal.status === 'APPROVED' ? 'ONAYLANDI' : proposal.status}
-                    </span>
-                  </p>
-                </div>
-                <div className="flex gap-2">
-                  {(proposal.status === 'DRAFT' || proposal.status === 'REJECTED') && (
-                    <button 
-                      onClick={() => {
-                        const opp = opportunities.find(o => o.id === proposal.opportunityId);
-                        if (opp) {
-                          setSelectedOpp(opp);
-                          setShowProposalEditor(true);
-                        }
-                      }}
-                      className="bg-slate-100 hover:bg-slate-200 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
-                    >
-                      {proposal.status === 'REJECTED' ? 'Revize Et' : 'Düzenle'}
-                    </button>
-                  )}
-                  {proposal.status === 'DRAFT' && (
-                    <button 
-                      onClick={async () => {
-                        setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
-                        try {
-                          const opp = opportunities.find(o => o.id === proposal.opportunityId);
-                          const customer = customers.find(c => c.id === proposal.customerId);
-                          const currency = customer?.currency || 'TRY';
-                          const priceLabel = proposal.totalPrice != null
-                            ? proposal.totalPrice.toLocaleString('tr-TR') + ' ' + currency
-                            : '';
-                          const newTask = await apiService.createTask({
-                            title: `Teklif Onayı: ${opp?.title ?? 'Fırsat'}`,
-                            description: priceLabel ? `Toplam Tutar: ${priceLabel}` : 'Yeni bir teklif onayınızı bekliyor.',
-                            unitId: 'unit_management',
-                            assignedBy: currentUser?.id || 'admin',
-                            priority: 'HIGH',
-                            status: 'PENDING',
-                            relatedModule: 'PROPOSAL',
-                            relatedItemId: proposal.id
-                          });
-                          if (setTasks) setTasks(prev => [newTask, ...prev]);
-                          alert('Teklif yönetici onayına gönderildi.');
-                        } catch (e) {
-                          alert('Görev atanamadı.');
-                        }
-                      }}
-                      className="bg-primary text-white hover:bg-primary/90 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg"
-                    >
-                      Onaya Gönder
-                    </button>
-                  )}
-                  {proposal.status === 'APPROVED' && (
-                    <button
-                      disabled={generatingPdfId === proposal.id}
-                      onClick={async () => {
-                        setGeneratingPdfId(proposal.id);
-                        try {
-                          const opp = opportunities.find(o => o.id === proposal.opportunityId);
-                          const cust = customers.find(c => c.id === (opp?.customerId ?? proposal.customerId));
-                          if (!opp) { alert('Fırsat bulunamadı.'); return; }
-                          await generateProposalPDF(proposal, opp, cust);
-                        } catch (err) {
-                          alert('PDF oluşturulamadı: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
-                        } finally {
-                          setGeneratingPdfId(null);
-                        }
-                      }}
-                      className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-60"
-                    >
-                      {generatingPdfId === proposal.id
-                        ? <Loader2 size={14} className="animate-spin" />
-                        : <Download size={14} />}
-                      PDF Oluştur
-                    </button>
-                  )}
-                </div>
-              </div>
-            );
-          })
+        )}
+
+        {/* Yollanan Teklifler */}
+        {sentProposals.length > 0 && (
+          <div>
+            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+              <Send size={14} />
+              Yollanan Teklifler ({sentProposals.length})
+            </h4>
+            <div className="space-y-3">
+              {sentProposals.map(proposal => {
+                const opp = opportunities.find(o => o.id === proposal.opportunityId);
+                const cust = opp ? customers.find(c => c.id === opp.customerId) : null;
+                const c = getContentJson(proposal);
+                const pdfDateRaw = c.pdfGeneratedAt as string | undefined;
+                const pdfDate = pdfDateRaw
+                  ? new Date(pdfDateRaw).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                  : '-';
+                const totalPrice = c.totalPrice as number | undefined;
+                const currency = cust?.currency ?? 'TRY';
+                const delivered = !!(c.deliveredToCustomer as boolean | undefined);
+                return (
+                  <div key={proposal.id} className="glass-panel p-5 rounded-2xl border-l-4 border-blue-400">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h4 className="font-bold text-sm">
+                          {cust?.name || 'Bilinmeyen Müşteri'} · {opp?.title || 'Bilinmeyen Fırsat'} · v{proposal.version || 1}
+                        </h4>
+                        <div className="flex items-center gap-5 mt-2 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <Package size={11} />
+                            PDF: {pdfDate}
+                          </span>
+                          {totalPrice != null && (
+                            <span className="font-black text-slate-700">
+                              {totalPrice.toLocaleString('tr-TR')} {currency}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <label className="flex items-center gap-2 cursor-pointer select-none ml-6">
+                        <div
+                          onClick={() => handleMarkDelivered(proposal, !delivered)}
+                          className={cn(
+                            "relative w-10 h-5 rounded-full transition-colors cursor-pointer",
+                            delivered ? "bg-emerald-500" : "bg-slate-300"
+                          )}
+                        >
+                          <span className={cn(
+                            "absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                            delivered && "translate-x-5"
+                          )} />
+                        </div>
+                        <span className={cn("text-xs font-black uppercase whitespace-nowrap", delivered ? "text-emerald-600" : "text-slate-400")}>
+                          {delivered ? 'İletildi' : 'İletilmedi'}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         )}
       </div>
-    </div>
     );
   };
 

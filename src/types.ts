@@ -282,7 +282,7 @@ export interface Proposal {
   opportunityId: string;
   customerId?: string;
   createdById?: string;
-  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ACCEPTED';
+  status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ACCEPTED' | 'SENT';
   version?: number;
   openForNegotiation?: boolean;
   content?: string | Record<string, unknown>;
