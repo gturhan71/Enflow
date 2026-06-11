@@ -65,6 +65,7 @@ export interface Opportunity {
   createdBy?: User;
   bomItems?: BoMItem[];
   costItems?: CostItem[];
+  costConfig?: CostConfig;
 }
 
 export interface Customer {
@@ -125,6 +126,7 @@ export interface BoMItem {
   unitSalePrice?: number;
   totalSalePrice?: number;
   vendor?: string;
+  currency?: string;
   source?: 'API' | 'EXCEL' | 'MANUAL';
   status?: 'PENDING_MATCH' | 'MATCHED';
 }
@@ -134,8 +136,16 @@ export interface CostItem {
   description: string;
   category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' | 'OTHER';
   amount: number;
+  currency?: string;
   opportunityId: string;
   tenantId?: string;
+}
+
+export interface CostConfig {
+  baseCurrency: string;
+  rates: Record<string, number>;
+  marginMode: 'PER_ITEM' | 'PROJECT_WIDE';
+  globalMargin: number;
 }
 
 export type SubscriptionPlanType = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';

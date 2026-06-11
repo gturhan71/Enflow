@@ -84,6 +84,9 @@ interface ParsedContent {
   description?: string;
   terms?: string;
   version?: number;
+  baseCurrency?: string;
+  exchangeRates?: Record<string, number>;
+  marginMode?: string;
 }
 
 const parseContent = (raw: string | Record<string, unknown> | undefined): ParsedContent => {
@@ -112,7 +115,7 @@ export const generateProposalPDF = async (
   const description = content.description ?? proposal.description ?? '';
   const terms       = content.terms ?? proposal.terms ?? '';
   const version     = content.version ?? proposal.version ?? 1;
-  const currency    = customer?.currency ?? 'TRY';
+  const currency    = content.baseCurrency ?? customer?.currency ?? 'TRY';
   const fmt         = (n: number) => `${n.toLocaleString('tr-TR')} ${currency}`;
 
   const doc       = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
@@ -168,7 +171,8 @@ export const generateProposalPDF = async (
     doc.setFont(font, 'normal');
     doc.text(clean(`Teklif No: PR-${proposal.id.slice(-6).toUpperCase()}-V${version}`), pageW - 20, 50, { align: 'right' });
     doc.text(clean(`Tarih: ${new Date().toLocaleDateString('tr-TR')}`), pageW - 20, 55, { align: 'right' });
-    doc.text(clean('Durum: ONAYLANDI'), pageW - 20, 60, { align: 'right' });
+    doc.text(clean(`Teklif Dovizi: ${currency}`), pageW - 20, 60, { align: 'right' });
+    doc.text(clean('Durum: ONAYLANDI'), pageW - 20, 65, { align: 'right' });
 
     // Müşteri & proje kutuları
     doc.setFontSize(8);

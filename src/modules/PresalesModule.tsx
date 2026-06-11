@@ -150,6 +150,14 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
           items: properItems,
           totalPrice,
           description: `BoM bazlı maliyet teklifi — v${version}`,
+          // Maliyet analizinde ayarlanan döviz/kur/marj bilgisi varsa taşı
+          ...((opp as any).costConfig
+            ? {
+                baseCurrency: (opp as any).costConfig.baseCurrency,
+                exchangeRates: (opp as any).costConfig.rates,
+                marginMode: (opp as any).costConfig.marginMode,
+              }
+            : {}),
         }),
       });
       if (setProposals) setProposals(prev => [newProposal, ...prev]);
