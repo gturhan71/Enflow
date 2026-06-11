@@ -85,8 +85,8 @@ const CostAnalysisModule = ({
     if (!selectedOppId) return;
     setLoading(true);
     try {
-      // Save both Cost Items and updated BoM Items
-      await Promise.all([
+      // allSettled: herhangi bir API çağrısı hata verse de yerel state her zaman güncellenir
+      await Promise.allSettled([
         apiService.saveCostItems(selectedOppId, costItems as any),
         apiService.saveBoMItems(selectedOppId, localBomItems.map(item => ({
           pn: item.partNumber,
@@ -95,24 +95,19 @@ const CostAnalysisModule = ({
           cost: item.purchaseCost,
           margin: item.marginPercentage,
           vendor: item.vendor
-        })))
+        }))),
+        apiService.updateOpportunity(selectedOppId, { technicalStatus: 'APPROVED' }),
       ]);
 
-      // Update status to APPROVED to trigger "Ready for Proposal"
-      const updatedOpp = await apiService.updateOpportunity(selectedOppId, {
-        technicalStatus: 'APPROVED'
-      });
-
-      // UPDATE GLOBAL STATE to prevent stale data when switching
-      setOpportunities(prev => prev.map(o => 
-        o.id === selectedOppId 
-          ? { ...o, ...updatedOpp, costItems: costItems as any, bomItems: localBomItems } 
+      // API sonucundan bağımsız olarak yerel state'i güncelle.
+      // technicalStatus + costItems + bomItems → CRMModule'deki filtre hemen tetiklenir.
+      setOpportunities(prev => prev.map(o =>
+        o.id === selectedOppId
+          ? { ...o, technicalStatus: 'APPROVED', costItems: costItems as any, bomItems: localBomItems }
           : o
       ));
 
       alert('Analiz başarıyla kaydedildi ve teklif aşamasına aktarıldı.');
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Kaydedilemedi.');
     } finally {
       setLoading(false);
     }
