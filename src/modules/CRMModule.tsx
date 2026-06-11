@@ -441,10 +441,20 @@ const CRMModule = ({
   );
 
   const renderProposals = () => {
+    // Maliyet analizi tamamlanmış fırsatlar:
+    // technicalStatus='APPROVED' VEYA kaydedilmiş BoM/maliyet kalemleri var.
+    // Sadece aktif (DRAFT/PENDING_APPROVAL/APPROVED/SENT) teklifi olmayan fırsatları göster;
+    // REJECTED teklifi olan fırsatlar yeniden listeye girer.
     const readyForProposalOpps = opportunities.filter(opp => {
-      const isApproved = opp.technicalStatus === 'APPROVED';
-      const hasProposal = proposals.find(p => p.opportunityId === opp.id);
-      return isApproved && !hasProposal;
+      const hasCostAnalysis =
+        opp.technicalStatus === 'APPROVED' ||
+        (opp.bomItems && opp.bomItems.length > 0) ||
+        (opp.costItems && opp.costItems.length > 0);
+      const hasBlockingProposal = proposals.some(p =>
+        p.opportunityId === opp.id &&
+        p.status !== 'REJECTED'
+      );
+      return hasCostAnalysis && !hasBlockingProposal;
     });
 
     // SENT statüsündekiler ayrı listeye; kalanlar APPROVED önde gelecek şekilde sıralanır
@@ -476,24 +486,62 @@ const CRMModule = ({
         {/* Teklife Hazır Fırsatlar */}
         {readyForProposalOpps.length > 0 && (
           <div className="mb-8">
-            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">
-              Teklife Hazır Fırsatlar ({readyForProposalOpps.length})
-            </h4>
-            <div className="space-y-4">
-              {readyForProposalOpps.map(opp => (
-                <div key={opp.id} className="glass-panel p-6 rounded-2xl flex justify-between items-center border-l-4 border-emerald-500">
-                  <div>
-                    <h4 className="font-bold">{opp.title}</h4>
-                    <p className="text-xs text-emerald-600 mt-1 font-black uppercase">Teklife Hazır</p>
-                  </div>
-                  <button
-                    onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
-                    className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <h4 className="text-sm font-black text-slate-600 uppercase tracking-widest">
+                Maliyet Analizi Tamamlanan Fırsatlar ({readyForProposalOpps.length})
+              </h4>
+            </div>
+            <div className="space-y-3">
+              {readyForProposalOpps.map(opp => {
+                const cust = customers.find(c => c.id === opp.customerId);
+                const currency = cust?.currency ?? 'TRY';
+                // BoM toplamını hesapla; yoksa fırsat değerini göster
+                const bomTotal = opp.bomItems && opp.bomItems.length > 0
+                  ? opp.bomItems.reduce((sum, item) => {
+                      const sp = item.unitSalePrice
+                        ?? ((item.purchaseCost ?? 0) * (1 + (item.marginPercentage ?? 0) / 100));
+                      return sum + sp * (item.quantity ?? 1);
+                    }, 0)
+                  : null;
+                const displayTotal = bomTotal ?? opp.value;
+                const hasRejectedProposal = proposals.some(
+                  p => p.opportunityId === opp.id && p.status === 'REJECTED'
+                );
+                return (
+                  <div
+                    key={opp.id}
+                    className="glass-panel p-5 rounded-2xl border-l-4 border-emerald-400 flex items-center justify-between gap-4"
                   >
-                    Teklif Oluştur
-                  </button>
-                </div>
-              ))}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-black text-slate-800 text-sm truncate">{opp.title}</h4>
+                        {hasRejectedProposal && (
+                          <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600 uppercase tracking-widest">
+                            Önceki Reddedildi
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-1.5 text-xs text-slate-500">
+                        {cust && <span className="flex items-center gap-1"><Building size={11} />{cust.name}</span>}
+                        {displayTotal > 0 && (
+                          <span className="flex items-center gap-1 font-black text-slate-700">
+                            <DollarSign size={11} />
+                            {Math.round(displayTotal).toLocaleString('tr-TR')} {currency}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
+                      className="shrink-0 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-emerald-100"
+                    >
+                      <Plus size={13} />
+                      Yeni Teklif Oluştur
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
