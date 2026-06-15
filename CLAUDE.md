@@ -252,17 +252,12 @@ POST /:id/close            → CLOSED yap
 
 ## deps
 ```
-src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
-backend/src/usageService.ts ← prismaClient
-src/modules/LicenseGeneratorModule.tsx ← types
-src/layout/MobileNav.tsx ← lib/utils
 src/components/WorkflowSimulation.tsx ← lib/utils, types
 src/components/SaveButton.tsx ← lib/utils
 src/services/whatsappService.ts ← types, utils/logger
 src/services/nextcloudService.ts ← types, utils/logger
 src/services/exchangeService.ts ← types, utils/logger
 src/modules/SalesSupport.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/ProcurementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/SubscriptionModule.tsx ← types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
 src/contexts/AuthContext.tsx ← constants, types
@@ -276,7 +271,6 @@ src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../services/apiService
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
-src/modules/ProjectManagementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/SpecAnalysis.tsx ← lib/utils, types
 src/modules/Login.tsx ← constants, services/apiService
 src/components/CustomerImportWizard.tsx ← lib/utils, types, services/apiService
@@ -285,11 +279,16 @@ src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesC
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
+src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
 src/modules/ContractWorkflowTest.tsx ← services/apiClient, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
+src/modules/LicenseGeneratorModule.tsx ← types, contexts/AuthContext, services/apiService
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProposalEditor.tsx ← lib/utils, types
 src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -298,12 +297,13 @@ src/services/apiService.ts ← apiClient, crmService, projectService, taskServic
 backend/src/middleware.ts ← prismaClient
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
 src/modules/ContractWorkflowTest.tsx          +apiFetch  +bestProposalPrice  +ContractWorkflowTest
+src/modules/ProjectManagementModule.tsx       +kar
 src/modules/SecurityTestModule.tsx            +flattenSuite  +parseResults
 src/services/apiService.ts                    ~ApiService
-.github/copilot-instructions.md               +ApiClient  +WhatsAppService  +NextcloudService  +ExchangeService
+.github/copilot-instructions.md               +checkLimit  +incrementUsage  +ApiClient  +WhatsAppService
 ```
 
 ## .github
@@ -314,44 +314,30 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
+h2 changes (last 10 commits — 0 seconds ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
-h3 backend/prisma/migrations/20260517130111_add_workflow_tables/migration.sql
-h3 backend/prisma/migrations/20260517151311_add_activity_log/migration.sql
-h3 backend/prisma/migrations/20260517182206_make_task_related_item_generic/migration.sql
-h3 backend/prisma/migrations/20260517183328_add_cost_items/migration.sql
-h3 backend/prisma/migrations/20260517184301_add_proposal_model/migration.sql
 h3 backend/prisma/migrations/20260518175704_add_subscription_and_usage_metrics/migration.sql
-h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/src/usageService.ts
+h3 backend/prisma/migrations/migration_lock.toml
+h3 backend/pnpm-lock.yaml
+h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
+h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/src/middleware.ts
 h2 src
-h3 src/hooks/useShared.ts
-h3 src/modules/ArchiveModule.tsx
-h3 src/modules/ProvisionWizard.tsx
 h3 src/modules/ContractModule.tsx
 h3 src/contexts/ThemeContext.tsx
 h3 src/modules/LicenseGeneratorModule.tsx
-h3 src/layout/Sidebar.tsx
 h3 src/layout/MobileNav.tsx
+h3 src/index.css
+h3 src/components/CostAnalysisModule.tsx
+h3 src/components/WorkflowSimulation.tsx
+h3 src/components/SaveButton.tsx
 ```
 
 ## backend
-
-### backend/prisma/migrations/20260518175704_add_subscription_and_usage_metrics/migration.sql
-```
-TABLE Subscription
-TABLE UsageMetric
-INDEX Subscription_tenantId_key ON Subscription
-INDEX UsageMetric_tenantId_feature_period_key ON UsageMetric
-```
-
-### backend/src/usageService.ts
-```
-export async function checkLimit  :9-23
-export async function incrementUsage  :25-32
-```
 
 ### backend/prisma/migrations/migration_lock.toml
 ```
@@ -363,20 +349,37 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
+### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+```
+TABLE new_ContractWorkflowDoc
+```
+
+### backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
+```
+TABLE Vendor
+TABLE PurchaseRequest
+TABLE PurchaseItem
+TABLE PurchaseQuote
+TABLE DeliveryRecord
+```
+
 ### backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 ```
 TABLE ContractWorkflow
 TABLE ContractWorkflowDoc
 ```
 
-### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
-```
-TABLE new_ContractWorkflowDoc
-```
-
 ### backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 ```
 TABLE new_Tenant
+```
+
+### backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
+```
+TABLE ProjectMilestone
+TABLE ProjectCostItem
+TABLE new_Project
+INDEX Project_opportunityId_key ON Project
 ```
 
 ### backend/src/middleware.ts
@@ -386,52 +389,6 @@ export const requireRole  :40-48
 ```
 
 ## src
-
-### src/modules/ContractModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export ContractModule
-handler onChange
-handler onClick
-```
-
-### src/contexts/ThemeContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export ThemeProvider
-```
-
-### src/modules/LicenseGeneratorModule.tsx
-```
-hook useState
-export LicenseGeneratorModule
-handler onChange
-handler onClick
-```
-
-### src/layout/MobileNav.tsx
-```
-export MobileNav
-```
-
-### src/index.css
-```
-var --background
-var --foreground
-var --primary
-var --primary-foreground
-var --glass-bg
-var --glass-border
-var --sidebar-bg
-var --header-bg
-var --card-bg
-var --input-bg
-var --foreground-glass
-```
 
 ### src/components/CostAnalysisModule.tsx
 ```
@@ -505,14 +462,6 @@ async syncCalendar  :37-41
 ```
 hook useState
 export SalesSupport
-handler onChange
-handler onClick
-```
-
-### src/modules/ProcurementModule.tsx
-```
-hook useState
-export ProcurementModule
 handler onChange
 handler onClick
 ```
@@ -645,15 +594,6 @@ handler onClick
 handler onPath
 ```
 
-### src/modules/ProjectManagementModule.tsx
-```
-hook useState
-export ProjectManagementModule
-handler onChange
-handler onClick
-handler onConfirm
-```
-
 ### src/modules/SpecAnalysis.tsx
 ```
 props SpecAnalysisProps
@@ -753,6 +693,16 @@ handler onConfirm
 handler onSubmit
 ```
 
+### src/modules/ContractModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export ContractModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/ContractWorkflowTest.tsx
 ```
 component ContractWorkflowTest
@@ -788,6 +738,26 @@ handler onValue
 handler onCount
 ```
 
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
+handler onChange
+handler onClick
+```
+
+### src/modules/LicenseGeneratorModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseGeneratorModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/NegotiationModule.tsx
 ```
 hook useAuth
@@ -813,6 +783,46 @@ export PresalesModule
 handler onChange
 handler onClick
 handler onTransferToBoM
+```
+
+### src/modules/ProcurementModule.tsx
+```
+props VendorFormProps
+props PRDetailDrawerProps
+props PRFormProps
+props ProcurementModuleProps
+hook useState
+hook useAuth
+hook useCallback
+hook useEffect
+export ProcurementModule
+handler onClick
+handler onChange
+handler onKeyDown
+handler onRefresh
+handler onSave
+```
+
+### src/modules/ProjectManagementModule.tsx
+```
+props OpportunityPickerProps
+props ProjectFormProps
+props CostFormProps
+props ProjectDetailProps
+props ProjectManagementModuleProps
+hook useState
+hook useEffect
+hook useMemo
+hook useAuth
+hook useCallback
+export ProjectManagementModule
+handler onClick
+handler onChange
+handler onSave
+handler onOpportunities
+handler onRefresh
+handler onPrintReport
+handler onSelect
 ```
 
 ### src/modules/ProposalEditor.tsx
@@ -862,7 +872,7 @@ handler onChange
 
 ### src/services/apiService.ts
 ```
-class ApiService  :13-85
+class ApiService  :13-87
 setAuth  :14-16
 async login  :18-20
 async forgotPassword  :22-24
