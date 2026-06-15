@@ -1,7 +1,7 @@
 # Enflow — Kurumsal Süreç İşletim Sistemi
 
-> **Sürüm:** v1.6.3 | **Tarih:** 09.06.2026  
-> End-to-End Enterprise Process Automation — Presales'dan Proje Teslimata kadar tek platform.
+> **Sürüm:** v2.0 | **Tarih:** 16.06.2026  
+> End-to-End Enterprise Process Automation — CRM'den Proje Teslimatına, Tahsilata kadar tek platform.
 
 ---
 
@@ -25,7 +25,7 @@
 
 ## 1. Ne Yapar?
 
-Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde yönetir. Satışın bir müşteri fırsatı açmasından başlayarak projenin saha ekibine teslim edilmesine kadar geçen her adım — teknik analiz, teklif, maliyet, onay, sözleşme, satın alma, proje takibi — Enflow'da kayıt altına alınır ve birimler arası otomatik devir mekanizmasıyla ilerler.
+Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde yönetir. Satışın bir müşteri fırsatı açmasından başlayarak projenin teslim edilmesine ve tahsilata kadar geçen her adım — teknik analiz, teklif, maliyet, müzakere, sözleşme, satın alma, proje takibi ve karlılık raporu — Enflow'da kayıt altına alınır ve birimler arası otomatik devir mekanizmasıyla ilerler.
 
 ### Hangi Sorunu Çözer?
 
@@ -34,8 +34,11 @@ Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde y�
 | Birimler arası bilgi kaybolur | Workflow Engine her adımı kaydeder, ilgili birimi uyarır |
 | Teklifler Excel'de kaybolur | Versiyonlu teklif editörü, PDF çıktısı, onay zinciri |
 | Kim ne yapıyor bilinmez | TodoTask sistemi + Dashboard KPI'ları |
-| Sözleşme evrakları eksik imzalanır | Strict evrak doğrulama — eksiksiz olmadan ilerlenemez |
+| Sözleşme evrakları eksik imzalanır | AI analizi + evrak doğrulama — eksiksiz olmadan ilerlenemez |
 | Her şirket için ayrı sistem | Multi-tenant yapı, `x-tenant-id` ile tam veri izolasyonu |
+| Proje karlılığı bilinemez | Planlanan / gerçekleşen / tahmini marj — canlı hesaplama |
+| Satınalma süreci izlenemiyor | 9 statülü tam tedarik döngüsü (Talep → PO → Teslimat → Fatura) |
+| Müzakere sürecinde taban kaybolur | Dip marj korumalı müzakere simülasyonu + açık eksiltme |
 
 ---
 
@@ -45,26 +48,26 @@ Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde y�
 ┌─────────────────────────────────────────────────────────────┐
 │                        FRONTEND                             │
 │   React 18 + Vite · TypeScript strict · Tailwind CSS        │
-│   Framer Motion · Recharts · TanStack Query · Sonner Toast  │
-│   Port: 3000                                                │
+│   motion/react · TanStack Query v5 · lucide-react           │
+│   Port: 5173                                                │
 └───────────────────────────┬─────────────────────────────────┘
-                            │ REST API (x-tenant-id header)
+                            │ REST API (/api prefix, x-tenant-id header)
 ┌───────────────────────────▼─────────────────────────────────┐
 │                        BACKEND                              │
-│   Node.js + Express.js · TypeScript · ts-node              │
-│   Prisma 7 ORM · SQLite / LibSQL                           │
+│   Node.js + Express.js v5 · TypeScript                     │
+│   Prisma ORM · SQLite (dev) → PostgreSQL (prod)            │
 │   Port: 3002                                                │
 │                                                             │
 │   backend/src/                                              │
 │   ├── index.ts          — app setup + route mount'lar       │
 │   ├── middleware.ts     — asyncHandler, tenantMiddleware     │
-│   └── routes/           — 17 kaynak router dosyası          │
+│   └── routes/           — 19 kaynak router dosyası          │
 └───────────────────────────┬─────────────────────────────────┘
                             │ Prisma Client
 ┌───────────────────────────▼─────────────────────────────────┐
 │                       DATABASE                              │
-│   SQLite (geliştirme) / LibSQL / PostgreSQL (production)    │
-│   20 Prisma model · multi-tenant şema                       │
+│   SQLite (geliştirme) / PostgreSQL (production)             │
+│   26 Prisma model · multi-tenant şema                       │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -73,54 +76,61 @@ Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde y�
 | Katman | Teknoloji |
 |---|---|
 | Framework | React 18 (SPA, Client-Side Routing) |
-| Build | Vite 6 |
+| Build | Vite 6 (17 chunk — manualChunks ile optimize) |
 | Dil | TypeScript (strict mode, sıfır `any`) |
-| Stil | Tailwind CSS + custom `glass-panel` design system |
-| Animasyon | Framer Motion (modal, geçiş, hover efektleri) |
-| Grafik | Recharts (bar chart, pipeline görselleştirme) |
-| İkon | Lucide React |
+| Stil | Tailwind CSS + glassmorphism design system (`glass-card`, `input-glass`, `btn-primary`) |
+| Animasyon | **motion/react** (paket adı `motion`, framer-motion DEĞİL) |
+| Grafik | Recharts |
+| İkon | lucide-react |
 | Server State | TanStack React Query v5 |
-| Toast | Sonner (global `window.alert` override ile entegre) |
-| HTTP | `apiClient.ts` — Axios/fetch wrapper, `x-tenant-id` header otomatik eklenir |
+| HTTP | `apiClient.ts` — fetchWithAuth, parse edilmiş JSON döner; `.json()` çağırma |
+| AI | Claude claude-sonnet-4-6 (sözleşme analizi, görev üretimi) |
 
 ### Backend Teknoloji Yığını
 
 | Katman | Teknoloji |
 |---|---|
-| Runtime | Node.js (ESM, TypeScript via ts-node) |
-| Web Framework | Express.js |
-| ORM | Prisma 7 |
-| Veritabanı | SQLite (LibSQL adapter) → production'da PostgreSQL drop-in |
-| Auth | Mock JWT (production için swap edilebilir) |
-| Hot Reload | nodemon |
+| Runtime | Node.js + TypeScript |
+| Web Framework | Express.js v5 |
+| ORM | Prisma (SQLite dev, PostgreSQL prod) |
+| Auth | JWT tabanlı (x-tenant-id header zorunlu) |
+| Dosya Upload | multer v2 (memoryStorage → lokal / Nextcloud WebDAV) |
 
 ---
 
 ## 3. Veri Modeli
 
-Prisma schema'da tanımlı 20 model:
+Prisma schema'da 26 model:
 
 ```
 Tenant              — Şirket/kiracı kaydı
-Subscription        — Kiracı abonelik planı (STARTER/PROFESSIONAL/ENTERPRISE)
+Subscription        — Kiracı abonelik planı + lisans bilgileri
 UsageMetric         — Kullanım istatistikleri (periyot bazlı)
-Unit                — Organizasyon birimi (Satış, Presales, Yönetim...)
+Unit                — Organizasyon birimi
 User                — Kullanıcı (unit'e bağlı, permissions JSON)
-Customer            — Müşteri (risk skoru, kredi limiti, tech stack dahil)
+Customer            — Müşteri (risk skoru, kredi limiti, tech stack)
 Opportunity         — Satış fırsatı (pipeline)
 Proposal            — Versiyonlu teklif
 BoMItem             — Malzeme listesi (Bill of Materials) kalemi
-CostItem            — Maliyet kalemi
-WorkflowLog         — Birimler arası devir geçmişi
-Project             — Proje (kazanılan fırsattan oluşur)
-Contract            — Sözleşme
-TodoTask            — Görev (birime ve kullanıcıya atanabilir)
+CostItem            — Fırsat maliyet kalemi (LABOR/LOGISTICS/TRAVEL/OTHER)
+Contract            — Sözleşme (eski basit model)
+ContractWorkflow    — Sözleşme süreç yönetimi (5 aşamalı AI destekli)
+ContractWorkflowDoc — Sözleşme evrakları (upload + durum takibi)
+Project             — Proje (type, phase, milestone/cost relations)
+ProjectMilestone    — Aşama takibi (paralel, onay gerektiren, progress bar)
+ProjectCostItem     — Proje maliyet kalemi (PROCUREMENT/TRAVEL/EXTERNAL_SERVICE/OTHER)
+Vendor              — Tedarikçi kaydı (kategori, IBAN, değerlendirme)
+PurchaseRequest     — Satınalma talebi (9 statü, tam tedarik döngüsü)
+PurchaseItem        — Talep satır kalemleri
+PurchaseQuote       — Tedarikçi teklifleri (çoklu, karşılaştırmalı)
+DeliveryRecord      — Teslimat kaydı (miktar takibi dahil)
+TodoTask            — Görev (birim bazlı, relatedModule + relatedItemId)
 ArchiveItem         — Fiziksel arşiv kaydı (raf, kutu, ödünç durumu)
-ActivityLog         — Denetim izi (her kritik aksiyon)
+ActivityLog         — Denetim izi
 Notification        — Sistem bildirimleri
 CorporateDocument   — Kurumsal doküman (ISO, sertifika, vb.)
 Workflow            — İş akışı tanımı
-WorkflowStep        — İş akışı adımı (sıralı, birime atanmış)
+WorkflowStep        — İş akışı adımı
 ```
 
 ---
@@ -133,354 +143,346 @@ Ana kontrol paneli. Gerçek zamanlı KPI kartları ve canlı operasyon akışı.
 
 **Yapabilecekleri:**
 - **Pipeline KPI'ları:** Toplam açık fırsat değeri, kazanılan değer, kaybedilen değer, aktif proje sayısı
-- **Birim Performans Grafiği:** Bar chart ile satış/presales/proje birimlerinin karşılaştırmalı performansı (Recharts)
-- **Canlı Operasyon Gelişmeleri:** İmzalanan sözleşmeler, atanan görevler, tamamlanan devir işlemleri — anlık feed
-- **Backend Health Banner:** API bağlantısını kontrol eder, kesintide kullanıcıyı uyarır
-- **Rol bazlı görünüm:** Her kullanıcı kendi birimin KPI'larını görür
+- **Satış Boru Hattı Grafiği:** Statü bazında fırsat değerleri (Recharts bar chart)
+- **Aktif Projeler Listesi:** İlerleme %, bitiş tarihi — tıkla, Proje Yönetimine git
+- **Canlı Operasyon Gelişmeleri:** Güncel görevler, teklifler, sözleşmeler akış görünümünde
+- **GM-Only Sekmeler:** Kazanma oranı, birim performans karşılaştırması
 
 ---
 
-### 4.2 CRM Modülü
+### 4.2 CRM & Müşteri Modülü
 
-Müşteri ve fırsat yönetiminin merkezi.
+Satış pipeline yönetimi, müşteri ve teklif takibinin merkezi. 5 alt sekmeli dashboard yapısıyla.
 
-**Yapabilecekleri:**
+**Alt Sekmeler:**
+```
+CRM & Müşteri
+ ├── Genel Bakış       — Metrik kartlar, modül kartları, pipeline dağılım
+ ├── Fırsatlar         — NEW→WON/LOST pipeline
+ ├── Teklifler         — Versiyonlu teklif yönetimi
+ ├── Müşteriler        — Tam müşteri profili + Excel import
+ └── Canlı Pazarlıklar — Müzakere modülüne erişim
+```
 
-**Müşteri Yönetimi:**
-- Müşteri oluşturma/düzenleme: isim, sektör, vergi dairesi, vergi no, ticaret sicil no, kredi limiti, risk skoru, para birimi (USD/EUR/TRY), tech stack, sosyal medya
-- Müşteri arama ve filtreleme
-- Müşteri bazlı fırsat ve teklif geçmişi
+**Fırsat Durum Makinesi:**
+```
+NEW → CONTACTED → QUALIFIED → PROPOSAL → NEGOTIATION → WON
+                                                      → LOST
+```
 
-**Fırsat (Opportunity) Yönetimi:**
-- Pipeline yönetimi: `NEW → CONTACTED → QUALIFIED → PROPOSAL → NEGOTIATION → WON → LOST`
-- Fırsata müşteri, sorumlu kullanıcı ve birim atama
-- Tahmini kapanış tarihi ve olasılık yüzdesi
-- Fırsatın `WON` olmasıyla otomatik sözleşme oluşturma
-- `LOST` statüsünde Dashboard'da "Kaybedilen Değer" KPI'ına anlık yansıma
+**Teklif Durum Sıralaması:**
+```
+DRAFT (0) → PENDING_APPROVAL (1) → APPROVED (2) → SENT (3) → ACCEPTED (4)
+                                 → REJECTED (-1)
+```
 
-**Teklif (Proposal) Yönetimi:**
-- Fırsata bağlı versiyonlu teklif oluşturma (v1, v2, v3...)
-- Teklif düzenleme → PDF çıktısı alma
-- Müzakere modu: `openForNegotiation` flag'i ile fırsatı `NEGOTIATION` statüsüne taşıma
-- Teklif onay zinciri (Approval Chain) — presales'dan yönetime onaya gönderme
-- Statü akışı: `DRAFT → PENDING_APPROVAL → APPROVED / REJECTED → ACCEPTED`
+**Kazanıldı / Kaybedildi Akışı:**
+- Teklif üzerinden: `SENT` teklif → **Kazanıldı** → Fırsat `WON`, teklif `ACCEPTED` → Sözleşme Yönetimine otomatik yönlendir
+- Fırsat üzerinden (teklif olmadan): Direkt `WON` / `LOST` işaretleme
 
-**Hand-Off (İş Devri):**
-- Fırsatı başka birimi veya kullanıcıya devretme
-- Devir anında WhatsApp + Exchange e-posta bildirimi otomatik gönderilir
+**Müşteri Kaydı:** Firma adı, sektör, vergi bilgileri, ticaret sicil, kredi limiti, risk skoru (renk kodlu), tech stack, sosyal medya; Excel toplu import.
 
 ---
 
-### 4.3 Presales Modülü
+### 4.3 Presales & Dizayn Modülü
 
-Teknik analiz ve malzeme listesi hazırlama.
+Teknik analiz ve malzeme listesi hazırlama. 2 alt sekme.
 
-**Yapabilecekleri:**
-
-**BoM (Bill of Materials) Editörü:**
-- Fırsata BoM kalemi ekleme: part number, açıklama, adet, alış maliyeti, marj yüzdesi, tedarikçi
-- Excel dosyasından BoM import (`.xlsx` → `bomParser.ts` ile parse)
-- Kalem bazlı satış fiyatı ve toplam hesaplama
-- BoM'u kaydetme (mevcut liste silinip yenisi oluşturulur — transactional)
+**BoM & Tasarım:**
+- Part Number, açıklama, adet, alış maliyeti, marj % → satış fiyatı otomatik
+- Excel / CSV import; `MATCHED` / `PENDING_MATCH` durumu
+- Şartname Analizi: metin yapıştır → Claude AI gereksinimler + ürün listesini çıkarır
+- **Onaya Gönder:** BoM özeti önizle → yönetici seç → TodoTask oluşturulur
 
 **Maliyet Analizi:**
-- Fırsata maliyet kalemi ekleme: iş gücü, lojistik, seyahat, outsourcing, diğer
-- Kategori bazlı maliyet dağılımı
-
-**AI Spec Analizi (SpecAnalysis):**
-- PDF/Word şartname yükleme
-- Google Gemini AI ile otomatik analiz:
-  - Teknik gereksinimler özeti
-  - Spec detayları
-  - Ürün listesi (Part Number) çıkarımı
-- Analiz sonucu `AnalysisResult` tipinde döner: title, summary, specDetails, extractedProducts
-
-**Teknik Onay Akışı:**
-- Presales, hazırladığı BoM'u onaya gönderir (`WAITING_APPROVAL`)
-- Yönetim biriminde `TodoTask` oluşturulur
-- Onay verilince fırsat `PROPOSAL` statüsüne geçer
+- Kategori bazlı giderler: İşçilik, Lojistik, Seyahat, Dış Kaynak
+- Döviz & kur yönetimi (USD/EUR/TRY, anlık hesaplama)
+- **Marj Modu:** `PER_ITEM` (kalem bazlı) veya `PROJECT_WIDE` (global)
+- Sticky finansal özet: Toplam Maliyet, Toplam Satış, Brüt Kar, Kar Marjı %
 
 ---
 
-### 4.4 Satış Destek Modülü (SalesSupport)
+### 4.4 Müzakere Modülü
 
-Kazanılan fırsatların sözleşmeye dönüştürülmesi ve evrak yönetimi.
+Teklifin müşteri ile müzakere sürecinin yönetimi. İki mod:
 
-**Yapabilecekleri:**
-- Kazanılan fırsatlar için gerekli evrak listesi oluşturma (Sözleşme taslağı, maliyet analizi, imza sirküleri vb.)
-- Evrak yükleme ve doğrulama (her evrak tek tek onaylanmadan sözleşme tamamlanamaz)
-- Satış destek görevlerinin atanması ve takibi
+**Canlı Pazarlık (AI Simülasyonu):**
+```
+IDLE → INTRO → NEGOTIATING → AGREED
+                            → FAILED
+```
+- Teklif seç → AI müşteri simülasyonu başlar
+- Karşı teklif ver (%) → Dip marj koruması: minimum marjın altına inemezsin
+- Anlık marj barı: Yeşil / Sarı / Kırmızı renk kodu
+- `AGREED` → Fırsatı WON olarak tescil et
 
----
-
-### 4.5 Sözleşme Modülü (ContractModule)
-
-Sözleşme yaşam döngüsü yönetimi.
-
-**Yapabilecekleri:**
-- `WON` statüsündeki fırsatlardan otomatik sözleşme kartı oluşturma
-- Statü akışı: `DRAFT → SIGNED → EXPIRED / TERMINATED`
-- İmza tarihi, bitiş tarihi, teminat tutarı ve teminat bitiş tarihi takibi
-- **Evrak Doğrulama (Strict Validation):** Tüm gereken dokümanlar `APPROVED` statüsüne geçmeden sözleşme imzalanamaz
-- Sözleşme tamamlandığında otomatik paralel iş tetikleme:
-  - Proje Yönetimi birimine "Proje Başlatma" görevi
-  - Satın Alma birimine "BoM Tedariki" görevi
-- Hand-Off: Sözleşme tamamlandığında ilgili birime otomatik devir
+**Açık Eksiltme:**
+```
+IDLE → SETUP → BIDDING → FINISHED
+```
+- Rakip firmaları ve başlangıç tekliflerini gir
+- Tur bazlı fiyat eksiltmesi, süre sınırı, minimum adım %
+- Kazanan belirlenir; Enflow'un teklifini güncelle
 
 ---
 
-### 4.6 Proje Yönetimi Modülü
+### 4.5 Sözleşme Yönetimi (ContractWorkflow)
 
-Saha operasyonlarının kanban bazlı takibi.
+AI destekli 5 aşamalı sözleşme süreç yönetimi.
 
-**Yapabilecekleri:**
-- Proje oluşturma (fırsattan veya manuel)
-- Statü yönetimi: `DRAFT → ANALYSIS → AWAITING_APPROVAL → APPROVED → IN_PROGRESS → COMPLETED`
-- Proje bazlı görev (ProjectTask) yönetimi: `TODO → DOING → DONE`
-- Satın alma notları (procurementNotes) ekleme
-- Deadline ve ilerleme yüzdesi takibi
-- Hand-Off ile birimi değiştirme
+**Durum Makinesi:**
+```
+DRAFT
+  → ANALYSIS_DONE               (AI analizi tamamlandı)
+  → PREPARATION                 (evrak hazırlık)
+  → READY_TO_SIGN               (tüm zorunlu evraklar tam — OTOMATİK)
+  → PENDING_SIGNATURE_APPROVAL  (yönetici onayı bekleniyor)
+  → SIGNED                      (onaylandı)
+  → TRANSFERRED                 (Proje Yönetimine devredildi — OTOMATİK)
+```
+
+**5 Sekme:**
+
+| Sekme | İçerik |
+|-------|--------|
+| 1 — Bağlam | İhale adı, İKN, sözleşme bedeli, son tarih |
+| 2 — Analiz | Sözleşme metni + şartname → AI ile analiz (önemli maddeler, riskler, evrak listesi, yapılacaklar) |
+| 3 — Evrak Takibi | PENDING/UPLOADED/VERIFIED/WAIVED durumlu evrak kartları; dosya yükle → otomatik ilerleme |
+| 4 — İmzalama | 4 adımlı onay akışı; imzalanma tarihi girişi |
+| 5 — Proje Aktarımı | AI görevleri → TodoTask; Onayla & Aktar → SIGNED + TRANSFERRED |
+
+**Dosya Yükleme:** multer → lokal `backend/uploads/contracts/` + opsiyonel Nextcloud WebDAV.
+
+**Otomatik Geçişler:**
+- Tüm `isRequired: true` evraklar `UPLOADED/VERIFIED/WAIVED` → `READY_TO_SIGN`
+- "Onayla & Aktar" → `SIGNED` + `/transfer` çağrısı → `TRANSFERRED`
 
 ---
 
-### 4.7 Satın Alma Modülü (ProcurementModule)
+### 4.6 Satın Alma Modülü
 
-BoM kalemlerinin tedarik sürecinin yönetimi.
+Tam tedarik döngüsü — talepten faturaya.
 
-**Yapabilecekleri:**
-- Onaylı BoM kalemlerinin sipariş durumu takibi
-- ETA (Tahmini Teslimat) yönetimi
-- Tedarikçi bazlı kalem görüntüleme
-- Fiziksel depo giriş kontrolü
+**Durum Makinesi:**
+```
+DRAFT → PENDING_UNIT → PENDING_PROCUREMENT → PENDING_GM
+  → PO_ISSUED → IN_DELIVERY → INVOICED → CLOSED
+  → REJECTED (herhangi bir aşamada)
+```
+
+**Kaynaklar:** `MANUAL` | `BOM` | `PROJECT` | `UNIT`  
+**Aciliyet:** `LOW` | `NORMAL` | `HIGH` | `URGENT`
+
+**Akış Adımları:**
+1. Talep oluştur + kalem satırları ekle → `DRAFT`
+2. Onay hiyerarşisi: Birim → Satın Alma → GM (bütçe eşiğine göre)
+3. Tedarikçi teklifleri topla → karşılaştır → seç
+4. PO kesilir → yazdır → `PO_ISSUED`
+5. Teslimat kaydı (miktar takibi) → `IN_DELIVERY`
+6. Fatura bilgisi gir → `INVOICED` → Kapat → `CLOSED`
+
+**Tedarikçi Yönetimi:** Firma adı, vergi no, iletişim, IBAN, kategori etiketleri, 1-5 yıldız değerlendirme.
+
+**PR Detay Drawer — 4 Sekme:** Bilgi | Teklifler (karşılaştırmalı) | Teslimat | Fatura
+
+---
+
+### 4.7 Proje Yönetimi Modülü
+
+Satınalma'dan tahsilata tam proje yaşam döngüsü.
+
+**Proje Oluşturma Akışı:**
+```
+WON Fırsat → Fırsat Seçici → Proje Formu (otomatik dolar) → Backend milestone şablonu oluşturur
+```
+
+**Proje Tipleri & Milestone Şablonları:**
+
+| Tip | Otomatik Aşamalar |
+|-----|------------------|
+| HARDWARE | Planlama → Satınalma → Sevkiyat → Kurulum → Test → Kabul → Garanti → Faturalama → Tahsilat |
+| SOFTWARE | Planlama → Geliştirme → Test → Kabul → Faturalama → Tahsilat |
+| SERVICE | Planlama → Kurulum → Kabul → Faturalama → Tahsilat |
+| MIXED | Planlama → Satınalma → Sevkiyat → Kurulum → Geliştirme → Test → Kabul → Garanti → Faturalama → Tahsilat |
+
+**Görünüm Modları:**
+- **Kanban:** 4 kolon (PLANNING / IN_PROGRESS / ON_HOLD / COMPLETED) — proje kartları
+- **Liste:** Durum/tip filtreleri + metin araması
+
+**Proje Detay Çekmecesi — 4 Sekme:**
+
+| Sekme | İçerik |
+|-------|--------|
+| Genel | Finansal grid, marj badge (Planlanan/Gerçekleşen/Tahmini) |
+| Milestones | Genişletilebilir kartlar, progress slider, durum geçiş butonları |
+| Maliyetler | PROCUREMENT/TRAVEL/EXTERNAL_SERVICE/OTHER kategorileri, kalem ekleme |
+| Karlılık | Maliyet karşılaştırması, kategori dağılım barları, otomatik risk uyarısı |
+
+**Karlılık Formülleri:**
+```
+plannedMargin = (contractValue - totalPlannedCost) / contractValue × 100
+actualMargin  = (contractValue - totalActualCost)  / contractValue × 100
+forecastCost  = actualCost + remainingPlannedCost
+```
+
+**Risk Paneli:** Gecikmiş milestone, %85+ bütçe kullanımı veya 5+ puan marj kaybı olan projeler listelenir.
+
+**PDF Raporlar:** Standart (tam finansal) + Müşteri (maliyetler gizli) — tarayıcı yazdırma.
+
+**Milestone Durum Makinesi:**
+```
+NOT_STARTED → IN_PROGRESS → COMPLETED
+            → BLOCKED
+            → CANCELLED
+```
 
 ---
 
 ### 4.8 Görev Modülü (TodoModule)
 
-Birim ve kullanıcı bazlı görev yönetimi.
+Birim ve kullanıcı bazlı görev yönetimi + teklif onay kuyruğu.
 
-**Yapabilecekleri:**
-- Görev oluşturma: başlık, açıklama, öncelik (`LOW/MEDIUM/HIGH/URGENT`), birim, sorumlu, vade tarihi
-- Statü akışı: `PENDING → IN_PROGRESS → COMPLETED / CANCELLED`
-- İlgili modüle bağlama (`relatedModule`, `relatedItemId`)
-- İlerleme notları ekleme
-- Öncelik bazlı filtreleme ve sıralama
-- Workflow Engine'den otomatik oluşturulan görevler (sistem kaynaklı)
+**Görev Kaynakları:**
+- Manuel oluşturma (TodoModule)
+- Presales BoM → Onaya Gönder → TodoTask
+- Sözleşme Aktarımı → AI görevleri → TodoTask
+- Milestone `requiresApproval: true` → GM TodoTask
 
----
+**Teklif Onay Kuyruğu:** PENDING onay görevleri kırmızı uyarı ile öne çıkar; görev içinde Onayla / Reddet / Revize İste aksiyonları.
 
-### 4.9 Belgeler Modülü (DocumentsModule)
-
-Kurumsal doküman arşivi.
-
-**Yapabilecekleri:**
-- Doküman yükleme ve kategorileme: `LEGAL / ISO / CERTIFICATE / FINANCIAL / WORK_EXPERIENCE`
-- Son kullanım tarihi takibi (otomatik uyarı)
-- Tag bazlı etiketleme
-- Nextcloud DMS entegrasyonu (dokümanları Nextcloud'a push etme)
+**Durum Makinesi:** `PENDING → IN_PROGRESS → COMPLETED / CANCELLED`
 
 ---
 
-### 4.10 Arşiv Modülü (ArchiveModule)
+### 4.9 Satış Destek (SalesSupport)
 
-Fiziksel arşiv kayıt sistemi.
+İhale yönetimi ve iş bitirme belgeleri.
 
 **Yapabilecekleri:**
-- Islak imzalı evrak kutu/raf takibi
-- Ödünç verme durumu yönetimi
-- Kategori, etiket ve tarih bazlı arama
-- Multi-tenant veri izolasyonu
+- İhale dosyası takibi: deadline sayacı, hazırlık % , URGENT flag
+- Personel sertifikaları (VALID / RENEWAL_NEEDED)
+- İş bitirme dilekçesi: tamamlanmış projeden otomatik şablon oluşturma
 
 ---
 
-### 4.11 Workflow Builder
+### 4.10 Şirket Evrakları (DocumentsModule)
 
-Birimler arası iş akışlarının görsel tasarım aracı.
-
-**Yapabilecekleri:**
-- Yeni iş akışı oluşturma (ad, açıklama)
-- Adım ekleme: hangi birim → sıra → tip (`AUTO/MANUAL`) → sonraki adım
-- Mevcut workflow'u düzenleme (adımlar transactional olarak sıfırlanıp yeniden oluşturulur)
-- **Simülasyon Modu:** Bir workflow'un adım adım nasıl işlediğini otomatik veya manuel adımlarla görselleştirme (5 saniyelik otomatik ilerleme ile play/pause)
-- Aktif workflow seçimi ve anlık önizleme
+Kurumsal doküman arşivi — LEGAL / ISO / CERTIFICATE / FINANCIAL / WORK_EXPERIENCE kategorileri, geçerlilik tarihi uyarısı, etiket bazlı arama.
 
 ---
 
-### 4.12 Ayarlar Modülü (SettingsModule)
+### 4.11 Fiziksel Arşiv (ArchiveModule)
 
-Platform yönetim merkezi. 6 alt sekme:
-
-**Şirket Ayarları:**
-- Şirket logo yükleme
-- Multi-tenant: aktif kiracı seçimi ve yönetimi
-
-**Birim Yönetimi:**
-- Organizasyon birimi oluşturma/silme
-- Silme işleminde `TRANSFER_REQUIRED` koruması: birimde kullanıcı varsa önce transfer gerekir
-
-**Kullanıcı Yönetimi:**
-- Kullanıcı oluşturma/düzenleme/silme
-- Rol ve birim atama
-- İzin (permission) listesi güncelleme
-
-**İzin Yönetimi (PermissionSettings):**
-- Kullanıcı bazlı granüler izin kontrolü
-- Her izin kodu için toggle (açık/kapalı)
-- Değişiklikler anlık olarak kullanıcının arayüzüne yansır (PermissionGate)
-
-**Abonelik Ayarları:**
-- Aktif plan görüntüleme (STARTER / PROFESSIONAL / ENTERPRISE)
-- Kullanım metrikleri (count, birim maliyet, toplam maliyet)
-- Plan yükseltme
-
-**Entegrasyon Sihirbazı (IntegrationWizard):**
-- WhatsApp Business API yapılandırması (Phone Number ID, Access Token, Webhook)
-- Microsoft Exchange yapılandırması (sunucu, domain, e-posta, şifre, takvim sync)
-- Nextcloud DMS yapılandırması (URL, admin kullanıcı, app password, base path)
+Islak imzalı evrakların kutu/raf/ödünç takibi — `IN_ARCHIVE` / `BORROWED` durum yönetimi.
 
 ---
 
-### 4.13 Abonelik Modülü (SubscriptionModule)
+### 4.12 Workflow Builder
 
-Ürünün kendi lisans yönetim sayfası.
-
-**Lisans Modelleri:**
-
-| Model | Açıklama | Fiyat |
-|---|---|---|
-| **KOBİ (SaaS)** | Bulut tabanlı, 5 kullanıcı, 10GB | $49/ay |
-| **PAY AS YOU GO** | Kullanım bazlı ücretlendirme, 15 kullanıcı, 50GB | $0.15/API çağrısı |
-| **ON-PREMISE** | Şirket içi kurulum, sınırsız kullanıcı, 1TB | Tek seferlik |
-
-**Yapabilecekleri:**
-- Plan seçimi ve aktivasyon
-- Aktif lisans bilgisi (süre, kullanıcı limiti, depolama limiti)
-- Lisans anahtarı görüntüleme ve kopyalama
-- Lisans iptali
+Birimler arası iş akışlarının görsel tasarım aracı. WorkflowStep: birim, tip (AUTO/MANUAL), sıra, sonraki adım bağlantısı. Simülasyon modu ile adım adım test.
 
 ---
 
-### 4.14 Lisans Üretici Modülü (LicenseGeneratorModule)
+### 4.13 Ayarlar Modülü
 
-Enflow'u başkalarına lisanslayan operator'lar için araç.
+10 alt sekme:
 
-**Yapabilecekleri:**
-- Şirket bazlı lisans anahtarı üretme
-- Model seçimi: `KOBI / PAY_AS_YOU_GO / ON_PREMISE`
-- Geçerlilik süresi (ay bazlı veya 30 günlük deneme)
-- Kullanıcı ve depolama limiti belirleme
-- JSON formatında imzalanmış lisans verisi oluşturma
-- Kopyalama ve `.json` indirme
-
----
-
-### 4.15 Maliyet Analizi (CostAnalysisModule)
-
-Bağımsız veya Presales içine gömülü çalışan maliyet hesaplama.
-
-**Yapabilecekleri:**
-- Kategori bazlı (iş gücü, lojistik, seyahat, outsourcing, diğer) maliyet kalemi yönetimi
-- Toplam maliyet hesaplama
-- BoM toplam satış fiyatı ile karşılaştırmalı marj analizi
+| Sekme | İçerik |
+|-------|--------|
+| Şirket Profili | Tenant adı, logo |
+| Birimler | CRUD + silerken transfer koruması |
+| Kullanıcılar | Kullanıcı CRUD, rol + birim atama |
+| İş Akışı | Workflow Builder |
+| Yetkiler | Rol-izin matrisi |
+| Entegrasyonlar | Nextcloud / Exchange / WhatsApp |
+| Abonelik & Kullanım | Plan, kullanım metrikleri |
+| Lisans Planları | Plan listesi ve düzenleme |
+| Lisans Anahtarı Oluştur | İmzalanmış lisans üretimi [GM only] |
+| Modüller | Test modüllerini canlıya alma [GM only] |
 
 ---
 
-### 4.16 Müzakere Modülü (NegotiationModule)
+### 4.14 Lisans Modülleri
 
-Teklifin müşteri ile müzakere sürecinin yönetimi.
+**LicenseTypesModule:** Mevcut plan listesi, model, fiyat, limitler, özellikler.
 
-**Yapabilecekleri:**
-- Teklifi müzakereye açma (`openForNegotiation` flag)
-- Müzakere notları ve versiyon takibi
-- Fırsatı `NEGOTIATION` statüsüne taşıma
+**LicenseGeneratorModule [GM only]:** Şirket bazlı lisans anahtarı üretimi (KOBI / PAY_AS_YOU_GO / ON_PREMISE), geçerlilik süresi, kullanıcı / depolama limiti, deneme flag'i, JSON indirme.
 
 ---
 
-### 4.17 Final Teklif Üretici (FinalProposalGenerator)
+### 4.15 Abonelik Modülü
 
-PDF teklif belgesi oluşturma bileşeni.
-
-**Yapabilecekleri:**
-- Teklif içeriğini formatlı PDF olarak render etme
-- Şirket logosu, BoM tablosu, maliyet özeti dahil
-- Türkçe karakter desteği (trToEn normalizasyon fonksiyonu)
-- Base64 ArrayBuffer → PDF dönüşümü
-- Onay zinciri (ApprovalChain) aşamaları görüntüleme
+Aktif plan bilgisi, kullanım metrikleri, plan yükseltme, lisans anahtar yönetimi.
 
 ---
 
 ## 5. İş Akışı Motoru
 
-Enflow'un temel gücü. Birimler arası tüm iş geçişleri bu motor üzerinden geçer.
-
-### Akış Mimarisi
+### Tam Akış Diyagramı
 
 ```
-[Presales] → BoM tamamlandı → Onaya gönder
-                    ↓
-[Yönetim] → TodoTask oluşturulur + WhatsApp/E-posta bildirimi
-                    ↓
-[Yönetim] → Onayla/Reddet
-                    ↓ (Onay)
-[Satış] → Teklif hazırla → PDF çıktısı → Müşteriye sun
-                    ↓ (WON)
-[Satış Destek] → Evrak hazırlığı (strict validation)
-                    ↓ (Tüm evraklar tamamlandı)
-[Sözleşme] → İmzala
-                    ↓ (Paralel tetikleme)
-         ┌──────────┴──────────┐
-[Proje Yönetimi]       [Satın Alma]
- Proje başlatma        BoM tedariki
+[1] CRM — Fırsat Girişi (NEW)
+  ↓
+[2] CRM — Pipeline ilerlemesi → PROPOSAL
+  ↓
+[3] Presales — BoM + Şartname Analizi (AI)
+  ↓
+[4] Presales — Maliyet Analizi (döviz, marj modu)
+  ↓
+[5] CRM — Teklif oluştur → PENDING_APPROVAL → APPROVED → SENT
+  ↓
+[6] Müzakere — Canlı pazarlık / Açık eksiltme → Anlaşma
+  ↓
+[7] CRM — Kazanıldı (WON) → Sözleşme Yönetimine yönlendir
+  ↓
+[8] Sözleşme — AI analiz → Evrak takip → İmzala → Proje Aktarımı
+  ↓ (paralel)
+[9a] Satın Alma — Talep → PO → Teslimat → Fatura
+[9b] Proje Yönetimi — WON fırsat → Milestone takibi → Karlılık → Tahsilat
+  ↓
+[10] Görevler — Tüm aşamalarda birim bazlı görev takibi
 ```
 
 ### WorkflowLog Kaydı
 
-Her hand-off işleminde `WorkflowLog` tablosuna kayıt düşülür:
-- `fromUnitId` / `toUnitId`
-- `assignedBy` / `assignedTo`
-- `note`
+Her hand-off işleminde `ActivityLog` + `WorkflowLog` kaydı:
+- `fromUnitId` / `toUnitId`, `assignedBy` / `assignedTo`, `note`
 - `status`: `PENDING → COMPLETED / APPROVED / CANCELLED`
 
 ### WorkflowService API
 
 ```typescript
 triggerHandOff(fromUser, toUser, item, note, type)
-  → WhatsApp bildirimi (toUser.phone)
-  → Exchange e-posta (toUser.email)
-  → WorkflowLog kaydı
+  → WhatsApp bildirimi + Exchange e-posta + WorkflowLog
 
 requestApproval(opportunityId)
   → technicalStatus: 'WAITING_APPROVAL'
-  → Yönetim birimine TodoTask oluşturma
-  → WorkflowLog kaydı (PENDING)
+  → Yönetim birimine TodoTask
+  → WorkflowLog (PENDING)
 
 approveOpportunity(opportunityId)
-  → technicalStatus: 'APPROVED'
-  → status: 'PROPOSAL'
-  → WorkflowLog güncelleme (APPROVED)
+  → technicalStatus: 'APPROVED' → status: 'PROPOSAL'
+  → WorkflowLog (APPROVED)
 ```
 
 ---
 
 ## 6. Bildirim Katmanı
 
-Her kritik iş akışı adımında üç kanaldan bildirim gider:
-
 ### 6.1 WhatsApp (Meta Cloud API)
 
 ```typescript
 whatsappService.sendMessage(phoneNumber, message)
 // POST https://graph.facebook.com/v18.0/{phoneNumberId}/messages
-// Bearer {accessToken}
 ```
 
 Tetiklendiği durumlar: Hand-Off, onay talebi, kritik görev ataması.
 
-### 6.2 Microsoft Exchange (E-Posta)
+### 6.2 Microsoft Exchange
 
 ```typescript
 exchangeService.sendEmail(to, subject, body)
-// EWS veya Graph API üzerinden kurumsal e-posta
+// EWS veya Graph API
 ```
 
 Tetiklendiği durumlar: Hand-Off, sözleşme tamamlanma, onay sonucu.
@@ -498,35 +500,32 @@ Dashboard Header'da kırmızı bayraklı uyarı ikonu + bildirim paneli.
 
 ## 7. Yetkilendirme Sistemi (RBAC)
 
+### Tanımlı Roller
+
+| Rol Kodu | Görünen Ad |
+|----------|-----------|
+| `GENERAL_MANAGER` | Genel Müdür |
+| `SALES_MGR` | Satış Müdürü |
+| `SALES_REP` | Satış Temsilcisi |
+| `SALES_SUPPORT` | Satış Destek |
+| `PRESALES_MGR` | Presales Müdürü |
+| `PRESALES_ENG` | Presales Mühendisi |
+| `PROJECT_MGR` | Proje Yöneticisi |
+| `PROCUREMENT_MGR` | Satın Alma Müdürü |
+| `FINANCE_MGR` | Finans Müdürü |
+| `OPERATIONS_MGR` | Operasyon Müdürü |
+| `AUDITOR` | Denetçi |
+| `ADMIN` | Sistem Yöneticisi |
+
 ### PermissionGate Bileşeni
 
 ```tsx
-<PermissionGate permission="PROPOSAL_CREATE">
-  <CreateProposalButton />
+<PermissionGate permission="OFFER_APPROVE">
+  <ApproveButton />
 </PermissionGate>
 ```
 
-- `hasPermission(code)` → AuthContext'ten kullanıcının `permissions` dizisini kontrol eder
-- İzin yoksa bileşen render edilmez (veya `showIfNoPermission: true` ile disabled render)
-- Admin panelinden bir izin kaldırıldığında, ilgili buton/sayfa **anlık** olarak kaybolur
-
-### İzin Kodları (örnekler)
-
-```
-DASHBOARD_VIEW
-OPPORTUNITY_CREATE / OPPORTUNITY_EDIT
-PROPOSAL_CREATE / PROPOSAL_APPROVE
-BOM_EDIT
-CONTRACT_SIGN
-TASK_ASSIGN
-SETTINGS_MANAGE
-USER_MANAGE
-WORKFLOW_CONFIGURE
-```
-
-### Kullanıcı Rolleri
-
-Roller esnek string alanı — `ADMIN`, `MANAGER`, `SALES`, `PRESALES`, `PM`, `PROCUREMENT` gibi tanımlanabilir. İzinler rol bazlı değil kullanıcı bazlı atanır (granüler kontrol).
+`hasPermission(code)` → AuthContext'ten kullanıcının `permissions` dizisini kontrol eder. İzin yoksa bileşen render edilmez. Admin panelinden bir izin kaldırıldığında, ilgili buton/sayfa **anlık** olarak kaybolur.
 
 ---
 
@@ -539,29 +538,25 @@ GET /api/opportunities
 Headers: x-tenant-id: tenant-abc-123
 ```
 
-### Tenant Middleware (backend/src/middleware.ts)
+### Tenant Middleware
 
 ```typescript
 const tenantMiddleware = asyncHandler(async (req, res, next) => {
   const tenantId = req.headers['x-tenant-id'];
-  // Header yoksa → 400
-  // Tenant bulunamazsa → 404
-  req.tenantId = tenantId; // Express.Request augmentation
+  req.tenantId = tenantId; // Express.d.ts namespace augmentation
   next();
 });
 ```
 
 ### Veri İzolasyonu
 
-Her Prisma sorgusunda `where: { tenantId: req.tenantId }` filtresi uygulanır. Bir şirket başka şirketin verisini hiçbir şekilde göremez.
+Her Prisma sorgusunda `where: { tenantId: req.tenantId }` filtresi zorunlu.
 
-### Tenant Yaşam Döngüsü
+### Modül Tanıtım Sistemi
 
+`Tenant.moduleSettings` JSON alanı — test modüllerini canlıya alma:
 ```
-POST /api/tenants → Tenant + Subscription (STARTER) transaction'da oluşturulur
-GET  /api/tenants → Tüm tenant'lar (admin görünümü)
-PUT  /api/tenants/:id → İsim güncelleme
-PUT  /api/tenants/:id/subscription → Plan güncelleme
+GET/PUT /api/tenants/module-settings
 ```
 
 ---
@@ -577,8 +572,17 @@ PUT  /api/tenants/:id/subscription → Plan güncelleme
 | CRM & Pipeline | ✅ | ✅ | ✅ |
 | Workflow Engine | ❌ | ✅ | ✅ |
 | WhatsApp Entegrasyon | ❌ | ✅ | ✅ |
+| Proje Yönetimi | ✅ | ✅ | ✅ |
+| Satın Alma Modülü | ❌ | ✅ | ✅ |
 | On-Premise Kurulum | ❌ | ❌ | ✅ |
-| SLA | — | %99.5 | %99.9 |
+
+### Lisans Modelleri
+
+| Model | Açıklama |
+|-------|---------|
+| `KOBI` | Bulut tabanlı SaaS, aylık abonelik |
+| `PAY_AS_YOU_GO` | Kullanım bazlı ücretlendirme |
+| `ON_PREMISE` | Şirket içi kurulum, tek seferlik lisans |
 
 ### Lisans Anahtarı Yapısı
 
@@ -586,15 +590,13 @@ PUT  /api/tenants/:id/subscription → Plan güncelleme
 {
   "companyName": "Örnek A.Ş.",
   "model": "KOBI",
-  "expiryDate": "2027-06-09T...",
-  "issuedAt": "2026-06-09T...",
+  "expiryDate": "2027-06-16T...",
+  "issuedAt": "2026-06-16T...",
   "isTrial": false,
-  "limits": { "users": 5, "storage": 10 },
+  "limits": { "users": 25, "storage": 100 },
   "signature": "base64-imza"
 }
 ```
-
-`LicenseGeneratorModule` bu yapıyı üretir ve `.json` olarak indirmeye sunar.
 
 ---
 
@@ -602,28 +604,28 @@ PUT  /api/tenants/:id/subscription → Plan güncelleme
 
 ### 10.1 Nextcloud DMS
 
-- Kurumsal dokümanları Nextcloud'a WebDAV/API üzerinden push
+- Sözleşme evrakları WebDAV ile yüklenir (multer buffer → MKCOL + PUT)
+- Hata olursa lokale düşer (fallback)
 - Yapılandırma: URL, adminUser, appPassword, basePath
-- `nextcloudService.ts` — isEnabled kontrolü ile korumalı
+- Kullanıcı senkronizasyonu (syncUser)
 
 ### 10.2 Microsoft Exchange
 
-- Exchange Web Services (EWS) veya Graph API
-- E-posta gönderme, takvim senkronizasyonu
-- Yapılandırma: serverUrl, domain, adminEmail, adminPass, syncCalendar
-- `exchangeService.ts`
+- E-posta gönderme (hand-off, onay bildirimleri)
+- Takvim senkronizasyonu
+- Yapılandırma: serverUrl, domain, adminEmail, adminPass
 
 ### 10.3 WhatsApp Business Cloud API
 
 - Meta Graph API v18.0 üzerinden mesaj gönderme
 - Yapılandırma: phoneNumberId, accessToken, businessAccountId, webhookVerifyToken
-- `whatsappService.ts`
 
-### 10.4 Google Gemini AI
+### 10.4 Claude AI (Anthropic)
 
-- PDF/Word şartname analizi (`SpecAnalysis.tsx`)
-- `@google/genai` SDK
-- Yanıt tipi: `{ title, summary, specDetails, extractedProducts[] }`
+- Sözleşme metni + idari şartname analizi
+- Çıktı: önemli maddeler, risk değerlendirmesi, evrak listesi, yapılacaklar
+- Proje aktarım görevleri üretimi
+- Model: `claude-sonnet-4-6` / mock fallback (API key yoksa)
 
 ---
 
@@ -633,38 +635,44 @@ Tüm endpoint'ler `/api/` prefix'li. Tenant gerektiren route'larda `x-tenant-id`
 
 ### Kaynaklar ve Endpoint'ler
 
-| Kaynak | Route | Metotlar |
+| Kaynak | Route | Notlar |
 |---|---|---|
 | Health | `/api/health` | GET |
 | Auth | `/api/auth` | POST /login, POST /forgot-password |
-| Tenants | `/api/tenants` | GET, POST, PUT /:id, PUT /:id/subscription |
-| Subscription | `/api/subscription` | GET |
+| Tenants | `/api/tenants` | GET, POST, PUT /:id, GET/PUT /module-settings |
+| Subscription | `/api/subscription` | GET, PUT /plan, POST /activate-license |
 | Usage | `/api/usage` | GET |
 | Units | `/api/units` | GET, POST, DELETE /:id |
 | Users | `/api/users` | GET, POST, PUT /:id, DELETE /:id |
 | Customers | `/api/customers` | GET, POST, PUT /:id, DELETE /:id |
-| Opportunities | `/api/opportunities` | GET, POST, PUT /:id |
-| BoM | `/api/opportunities/:id/bom` | POST |
-| Costs | `/api/opportunities/:id/costs` | POST |
-| Approval | `/api/opportunities/:id/request-approval` | POST |
-| Approve | `/api/opportunities/:id/approve` | POST |
-| Revert | `/api/opportunities/:id/revert-approval` | POST |
-| Sync | `/api/sync` | POST |
-| Projects | `/api/projects` | GET, POST, PUT /:id, DELETE /:id |
+| Opportunities | `/api/opportunities` | GET, POST, PUT /:id + BoM/costs/approval alt-route'ları |
+| Proposals | `/api/proposals` | GET, POST, PUT /:id, DELETE /:id |
+| ContractWorkflows | `/api/contract-workflows` | CRUD + /analyze + /documents + /documents/:id/upload + /transfer |
+| Projects | `/api/projects` | GET, POST, PUT /:id, DELETE /:id, GET /summary/all, + milestones + costs alt-route'ları |
+| Vendors | `/api/vendors` | GET, POST, PUT /:id, DELETE /:id |
+| PurchaseRequests | `/api/purchase-requests` | CRUD + approve/reject/quotes/delivery/invoice/close |
 | Tasks | `/api/tasks` | GET, POST, PUT /:id, DELETE /:id |
-| Contracts | `/api/contracts` | GET, POST, PUT /:id, DELETE /:id |
+| Contracts | `/api/contracts` | GET, POST, PUT /:id, DELETE /:id (eski model) |
 | Archive | `/api/archive` | GET, POST, PUT /:id, DELETE /:id |
 | Notifications | `/api/notifications` | GET, POST, PUT /:id, DELETE /:id |
 | Documents | `/api/documents` | GET, POST, PUT /:id, DELETE /:id |
-| Proposals | `/api/proposals` | GET, POST, PUT /:id, DELETE /:id |
 | Workflows | `/api/workflows` | GET, POST, PUT /:id |
 | Logs | `/api/logs/notifications` | GET, POST |
+| Static | `/uploads/...` | Yüklenen dosyalar |
 
-### Retry Mekanizması (withRetry)
+### Kritik Route Sırası
 
-SQLite lock hatalarında (`P2028`, `P2034`, `database is locked`) otomatik retry:
+```
+// GET /projects/summary/all MUTLAKA /:id'den ÖNCE tanımlanmalı
+router.get('/summary/all', handler);
+router.get('/:id', handler);
+```
+
+### Retry Mekanizması
+
+SQLite lock hatalarında (`P2028`, `P2034`) otomatik retry:
 - 3 deneme, exponential backoff (500ms → 1s → 2s)
-- `withRetry(fn, retries, delay)` — `backend/src/middleware.ts`
+- `asyncHandler` + `withRetry` — `backend/src/middleware.ts`
 
 ---
 
@@ -674,60 +682,75 @@ SQLite lock hatalarında (`P2028`, `P2034`, `database is locked`) otomatik retry
 
 ```
 src/
-├── App.tsx                — Root, global state, route logic
-├── types.ts               — Tüm TypeScript interface'leri (tek kaynak)
-├── constants/             — Mock data, simulation adımları, sabitler
+├── App.tsx                — Root, global state, activeTab route logic
+├── types.ts               — Tüm TypeScript interface'leri (tek kaynak gerçeklik)
+├── constants.ts           — NAV_ITEMS, ROLE_LABELS, MOCK_* verileri
 ├── contexts/
-│   ├── AuthContext.tsx    — Kullanıcı auth, hasPermission(), currentUser
+│   ├── AuthContext.tsx    — currentUser, hasPermission(), setAuth()
 │   ├── ThemeContext.tsx   — Aydınlık/karanlık tema
-│   └── UnsavedChangesContext.tsx — Kaydetmeden çıkış koruması
+│   └── UnsavedChangesContext.tsx — Kaydedilmemiş değişiklik koruması
 ├── hooks/
-│   ├── useEnflowQueries.ts — TanStack Query wrapper'ları (useOpportunities, useCustomers...)
+│   ├── useEnflowQueries.ts — TanStack Query hooks
 │   ├── useBoM.ts          — BoM state yönetimi
 │   └── useShared.ts       — useSearch, useForm
 ├── layout/
-│   ├── Sidebar.tsx        — Sol navigasyon
+│   ├── Sidebar.tsx        — Sol navigasyon (NAV_ITEMS bazlı, izin kontrollü)
 │   ├── Header.tsx         — Bildirim ikonu, kullanıcı profili
 │   └── MobileNav.tsx      — Mobil bottom navigation
 ├── modules/               — 21 modül (bkz. Bölüm 4)
 ├── components/
 │   ├── PermissionGate.tsx — RBAC render guard
-│   ├── SaveButton.tsx     — Global kaydet butonu (UnsavedChanges entegreli)
+│   ├── SaveButton.tsx     — Global kaydet butonu
 │   ├── HandOffModal.tsx   — İş devri modal
-│   ├── FinalProposalGenerator.tsx — PDF teklif üretici
-│   ├── TaskProgressTracker.tsx    — Görev ilerleme takip
-│   ├── WorkflowSimulation.tsx     — Workflow simülatörü
-│   └── settings/          — Ayarlar alt bileşenleri
+│   ├── FinalProposalGenerator.tsx — PDF teklif
+│   ├── TaskProgressTracker.tsx
+│   ├── WorkflowSimulation.tsx
+│   ├── CostAnalysisModule.tsx
+│   └── settings/          — TenantSettings, UnitManagement, UserManagement, vb.
 ├── services/
-│   ├── apiClient.ts       — HTTP client (tenant header otomatik)
-│   ├── apiService.ts      — Façade (tüm servisler burada birleşir)
-│   ├── crmService.ts      — Müşteri ve fırsat API'ları
+│   ├── apiClient.ts       — fetchWithAuth (parse edilmiş JSON döner; .json() çağırma)
+│   ├── apiService.ts      — Tüm API metodlarının façade'ı
+│   ├── crmService.ts      — CRM & teklif API'ları
+│   ├── projectService.ts  — Proje API'ları
+│   ├── taskService.ts     — Görev API'ları
+│   ├── documentService.ts — Evrak + arşiv + sözleşme API'ları
+│   ├── settingsService.ts — Ayarlar + abonelik + kullanıcı API'ları
 │   ├── workflowService.ts — Hand-off + bildirim tetikleme
 │   ├── whatsappService.ts — WhatsApp Cloud API
 │   ├── exchangeService.ts — Exchange e-posta
 │   └── nextcloudService.ts — Nextcloud DMS
 └── utils/
-    ├── logger.ts          — import.meta.env.DEV gate'li logger
+    ├── logger.ts          — import.meta.env.DEV gate'li logger (console.log yerine)
     └── bomParser.ts       — Excel → ParsedBoMItem[] dönüşümü
 ```
 
 ### Global State Stratejisi
 
-- **Server State:** TanStack React Query (cache, refetch, stale-time)
+- **Server State:** TanStack React Query v5 (cache, refetch, stale-time)
 - **UI State:** Component-level `useState`
 - **Cross-cutting State:** Context API (Auth, Theme, UnsavedChanges)
-- **Gerçek zamanlı:** React Query polling + manuel invalidation
 
-### UnsavedChanges Koruması
+### Vite Chunk Optimizasyonu
 
-`UnsavedChangesContext` — kullanıcı kaydedilmemiş değişiklik varken modülü terk etmeye çalışırsa uyarı gösterir.
+```typescript
+// vite.config.ts — manualChunks
+// 3.47MB tek chunk → 17 chunk (en büyük ~520KB gzip ~121KB)
+{
+  'vendor-lucide': id.includes('lucide-react'),   // ← react'tan ÖNCE gelmeli
+  'vendor-charts': id.includes('recharts') || ...,
+  'vendor-query':  id.includes('@tanstack'),
+  'vendor-motion': id.includes('motion'),
+  'vendor-react':  id.includes('react-dom') || ...,
+  // ...
+}
+```
 
-```tsx
-const { setHasUnsavedChanges } = useUnsavedChanges();
-// Form değiştiğinde:
-setHasUnsavedChanges(true);
-// Kaydedildiğinde:
-setHasUnsavedChanges(false);
+### API Path Kuralı
+
+```typescript
+// apiClient.fetchWithAuth(path) → path /api olmadan yaz; client ekliyor
+apiClient.fetchWithAuth('/projects')         // → GET /api/projects
+apiClient.fetchWithAuth('/vendors', {...})    // → POST /api/vendors
 ```
 
 ---
@@ -749,19 +772,21 @@ pnpm install
 cd backend
 pnpm install
 npx prisma generate
-npx prisma db push   # İlk kurulum — SQLite oluşturur
+npx prisma migrate dev   # migrations uygular
 ```
 
 ### Geliştirme
 
 ```bash
 # Terminal 1 — Backend (Port 3002)
-cd backend
-pnpm dev
+cd backend && pnpm dev
 
-# Terminal 2 — Frontend (Port 3000)
+# Terminal 2 — Frontend (Port 5173)
 pnpm dev
 ```
+
+**Test kullanıcısı:** `gokhan@t-ecosystem.com` / `123456`  
+**Tenant:** `tenant-1` (TechCorp A.Ş.) · Rol: `GENERAL_MANAGER`
 
 ### Ortam Değişkenleri
 
@@ -769,6 +794,7 @@ pnpm dev
 ```env
 DATABASE_URL="file:./dev.db"
 NODE_ENV=development
+ANTHROPIC_API_KEY=sk-ant-...   # opsiyonel — yoksa mock analiz çalışır
 ```
 
 **Frontend:** Vite proxy yapılandırması `vite.config.ts`'de — `/api` istekleri `localhost:3002`'ye yönlendirilir.
@@ -777,7 +803,7 @@ NODE_ENV=development
 
 ```bash
 # Frontend
-pnpm build   # dist/ klasörüne çıkarır
+pnpm build   # dist/ klasörüne çıkarır (17 optimized chunk)
 
 # Backend
 cd backend
@@ -790,27 +816,28 @@ node dist/index.js
 ```bash
 cd backend
 
-# Prisma Studio (görsel DB editörü)
-npx prisma studio
-
-# Schema değişikliklerini uygula
-npx prisma db push
-
-# Migration oluştur (production)
-npx prisma migrate dev --name <migration-name>
+npx prisma studio                          # görsel DB editörü
+npx prisma migrate dev --name <isim>       # yeni migration oluştur + uygula
+npx prisma generate                        # client'ı yenile (schema değişiminde)
 ```
 
 ---
 
-## Teknik Standartlar (v1.6.3+)
+## Teknik Standartlar
 
-- **TypeScript:** Strict mode, sıfır `any`, `Omit<T,'id'>` create, `Partial<T>` update
-- **Logging:** `import.meta.env.DEV` korumalı logger — production build'de `debug/info/warn` susturulur, `error` her zaman loglanır
-- **Backend:** Resource-per-file router pattern — `backend/src/routes/`
-- **Hata Yakalama:** `catch (err)` → `err instanceof Error ? err.message : 'fallback'`
-- **Tenant Güvenliği:** Her DB sorgusunda `tenantId` filtresi zorunlu
-- **Transaction:** Tutarlılık gerektiren çok adımlı işlemler `prisma.$transaction` ile
+```
+TypeScript      → Strict mode, sıfır any; Omit<T,'id'> create, Partial<T> update
+Logging         → src/utils/logger kullan; console.log yasak
+motion/react    → Paket adı "motion" — "framer-motion" değil
+apiClient       → fetchWithAuth parse edilmiş JSON döner; .json() ÇAĞIRMA
+Express v5      → String(req.params.id) kullan (params tipi string | string[])
+req.tenantId    → Express.d.ts namespace'den; cast gereksiz
+multer v2       → upload.single('file'), req.file.buffer
+Route sırası    → GET /summary/all MUTLAKA GET /:id'den ÖNCE
+opportunityId   → Backend POST /projects'ta opp verisi otomatik çekilir
+lucide-react    → vite manualChunks'ta react kontrolünden ÖNCE gelmeli
+```
 
 ---
 
-*Bu doküman Enflow v1.6.3 mimarisini ve yeteneklerini kapsamlı biçimde açıklar. Son güncelleme: 09.06.2026.*
+*Bu doküman Enflow v2.0 mimarisini ve yeteneklerini kapsamlı biçimde açıklar. Son güncelleme: 16.06.2026.*
