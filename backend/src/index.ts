@@ -20,13 +20,18 @@ import notificationsRouter from './routes/notifications';
 import documentsRouter from './routes/documents';
 import proposalsRouter from './routes/proposals';
 import workflowsRouter from './routes/workflows';
+import contractWorkflowRouter from './routes/contractWorkflow';
+import adminTestRouter from './routes/adminTest';
 
 dotenv.config();
 
 const app = express();
 const port = 3002;
 
+import path from 'path';
+
 app.use(express.json({ limit: '50mb' }));
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
@@ -54,6 +59,8 @@ app.use('/api/notifications', notificationsRouter);
 app.use('/api/documents', documentsRouter);
 app.use('/api/proposals', proposalsRouter);
 app.use('/api/workflows', workflowsRouter);
+app.use('/api/contract-workflows', contractWorkflowRouter);
+app.use('/api/admin/security-test', adminTestRouter);
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Error Detail]', err);

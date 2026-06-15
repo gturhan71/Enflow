@@ -1,4 +1,182 @@
+# Enflow — Proje Bağlamı
 
+## Proje Nedir
+
+Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant) bir SaaS platformudur. Satış fırsatlarının CRM'den başlayıp sözleşme imzalanmasına ve proje yönetimine aktarılmasına kadar tüm yaşam döngüsünü kapsar.
+
+**Hedef kullanıcı rolleri:** GENERAL_MANAGER, SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL, PROJECT_MANAGER, ADMIN
+
+## Tech Stack
+
+| Katman | Teknoloji |
+|--------|-----------|
+| Frontend | React 18 + TypeScript (strict), Vite, TanStack Query v5 |
+| UI | Tailwind CSS, glass-morphism design (`glass-card`, `input-glass`, `btn-primary`, `btn-secondary`), `motion/react` (paket adı `motion`, **framer-motion değil**) |
+| Backend | Express.js v5, TypeScript, Prisma ORM |
+| DB | SQLite (dev), geçiş için Prisma migrations |
+| İconlar | `lucide-react` |
+| Package manager | **pnpm** |
+
+## Çalıştırma
+
+```bash
+# Frontend (port 5173)
+pnpm dev
+
+# Backend (port 3002)
+cd backend && pnpm dev
+```
+
+**Test kullanıcısı:** `gokhan@t-ecosystem.com` / şifre: `123456`  
+**Tenant:** `tenant-1`, Rol: `GENERAL_MANAGER`
+
+## Mimari
+
+### Frontend
+
+- `src/App.tsx` — ana router; `activeTab` state ile modül geçişi (`setActiveTab('module-key')`)
+- `src/modules/` — her modül kendi sekmesi
+- `src/hooks/useEnflowQueries.ts` — TanStack Query hooks (useOpportunities, useProposals, vb.)
+- `src/services/apiClient.ts` — `ApiClient` sınıfı; **`fetchWithAuth(path, init)`** zaten parse edilmiş JSON döner, üstüne `.ok` veya `.json()` çağırma
+- `src/services/apiService.ts` — `ApiService` sınıfı, apiClient'ı wrap eder
+- `src/contexts/AuthContext.tsx` — `useAuth()` → `currentUser`, `setAuth(token, tenantId)`
+
+**API path kuralı:** `apiClient.fetchWithAuth(path)` çağrısında path `/api` **olmadan** yaz — client zaten ekliyor. Örn: `/contract-workflows` → tam URL `/api/contract-workflows` olur.
+
+### Backend
+
+- `backend/src/index.ts` — Express app, tüm router mount noktaları
+- `backend/src/routes/` — her domain için ayrı router
+- `backend/prisma/schema.prisma` — tek kaynak gerçeklik; migration'lar `backend/prisma/migrations/` altında
+- `req.tenantId` — `Express.d.ts` namespace declaration ile ekleniyor, cast gerekmez
+- Express v5'te `req.params.id` tipi `string | string[]` — `String(req.params.id)` ile al
+
+**Upload:** `multer` memoryStorage → lokal `backend/uploads/contracts/{folder}/` + opsiyonel Nextcloud WebDAV  
+**Static dosyalar:** `GET /uploads/...` → `backend/uploads/` dizini
+
+## Veritabanı Modelleri (Prisma)
+
+Tüm modeller `tenantId` ile izole edilmiş.
+
+| Model | Amaç |
+|-------|------|
+| `Tenant` | Kiracı |
+| `User` | Kullanıcı (rol + izin JSON) |
+| `Customer` | Müşteri |
+| `Opportunity` | Satış fırsatı |
+| `Proposal` | Teklif (versiyonlu, durum akışı) |
+| `BoMItem` | Malzeme listesi kalemi |
+| `CostItem` | Maliyet kalemi (LABOR/LOGISTICS/TRAVEL/OTHER) |
+| `Contract` | Sözleşme (eski basit model) |
+| `ContractWorkflow` | Sözleşme süreç yönetimi — aktif geliştirme |
+| `ContractWorkflowDoc` | Sözleşme evrakları |
+| `TodoTask` | Görev (birim bazlı, relatedModule + relatedItemId) |
+| `Workflow` / `WorkflowStep` | Onay akışı şablonları |
+| `Project` | Proje |
+| `ActivityLog` | Değişiklik logu |
+| `Notification` | Kullanıcı bildirimi |
+
+## Modüller ve Sidebar Menüsü
+
+| Sekme key | Bileşen | Açıklama |
+|-----------|---------|----------|
+| `dashboard` | `Dashboard` | Özet metrikler |
+| `crm` | `CRMModule` | Müşteri + fırsat + teklif yönetimi |
+| `presales` | `PresalesModule` | BoM (malzeme listesi) + maliyet analizi |
+| `negotiation` | `NegotiationModule` | Müzakere + anlaşma |
+| `contract` | `ContractModule` | Eski sözleşme modülü |
+| `project` | `ProjectManagementModule` | Proje takibi |
+| `procurement` | `ProcurementModule` | Satın alma |
+| `sales-support` | `SalesSupport` | İhale desteği |
+| `todo` | `TodoModule` | Görev yönetimi |
+| `documents` | `DocumentsModule` | Kurumsal dokümanlar |
+| `archive` | `ArchiveModule` | Fiziksel arşiv |
+| `settings` | `SettingsModule` | Ayarlar (kullanıcı, birim, entegrasyon) |
+| `contract-workflow-test` | `ContractWorkflowTest` | **TEST** — Sözleşme süreç yönetimi (sadece GENERAL_MANAGER görür) |
+
+## ContractWorkflow Modülü — Aktif Geliştirme
+
+### Durum Akışı
+
+```
+DRAFT
+  → ANALYSIS_DONE      (AI analizi tamamlandı, evrak listesi oluştu)
+  → PREPARATION        (evrak hazırlık)
+  → READY_TO_SIGN      (tüm zorunlu evraklar yüklendi — otomatik geçiş)
+  → PENDING_SIGNATURE_APPROVAL  (birim yöneticisine onaya gönderildi)
+  → SIGNED             (yönetici onayladı)
+  → TRANSFERRED        (görevler Proje Yönetimine aktarıldı — otomatik)
+```
+
+**Otomatik geçişler:**
+- Tüm `isRequired: true` evraklar `UPLOADED/VERIFIED/WAIVED` olduğunda → `READY_TO_SIGN` (handleFileUpload içinde)
+- "Onayla & Aktar" butonunda → önce `SIGNED`, hemen ardından `/transfer` çağrısı → `TRANSFERRED`
+
+### 5 Sekme
+
+1. **Bağlam** — İhale adı, İKN, sözleşme bedeli (kazanılan tekliften otomatik), son tarih
+2. **Analiz** — Sözleşme metni + idari şartname; AI ile analiz (Claude claude-sonnet-4-6 / mock fallback)
+3. **Evrak Takibi** — Evrak kartları, her kart satır içi "Yükle" butonu; yükleme tamamlanınca otomatik ilerleme
+4. **İmzalama** — 4 adımlı onay akışı (bkz. yukarıdaki durum akışı)
+5. **Proje Aktarımı** — AI görevleri TodoTask olarak aktarılır; bilgi ekranı
+
+### Evrak Durum Akışı
+
+`PENDING` / `IN_PROGRESS` → amber **Yükle** butonu  
+`UPLOADED` (dosya var) → yeşil check + dosya linki + **Değiştir**  
+`VERIFIED` → yeşil "Onaylandı" badge  
+`WAIVED` → gri "Muaf" badge
+
+### Backend Endpoint'leri (`/api/contract-workflows`)
+
+```
+GET    /                          → tüm workflow'lar (tenant)
+POST   /                          → yeni workflow; title otomatik: "{tenderName} — İKN: {tenderNo}"
+GET    /:id                        → tek workflow (documents include)
+PUT    /:id                        → güncelle (title, status, signedDate, vb.)
+DELETE /:id                        → sil
+
+POST   /:id/analyze                → AI analiz (claude-sonnet-4-6); evrak listesi oluştur
+POST   /:id/documents              → evrak ekle
+PUT    /:id/documents/:docId       → evrak güncelle
+DELETE /:id/documents/:docId       → evrak sil
+POST   /:id/documents/:docId/upload → dosya yükle (multer); lokal veya Nextcloud
+POST   /:id/transfer               → AI görevleri → TodoTask; status=TRANSFERRED
+```
+
+### Dosya Yükleme Notları
+
+- Klasör adı: `slugify(tenderName)_slugify(tenderNo)` — Türkçe karakterler ASCII'ye çevrilir
+- Lokal path: `backend/uploads/contracts/{folder}/{timestamp}_{filename}`
+- Nextcloud: MKCOL + PUT via WebDAV (yapılandırılmışsa); hata olursa lokale düşer
+- Upload `fetch` ile yapılır (`apiClient` değil) — çünkü `FormData` gönderiliyor, manuel header eklenir
+
+## Teklif Durum Sıralaması
+
+```ts
+const STATUS_RANK = { APPROVED: 4, ACCEPTED: 3, SENT: 2, PENDING_APPROVAL: 1, DRAFT: 0, REJECTED: -1 }
+```
+`bestProposalPrice(opportunityId, proposals)` → en yüksek ranked + en yüksek versiyonlu teklifin fiyatı
+
+## Önemli Teknik Kararlar
+
+- **`motion/react`** — `framer-motion` paketi yok, `motion` paketi var (`^12.x`)
+- **`apiClient.fetchWithAuth`** — parse edilmiş JSON döner; `.ok` / `.json()` çağırma
+- **Express v5 params** — `String(req.params.id)` helper kullan
+- **`req.tenantId`** — `Express.d.ts` namespace'den geliyor, cast gereksiz
+- **multer v2** — `upload.single('file')` middleware, `req.file.buffer` kullan
+- **No `console.log`** — `utils/logger` kullan (production rule)
+- **No `any`** — TypeScript strict mode
+
+## Sonraki Adımlar (Planlanan)
+
+- ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
+- Birim yöneticisi onayı için gerçek TodoTask yaratma + bildirim gönderme
+- Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
+- İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
+
+
+---
 
 ## Auto-generated signatures
 <!-- Updated by gen-context.js -->
@@ -11,57 +189,45 @@ src/modules/ProvisionWizard.tsx ← types
 src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
 backend/src/usageService.ts ← prismaClient
 src/modules/LicenseGeneratorModule.tsx ← types
-src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
-src/components/FinalProposalGenerator.tsx ← services/workflowService, types
-src/components/SaveButton.tsx ← lib/utils
-src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/components/WorkflowSimulation.tsx ← lib/utils, types
-src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
-src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../services/apiService
-src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
-src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
-src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext
-src/contexts/AuthContext.tsx ← constants, types
-src/hooks/useEnflowQueries.ts ← services/apiService
-src/layout/MobileNav.tsx ← lib/utils
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
-src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
-src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
-src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
-src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
-src/modules/Login.tsx ← constants, services/apiService
-src/modules/ProjectManagementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/ProcurementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/ProposalEditor.tsx ← lib/utils, types
-src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
-src/modules/SubscriptionModule.tsx ← types
-src/modules/SalesSupport.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/SpecAnalysis.tsx ← lib/utils, types
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext
-src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/services/nextcloudService.ts ← types, utils/logger
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
+src/layout/MobileNav.tsx ← lib/utils
+src/components/WorkflowSimulation.tsx ← lib/utils, types
+src/components/SaveButton.tsx ← lib/utils
 src/services/whatsappService.ts ← types, utils/logger
+src/services/nextcloudService.ts ← types, utils/logger
 src/services/exchangeService.ts ← types, utils/logger
+src/modules/SalesSupport.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/ProcurementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/SubscriptionModule.tsx ← types
+src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
+src/contexts/AuthContext.tsx ← constants, types
+src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
+src/components/FinalProposalGenerator.tsx ← services/workflowService, types
 src/services/workflowService.ts ← whatsappService, exchangeService, types, utils/logger
+src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/hooks/useEnflowQueries.ts ← services/apiService
+src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
+src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../services/apiService
+src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
+src/modules/ProjectManagementModule.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
+src/modules/SpecAnalysis.tsx ← lib/utils, types
 backend/src/middleware.ts ← prismaClient
-```
-
-## changes (last 10 commits — 38 seconds ago)
-```
-src/components/settings/UnitManagement.tsx    +Birim
-src/modules/WorkflowBuilder.tsx               ~k  ~Marj
-src/services/apiClient.ts                     +ApiClient
-src/services/nextcloudService.ts              ~NextcloudService
-src/services/apiService.ts                    ~ApiService
-src/services/whatsappService.ts               ~WhatsAppService
-src/services/exchangeService.ts               ~ExchangeService
-src/services/workflowService.ts               ~WorkflowService
-.github/copilot-instructions.md               +checkLimit  +incrementUsage  +useForm  +ApiClient
+src/modules/Login.tsx ← constants, services/apiService
+src/components/CustomerImportWizard.tsx ← lib/utils, types, services/apiService
+src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
+src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
+src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
+src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
+src/modules/ProposalEditor.tsx ← lib/utils, types
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext
 ```
 
 ## .github
@@ -72,12 +238,9 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
-h2 changes (last 10 commits — 36 seconds ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
-h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260514221705_expand_schema/migration.sql
 h3 backend/prisma/migrations/20260517130111_add_workflow_tables/migration.sql
 h3 backend/prisma/migrations/20260517151311_add_activity_log/migration.sql
 h3 backend/prisma/migrations/20260517182206_make_task_related_item_generic/migration.sql
@@ -93,25 +256,12 @@ h3 src/modules/ArchiveModule.tsx
 h3 src/modules/ProvisionWizard.tsx
 h3 src/modules/ContractModule.tsx
 h3 src/contexts/ThemeContext.tsx
+h3 src/modules/LicenseGeneratorModule.tsx
+h3 src/layout/Sidebar.tsx
+h3 src/layout/MobileNav.tsx
 ```
 
 ## backend
-
-### backend/pnpm-lock.yaml
-```
-keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260514221705_expand_schema/migration.sql
-```
-TABLE Contract
-TABLE TodoTask
-TABLE ArchiveItem
-TABLE Notification
-TABLE CorporateDocument
-TABLE new_Project
-INDEX Project_opportunityId_key ON Project
-```
 
 ### backend/prisma/migrations/20260517130111_add_workflow_tables/migration.sql
 ```
@@ -214,6 +364,347 @@ handler onChange
 handler onClick
 ```
 
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+export Sidebar
+handler onClick
+```
+
+### src/layout/MobileNav.tsx
+```
+export MobileNav
+```
+
+### src/index.css
+```
+var --background
+var --foreground
+var --primary
+var --primary-foreground
+var --glass-bg
+var --glass-border
+var --sidebar-bg
+var --header-bg
+var --card-bg
+var --input-bg
+var --foreground-glass
+```
+
+### src/components/CostAnalysisModule.tsx
+```
+hook useState
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
+### src/components/WorkflowSimulation.tsx
+```
+hook useState
+hook useEffect
+export WorkflowSimulation
+```
+
+### src/components/SaveButton.tsx
+```
+props SaveButtonProps
+export SaveButton
+handler onClick
+```
+
+### src/contexts/UnsavedChangesContext.tsx
+```
+hook useContext
+hook useState
+hook useEffect
+export UnsavedChangesProvider
+handler onClick
+```
+
+### src/services/apiClient.ts
+```
+class ApiClient  :3-70
+setAuth  :7-10
+async fetchWithAuth  :12-44
+async login  :46-55
+async forgotPassword  :57-69
+```
+
+### src/services/whatsappService.ts
+```
+class WhatsAppService  :4-37
+getConfig  :13-15
+updateConfig  :17-20
+testConnection  :22-26
+async sendMessage  :28-36
+```
+
+### src/services/nextcloudService.ts
+```
+class NextcloudService  :8-66
+async syncUser  :21-26
+async uploadFile  :44-53
+updateConfig  :58-61
+getConfig  :63-65
+```
+
+### src/services/exchangeService.ts
+```
+class ExchangeService  :4-42
+getConfig  :15-17
+updateConfig  :19-23
+testConnection  :25-29
+async sendEmail  :31-35
+async syncCalendar  :37-41
+```
+
+### src/modules/SalesSupport.tsx
+```
+hook useState
+export SalesSupport
+handler onChange
+handler onClick
+```
+
+### src/modules/ProcurementModule.tsx
+```
+hook useState
+export ProcurementModule
+handler onChange
+handler onClick
+```
+
+### src/modules/SubscriptionModule.tsx
+```
+hook useState
+export SubscriptionModule
+handler onChange
+handler onClick
+```
+
+### src/components/settings/TenantSettings.tsx
+```
+props TenantSettingsProps
+export TenantSettings
+handler onChange
+handler onClick
+```
+
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
+```
+
+### src/components/settings/SubscriptionSettings.tsx
+```
+props SubscriptionSettingsProps
+export SubscriptionSettings
+handler onChange
+```
+
+### src/components/HandOffModal.tsx
+```
+props HandOffModalProps
+hook useState
+export HandOffModal
+handler onClick
+handler onChange
+```
+
+### src/components/FinalProposalGenerator.tsx
+```
+props Props
+hook useState
+hook useEffect
+export FinalProposalGenerator
+handler onClick
+```
+
+### src/services/workflowService.ts
+```
+class WorkflowService  :13-116
+createApprovalChain  :19-28
+getChainForEntity  :30-32
+approveStage  :34-49
+async triggerHandOff  :51-107
+getLogsForItem  :109-111
+getNotificationsForUser  :113-115
+```
+
+### src/components/settings/UnitManagement.tsx
+```
+props UnitManagementProps
+hook useState
+export UnitManagement
+handler onSubmit
+handler onChange
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
+### src/services/apiService.ts
+```
+class ApiService  :13-85
+setAuth  :14-16
+async login  :18-20
+async forgotPassword  :22-24
+async getCustomers  :27-27
+async createCustomer  :28-28
+async updateCustomer  :29-29
+async deleteCustomer  :30-30
+async getOpportunities  :33-33
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+export UserManagement
+handler onSubmit
+```
+
+### src/hooks/useEnflowQueries.ts
+```
+export const useOpportunities  :6-14
+export const useCustomers  :16-24
+export const useProjects  :26-34
+export const useContracts  :36-44
+export const useTasks  :46-54
+export const useUnits  :56-64
+export const useUsers  :66-74
+export const useDocuments  :76-84
+export const useProposals  :86-94
+export const useApproveProposalMutation  :98-107
+```
+
+### src/modules/DocumentsModule.tsx
+```
+props DocumentsModuleProps
+hook useState
+hook useMemo
+export DocumentsModule
+handler onChange
+handler onSubmit
+```
+
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useAuth
+hook useState
+hook useEffect
+export SettingsModule
+handler onData
+```
+
+### src/components/settings/PermissionSettings.tsx
+```
+props PermissionSettingsProps
+hook useState
+export PermissionSettings
+handler onChange
+handler onClick
+```
+
+### src/modules/IntegrationWizard.tsx
+```
+hook useState
+export IntegrationWizard
+handler onClick
+handler onChange
+```
+
+### src/modules/NegotiationModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+hook useRef
+export NegotiationModule
+handler onDeal
+handler onChange
+handler onClick
+handler onSubmit
+```
+
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useEffect
+hook useMemo
+export WorkflowBuilder
+handler onChange
+handler onClick
+handler onPath
+```
+
+### src/modules/ProjectManagementModule.tsx
+```
+hook useState
+export ProjectManagementModule
+handler onChange
+handler onClick
+handler onConfirm
+```
+
+### src/modules/Dashboard.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export Dashboard
+```
+
+### src/modules/SpecAnalysis.tsx
+```
+props SpecAnalysisProps
+hook useState
+export SpecAnalysis
+handler onChange
+handler onClick
+```
+
+### src/modules/Login.tsx
+```
+props LoginProps
+hook useState
+export Login
+handler onSubmit
+handler onChange
+```
+
+### src/components/CustomerImportWizard.tsx
+```
+props Props
+hook useState
+hook useRef
+hook useCallback
+export CustomerImportWizard
+handler onClick
+handler onDragOver
+handler onDrop
+handler onChange
+```
+
 ### src/App.tsx
 ```
 hook useState
@@ -235,172 +726,9 @@ handler onLogout
 handler onLogin
 ```
 
-### src/components/CostAnalysisModule.tsx
-```
-hook useState
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
-### src/components/HandOffModal.tsx
-```
-props HandOffModalProps
-hook useState
-export HandOffModal
-handler onClick
-handler onChange
-```
-
-### src/components/FinalProposalGenerator.tsx
-```
-props Props
-hook useState
-hook useEffect
-export FinalProposalGenerator
-handler onClick
-```
-
-### src/components/SaveButton.tsx
-```
-props SaveButtonProps
-export SaveButton
-handler onClick
-```
-
-### src/components/settings/UnitManagement.tsx
-```
-props UnitManagementProps
-hook useState
-export UnitManagement
-handler onSubmit
-handler onChange
-```
-
-### src/components/WorkflowSimulation.tsx
-```
-hook useState
-hook useEffect
-export WorkflowSimulation
-```
-
-### src/components/settings/TenantSettings.tsx
-```
-props TenantSettingsProps
-export TenantSettings
-handler onChange
-handler onClick
-```
-
-### src/components/settings/PermissionSettings.tsx
-```
-props PermissionSettingsProps
-hook useState
-export PermissionSettings
-handler onChange
-handler onClick
-```
-
-### src/components/settings/SubscriptionSettings.tsx
-```
-props SubscriptionSettingsProps
-export SubscriptionSettings
-handler onChange
-```
-
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-export UserManagement
-handler onSubmit
-```
-
 ### src/hooks/useBoM.ts
 ```
-export const useBoM  :6-78
-```
-
-### src/contexts/UnsavedChangesContext.tsx
-```
-hook useContext
-hook useState
-hook useEffect
-export UnsavedChangesProvider
-handler onClick
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
-```
-
-### src/hooks/useEnflowQueries.ts
-```
-export const useOpportunities  :6-14
-export const useCustomers  :16-24
-export const useProjects  :26-34
-export const useContracts  :36-44
-export const useTasks  :46-54
-export const useUnits  :56-64
-export const useUsers  :66-74
-export const useDocuments  :76-84
-export const useProposals  :86-94
-export const useApproveProposalMutation  :98-107
-```
-
-### src/index.css
-```
-var --background
-var --foreground
-var --primary
-var --primary-foreground
-var --glass-bg
-var --glass-border
-var --sidebar-bg
-var --header-bg
-var --card-bg
-var --input-bg
-var --foreground-glass
-```
-
-### src/layout/MobileNav.tsx
-```
-export MobileNav
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-export Sidebar
-handler onClick
-```
-
-### src/modules/CostAnalysisModule.tsx
-```
-hook useState
-hook useMemo
-hook useEffect
-export CostAnalysisModule
-handler onChange
-handler onClick
+export const useBoM  :7-90
 ```
 
 ### src/modules/CRMModule.tsx
@@ -411,88 +739,22 @@ hook useSearch
 export CRMModule
 handler onProposal
 handler onClick
+handler onChange
 handler onSave
+handler onImported
 handler onConfirm
 handler onSubmit
-handler onChange
 ```
 
-### src/modules/IntegrationWizard.tsx
+### src/modules/CostAnalysisModule.tsx
 ```
-hook useState
-export IntegrationWizard
-handler onClick
-handler onChange
-```
-
-### src/modules/Dashboard.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export Dashboard
-```
-
-### src/modules/DocumentsModule.tsx
-```
-props DocumentsModuleProps
-hook useState
-hook useMemo
-export DocumentsModule
-handler onChange
-handler onSubmit
-```
-
-### src/modules/NegotiationModule.tsx
-```
-hook useAuth
+hook useQueryClient
 hook useState
 hook useMemo
 hook useEffect
-hook useRef
-export NegotiationModule
-handler onDeal
+export CostAnalysisModule
 handler onChange
 handler onClick
-handler onSubmit
-```
-
-### src/modules/Login.tsx
-```
-props LoginProps
-hook useState
-export Login
-handler onSubmit
-handler onChange
-```
-
-### src/modules/ProjectManagementModule.tsx
-```
-hook useState
-export ProjectManagementModule
-handler onChange
-handler onClick
-handler onConfirm
-```
-
-### src/modules/ProcurementModule.tsx
-```
-hook useState
-export ProcurementModule
-handler onChange
-handler onClick
-```
-
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -508,29 +770,15 @@ handler onClick
 handler onTransferToBoM
 ```
 
-### src/modules/SubscriptionModule.tsx
+### src/modules/ProposalEditor.tsx
 ```
+props ProposalEditorProps
 hook useState
-export SubscriptionModule
-handler onChange
+hook useMemo
+hook useEffect
+export ProposalEditor
 handler onClick
-```
-
-### src/modules/SalesSupport.tsx
-```
-hook useState
-export SalesSupport
 handler onChange
-handler onClick
-```
-
-### src/modules/SpecAnalysis.tsx
-```
-props SpecAnalysisProps
-hook useState
-export SpecAnalysis
-handler onChange
-handler onClick
 ```
 
 ### src/modules/TodoModule.tsx
@@ -540,89 +788,6 @@ hook useState
 export TodoModule
 handler onClick
 handler onChange
-```
-
-### src/modules/WorkflowBuilder.tsx
-```
-hook useUnsavedChanges
-hook useState
-hook useEffect
-hook useMemo
-export WorkflowBuilder
-handler onChange
-handler onClick
-handler onPath
-```
-
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useAuth
-hook useState
-hook useEffect
-export SettingsModule
-handler onData
-```
-
-### src/services/apiClient.ts
-```
-class ApiClient  :3-70
-setAuth  :7-10
-async fetchWithAuth  :12-44
-async login  :46-55
-async forgotPassword  :57-69
-```
-
-### src/services/nextcloudService.ts
-```
-class NextcloudService  :8-66
-async syncUser  :21-26
-async uploadFile  :44-53
-updateConfig  :58-61
-getConfig  :63-65
-```
-
-### src/services/apiService.ts
-```
-class ApiService  :13-85
-setAuth  :14-16
-async login  :18-20
-async forgotPassword  :22-24
-async getCustomers  :27-27
-async createCustomer  :28-28
-async updateCustomer  :29-29
-async deleteCustomer  :30-30
-async getOpportunities  :33-33
-```
-
-### src/services/whatsappService.ts
-```
-class WhatsAppService  :4-37
-getConfig  :13-15
-updateConfig  :17-20
-testConnection  :22-26
-async sendMessage  :28-36
-```
-
-### src/services/exchangeService.ts
-```
-class ExchangeService  :4-42
-getConfig  :15-17
-updateConfig  :19-23
-testConnection  :25-29
-async sendEmail  :31-35
-async syncCalendar  :37-41
-```
-
-### src/services/workflowService.ts
-```
-class WorkflowService  :13-116
-createApprovalChain  :19-28
-getChainForEntity  :30-32
-approveStage  :34-49
-async triggerHandOff  :51-107
-getLogsForItem  :109-111
-getNotificationsForUser  :113-115
 ```
 
 ### src/types.ts

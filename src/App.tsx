@@ -49,6 +49,8 @@ import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import ArchiveModule from './modules/ArchiveModule';
 import SubscriptionModule from './modules/SubscriptionModule';
+import ContractWorkflowTest from './modules/ContractWorkflowTest';
+import SecurityTestModule from './modules/SecurityTestModule';
 import LicenseGeneratorModule from './modules/LicenseGeneratorModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
@@ -206,11 +208,12 @@ const TenantAppInner = ({
   const isDocsActive = activeTab === 'documents';
   const isContractsActive = activeTab === 'contracts';
   const isCostActive = activeTab === 'cost-analysis';
+  const isContractWorkflowTestActive = activeTab === 'contract-workflow-test';
 
   const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
-    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive
+    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowTestActive
   });
-  const { data: customersData, isLoading: customersLoading } = useCustomers(tenantId, {
+  const { data: customersData } = useCustomers(tenantId, {
     enabled: isCrmActive
   });
   const { data: projectsData, isLoading: projectsLoading } = useProjects(tenantId, {
@@ -223,7 +226,7 @@ const TenantAppInner = ({
     enabled: isDashboardActive || isCrmActive || isProjectActive || isContractsActive || isTodoActive
   });
   const { data: unitsData, isLoading: unitsLoading } = useUnits(tenantId, {
-    enabled: isSettingsActive || isPresalesActive
+    enabled: isSettingsActive || isPresalesActive || isDashboardActive
   });
   const { data: systemUsersData, isLoading: systemUsersLoading } = useUsers(tenantId, {
     enabled: isSettingsActive || isPresalesActive
@@ -232,7 +235,7 @@ const TenantAppInner = ({
     enabled: isDocsActive
   });
   const { data: proposalsData, isLoading: proposalsLoading } = useProposals(tenantId, {
-    enabled: isCrmActive || isTodoActive
+    enabled: isCrmActive || isTodoActive || isDashboardActive || isContractWorkflowTestActive
   });
 
   // Sync React Query data to local state for compatibility
@@ -248,7 +251,7 @@ const TenantAppInner = ({
 
   // Combined Loading state based on active tab
   const loading = 
-    (isCrmActive && (opportunitiesLoading || customersLoading || tasksLoading || proposalsLoading)) ||
+    (isCrmActive && opportunitiesLoading) ||
     (isDashboardActive && (opportunitiesLoading || projectsLoading || tasksLoading || contractsLoading)) ||
     (isPresalesActive && (opportunitiesLoading || unitsLoading || systemUsersLoading)) ||
     (isSettingsActive && (unitsLoading || systemUsersLoading)) ||
@@ -298,7 +301,7 @@ const TenantAppInner = ({
     }
     
     switch (activeTab) {
-      case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} onApproveProposal={handleApproveProposal} />;
+      case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} />;
       case 'crm':
       case 'crm-opportunities':
       case 'crm-customers':
@@ -318,18 +321,36 @@ const TenantAppInner = ({
             setActiveTab={setActiveTab}
           />
         );
-      case 'presales': return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} />;
+      // Presales & alt sekmeler
+      case 'presales':
+      case 'presales-bom':
+        return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} />;
+      case 'presales-cost':
+      case 'cost-analysis': // geriye dönük uyumluluk
+        return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} />;
+
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
-      case 'cost-analysis': return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} />;
-      case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
+
+      // Sözleşme — yeni ContractWorkflow ana modül
+      case 'contract-workflow':
+      case 'contract-workflow-test': // geriye dönük uyumluluk
+        return <ContractWorkflowTest opportunities={opportunities} proposals={proposals} />;
+
+      // Eski sözleşme modülü — erişim kapanmadı, sadece menüden çıkarıldı
       case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
-      case 'archive': return <ArchiveModule />;
-      case 'subscription': return <SubscriptionModule />;
-      case 'license-gen': return <LicenseGeneratorModule />;
+
       case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
       case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} setProposals={setProposals} />;
-      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} onApproveProposal={handleApproveProposal} />;
+      case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
+      case 'archive': return <ArchiveModule />;
+      case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
+
+      // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
+      case 'subscription': return <SubscriptionModule />;
+      case 'license-gen': return <LicenseGeneratorModule />;
+
+      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} />;
     }
   };
 

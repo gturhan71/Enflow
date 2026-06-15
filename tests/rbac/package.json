@@ -1,0 +1,20 @@
+{
+  "name": "enflow-rbac-tests",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:api": "playwright test tests/api-permissions.spec.ts",
+    "test:isolation": "playwright test tests/tenant-isolation.spec.ts",
+    "test:ui": "playwright test tests/ui-access.spec.ts",
+    "report": "playwright show-report",
+    "prelaunch": "SEND_SECURITY_REPORT=true playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/nodemailer": "^8.0.1",
+    "dotenv": "^16.4.5",
+    "nodemailer": "^9.0.0",
+    "typescript": "^5.6.0"
+  }
+}

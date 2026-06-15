@@ -18,10 +18,18 @@ import {
   Download,
   CheckCircle,
   XCircle,
+  ThumbsUp,
+  ThumbsDown,
   GitBranch,
   FileSpreadsheet,
   Send,
-  Package
+  Package,
+  Trophy,
+  AlertTriangle,
+  BarChart2,
+  ChevronRight,
+  Calendar,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -77,6 +85,7 @@ const CRMModule = ({
   const [showOpportunitySelector, setShowOpportunitySelector] = useState(false);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
+  const [customerReportTarget, setCustomerReportTarget] = useState<Customer | null>(null);
 
   const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
     if (!handOffTarget || !currentUser) return;
@@ -119,6 +128,24 @@ const CRMModule = ({
         createdById: currentUser?.id
       });
       setProposals(prev => [...(prev || []), saved]);
+
+      // Determine target status based on proposal content
+      let targetStatus: Opportunity['status'] = 'PROPOSAL';
+      try {
+        const contentObj = typeof proposalData.content === 'string'
+          ? JSON.parse(proposalData.content as string)
+          : (proposalData.content as Record<string, unknown>);
+        if (contentObj?.openForNegotiation) targetStatus = 'NEGOTIATION';
+      } catch { /* ignore parse errors */ }
+
+      // Auto-advance opportunity if it's earlier in the pipeline
+      const NON_FINAL: Opportunity['status'][] = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL'];
+      if (NON_FINAL.includes(selectedOpp.status) ||
+          (targetStatus === 'NEGOTIATION' && selectedOpp.status === 'PROPOSAL')) {
+        await apiService.updateOpportunity(selectedOpp.id, { status: targetStatus });
+        setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: targetStatus } : o));
+      }
+
       setShowProposalEditor(false);
       setSelectedOpp(null);
     } catch (err) {
@@ -173,12 +200,10 @@ const CRMModule = ({
     try {
       await apiService.updateProposal(proposal.id, { status: 'ACCEPTED' });
       await apiService.updateOpportunity(proposal.opportunityId, { status: 'WON' });
-      
       setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'ACCEPTED' } : p));
       setOpportunities(prev => prev.map(o => o.id === proposal.opportunityId ? { ...o, status: 'WON' } : o));
-      
       alert('Tebrikler! Teklif kazanıldı. Sözleşme yönetimi modülüne yönlendiriliyorsunuz.');
-      if (setActiveTab) setActiveTab('contract');
+      if (setActiveTab) setActiveTab('contract-workflow');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
@@ -192,9 +217,37 @@ const CRMModule = ({
     try {
       await apiService.updateProposal(proposal.id, { status: 'REJECTED' });
       await apiService.updateOpportunity(proposal.opportunityId, { status: 'LOST' });
-      
       setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED' } : p));
       setOpportunities(prev => prev.map(o => o.id === proposal.opportunityId ? { ...o, status: 'LOST' } : o));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Teklif objesi olmadan direkt fırsat üzerinde kazanıldı/kaybedildi
+  const handleWonOpportunity = async (opp: Opportunity) => {
+    if (!window.confirm(`"${opp.title}" fırsatını KAZANILDI olarak işaretlemek istiyor musunuz?`)) return;
+    setLoading(true);
+    try {
+      await apiService.updateOpportunity(opp.id, { status: 'WON' });
+      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, status: 'WON' } : o));
+      alert('Tebrikler! Fırsat kazanıldı. Sözleşme yönetimi modülüne yönlendiriliyorsunuz.');
+      if (setActiveTab) setActiveTab('contract-workflow');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLostOpportunity = async (opp: Opportunity) => {
+    if (!window.confirm(`"${opp.title}" fırsatını KAYBEDİLDİ olarak işaretlemek istiyor musunuz?`)) return;
+    setLoading(true);
+    try {
+      await apiService.updateOpportunity(opp.id, { status: 'LOST' });
+      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, status: 'LOST' } : o));
     } catch (err) {
       alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
@@ -292,9 +345,18 @@ const CRMModule = ({
     setShowNewOpportunityModal(true);
   };
 
+  const PIPELINE_STAGES: Opportunity['status'][] = ['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON'];
+
+  const STATUS_LABEL: Record<string, string> = {
+    NEW: 'Yeni', CONTACTED: 'İletişimde', QUALIFIED: 'Nitelikli',
+    PROPOSAL: 'Teklif Aşaması', NEGOTIATION: 'Pazarlıkta',
+    WON: 'Kazanıldı', LOST: 'Kaybedildi',
+  };
+
   const getStatusStyle = (status: string) => {
     const styles: Record<string, string> = {
       'NEW': 'bg-blue-50 text-blue-600 border-blue-100',
+      'CONTACTED': 'bg-sky-50 text-sky-600 border-sky-100',
       'QUALIFIED': 'bg-primary/10 text-primary border-primary/20',
       'PROPOSAL': 'bg-amber-50 text-amber-600 border-amber-100',
       'NEGOTIATION': 'bg-purple-50 text-purple-600 border-purple-100',
@@ -304,44 +366,214 @@ const CRMModule = ({
     return styles[status] || 'bg-slate-50 text-slate-600 border-slate-100';
   };
 
+  const handleProgressStatus = async (opp: Opportunity, toStatus: Opportunity['status']) => {
+    try {
+      const updated = await apiService.updateOpportunity(opp.id, { status: toStatus });
+      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, ...updated, status: toStatus } : o));
+    } catch {
+      alert('Durum güncellenemedi.');
+    }
+  };
+
   const renderOpportunities = () => {
+    // Group by status for pipeline view
+    const grouped: Partial<Record<Opportunity['status'], Opportunity[]>> = {};
+    for (const stage of PIPELINE_STAGES) grouped[stage] = [];
+    grouped['LOST'] = [];
+    for (const opp of opportunitySearch.filteredItems) {
+      (grouped[opp.status] ?? []).push(opp);
+    }
+
+    const stageColors: Record<string, string> = {
+      NEW: 'border-t-blue-400', CONTACTED: 'border-t-sky-400',
+      QUALIFIED: 'border-t-primary', PROPOSAL: 'border-t-amber-400',
+      NEGOTIATION: 'border-t-purple-400', WON: 'border-t-emerald-500', LOST: 'border-t-red-400',
+    };
+
+    const allStages: Opportunity['status'][] = [...PIPELINE_STAGES, 'LOST'];
+
     return (
       <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar min-h-0">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Satış Boru Hattı</h3>
+            <p className="text-slate-400 text-sm font-medium mt-1">{opportunitySearch.filteredItems.length} fırsat · {opportunitySearch.filteredItems.filter(o => o.status !== 'LOST' && o.status !== 'WON').length} aktif</p>
           </div>
           <div className="flex items-center gap-4">
             <SaveButton onClick={handleSaveAll} loading={loading} />
             <PermissionGate permission="CRM_EDIT">
-              <button 
-                onClick={() => {
-                  opportunityForm.resetForm();
-                  setIsEditingOpp(false);
-                  setShowNewOpportunityModal(true);
-                }} 
-                className="bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all"
+              <button
+                onClick={() => { opportunityForm.resetForm(); setIsEditingOpp(false); setShowNewOpportunityModal(true); }}
+                className="flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all"
               >
                 <Plus size={18} /> Yeni Fırsat
               </button>
             </PermissionGate>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {opportunitySearch.filteredItems.map(opp => (
-            <motion.div layout key={opp.id} className="glass-panel p-8 rounded-[32px]">
-              <h5 className="font-black text-slate-900 text-lg">{opp.title}</h5>
-              <button 
-                onClick={() => { setHandOffTarget(opp); setShowHandOffModal(true); }}
-                className="mt-4 text-[10px] font-black uppercase tracking-widest text-primary"
-              >
-                Görev Aktar <GitBranch size={12} className="inline" />
-              </button>
-            </motion.div>
-          ))}
+
+        {/* Pipeline Progress Bar */}
+        <div className="flex items-center gap-0 overflow-x-auto pb-1">
+          {PIPELINE_STAGES.filter(s => s !== 'WON').map((stage, idx) => {
+            const count = (grouped[stage] ?? []).length;
+            const isActive = count > 0;
+            return (
+              <React.Fragment key={stage}>
+                <div className={cn(
+                  "flex-1 min-w-[80px] text-center py-2 px-3 text-[9px] font-black uppercase tracking-wider rounded-lg transition-all",
+                  isActive ? getStatusStyle(stage) : 'text-slate-300 bg-slate-50'
+                )}>
+                  {STATUS_LABEL[stage]}
+                  <span className="ml-1 opacity-70">({count})</span>
+                </div>
+                {idx < PIPELINE_STAGES.filter(s => s !== 'WON').length - 1 && (
+                  <ArrowRight size={12} className="text-slate-300 shrink-0 mx-0.5" />
+                )}
+              </React.Fragment>
+            );
+          })}
         </div>
+
+        {/* Cards grouped by stage */}
+        {allStages.filter(stage => (grouped[stage] ?? []).length > 0).map(stage => (
+          <div key={stage}>
+            <div className="flex items-center gap-3 mb-4">
+              <span className={cn("text-[10px] font-black uppercase tracking-widest px-3 py-1 rounded-full border", getStatusStyle(stage))}>
+                {STATUS_LABEL[stage]}
+              </span>
+              <span className="text-xs text-slate-400 font-bold">{(grouped[stage] ?? []).length} fırsat</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+              {(grouped[stage] ?? []).map(opp => {
+                const customer = customers.find(c => c.id === opp.customerId);
+                const oppProposals = proposals.filter(p => p.opportunityId === opp.id);
+                const latestProposal = oppProposals.length > 0
+                  ? [...oppProposals].sort((a, b) => (b.version || 0) - (a.version || 0))[0]
+                  : null;
+                const stageIdx = PIPELINE_STAGES.indexOf(opp.status);
+                const nextStage = stageIdx >= 0 && stageIdx < PIPELINE_STAGES.length - 1
+                  ? PIPELINE_STAGES[stageIdx + 1]
+                  : null;
+                return (
+                  <motion.div
+                    layout key={opp.id}
+                    className={cn("glass-panel p-6 rounded-[24px] border-t-4 flex flex-col gap-4 hover:shadow-xl transition-all", stageColors[opp.status] || 'border-t-slate-200')}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h5 className="font-black text-slate-900 text-sm leading-snug truncate">{opp.title}</h5>
+                        {customer && (
+                          <p className="text-[10px] text-slate-500 font-bold mt-0.5 flex items-center gap-1">
+                            <Building size={10} />{customer.name}
+                          </p>
+                        )}
+                      </div>
+                      <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border shrink-0", getStatusStyle(opp.status))}>
+                        {STATUS_LABEL[opp.status]}
+                      </span>
+                    </div>
+
+                    {opp.value > 0 && (
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-400 font-medium">Değer</span>
+                        <span className="font-black text-slate-800">{opp.value.toLocaleString('tr-TR')} {customer?.currency || ''}</span>
+                      </div>
+                    )}
+
+                    {opp.probability > 0 && (
+                      <div className="space-y-1">
+                        <div className="flex justify-between text-[10px] text-slate-400 font-bold">
+                          <span>Olasılık</span><span>{opp.probability}%</span>
+                        </div>
+                        <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-primary/60 rounded-full" style={{ width: `${opp.probability}%` }} />
+                        </div>
+                      </div>
+                    )}
+
+                    {latestProposal && (
+                      <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-bold">
+                        <FileSignature size={11} />
+                        Teklif v{latestProposal.version} ·{' '}
+                        <span className={cn("font-black", latestProposal.status === 'APPROVED' ? 'text-emerald-600' : latestProposal.status === 'REJECTED' ? 'text-red-500' : 'text-slate-500')}>
+                          {latestProposal.status === 'DRAFT' ? 'Taslak' : latestProposal.status === 'PENDING_APPROVAL' ? 'Onay Bekliyor' : latestProposal.status === 'APPROVED' ? 'Onaylandı' : latestProposal.status === 'SENT' ? 'Gönderildi' : latestProposal.status === 'ACCEPTED' ? 'Kabul Edildi' : latestProposal.status === 'REJECTED' ? 'Reddedildi' : latestProposal.status}
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+                      {nextStage && opp.status !== 'WON' && opp.status !== 'LOST' && (
+                        <button
+                          onClick={() => handleProgressStatus(opp, nextStage)}
+                          className="flex items-center gap-1 bg-primary/10 text-primary hover:bg-primary hover:text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          <ArrowRight size={11} /> {STATUS_LABEL[nextStage]}
+                        </button>
+                      )}
+                      {opp.status !== 'WON' && opp.status !== 'LOST' && (
+                        <button
+                          onClick={() => handleProgressStatus(opp, 'LOST')}
+                          className="flex items-center gap-1 bg-red-50 text-red-500 hover:bg-red-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          <XCircle size={11} /> Kaybedildi
+                        </button>
+                      )}
+                      {opp.status === 'LOST' && (
+                        <button
+                          onClick={() => handleProgressStatus(opp, 'NEW')}
+                          className="flex items-center gap-1 bg-blue-50 text-blue-500 hover:bg-blue-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                        >
+                          <ArrowRight size={11} /> Yeniden Aç
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setHandOffTarget(opp); setShowHandOffModal(true); }}
+                        className="flex items-center gap-1 text-slate-400 hover:text-primary px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-slate-50"
+                      >
+                        <GitBranch size={11} /> Aktar
+                      </button>
+                      <PermissionGate permission="CRM_EDIT">
+                        <button
+                          onClick={() => openEditOpportunity(opp)}
+                          className="flex items-center gap-1 text-slate-400 hover:text-slate-700 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all hover:bg-slate-50"
+                        >
+                          <Edit2 size={11} /> Düzenle
+                        </button>
+                      </PermissionGate>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+
+        {opportunitySearch.filteredItems.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-24 text-slate-400">
+            <Target size={48} className="mb-4 opacity-20" />
+            <p className="font-black text-sm uppercase tracking-widest">Henüz fırsat kaydı bulunmuyor</p>
+          </div>
+        )}
       </div>
     );
+  };
+
+  const getCustomerStats = (customerId: string) => {
+    const customerOpps = opportunities.filter(o => o.customerId === customerId);
+    const wonOpps = customerOpps.filter(o => o.status === 'WON');
+    const lostOpps = customerOpps.filter(o => o.status === 'LOST');
+    const activeOpps = customerOpps.filter(o => !['WON', 'LOST'].includes(o.status));
+
+    const getBestValue = (opp: Opportunity) => {
+      const oppProposals = proposals.filter(p => p.opportunityId === opp.id && p.totalPrice);
+      if (oppProposals.length === 0) return opp.value ?? 0;
+      return [...oppProposals].sort((a, b) => (b.version || 0) - (a.version || 0))[0].totalPrice!;
+    };
+
+    const wonValue = wonOpps.reduce((s, o) => s + getBestValue(o), 0);
+    const lostValue = lostOpps.reduce((s, o) => s + getBestValue(o), 0);
+
+    return { wonOpps, lostOpps, activeOpps, wonValue, lostValue, getBestValue };
   };
 
   const renderCustomers = () => (
@@ -433,6 +665,63 @@ const CRMModule = ({
                   {customer.creditLimit?.toLocaleString('tr-TR')} {customer.currency}
                 </span>
               </div>
+
+              {/* Won / Lost Stats */}
+              {(() => {
+                const stats = getCustomerStats(customer.id);
+                const hasAny = stats.wonOpps.length > 0 || stats.lostOpps.length > 0;
+                return (
+                  <button
+                    onClick={() => setCustomerReportTarget(customer)}
+                    className={cn(
+                      "w-full mt-4 pt-4 border-t border-slate-100 grid grid-cols-2 gap-3 text-left group/stat",
+                      hasAny ? "cursor-pointer hover:opacity-80 transition-opacity" : "cursor-default"
+                    )}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-emerald-600">
+                        <Trophy size={11} className="shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Kazanılan</span>
+                      </div>
+                      <p className="text-sm font-black text-slate-900">
+                        {stats.wonOpps.length} <span className="text-[10px] font-medium text-slate-400">proje</span>
+                      </p>
+                      {stats.wonValue > 0 && (
+                        <p className="text-[10px] font-bold text-emerald-600">
+                          {stats.wonValue >= 1_000_000
+                            ? `${(stats.wonValue / 1_000_000).toFixed(1)}M`
+                            : stats.wonValue >= 1_000
+                            ? `${(stats.wonValue / 1_000).toFixed(0)}K`
+                            : stats.wonValue.toLocaleString('tr-TR')} {customer.currency}
+                        </p>
+                      )}
+                    </div>
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1 text-red-400">
+                        <AlertTriangle size={11} className="shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Kaybedilen</span>
+                      </div>
+                      <p className="text-sm font-black text-slate-900">
+                        {stats.lostOpps.length} <span className="text-[10px] font-medium text-slate-400">fırsat</span>
+                      </p>
+                      {stats.lostValue > 0 && (
+                        <p className="text-[10px] font-bold text-red-400">
+                          {stats.lostValue >= 1_000_000
+                            ? `${(stats.lostValue / 1_000_000).toFixed(1)}M`
+                            : stats.lostValue >= 1_000
+                            ? `${(stats.lostValue / 1_000).toFixed(0)}K`
+                            : stats.lostValue.toLocaleString('tr-TR')} {customer.currency}
+                        </p>
+                      )}
+                    </div>
+                    {hasAny && (
+                      <div className="col-span-2 flex items-center justify-end gap-1 text-[9px] font-black text-primary uppercase tracking-widest opacity-0 group-hover/stat:opacity-100 transition-opacity">
+                        <BarChart2 size={10} /> Detay Rapor <ChevronRight size={10} />
+                      </div>
+                    )}
+                  </button>
+                );
+              })()}
             </motion.div>
           ))}
         </div>
@@ -450,25 +739,58 @@ const CRMModule = ({
         opp.technicalStatus === 'APPROVED' ||
         (opp.bomItems && opp.bomItems.length > 0) ||
         (opp.costItems && opp.costItems.length > 0);
+      // Presales BoM onay teklifleri bloklucu sayılmaz;
+      // sadece CRM'den oluşturulan gerçek müşteri teklifleri bloklucu.
+      const isBoMApproval = (p: Proposal) => {
+        try {
+          const c = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+          const obj = c as Record<string, unknown>;
+          return !!(
+            obj?.isBomApproval ||
+            (typeof obj?.description === 'string' && obj.description.startsWith('BoM bazlı'))
+          );
+        } catch { return false; }
+      };
+      // WON/LOST fırsatlar listede görünmemeli
+      if (opp.status === 'WON' || opp.status === 'LOST') return false;
       const hasBlockingProposal = proposals.some(p =>
         p.opportunityId === opp.id &&
-        p.status !== 'REJECTED'
+        ['DRAFT', 'PENDING_APPROVAL', 'APPROVED'].includes(p.status) &&
+        !isBoMApproval(p)
       );
       return hasCostAnalysis && !hasBlockingProposal;
     });
 
-    // SENT statüsündekiler ayrı listeye; kalanlar APPROVED önde gelecek şekilde sıralanır
-    const activeProposals = [...proposals.filter(p => p.status !== 'SENT')].sort((a, b) => {
+    // Aktif teklifler: ACCEPTED (kazanıldı) ve kaybedilen REJECTED'lar gösterilmez
+    const activeProposals = [...proposals.filter(p => {
+      if (p.status === 'SENT' || p.status === 'ACCEPTED') return false;
+      if (p.status === 'REJECTED') {
+        // Yönetici reddi → revize edilebilir, göster
+        // Kaybedilen anlaşma → fırsat LOST → gizle
+        const opp = opportunities.find(o => o.id === p.opportunityId);
+        return opp?.status !== 'LOST';
+      }
+      return true;
+    })].sort((a, b) => {
       if (a.status === 'APPROVED' && b.status !== 'APPROVED') return -1;
       if (a.status !== 'APPROVED' && b.status === 'APPROVED') return 1;
       return 0;
     });
-    const sentProposals = proposals.filter(p => p.status === 'SENT');
+
+    // Yollanan teklifler: WON veya LOST olan fırsatların teklifleri kaldırılır
+    const sentProposals = proposals.filter(p => {
+      if (p.status !== 'SENT') return false;
+      const opp = opportunities.find(o => o.id === p.opportunityId);
+      return opp?.status !== 'WON' && opp?.status !== 'LOST';
+    });
 
     const statusLabel = (s: string) => {
+      if (s === 'DRAFT') return 'TASLAK';
       if (s === 'PENDING_APPROVAL') return 'YÖNETİCİ ONAYINDA';
       if (s === 'REJECTED') return 'REDDEDİLDİ';
       if (s === 'APPROVED') return 'ONAYLANDI';
+      if (s === 'ACCEPTED') return 'MÜŞTERİ KABUL';
+      if (s === 'SENT') return 'GÖNDERİLDİ';
       return s;
     };
     const statusCls = (s: string) =>
@@ -483,20 +805,20 @@ const CRMModule = ({
           <h3 className="text-2xl font-black">Teklifler</h3>
         </div>
 
-        {/* Teklife Hazır Fırsatlar */}
-        {readyForProposalOpps.length > 0 && (
+        {/* Aktif Teklifler — teklif bekleyen fırsatlar + mevcut taslak/onay teklifleri */}
+        {(readyForProposalOpps.length > 0 || activeProposals.length > 0) && (
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
               <h4 className="text-sm font-black text-slate-600 uppercase tracking-widest">
-                Maliyet Analizi Tamamlanan Fırsatlar ({readyForProposalOpps.length})
+                Aktif Teklifler ({readyForProposalOpps.length + activeProposals.length})
               </h4>
             </div>
-            <div className="space-y-3">
+            <div className="space-y-4">
+              {/* 1. Maliyet analizi tamamlanmış, teklif henüz oluşturulmamış fırsatlar */}
               {readyForProposalOpps.map(opp => {
                 const cust = customers.find(c => c.id === opp.customerId);
                 const currency = cust?.currency ?? 'TRY';
-                // BoM toplamını hesapla; yoksa fırsat değerini göster
                 const bomTotal = opp.bomItems && opp.bomItems.length > 0
                   ? opp.bomItems.reduce((sum, item) => {
                       const sp = item.unitSalePrice
@@ -510,12 +832,15 @@ const CRMModule = ({
                 );
                 return (
                   <div
-                    key={opp.id}
+                    key={`ready-${opp.id}`}
                     className="glass-panel p-5 rounded-2xl border-l-4 border-emerald-400 flex items-center justify-between gap-4"
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-black text-slate-800 text-sm truncate">{opp.title}</h4>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 uppercase tracking-widest">
+                          Teklif Bekliyor
+                        </span>
                         {hasRejectedProposal && (
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-red-100 text-red-600 uppercase tracking-widest">
                             Önceki Reddedildi
@@ -532,27 +857,36 @@ const CRMModule = ({
                         )}
                       </div>
                     </div>
-                    <button
-                      onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
-                      className="shrink-0 flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-emerald-100"
-                    >
-                      <Plus size={13} />
-                      Yeni Teklif Oluştur
-                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        onClick={() => handleWonOpportunity(opp)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                        title="Teklif olmadan direkt kazanıldı işaretle"
+                      >
+                        <ThumbsUp size={12} />
+                        Kazanıldı
+                      </button>
+                      <button
+                        onClick={() => handleLostOpportunity(opp)}
+                        disabled={loading}
+                        className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 px-3 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                        title="Teklif olmadan direkt kaybedildi işaretle"
+                      >
+                        <ThumbsDown size={12} />
+                        Kaybedildi
+                      </button>
+                      <button
+                        onClick={() => { setSelectedOpp(opp); setShowProposalEditor(true); }}
+                        className="flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-md shadow-primary/20"
+                      >
+                        <Plus size={13} />
+                        Teklif Oluştur
+                      </button>
+                    </div>
                   </div>
                 );
               })}
-            </div>
-          </div>
-        )}
-
-        {/* Aktif Teklifler */}
-        {activeProposals.length > 0 && (
-          <div className="mb-8">
-            <h4 className="text-sm font-black text-slate-500 uppercase tracking-widest mb-4">
-              Aktif Teklifler ({activeProposals.length})
-            </h4>
-            <div className="space-y-4">
               {activeProposals.map(proposal => {
                 const opp = opportunities.find(o => o.id === proposal.opportunityId);
                 const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
@@ -638,6 +972,12 @@ const CRMModule = ({
                               setProposals(prev => prev.map(p =>
                                 p.id === proposal.id ? { ...p, status: 'SENT', content: newContent } : p
                               ));
+                              // Auto-advance opportunity to NEGOTIATION when proposal is sent
+                              const opp2 = opportunities.find(o => o.id === proposal.opportunityId);
+                              if (opp2 && !['NEGOTIATION', 'WON', 'LOST'].includes(opp2.status)) {
+                                await apiService.updateOpportunity(opp2.id, { status: 'NEGOTIATION' });
+                                setOpportunities(prev => prev.map(o => o.id === opp2.id ? { ...o, status: 'NEGOTIATION' } : o));
+                              }
                             } catch (err) {
                               alert('PDF oluşturulamadı: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
                             } finally {
@@ -702,23 +1042,42 @@ const CRMModule = ({
                           )}
                         </div>
                       </div>
-                      <label className="flex items-center gap-2 cursor-pointer select-none ml-6">
-                        <div
-                          onClick={() => handleMarkDelivered(proposal, !delivered)}
-                          className={cn(
-                            "relative w-10 h-5 rounded-full transition-colors cursor-pointer",
-                            delivered ? "bg-emerald-500" : "bg-slate-300"
-                          )}
+                      <div className="flex items-center gap-2 ml-4 shrink-0 flex-wrap justify-end">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <div
+                            onClick={() => handleMarkDelivered(proposal, !delivered)}
+                            className={cn(
+                              "relative w-10 h-5 rounded-full transition-colors cursor-pointer",
+                              delivered ? "bg-emerald-500" : "bg-slate-300"
+                            )}
+                          >
+                            <span className={cn(
+                              "absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform",
+                              delivered && "translate-x-5"
+                            )} />
+                          </div>
+                          <span className={cn("text-xs font-black uppercase whitespace-nowrap", delivered ? "text-emerald-600" : "text-slate-400")}>
+                            {delivered ? 'İletildi' : 'İletilmedi'}
+                          </span>
+                        </label>
+                        <div className="w-px h-6 bg-slate-200" />
+                        <button
+                          onClick={() => handleWonProposal(proposal)}
+                          disabled={loading}
+                          className="flex items-center gap-1.5 bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 shadow-sm shadow-emerald-200"
                         >
-                          <span className={cn(
-                            "absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform",
-                            delivered && "translate-x-5"
-                          )} />
-                        </div>
-                        <span className={cn("text-xs font-black uppercase whitespace-nowrap", delivered ? "text-emerald-600" : "text-slate-400")}>
-                          {delivered ? 'İletildi' : 'İletilmedi'}
-                        </span>
-                      </label>
+                          <ThumbsUp size={12} />
+                          Kazanıldı
+                        </button>
+                        <button
+                          onClick={() => handleLostProposal(proposal)}
+                          disabled={loading}
+                          className="flex items-center gap-1.5 bg-red-100 hover:bg-red-200 disabled:opacity-50 text-red-700 px-3 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all active:scale-95"
+                        >
+                          <ThumbsDown size={12} />
+                          Kaybedildi
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -749,7 +1108,11 @@ const CRMModule = ({
           items: content.items,
           terms: content.terms,
           description: content.description,
-          totalPrice: content.totalPrice
+          totalPrice: content.totalPrice,
+          marginMode: content.marginMode,
+          globalMargin: content.globalMargin,
+          currency: content.currency,
+          openForNegotiation: content.openForNegotiation,
         };
       } catch (e) {
         console.error("Failed to parse proposal content", e);
@@ -782,11 +1145,183 @@ const CRMModule = ({
           proposals={proposals}
           setActiveTab={setActiveTab} 
         />
-      ) : activeTab === 'crm-proposals' ? renderProposals() : 
-       activeTab === 'crm-customers' ? renderCustomers() : 
-       renderOpportunities()}
+      ) : activeTab === 'crm-opportunities' ? renderOpportunities() :
+       activeTab === 'crm-customers' ? renderCustomers() :
+       renderProposals()}
 
       <AnimatePresence>
+        {/* Customer Detail Report Modal */}
+        {customerReportTarget && (() => {
+          const cust = customerReportTarget;
+          const stats = getCustomerStats(cust.id);
+          const winRate = (stats.wonOpps.length + stats.lostOpps.length) > 0
+            ? Math.round((stats.wonOpps.length / (stats.wonOpps.length + stats.lostOpps.length)) * 100)
+            : null;
+          const fmtVal = (v: number) => v >= 1_000_000
+            ? `${(v / 1_000_000).toFixed(2)}M ${cust.currency}`
+            : v >= 1_000
+            ? `${(v / 1_000).toFixed(1)}K ${cust.currency}`
+            : `${v.toLocaleString('tr-TR')} ${cust.currency}`;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="glass-panel w-full max-w-2xl rounded-[40px] shadow-2xl bg-white flex flex-col max-h-[88vh] overflow-hidden"
+              >
+                {/* Header */}
+                <div className="p-8 border-b border-slate-100 flex items-start justify-between gap-4 shrink-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center shrink-0">
+                      <Building size={24} className="text-primary" />
+                    </div>
+                    <div>
+                      <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic leading-none">{cust.name}</h4>
+                      {cust.shortName && <p className="text-xs text-primary font-bold mt-0.5">{cust.shortName}</p>}
+                      {cust.industry && <p className="text-xs text-slate-400 font-medium">{cust.industry}</p>}
+                    </div>
+                  </div>
+                  <button onClick={() => setCustomerReportTarget(null)} className="p-3 hover:bg-slate-100 rounded-2xl transition-all shrink-0">
+                    <X size={20} />
+                  </button>
+                </div>
+
+                {/* Summary KPIs */}
+                <div className="grid grid-cols-3 gap-0 border-b border-slate-100 shrink-0">
+                  <div className="p-6 text-center border-r border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Trophy size={10} className="text-emerald-500" />Kazanılan</p>
+                    <p className="text-3xl font-black text-emerald-600 tracking-tighter">{stats.wonOpps.length}</p>
+                    {stats.wonValue > 0 && <p className="text-[11px] font-bold text-emerald-500 mt-0.5">{fmtVal(stats.wonValue)}</p>}
+                  </div>
+                  <div className="p-6 text-center border-r border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><AlertTriangle size={10} className="text-red-400" />Kaybedilen</p>
+                    <p className="text-3xl font-black text-red-500 tracking-tighter">{stats.lostOpps.length}</p>
+                    {stats.lostValue > 0 && <p className="text-[11px] font-bold text-red-400 mt-0.5">{fmtVal(stats.lostValue)}</p>}
+                  </div>
+                  <div className="p-6 text-center">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center justify-center gap-1"><Activity size={10} className="text-blue-500" />Kazanma Oranı</p>
+                    {winRate !== null
+                      ? <p className="text-3xl font-black text-blue-600 tracking-tighter">%{winRate}</p>
+                      : <p className="text-3xl font-black text-slate-300 tracking-tighter">—</p>}
+                    {stats.activeOpps.length > 0 && <p className="text-[11px] font-bold text-slate-400 mt-0.5">{stats.activeOpps.length} aktif fırsat</p>}
+                  </div>
+                </div>
+
+                {/* Detail lists */}
+                <div className="overflow-y-auto flex-1 custom-scrollbar p-8 space-y-8">
+                  {stats.wonOpps.length > 0 && (
+                    <div>
+                      <h5 className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Trophy size={13} /> Kazanılan Projeler / Fırsatlar
+                      </h5>
+                      <div className="space-y-3">
+                        {stats.wonOpps.map(opp => {
+                          const val = stats.getBestValue(opp);
+                          const oppProps = proposals.filter(p => p.opportunityId === opp.id);
+                          const latest = oppProps.length > 0 ? [...oppProps].sort((a, b) => (b.version||0)-(a.version||0))[0] : null;
+                          return (
+                            <div key={opp.id} className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-slate-900 truncate">{opp.title}</p>
+                                <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500 font-bold flex-wrap">
+                                  {opp.expectedCloseDate && (
+                                    <span className="flex items-center gap-1"><Calendar size={9} />{new Date(opp.expectedCloseDate).toLocaleDateString('tr-TR')}</span>
+                                  )}
+                                  {latest && <span>Teklif v{latest.version}</span>}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-black text-emerald-600">{fmtVal(val)}</p>
+                                <p className="text-[9px] font-black text-emerald-500 uppercase">Kazanıldı</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {stats.lostOpps.length > 0 && (
+                    <div>
+                      <h5 className="text-[10px] font-black text-red-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <AlertTriangle size={13} /> Kaybedilen Fırsatlar
+                      </h5>
+                      <div className="space-y-3">
+                        {stats.lostOpps.map(opp => {
+                          const val = stats.getBestValue(opp);
+                          const oppProps = proposals.filter(p => p.opportunityId === opp.id);
+                          const latest = oppProps.length > 0 ? [...oppProps].sort((a, b) => (b.version||0)-(a.version||0))[0] : null;
+                          return (
+                            <div key={opp.id} className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-red-50/60 border border-red-100">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-slate-900 truncate">{opp.title}</p>
+                                <div className="flex items-center gap-3 mt-1 text-[10px] text-slate-500 font-bold flex-wrap">
+                                  {opp.expectedCloseDate && (
+                                    <span className="flex items-center gap-1"><Calendar size={9} />{new Date(opp.expectedCloseDate).toLocaleDateString('tr-TR')}</span>
+                                  )}
+                                  {latest && <span>Teklif v{latest.version} · {latest.status === 'REJECTED' ? 'Reddedildi' : latest.status}</span>}
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-sm font-black text-red-500">{fmtVal(val)}</p>
+                                <p className="text-[9px] font-black text-red-400 uppercase">Kaybedildi</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {stats.activeOpps.length > 0 && (
+                    <div>
+                      <h5 className="text-[10px] font-black text-blue-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <Activity size={13} /> Aktif Fırsatlar
+                      </h5>
+                      <div className="space-y-3">
+                        {stats.activeOpps.map(opp => {
+                          const val = stats.getBestValue(opp);
+                          return (
+                            <div key={opp.id} className="flex items-center justify-between gap-4 p-4 rounded-2xl bg-blue-50/60 border border-blue-100">
+                              <div className="min-w-0">
+                                <p className="text-sm font-black text-slate-900 truncate">{opp.title}</p>
+                                <span className={cn("text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border inline-block mt-1", getStatusStyle(opp.status))}>
+                                  {STATUS_LABEL[opp.status] ?? opp.status}
+                                </span>
+                              </div>
+                              <div className="text-right shrink-0">
+                                {val > 0 && <p className="text-sm font-black text-slate-700">{fmtVal(val)}</p>}
+                                <p className="text-[9px] font-bold text-slate-400 uppercase">%{opp.probability} olasılık</p>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {stats.wonOpps.length === 0 && stats.lostOpps.length === 0 && stats.activeOpps.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-16 text-slate-300 gap-3">
+                      <BarChart2 size={40} className="opacity-30" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">Bu müşteriye ait fırsat kaydı bulunmuyor</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="p-6 border-t border-slate-100 shrink-0 flex justify-end">
+                  <button
+                    onClick={() => setCustomerReportTarget(null)}
+                    className="px-8 py-3 bg-slate-100 hover:bg-slate-200 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                  >
+                    Kapat
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          );
+        })()}
+
         {showImportWizard && (
           <CustomerImportWizard
             onClose={() => setShowImportWizard(false)}

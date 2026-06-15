@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 
 const router: Router = Router();
 
@@ -46,6 +46,29 @@ router.put('/:id/subscription', tenantMiddleware, asyncHandler(async (req: Reque
   });
 
   res.json(subscription);
+}));
+
+// ── Modül ayarları (GM only) ────────────────────────────────────────────────
+const GM = requireRole(['GENERAL_MANAGER']);
+
+router.get('/module-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  if (!tenant) return res.status(404).json({ error: 'Tenant bulunamadı.' });
+  try {
+    res.json(JSON.parse(tenant.moduleSettings || '{}'));
+  } catch {
+    res.json({});
+  }
+}));
+
+router.put('/module-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const { promotedModules } = req.body as { promotedModules: string[] };
+  if (!Array.isArray(promotedModules)) return res.status(400).json({ error: 'promotedModules array zorunlu.' });
+  const updated = await prisma.tenant.update({
+    where: { id: req.tenantId },
+    data: { moduleSettings: JSON.stringify({ promotedModules }) },
+  });
+  res.json(JSON.parse(updated.moduleSettings));
 }));
 
 export default router;

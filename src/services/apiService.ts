@@ -112,6 +112,18 @@ class ApiService {
   async getWorkflows() { return settingsService.getWorkflows(); }
   async createWorkflow(data: Omit<Workflow, 'id'>) { return settingsService.createWorkflow(data); }
   async updateWorkflow(id: string, data: Partial<Workflow>) { return settingsService.updateWorkflow(id, data); }
+
+  // --- MODULE SETTINGS ---
+  async getModuleSettings(): Promise<{ promotedModules: string[] }> {
+    return apiClient.fetchWithAuth('/tenants/module-settings');
+  }
+  async updateModuleSettings(promotedModules: string[]): Promise<{ promotedModules: string[] }> {
+    return apiClient.fetchWithAuth('/tenants/module-settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ promotedModules }),
+    });
+  }
 }
 
 export const apiService = new ApiService();

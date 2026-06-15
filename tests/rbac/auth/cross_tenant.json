@@ -1,0 +1,26 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "enflow_current_user_cmq484c3f0000jbw3z10ae4ex",
+          "value": "{\"id\":\"cmq48udhw0001grw3grvj8luw\",\"name\":\"ALİ MAL\",\"email\":\"ali.mal@enflow.com\",\"role\":\"SALES_REP\",\"permissions\":\"[\\\"DASHBOARD_VIEW\\\"]\",\"status\":\"ACTIVE\",\"tenantId\":\"cmq484c3f0000jbw3z10ae4ex\",\"unitId\":\"cmq48tl260000grw38g3mm1mq\",\"createdAt\":\"2026-06-07T20:37:49.652Z\",\"updatedAt\":\"2026-06-07T20:37:49.652Z\",\"tenant\":{\"id\":\"cmq484c3f0000jbw3z10ae4ex\",\"name\":\"ENFLOW MOCK LTD.\",\"createdAt\":\"2026-06-07T20:17:34.779Z\",\"updatedAt\":\"2026-06-07T20:17:34.779Z\"}}"
+        },
+        {
+          "name": "enflow_auth_token",
+          "value": "Y21xNDh1ZGh3MDAwMWdydzNncnZqOGx1dw=="
+        },
+        {
+          "name": "enflow_active_tenant_id",
+          "value": "cmq484c3f0000jbw3z10ae4ex"
+        },
+        {
+          "name": "enflow_theme",
+          "value": "light"
+        }
+      ]
+    }
+  ]
+}

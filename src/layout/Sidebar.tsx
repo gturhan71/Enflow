@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { 
+import {
   Zap,
   ChevronRight,
   LogOut,
-  Briefcase
+  ShieldCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
-import { 
-  NAV_ITEMS
-} from '../constants';
+import { NAV_ITEMS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 
 const Sidebar = ({ 
@@ -159,6 +157,28 @@ const Sidebar = ({
           );
         })}
       </nav>
+
+      {/* Test modules — GM only */}
+      {currentUser?.role === 'GENERAL_MANAGER' && (
+        <div className="px-4 pb-2">
+          <div className="border-t border-white/10 pt-3 mb-2">
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 px-2 mb-2">Test Ortamı</p>
+            <button
+              onClick={() => handleNavigate(() => setActiveTab('security-test'))}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 border",
+                activeTab === 'security-test'
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                  : "border-dashed border-amber-500/30 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-400"
+              )}
+            >
+              <ShieldCheck size={16} strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-widest flex-1 text-left">Güvenlik Testi</span>
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 font-black">TEST</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="p-6">
         <div className="glass-card rounded-[28px] p-5 flex items-center gap-4 border-white/40 bg-white/30 backdrop-blur-xl">

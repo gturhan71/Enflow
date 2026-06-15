@@ -150,6 +150,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
           items: properItems,
           totalPrice,
           description: `BoM bazlı maliyet teklifi — v${version}`,
+          isBomApproval: true,
           // Maliyet analizinde ayarlanan döviz/kur/marj bilgisi varsa taşı
           ...((opp as any).costConfig
             ? {

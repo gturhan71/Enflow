@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 
+const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
 
-router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.get('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     where: { tenantId: req.tenantId },
     include: { unit: true }
@@ -12,7 +13,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
   res.json(users);
 }));
 
-router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const { name, email, role, unitId, permissions } = req.body;
   const user = await prisma.user.create({
     data: {
@@ -25,7 +26,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
   res.json(user);
 }));
 
-router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const { name, email, role, unitId, permissions, status } = req.body;
   const tenantId = req.tenantId;
   const id = req.params.id as string;
@@ -41,7 +42,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   res.json(user);
 }));
 
-router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
   const id = req.params.id as string;
 

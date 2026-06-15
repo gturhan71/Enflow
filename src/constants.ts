@@ -1,10 +1,11 @@
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
+import React from 'react';
+import {
+  LayoutDashboard,
+  Users,
+  FileSearch,
+  FileText,
+  ShoppingCart,
+  Archive,
   Settings,
   Bell,
   Search,
@@ -24,7 +25,8 @@ import {
   ListTodo,
   Calendar,
   CreditCard,
-  Key
+  Key,
+  FlaskConical
 } from 'lucide-react';
 
 import { 
@@ -70,45 +72,63 @@ export const MOCK_TENANTS: Tenant[] = [
 ];
 
 export const NAV_ITEMS = [
+  // ── İş akışı sırasına göre düzenlenmiş ──────────────────────────────────
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
-  { id: 'subscription', label: 'Lisans & Abonelik', icon: CreditCard, requiredPermission: 'GENERAL_MANAGER' },
-  { id: 'license-gen', label: 'Lisans Üretici (Master)', icon: Key, requiredPermission: 'GENERAL_MANAGER' },
-  { 
-    id: 'crm', 
-    label: 'CRM & Müşteri', 
+  {
+    id: 'crm',
+    label: 'CRM & Müşteri',
     icon: Users,
     requiredPermission: 'CRM_VIEW',
     subItems: [
-      { id: 'crm-opportunities', label: 'Fırsatlar', requiredPermission: 'CRM_OPPS_VIEW' },
-      { id: 'crm-proposals', label: 'Teklifler', requiredPermission: 'CRM_PROPOSALS_VIEW' },
-      { id: 'crm-customers', label: 'Müşteriler', requiredPermission: 'CRM_CUSTOMERS_VIEW' },
-      { id: 'crm-negotiation', label: 'Canlı Pazarlıklar', requiredPermission: 'CRM_OPPS_VIEW' }
-    ]
+      { id: 'crm-opportunities', label: 'Fırsatlar',        requiredPermission: 'CRM_OPPS_VIEW' },
+      { id: 'crm-proposals',    label: 'Teklifler',          requiredPermission: 'CRM_PROPOSALS_VIEW' },
+      { id: 'crm-customers',    label: 'Müşteriler',         requiredPermission: 'CRM_CUSTOMERS_VIEW' },
+      { id: 'crm-negotiation',  label: 'Canlı Pazarlıklar',  requiredPermission: 'CRM_OPPS_VIEW' },
+    ],
   },
-  { id: 'presales', label: 'Presales & Dizayn', icon: FileSearch, requiredPermission: 'PRESALES_VIEW' },
-  { id: 'sales-support', label: 'Satış Destek', icon: FileCheck, requiredPermission: 'SALES_SUPPORT_VIEW' },
-  { id: 'procurement', label: 'Satın Alma', icon: ShoppingCart, requiredPermission: 'PROCUREMENT_VIEW' },
-  { id: 'archive', label: 'Fiziksel Arşiv', icon: Archive, requiredPermission: 'ARCHIVE_VIEW' },
-  { id: 'documents', label: 'Şirket Evrakları', icon: FileText, requiredPermission: 'DOCUMENTS_VIEW' },
-  { id: 'cost-analysis', label: 'Maliyet Analizi', icon: BarChart3, requiredPermission: 'COST_ANALYSIS_VIEW' },
-  { id: 'contracts', label: 'Sözleşme Yönetimi', icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
-  { id: 'project-mgmt', label: 'Proje Yönetimi', icon: Kanban, requiredPermission: 'PROJECT_MGMT_VIEW' },
-  { id: 'todo', label: 'Görevler & Takip', icon: ListTodo, requiredPermission: 'TODO_VIEW' },
-  { 
-    id: 'settings', 
-    label: 'Şirket Ayarları', 
+  {
+    id: 'presales',
+    label: 'Presales & Dizayn',
+    icon: FileSearch,
+    requiredPermission: 'PRESALES_VIEW',
+    subItems: [
+      { id: 'presales-bom',  label: 'BoM & Tasarım',    requiredPermission: 'PRESALES_VIEW' },
+      { id: 'presales-cost', label: 'Maliyet Analizi',   requiredPermission: 'COST_ANALYSIS_VIEW' },
+    ],
+  },
+  { id: 'sales-support',     label: 'Satış Destek',       icon: FileCheck,    requiredPermission: 'SALES_SUPPORT_VIEW' },
+  { id: 'contract-workflow', label: 'Sözleşme Yönetimi',  icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
+  { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
+  { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
+  { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
+  { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
+  { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },
+  {
+    id: 'settings',
+    label: 'Şirket Ayarları',
     icon: Settings,
     requiredPermission: 'SETTINGS_VIEW',
     subItems: [
-      { id: 'settings-company', label: 'Şirket Profili', requiredPermission: 'SETTINGS_COMPANY' },
-      { id: 'settings-units', label: 'Birimler', requiredPermission: 'SETTINGS_UNITS' },
-      { id: 'settings-users', label: 'Kullanıcılar', requiredPermission: 'SETTINGS_USERS' },
-      { id: 'settings-workflow', label: 'İş Akışı Yapılandırması', requiredPermission: 'SETTINGS_PERMISSIONS' },
-      { id: 'settings-permissions', label: 'Yetkiler', requiredPermission: 'SETTINGS_PERMISSIONS' },
-      { id: 'settings-integrations', label: 'Entegrasyonlar', requiredPermission: 'SETTINGS_INTEGRATIONS' }
-    ]
+      { id: 'settings-company',      label: 'Şirket Profili',         requiredPermission: 'SETTINGS_COMPANY' },
+      { id: 'settings-units',        label: 'Birimler',               requiredPermission: 'SETTINGS_UNITS' },
+      { id: 'settings-users',        label: 'Kullanıcılar',           requiredPermission: 'SETTINGS_USERS' },
+      { id: 'settings-workflow',     label: 'İş Akışı',               requiredPermission: 'SETTINGS_PERMISSIONS' },
+      { id: 'settings-permissions',  label: 'Yetkiler',               requiredPermission: 'SETTINGS_PERMISSIONS' },
+      { id: 'settings-integrations', label: 'Entegrasyonlar',         requiredPermission: 'SETTINGS_INTEGRATIONS' },
+      { id: 'settings-subscription', label: 'Abonelik & Lisans',      requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-modules',      label: 'Modüller',               requiredPermission: 'GENERAL_MANAGER' },
+    ],
   },
 ];
+
+// Test Ortamı'ndan ana sidebar'a tanıtılabilecek modüller
+// (yeni bir beta modül geliştirildikçe buraya eklenir)
+export const PROMOTABLE_TEST_MODULES: {
+  id: string;
+  label: string;
+  icon: React.ComponentType<{ size?: number; className?: string; strokeWidth?: number }>;
+  description: string;
+}[] = [];
 
 export const MOCK_CUSTOMERS = [
   { id: 'c1', name: 'Global Bank A.Ş.', industry: 'Finance', riskScore: 12, contactPerson: 'Ahmet Yılmaz', email: 'ahmet@globalbank.com' },

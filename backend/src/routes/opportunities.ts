@@ -1,7 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware, withRetry } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
 
+const GM = requireRole(['GENERAL_MANAGER']);
+const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
@@ -9,10 +11,15 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     where: { tenantId: req.tenantId },
     include: { customer: true, assignedTo: true, createdBy: true, bomItems: true, costItems: true }
   });
-  res.json(opps);
+  // costConfig JSON string'ini parse ederek nesne olarak gönder
+  const parsed = opps.map((o: any) => ({
+    ...o,
+    costConfig: o.costConfig ? (() => { try { return JSON.parse(o.costConfig); } catch { return undefined; } })() : undefined,
+  }));
+  res.json(parsed);
 }));
 
-router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
   const { title, value, probability, customerId, assignedToId, description, expectedCloseDate, status } = req.body;
   const tenantId = req.tenantId;
 
@@ -45,7 +52,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, description, status, expectedCloseDate, updatedBy } = req.body;
+  const { title, value, probability, customerId, description, status, expectedCloseDate, updatedBy, technicalStatus, costConfig } = req.body;
   const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
 
@@ -60,6 +67,8 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (status !== undefined) updateData.status = status;
   if (expectedCloseDate !== undefined) updateData.expectedCloseDate = new Date(expectedCloseDate as string);
   if (customerId !== undefined) updateData.customerId = customerId;
+  if (technicalStatus !== undefined) updateData.technicalStatus = technicalStatus;
+  if (costConfig !== undefined) updateData.costConfig = typeof costConfig === 'string' ? costConfig : JSON.stringify(costConfig);
 
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },
@@ -101,6 +110,8 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
       const cost = parseFloat(String(item.cost || item.purchaseCost)) || 0;
       const margin = parseFloat(String(item.margin || item.marginPercentage)) || 15;
 
+      const unitSalePrice = item.unitSalePrice !== undefined ? parseFloat(String(item.unitSalePrice)) : undefined;
+      const totalSalePrice = item.totalSalePrice !== undefined ? parseFloat(String(item.totalSalePrice)) : undefined;
       const newItem = await tx.boMItem.create({
         data: {
           opportunityId,
@@ -109,6 +120,10 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
           quantity: qty,
           purchaseCost: cost,
           marginPercentage: margin,
+          ...(unitSalePrice !== undefined && { unitSalePrice }),
+          ...(totalSalePrice !== undefined && { totalSalePrice }),
+          ...(item.currency ? { currency: String(item.currency) } : {}),
+          ...(item.source ? { source: String(item.source) } : {}),
           vendor: String(item.vendor || '')
         }
       });
@@ -135,7 +150,8 @@ router.post('/:id/costs', tenantMiddleware, asyncHandler(async (req: Request, re
           tenantId,
           description: item.description,
           category: item.category,
-          amount: parseFloat(String(item.amount)) || 0
+          amount: parseFloat(String(item.amount)) || 0,
+          ...(item.currency ? { currency: String(item.currency) } : {})
         }
       });
       created.push(createdItem);
@@ -191,7 +207,7 @@ router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: 
   res.json({ message: 'Teklif onay sürecine gönderildi.' });
 }));
 
-router.post('/:id/approve', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
   const tenantId = req.tenantId;
   const { note } = req.body;

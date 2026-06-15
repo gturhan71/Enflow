@@ -7,10 +7,11 @@ datasource db {
 }
 
 model Tenant {
-  id            String        @id @default(cuid())
-  name          String
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id             String        @id @default(cuid())
+  name           String
+  moduleSettings String        @default("{}")
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
   subscription  Subscription?
   usageMetrics  UsageMetric[]
   customers     Customer[]
@@ -23,8 +24,9 @@ model Tenant {
   archiveItems  ArchiveItem[]
   documents     CorporateDocument[]
   workflows     Workflow[]
-  costItems     CostItem[]
-  proposals     Proposal[]
+  costItems          CostItem[]
+  proposals          Proposal[]
+  contractWorkflows  ContractWorkflow[]
 }
 
 enum SubscriptionPlan {
@@ -128,6 +130,7 @@ model Opportunity {
   description       String?
   technicalStatus   String        @default("PENDING")
   bomStatus         String        @default("DRAFT")
+  costConfig        String?       // JSON: { baseCurrency, rates, marginMode, globalMargin }
   tenantId          String
   customerId        String
   assignedToId      String
@@ -166,6 +169,10 @@ model BoMItem {
   quantity         Int
   purchaseCost     Float
   marginPercentage Float
+  unitSalePrice    Float?
+  totalSalePrice   Float?
+  currency         String?
+  source           String?
   vendor           String?
   opportunityId    String
   createdAt        DateTime    @default(now())
@@ -178,6 +185,7 @@ model CostItem {
   description     String
   category        String      // LABOR, LOGISTICS, TRAVEL, OTHER
   amount          Float
+  currency        String?
   opportunityId   String
   tenantId        String
   createdAt       DateTime    @default(now())
@@ -330,4 +338,50 @@ model WorkflowStep {
   nextStepId  String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+// ── CONTRACT WORKFLOW (TEST MODULE) ─────────────────────────────────────────
+
+model ContractWorkflow {
+  id              String                @id @default(cuid())
+  title           String
+  opportunityId   String?
+  contractId      String?
+  contractValue   Float                 @default(0)
+  tenderName      String?               // İhale adı (SalesSupport'tan veya manuel)
+  tenderNo        String?               // İKN - İhale Kayıt Numarası
+  projectName     String?               // Şartnameden AI tarafından çıkarılan proje adı
+  contractText    String?
+  specText        String?
+  aiAnalysis      String?               // JSON
+  status          String                @default("DRAFT")
+  // DRAFT | ANALYSIS_DONE | PREPARATION | READY_TO_SIGN | SIGNED | TRANSFERRED
+  signedDate      DateTime?
+  deadline        DateTime?
+  notes           String?
+  tenantId        String
+  tenant          Tenant                @relation(fields: [tenantId], references: [id])
+  documents       ContractWorkflowDoc[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+}
+
+model ContractWorkflowDoc {
+  id            String           @id @default(cuid())
+  workflowId    String
+  workflow      ContractWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  name          String
+  docType       String           // TAX | BANK | LEGAL | FIRM_CERT | SPEC | ADMIN | OTHER
+  description   String?
+  deadline      DateTime?
+  status        String           @default("PENDING")
+  // PENDING | IN_PROGRESS | UPLOADED | VERIFIED | WAIVED
+  fileUrl       String?
+  isRequired    Boolean          @default(true)
+  isAiGenerated Boolean          @default(false)
+  sortOrder     Int              @default(0)
+  notes         String?
+  tenantId      String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 }

@@ -15,7 +15,6 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useQueryClient } from '@tanstack/react-query';
 import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem, CostConfig } from '../types';
 import { apiService } from '../services/apiService';
@@ -46,11 +45,11 @@ const CostAnalysisModule = ({
   setActiveTab?: (tab: string) => void;
   tenantId?: string;
 }) => {
-  const queryClient = useQueryClient();
 
   // ── Fırsat seçimi ─────────────────────────────────────────────────────────
   const [selectedOppId, setSelectedOppId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   // ── Maliyet verileri ──────────────────────────────────────────────────────
   const [costItems, setCostItems] = useState<Partial<CostItem>[]>([]);
@@ -185,7 +184,7 @@ const CostAnalysisModule = ({
       await Promise.allSettled([
         apiService.saveCostItems(selectedOppId, costItems as CostItem[]),
         apiService.saveBoMItems(selectedOppId, bomWithPrices),
-        apiService.updateOpportunity(selectedOppId, { technicalStatus: 'APPROVED' }),
+        apiService.updateOpportunity(selectedOppId, { technicalStatus: 'APPROVED', costConfig }),
       ]);
 
       const updatedOpp = (prev: Opportunity): Opportunity => ({
@@ -196,15 +195,15 @@ const CostAnalysisModule = ({
         costConfig,
       });
 
-      queryClient.setQueryData(
-        ['opportunities', tenantId ?? ''],
-        (old: Opportunity[] | undefined) =>
-          old ? old.map(o => (o.id === selectedOppId ? updatedOpp(o) : o)) : old,
-      );
+      // Önce local state'i güncelle — queryClient.setQueryData kullanılmıyor,
+      // çünkü bu App.tsx'deki useEffect(opportunitiesData) zincirini tetikleyerek
+      // state'i eski sunucu verisiyle ezip override edebilir.
       setOpportunities(prev => prev.map(o => (o.id === selectedOppId ? updatedOpp(o) : o)));
-
-      alert('Analiz başarıyla kaydedildi.');
-      if (setActiveTab) setTimeout(() => setActiveTab('crm-proposals'), 600);
+      setSaveSuccess(true);
+      setTimeout(() => setSaveSuccess(false), 3000);
+      // setActiveTab ayrı bir setTimeout içinde — state commit edildikten sonra
+      // (aynı batch içinde olsaydı CRMModule eski opportunities ile render edilebilirdi)
+      if (setActiveTab) setTimeout(() => setActiveTab('crm-proposals'), 0);
     } finally {
       setLoading(false);
     }
@@ -213,6 +212,21 @@ const CostAnalysisModule = ({
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
+
+      {/* Kayıt başarı bildirimi */}
+      <AnimatePresence>
+        {saveSuccess && (
+          <motion.div
+            initial={{ opacity: 0, y: -16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -16 }}
+            className="fixed top-6 right-6 z-50 bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2"
+          >
+            <Save size={14} />
+            Analiz başarıyla kaydedildi. Teklifler sayfasına yönlendiriliyorsunuz…
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Başlık + fırsat seçici */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">

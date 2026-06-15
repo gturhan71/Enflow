@@ -64,9 +64,12 @@ const NegotiationModule = ({
     return currentUser?.role === 'GENERAL_MANAGER';
   }, [currentUser]);
 
-  // Filter proposals marked as "Pazarlığa Açık"
+  // Filter proposals marked as "Pazarlığa Açık" — exclude if linked opportunity is WON or LOST
   const openProposals = useMemo(() => {
     return proposals.filter(p => {
+      const opp = opportunities.find(o => o.id === p.opportunityId);
+      if (opp && (opp.status === 'WON' || opp.status === 'LOST')) return false;
+
       if (p.openForNegotiation === true) return true;
       if (p.content) {
         try {
@@ -78,7 +81,7 @@ const NegotiationModule = ({
       }
       return false;
     });
-  }, [proposals]);
+  }, [proposals, opportunities]);
 
   const [selectedProposalId, setSelectedProposalId] = useState('');
   const [selectedOppId, setSelectedOppId] = useState('');
@@ -581,9 +584,18 @@ const NegotiationModule = ({
                   priceVal = content.totalPrice || priceVal;
                 } catch (e) {}
               }
+              let currency = 'USD';
+              if (p.content) {
+                try {
+                  const c = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+                  currency = c.currency || currency;
+                } catch { /* ignore */ }
+              }
+              const currSym: Record<string, string> = { USD: '$', EUR: '€', TRY: '₺' };
+              const sym = currSym[currency] || currency;
               return (
                 <option key={p.id} value={p.id}>
-                  {oppTitle} (V{p.version} - ${priceVal?.toLocaleString()})
+                  {oppTitle} — V{p.version} — {sym}{priceVal?.toLocaleString('tr-TR')}
                 </option>
               );
             })}
@@ -888,17 +900,32 @@ const NegotiationModule = ({
             )}
 
             {chatState === 'FAILED' && (
-              <div className="p-8 border-t border-slate-100 bg-red-500/5 flex items-center justify-between">
+              <div className="p-8 border-t border-slate-100 bg-red-500/5 flex items-center justify-between gap-4 flex-wrap">
                 <div>
                   <h6 className="font-black text-red-600 text-md uppercase italic tracking-tighter">Masa Dağıldı</h6>
                   <p className="text-xs font-medium text-slate-500">Müşteri teklifi reddetti ve müzakereyi sonlandırdı.</p>
                 </div>
-                <button 
-                  onClick={startChatSim}
-                  className="bg-red-500 text-white px-8 py-4 rounded-2xl text-xs font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
-                >
-                  MÜZAKEREYİ YENİDEN BAŞLAT
-                </button>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <button
+                    onClick={async () => {
+                      if (!selectedOpp) return;
+                      try {
+                        await apiService.updateOpportunity(selectedOpp.id, { status: 'LOST' });
+                        setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'LOST' } : o));
+                        alert('Fırsat KAYBEDİLDİ olarak işaretlendi.');
+                      } catch { alert('Durum güncellenemedi.'); }
+                    }}
+                    className="bg-slate-700 text-white px-6 py-3 rounded-2xl text-xs font-black hover:bg-slate-800 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
+                  >
+                    <XCircle size={13} /> Kaybedildi Olarak İşaretle
+                  </button>
+                  <button
+                    onClick={startChatSim}
+                    className="bg-red-500 text-white px-8 py-4 rounded-2xl text-xs font-black shadow-lg shadow-red-500/20 hover:bg-red-600 transition-all flex items-center gap-2 active:scale-95 uppercase tracking-widest"
+                  >
+                    MÜZAKEREYİ YENİDEN BAŞLAT
+                  </button>
+                </div>
               </div>
             )}
 

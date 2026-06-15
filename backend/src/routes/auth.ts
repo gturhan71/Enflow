@@ -8,7 +8,9 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   const { email } = req.body;
   const user = await prisma.user.findUnique({ where: { email }, include: { tenant: true } });
   if (!user) return res.status(401).json({ error: 'Geçersiz bilgiler.' });
-  res.json({ user, token: 'mock-jwt-token' });
+  // Token: base64(userId) — tenantMiddleware bu token'ı çözerek IDOR kontrolü yapar.
+  const token = Buffer.from(user.id).toString('base64');
+  res.json({ user, token });
 }));
 
 router.post('/forgot-password', asyncHandler(async (req: Request, res: Response) => {

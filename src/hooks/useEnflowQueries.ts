@@ -93,6 +93,15 @@ export const useProposals = (tenantId: string, options: { enabled?: boolean; sta
   });
 };
 
+export const useModuleSettings = (tenantId: string) => {
+  return useQuery({
+    queryKey: ['module-settings', tenantId],
+    queryFn: () => apiService.getModuleSettings(),
+    staleTime: 60 * 1000,
+    enabled: !!tenantId,
+  });
+};
+
 // --- MUTATION HOOKS ---
 
 export const useApproveProposalMutation = () => {

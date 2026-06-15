@@ -28,7 +28,7 @@ import {
   Cell
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import { Opportunity, Project, TodoTask, Contract } from '../types';
+import { Opportunity, Project, TodoTask, Contract, Unit, Proposal } from '../types';
 
 interface KPI {
   label: string;
@@ -90,17 +90,21 @@ const KPICard = React.memo(({ kpi, index }: { kpi: KPI, index: number }) => (
   </motion.div>
 ));
 
-const Dashboard = ({ 
-  opportunities = [], 
-  projects = [], 
+const Dashboard = ({
+  opportunities = [],
+  projects = [],
   tasks = [],
   contracts = [],
+  units = [],
+  proposals = [],
   onApproveProposal
-}: { 
-  opportunities: Opportunity[], 
-  projects: Project[], 
+}: {
+  opportunities: Opportunity[],
+  projects: Project[],
   tasks: TodoTask[],
   contracts?: Contract[],
+  units?: Unit[],
+  proposals?: Proposal[],
   onApproveProposal?: (id: string) => void
 }) => {
   const { currentUser } = useAuth();
@@ -122,45 +126,91 @@ const Dashboard = ({
   
   // Optimization: useMemo for expensive calculations
   const kpis = useMemo(() => {
+    // Build best proposal value per opportunity (prefer highest-ranked status, then highest version)
+    const STATUS_RANK: Record<string, number> = { APPROVED: 4, ACCEPTED: 3, SENT: 2, PENDING_APPROVAL: 1, DRAFT: 0, REJECTED: -1 };
+    type BestEntry = { rank: number; version: number; price: number };
+    const bestByOppId: Record<string, BestEntry> = {};
+    for (const p of proposals) {
+      if (!p.opportunityId || !p.totalPrice) continue;
+      const rank = STATUS_RANK[p.status] ?? 0;
+      const version = p.version ?? 0;
+      const cur = bestByOppId[p.opportunityId];
+      if (!cur || rank > cur.rank || (rank === cur.rank && version > cur.version)) {
+        bestByOppId[p.opportunityId] = { rank, version, price: p.totalPrice };
+      }
+    }
+    const bestProposalByOppId: Record<string, number> = Object.fromEntries(
+      Object.entries(bestByOppId).map(([id, e]) => [id, e.price])
+    );
+    const getOppValue = (o: Opportunity) => bestProposalByOppId[o.id] ?? o.value ?? 0;
+
     const activeOpps = opportunities.filter(o => o.status !== 'LOST' && o.status !== 'WON');
     const lostOpps = opportunities.filter(o => o.status === 'LOST');
-    
-    const totalPipelineValue = activeOpps.reduce((sum, o) => sum + (o.value || 0), 0);
-    const weightedValue = activeOpps.reduce((sum, o) => sum + ((o.value || 0) * ((o.probability || 0) / 100)), 0);
-    const lostValue = lostOpps.reduce((sum, o) => sum + (o.value || 0), 0);
+    const wonOpps = opportunities.filter(o => o.status === 'WON');
+
+    const totalPipelineValue = activeOpps.reduce((sum, o) => sum + getOppValue(o), 0);
+    const lostValue = lostOpps.reduce((sum, o) => sum + getOppValue(o), 0);
+    const wonValue = wonOpps.reduce((sum, o) => sum + getOppValue(o), 0);
     const activeProjects = projects.filter(p => ['IN_PROGRESS', 'NOT_STARTED'].includes(p.status)).length;
 
+    const fmtVal = (v: number) => v >= 1_000_000
+      ? `${(v / 1_000_000).toFixed(1)}M`
+      : v >= 1_000
+      ? `${(v / 1_000).toFixed(0)}K`
+      : v.toFixed(0);
+
     return [
-      { label: 'Toplam Pipeline', value: `${(totalPipelineValue / 1000000).toFixed(1)}M $`, sub: 'Aktif Fırsat Değeri', icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-500/10', glowBg: 'bg-emerald-500' },
-      { label: 'Kaybedilen Değer', value: `${(lostValue / 1000000).toFixed(1)}M $`, sub: 'Pipedan Düşen', icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', glowBg: 'bg-red-500' },
+      { label: 'Toplam Pipeline', value: fmtVal(totalPipelineValue), sub: `${activeOpps.length} Aktif Fırsat`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-500/10', glowBg: 'bg-emerald-500' },
+      { label: 'Kazanılan Değer', value: fmtVal(wonValue), sub: `${wonOpps.length} Kazanılan Fırsat`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-500/10', glowBg: 'bg-blue-500' },
       { label: 'Aktif Projeler', value: activeProjects, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-500/10', glowBg: 'bg-purple-500' },
-      { label: 'Ağırlıklı Değer', value: `${(weightedValue / 1000000).toFixed(1)}M $`, sub: 'Olasılık Bazlı Tahmin', icon: Target, color: 'text-blue-600', bg: 'bg-blue-500/10', glowBg: 'bg-blue-500' },
+      { label: 'Kaybedilen Değer', value: fmtVal(lostValue), sub: `${lostOpps.length} Kaybedilen Fırsat`, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', glowBg: 'bg-red-500' },
     ];
-  }, [opportunities, projects]);
+  }, [opportunities, projects, proposals]);
 
   const approvalQueue = useMemo(() => 
     opportunities.filter(o => o.technicalStatus === 'WAITING_APPROVAL'),
     [opportunities]
   );
 
-  const pipelineChartData = useMemo(() => [
-    { name: 'Yeni', value: opportunities.filter(o => o.status === 'NEW').length },
-    { name: 'Nitelikli', value: opportunities.filter(o => o.status === 'QUALIFIED').length },
-    { name: 'Teklif', value: opportunities.filter(o => o.status === 'PROPOSAL').length },
-    { name: 'Pazarlık', value: opportunities.filter(o => o.status === 'NEGOTIATION').length },
-    { name: 'Kazanıldı', value: opportunities.filter(o => o.status === 'WON').length },
-  ], [opportunities]);
+  const liveNegotiationCount = useMemo(() => {
+    const oppIds = new Set(
+      proposals.filter(p => {
+        if (p.openForNegotiation === true) return true;
+        try {
+          const c = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+          return (c as Record<string, unknown>)?.openForNegotiation === true;
+        } catch { return false; }
+      }).map(p => p.opportunityId)
+    );
+    return oppIds.size;
+  }, [proposals]);
+
+  const pipelineChartData = useMemo(() => {
+    const rows = [
+      { name: 'Yeni',         value: opportunities.filter(o => o.status === 'NEW').length,         grad: 'url(#barPrimary)' },
+      { name: 'İletişimde',   value: opportunities.filter(o => o.status === 'CONTACTED').length,   grad: 'url(#barBlue)' },
+      { name: 'Nitelikli',    value: opportunities.filter(o => o.status === 'QUALIFIED').length,    grad: 'url(#barPurple)' },
+      { name: 'Teklif',       value: opportunities.filter(o => o.status === 'PROPOSAL').length,     grad: 'url(#barOrange)' },
+      { name: 'Pazarlık',     value: opportunities.filter(o => o.status === 'NEGOTIATION').length,  grad: 'url(#barEmerald)' },
+      ...(liveNegotiationCount > 0
+        ? [{ name: 'Canlı Pazarlık', value: liveNegotiationCount, grad: 'url(#barLive)' }]
+        : []),
+      { name: 'Kazanıldı',   value: opportunities.filter(o => o.status === 'WON').length,          grad: 'url(#barWon)' },
+      { name: 'Kaybedildi',  value: opportunities.filter(o => o.status === 'LOST').length,         grad: 'url(#barLost)' },
+    ];
+    return rows;
+  }, [opportunities, liveNegotiationCount]);
 
   const developments = useMemo(() => {
     const list: DevelopmentItem[] = [];
-    
+
     // Add signed contracts
     opportunities.forEach(opp => {
       const contract = contracts.find(c => c.opportunityId === opp.id);
       if (contract && contract.status === 'SIGNED') {
         list.push({
           id: `dev-contract-${contract.id}`,
-          title: `Sözleşme İmzalandı`,
+          title: 'Sözleşme İmzalandı',
           description: `"${opp.title}" fırsatı için sözleşme imzalanarak Proje Yönetimine devredildi.`,
           date: contract.signedDate || 'Canlı Güncelleme',
           icon: FileSignature,
@@ -169,40 +219,46 @@ const Dashboard = ({
       }
     });
 
-    // Add active PM/Procurement tasks
-    tasks.filter(t => ['u3', 'u4'].includes(t.unitId)).forEach(task => {
-      const icon = task.unitId === 'u3' ? ShoppingCart : Kanban;
-      const unitLabel = task.unitId === 'u3' ? 'Satın Alma' : 'Proje Yönetimi';
+    // Match procurement/PM unit IDs by name keywords (DB IDs are cuid, not hardcoded)
+    const procurementIds = new Set(
+      units.filter(u => /satın|lojistik|procurement/i.test(u.name)).map(u => u.id)
+    );
+    const pmIds = new Set(
+      units.filter(u => /proje|yönetim|project/i.test(u.name)).map(u => u.id)
+    );
+
+    tasks.filter(t => procurementIds.has(t.unitId) || pmIds.has(t.unitId)).forEach(task => {
+      const isProcurement = procurementIds.has(task.unitId);
+      const unitName = units.find(u => u.id === task.unitId)?.name || (isProcurement ? 'Satın Alma' : 'Proje Yönetimi');
       list.push({
         id: `dev-task-${task.id}`,
         title: task.title,
-        description: `Birim: ${unitLabel} | Durum: ${task.status === 'COMPLETED' ? 'Tamamlandı' : 'Bekliyor'} | ${task.description || ''}`,
+        description: `Birim: ${unitName} | Durum: ${task.status === 'COMPLETED' ? 'Tamamlandı' : 'Bekliyor'} | ${task.description || ''}`,
         date: task.dueDate || 'Termin Belirtilmedi',
-        icon: icon,
+        icon: isProcurement ? ShoppingCart : Kanban,
         color: task.status === 'COMPLETED' ? 'text-emerald-600 bg-emerald-500/10' : 'text-amber-600 bg-amber-500/10'
       });
     });
 
     return list.slice(0, 6);
-  }, [opportunities, contracts, tasks]);
+  }, [opportunities, contracts, tasks, units]);
 
-  // Performance Data for Managers
+  // Performance Data for Managers — uses real DB unit IDs
   const performanceByUnit = useMemo(() => {
-    const units = ['u1', 'u2', 'u3', 'u4'];
-    const unitNames: Record<string, string> = { u1: 'Satış', u2: 'Teknik', u3: 'Lojistik', u4: 'İdari' };
-    
-    return units.map(uId => {
-      const unitTasks = tasks.filter(t => t.unitId === uId);
+    if (units.length === 0) return [];
+    return units.map(unit => {
+      const unitTasks = tasks.filter(t => t.unitId === unit.id);
       const completed = unitTasks.filter(t => t.status === 'COMPLETED').length;
       const total = unitTasks.length;
+      const shortName = unit.name.length > 14 ? unit.name.slice(0, 13) + '…' : unit.name;
       return {
-        name: unitNames[uId],
+        name: shortName,
         tamamlanan: completed,
         toplam: total,
         performans: total > 0 ? Math.round((completed / total) * 100) : 0
       };
-    });
-  }, [tasks]);
+    }).filter(u => u.toplam > 0);
+  }, [tasks, units]);
 
   if (activeTab === 'performance' && isManager) {
     return (
@@ -261,7 +317,7 @@ const Dashboard = ({
                 <div>
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Genel Verimlilik</p>
                   <h4 className="text-3xl font-black text-slate-900 tracking-tighter">
-                    {Math.round(performanceByUnit.reduce((a, b) => a + b.performans, 0) / performanceByUnit.length)}%
+                    {performanceByUnit.length > 0 ? Math.round(performanceByUnit.reduce((a, b) => a + b.performans, 0) / performanceByUnit.length) : 0}%
                   </h4>
                 </div>
               </div>
@@ -492,8 +548,15 @@ const Dashboard = ({
               <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Satış Boru Hattı</h4>
               <p className="text-xs text-slate-500 font-bold">Fırsatların aşamalara göre dağılımı</p>
             </div>
-            <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
-              <ShieldCheck size={12} /> Doğrulanmış Veri
+            <div className="flex items-center gap-3">
+              {liveNegotiationCount > 0 && (
+                <div className="flex items-center gap-2 text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-500/10 px-4 py-1.5 rounded-full border border-rose-500/20 animate-pulse">
+                  <Zap size={12} fill="currentColor" /> {liveNegotiationCount} Canlı Pazarlık
+                </div>
+              )}
+              <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
+                <ShieldCheck size={12} /> Doğrulanmış Veri
+              </div>
             </div>
           </div>
           <div className="flex-1 w-full min-h-[280px]">
@@ -521,6 +584,18 @@ const Dashboard = ({
                     <stop offset="0%" stopColor="hsla(151, 86%, 39%, 1)" />
                     <stop offset="100%" stopColor="hsla(151, 86%, 39%, 0.3)" />
                   </linearGradient>
+                  <linearGradient id="barLive" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(340, 90%, 55%, 1)" />
+                    <stop offset="100%" stopColor="hsla(340, 90%, 55%, 0.2)" />
+                  </linearGradient>
+                  <linearGradient id="barWon" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(142, 76%, 36%, 1)" />
+                    <stop offset="100%" stopColor="hsla(142, 76%, 36%, 0.25)" />
+                  </linearGradient>
+                  <linearGradient id="barLost" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="hsla(0, 84%, 60%, 1)" />
+                    <stop offset="100%" stopColor="hsla(0, 84%, 60%, 0.2)" />
+                  </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.015)" />
                 <XAxis 
@@ -542,11 +617,10 @@ const Dashboard = ({
                     backdropFilter: 'blur(16px)' 
                   }}
                 />
-                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={45}>
-                  {pipelineChartData.map((entry, index) => {
-                    const gradColors = ['url(#barPrimary)', 'url(#barBlue)', 'url(#barPurple)', 'url(#barOrange)', 'url(#barEmerald)'];
-                    return <Cell key={`cell-${index}`} fill={gradColors[index % gradColors.length]} />;
-                  })}
+                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={38}>
+                  {pipelineChartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.grad} />
+                  ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
@@ -583,9 +657,12 @@ const Dashboard = ({
                     <div className="flex items-center gap-2 mt-0.5">
                       <span className={cn(
                         "text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter",
-                        p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" : "bg-slate-100 text-slate-500"
+                        p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" :
+                        p.status === 'COMPLETED' ? "bg-blue-500/10 text-blue-600" :
+                        p.status === 'NOT_STARTED' ? "bg-amber-500/10 text-amber-600" :
+                        "bg-slate-100 text-slate-500"
                       )}>
-                        {p.status}
+                        {{ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' }[p.status] ?? p.status}
                       </span>
                     </div>
                   </div>
