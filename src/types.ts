@@ -154,6 +154,10 @@ export interface Subscription {
   id: string;
   plan: SubscriptionPlanType;
   tenantId: string;
+  licenseModel?: string | null;
+  licenseExpiryDate?: string | null;
+  licensedUserLimit?: number | null;
+  licensedStorageLimit?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -165,19 +169,90 @@ export interface ProcurementNote {
   author: string;
 }
 
+export type ProjectType    = 'HARDWARE' | 'SOFTWARE' | 'SERVICE' | 'MIXED';
+export type ProjectStatus  = 'PLANNING' | 'IN_PROGRESS' | 'ON_HOLD' | 'COMPLETED' | 'CANCELLED';
+export type MilestoneStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLOCKED' | 'CANCELLED';
+export type MilestoneType  =
+  | 'PLANNING' | 'PROCUREMENT' | 'SHIPMENT' | 'INSTALLATION'
+  | 'DEVELOPMENT' | 'TESTING' | 'ACCEPTANCE' | 'INVOICING'
+  | 'COLLECTION' | 'WARRANTY' | 'CUSTOM';
+export type CostCategory   = 'PROCUREMENT' | 'TRAVEL' | 'EXTERNAL_SERVICE' | 'OTHER';
+
+export interface ProjectMilestone {
+  id: string;
+  projectId: string;
+  title: string;
+  description?: string | null;
+  milestoneType: MilestoneType;
+  status: MilestoneStatus;
+  progress: number;
+  assignedToId?: string | null;
+  assignedToName?: string | null;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  actualStart?: string | null;
+  actualEnd?: string | null;
+  budgetAmount?: number | null;
+  actualCost?: number | null;
+  currency: string;
+  isParallel: boolean;
+  requiresApproval: boolean;
+  approvedById?: string | null;
+  approvedAt?: string | null;
+  order: number;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProjectCostItem {
+  id: string;
+  projectId: string;
+  category: CostCategory;
+  description: string;
+  plannedAmount: number;
+  actualAmount: number;
+  currency: string;
+  amountTRY: number;
+  milestoneId?: string | null;
+  purchaseRequestId?: string | null;
+  date?: string | null;
+  invoiceNo?: string | null;
+  notes?: string | null;
+  createdById?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Project {
   id: string;
   name: string;
-  customerId: string;
-  status: 'DRAFT' | 'ANALYSIS' | 'AWAITING_APPROVAL' | 'APPROVED' | 'WON' | 'LOST' | 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
+  type: ProjectType;
+  description?: string | null;
+  status: ProjectStatus;
+  phase: string;
+  customerId?: string | null;
+  customerName?: string | null;
+  opportunityId?: string | null;
+  contractId?: string | null;
+  ownerId?: string | null;
+  pmId?: string | null;
+  pmName?: string | null;
+  managerId?: string | null;
   totalValue: number;
+  contractCurrency: string;
+  budgetTotal: number;
   avgMargin: number;
-  deadline: string;
-  ownerId: string;
-  managerId?: string;
-  progress?: number;
-  opportunityId?: string;
-  procurementNotes?: ProcurementNote[];
+  progress: number;
+  startDate?: string | null;
+  plannedEndDate?: string | null;
+  actualEndDate?: string | null;
+  deadline?: string | null;
+  procurementNotes?: string | null;
+  milestones: ProjectMilestone[];
+  projectCostItems: ProjectCostItem[];
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Contract {
@@ -386,4 +461,121 @@ export interface AnalysisResult {
   summary: string;
   specDetails: string;
   extractedProducts: AnalysisResultProduct[];
+}
+
+// ── Satınalma Modülü ──────────────────────────────────────────────────────
+
+export interface Vendor {
+  id: string;
+  tenantId: string;
+  name: string;
+  taxNo?: string | null;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  contactName?: string | null;
+  iban?: string | null;
+  bankName?: string | null;
+  categories: string; // JSON string[]
+  rating?: number | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PurchaseStatus =
+  | 'DRAFT'
+  | 'PENDING_UNIT'
+  | 'PENDING_PROCUREMENT'
+  | 'PENDING_GM'
+  | 'PO_ISSUED'
+  | 'IN_DELIVERY'
+  | 'INVOICED'
+  | 'CLOSED'
+  | 'REJECTED';
+
+export type PurchaseSourceType = 'MANUAL' | 'BOM' | 'PROJECT' | 'UNIT';
+export type PurchaseUrgency = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+
+export interface PurchaseItem {
+  id: string;
+  purchaseRequestId: string;
+  name: string;
+  description?: string | null;
+  quantity: number;
+  unit: string;
+  estimatedUnitPrice?: number | null;
+  currency: string;
+  actualUnitPrice?: number | null;
+  createdAt: string;
+}
+
+export interface PurchaseQuote {
+  id: string;
+  purchaseRequestId: string;
+  vendorId?: string | null;
+  vendor?: Vendor | null;
+  vendorName: string;
+  totalAmount: number;
+  currency: string;
+  totalAmountTRY?: number | null;
+  deliveryDays?: number | null;
+  validUntil?: string | null;
+  notes?: string | null;
+  isSelected: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface DeliveryRecord {
+  id: string;
+  purchaseRequestId: string;
+  deliveredAt: string;
+  receivedBy?: string | null;
+  quantityOrdered?: number | null;
+  quantityReceived?: number | null;
+  quantityDamaged?: number | null;
+  status: string;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface PurchaseRequest {
+  id: string;
+  tenantId: string;
+  title: string;
+  description?: string | null;
+  sourceType: PurchaseSourceType;
+  sourceBomId?: string | null;
+  projectId?: string | null;
+  requestedBy: string;
+  requestedByName?: string | null;
+  unitId?: string | null;
+  unitName?: string | null;
+  status: PurchaseStatus;
+  urgency: PurchaseUrgency;
+  neededBy?: string | null;
+  budgetAmount?: number | null;
+  currency: string;
+  budgetAmountTRY?: number | null;
+  selectedVendorId?: string | null;
+  selectedVendorName?: string | null;
+  poNumber?: string | null;
+  poIssuedAt?: string | null;
+  invoiceNo?: string | null;
+  invoiceAmount?: number | null;
+  invoiceDate?: string | null;
+  invoicePaidAt?: string | null;
+  approvedByUnit?: string | null;
+  approvedByProcurement?: string | null;
+  approvedByGM?: string | null;
+  rejectedBy?: string | null;
+  rejectionNote?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: PurchaseItem[];
+  quotes: PurchaseQuote[];
+  deliveries: DeliveryRecord[];
 }

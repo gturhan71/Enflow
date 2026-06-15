@@ -77,6 +77,13 @@ export const settingsService = {
     });
   },
 
+  async activateLicense(licenseKey: string) {
+    return apiClient.fetchWithAuth('/tenants/activate-license', {
+      method: 'POST',
+      body: JSON.stringify({ licenseKey }),
+    });
+  },
+
   async getUsage() {
     return apiClient.fetchWithAuth('/usage');
   },

@@ -1,663 +1,1100 @@
-import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  ArrowUpRight,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  FileCheck,
-  ChevronRight,
-  Menu,
-  X,
-  LogOut,
-  TrendingUp,
-  DollarSign,
-  Briefcase,
-  Truck,
-  Package,
-  History,
-  FileDown,
-  Calendar,
-  ShieldCheck,
-  MapPin,
-  UserCheck,
-  ExternalLink,
-  Download,
-  Filter,
-  MoreVertical,
-  BarChart3,
-  PieChart,
-  ArrowDownRight,
-  Target,
-  Percent,
-  FileSignature,
-  Gavel,
-  Kanban,
-  Wand2,
-  Puzzle,
-  Cpu,
-  Mail,
-  MessageSquare,
-  ListTodo,
-  UserPlus,
-  FileCheck2
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  Plus, Search, X, RefreshCw, ChevronRight, Edit2, Trash2,
+  CheckCircle2, Clock, AlertTriangle, Ban, Layers, TrendingUp,
+  TrendingDown, DollarSign, Calendar, Users, FileText, BarChart3,
+  Package, Truck, Code2, CheckSquare, ShieldCheck, Receipt, Banknote,
+  Wrench, ArrowRight, Target, Activity, Printer, AlertCircle, Flag,
+  MoreVertical, ChevronDown, ChevronUp
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
-import { 
-  NAV_ITEMS, 
-  MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
-  MOCK_SYSTEM_USERS,
-  MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
-} from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
-  TodoTask,
-  Opportunity,
-  Project,
-  NextcloudConfig,
-  ExchangeConfig,
-  WhatsAppConfig
+import { apiService } from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  Project, ProjectMilestone, ProjectCostItem,
+  ProjectType, ProjectStatus, MilestoneStatus, CostCategory,
+  User, Unit, Opportunity
 } from '../types';
-import { nextcloudService } from '../services/nextcloudService';
-import { exchangeService } from '../services/exchangeService';
-import { whatsappService } from '../services/whatsappService';
 
+// ── Sabitler ──────────────────────────────────────────────────────────────────
 
-import { HandOffModal } from '../components/HandOffModal';
-import { workflowService } from '../services/workflowService';
-import { TaskProgressTracker } from '../components/TaskProgressTracker';
+const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
+  HARDWARE: 'Donanım', SOFTWARE: 'Yazılım', SERVICE: 'Hizmet', MIXED: 'Karma',
+};
+const PROJECT_TYPE_COLOR: Record<ProjectType, string> = {
+  HARDWARE: 'bg-blue-100 text-blue-700',
+  SOFTWARE: 'bg-purple-100 text-purple-700',
+  SERVICE: 'bg-emerald-100 text-emerald-700',
+  MIXED: 'bg-amber-100 text-amber-700',
+};
+const STATUS_CONFIG: Record<ProjectStatus, { label: string; color: string; bg: string }> = {
+  PLANNING:    { label: 'Planlama',     color: 'text-slate-600',  bg: 'bg-slate-100'  },
+  IN_PROGRESS: { label: 'Devam Ediyor', color: 'text-blue-700',   bg: 'bg-blue-100'   },
+  ON_HOLD:     { label: 'Beklemede',    color: 'text-amber-700',  bg: 'bg-amber-100'  },
+  COMPLETED:   { label: 'Tamamlandı',   color: 'text-green-700',  bg: 'bg-green-100'  },
+  CANCELLED:   { label: 'İptal',        color: 'text-red-700',    bg: 'bg-red-100'    },
+};
+const MS_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: string; icon: React.ReactNode }> = {
+  NOT_STARTED: { label: 'Başlamadı',   color: 'text-slate-400',  icon: <Clock size={14} /> },
+  IN_PROGRESS: { label: 'Devam Ediyor',color: 'text-blue-500',   icon: <Activity size={14} /> },
+  COMPLETED:   { label: 'Tamamlandı',  color: 'text-green-500',  icon: <CheckCircle2 size={14} /> },
+  BLOCKED:     { label: 'Engellendi',  color: 'text-red-500',    icon: <AlertTriangle size={14} /> },
+  CANCELLED:   { label: 'İptal',       color: 'text-slate-400',  icon: <Ban size={14} /> },
+};
+const MS_TYPE_ICON: Record<string, React.ReactNode> = {
+  PLANNING:     <Target size={14} />,
+  PROCUREMENT:  <Package size={14} />,
+  SHIPMENT:     <Truck size={14} />,
+  INSTALLATION: <Wrench size={14} />,
+  DEVELOPMENT:  <Code2 size={14} />,
+  TESTING:      <CheckSquare size={14} />,
+  ACCEPTANCE:   <ShieldCheck size={14} />,
+  WARRANTY:     <ShieldCheck size={14} />,
+  INVOICING:    <Receipt size={14} />,
+  COLLECTION:   <Banknote size={14} />,
+  CUSTOM:       <Flag size={14} />,
+};
+const COST_CAT_LABEL: Record<CostCategory, string> = {
+  PROCUREMENT: 'Satınalma', TRAVEL: 'Seyahat/Lojistik',
+  EXTERNAL_SERVICE: 'Harici Hizmet', OTHER: 'Diğer',
+};
+const COST_CAT_COLOR: Record<CostCategory, string> = {
+  PROCUREMENT: 'bg-blue-100 text-blue-700',
+  TRAVEL: 'bg-amber-100 text-amber-700',
+  EXTERNAL_SERVICE: 'bg-purple-100 text-purple-700',
+  OTHER: 'bg-slate-100 text-slate-600',
+};
 
-const ProjectManagementModule = ({ projects, setProjects, tasks, setTasks, setActiveTab: setGlobalActiveTab }: { 
-  projects: Project[], 
-  setProjects?: React.Dispatch<React.SetStateAction<Project[]>>, 
-  tasks?: TodoTask[], 
-  setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>,
-  setActiveTab?: (tab: string) => void
-}) => {
-  // Assuming current user is cmp5lhehc000259w33zxhyy0p for demo purposes
-  const currentUser = { id: 'cmp5lhehc000259w33zxhyy0p', name: 'Gökhan Turhan' };
-  const myProjects = projects.filter(p => p.managerId === currentUser.id);
-  const [selectedProjectId, setSelectedProjectId] = useState(myProjects[0]?.id || projects[0]?.id);
-  const [activeTab, setActiveTab] = useState<'KANBAN' | 'PROCUREMENT' | 'REPORTING' | 'TASKS'>('KANBAN');
-  const [showHandOffModal, setShowHandOffModal] = useState(false);
-  const [handOffTarget, setHandOffTarget] = useState<TodoTask | null>(null);
+const fmt = (v: number, c = 'TRY') =>
+  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, minimumFractionDigits: 0 }).format(v);
+const fmtDate = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+const fmtShort = (d?: string | null) =>
+  d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' }) : '—';
+const isOverdue = (d?: string | null) => !!d && new Date(d) < new Date();
 
-  const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
-    if (!handOffTarget) return;
-    await workflowService.triggerHandOff({
-      itemId: handOffTarget.id,
-      itemTitle: handOffTarget.title,
-      fromUnit: 'unit_pm', // Demo: Proje Yönetimi
-      toUnit: data.toUnit,
-      fromUser: currentUser,
-      toUser: data.toUser,
-      note: data.note
-    });
-    setShowHandOffModal(false);
-    setHandOffTarget(null);
-  };
-  const [showNewTaskModal, setShowNewTaskModal] = useState(false);
-  const [newTask, setNewTask] = useState<Partial<ProjectTask>>({
-    status: 'TODO'
+// ── Yardımcı hesaplamalar ──────────────────────────────────────────────────────
+
+const calcFinancials = (p: Project) => {
+  const totalPlanned = p.projectCostItems.reduce((s, c) => s + c.plannedAmount, 0);
+  const totalActual  = p.projectCostItems.reduce((s, c) => s + c.amountTRY, 0);
+  const contractVal  = p.totalValue;
+  const plannedMargin = contractVal > 0 ? ((contractVal - totalPlanned) / contractVal) * 100 : 0;
+  const actualMargin  = contractVal > 0 ? ((contractVal - totalActual)  / contractVal) * 100 : 0;
+  const forecastCost  = totalActual + (totalPlanned > totalActual ? totalPlanned - totalActual : 0);
+  const forecastMargin = contractVal > 0 ? ((contractVal - forecastCost) / contractVal) * 100 : 0;
+  const delayedMs = p.milestones.filter(m =>
+    m.status !== 'COMPLETED' && m.status !== 'CANCELLED' && isOverdue(m.plannedEnd)
+  ).length;
+  return { totalPlanned, totalActual, plannedMargin, actualMargin, forecastMargin, forecastCost, delayedMs };
+};
+
+// ── Bileşenler ────────────────────────────────────────────────────────────────
+
+const StatusBadge: React.FC<{ status: ProjectStatus }> = ({ status }) => {
+  const c = STATUS_CONFIG[status];
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold ${c.bg} ${c.color}`}>{c.label}</span>;
+};
+
+const MarginBadge: React.FC<{ value: number; label?: string }> = ({ value, label }) => {
+  const color = value >= 20 ? 'text-green-600 bg-green-50' : value >= 0 ? 'text-amber-600 bg-amber-50' : 'text-red-600 bg-red-50';
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold ${color}`}>
+      {value >= 0 ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+      {label && <span className="font-normal">{label}:</span>} %{value.toFixed(1)}
+    </span>
+  );
+};
+
+// ── Fırsat Seçici ─────────────────────────────────────────────────────────────
+
+interface OpportunityPickerProps {
+  opportunities: Opportunity[];
+  existingProjectOppIds: Set<string>;
+  onSelect: (opp: Opportunity) => void;
+  onBlank: () => void;
+  onClose: () => void;
+}
+
+const OpportunityPicker: React.FC<OpportunityPickerProps> = ({ opportunities, existingProjectOppIds, onSelect, onBlank, onClose }) => {
+  const [search, setSearch] = useState('');
+  const won = opportunities.filter(o =>
+    o.status === 'WON' && !existingProjectOppIds.has(o.id) &&
+    (!search || o.title.toLowerCase().includes(search.toLowerCase()) || o.customer?.name.toLowerCase().includes(search.toLowerCase()))
+  );
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-card w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden max-h-[80vh] flex flex-col">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
+          <div>
+            <h4 className="text-lg font-bold">Kazanılan Teklif Seç</h4>
+            <p className="text-xs text-slate-400 mt-0.5">Proje olarak açmak istediğiniz fırsatı seçin</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl"><X size={18} /></button>
+        </div>
+        <div className="p-4 border-b border-white/5 shrink-0">
+          <div className="relative">
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ara…"
+              className="input-glass w-full pl-8 pr-3 py-2 text-sm rounded-xl" autoFocus />
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {won.length === 0 ? (
+            <div className="text-center py-8 text-slate-400 text-sm">
+              {search ? 'Eşleşen fırsat yok.' : 'Henüz projeye dönüştürülmemiş kazanılmış fırsat yok.'}
+            </div>
+          ) : won.map(opp => (
+            <button key={opp.id} onClick={() => onSelect(opp)}
+              className="w-full text-left glass-card rounded-xl p-3 hover:border-indigo-500/40 transition-all group">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold group-hover:text-indigo-300 transition-colors truncate">{opp.title}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {opp.customer?.name ?? '—'}
+                    {opp.value ? ` · ${fmt(opp.value)}` : ''}
+                  </p>
+                </div>
+                <ChevronRight size={14} className="text-slate-500 group-hover:text-indigo-400 shrink-0" />
+              </div>
+            </button>
+          ))}
+        </div>
+        <div className="p-4 border-t border-white/10 shrink-0">
+          <button onClick={onBlank} className="w-full btn-secondary py-2 text-sm rounded-xl flex items-center justify-center gap-2">
+            <Plus size={14} /> Fırsatsız Boş Proje Aç
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ── Proje Formu ───────────────────────────────────────────────────────────────
+
+interface ProjectFormProps {
+  initial?: Partial<Project>;
+  users: User[];
+  customers: { id: string; name: string }[];
+  onSave: (data: Record<string, unknown>) => void;
+  onClose: () => void;
+}
+
+const ProjectForm: React.FC<ProjectFormProps> = ({ initial, users, customers, onSave, onClose }) => {
+  const [form, setForm] = useState({
+    opportunityId: (initial as Record<string, string> | undefined)?.opportunityId ?? '',
+    name: initial?.name ?? '',
+    type: (initial?.type ?? 'HARDWARE') as ProjectType,
+    description: initial?.description ?? '',
+    customerId: initial?.customerId ?? '',
+    customerName: initial?.customerName ?? '',
+    pmId: initial?.pmId ?? '',
+    pmName: initial?.pmName ?? '',
+    totalValue: initial?.totalValue?.toString() ?? '',
+    contractCurrency: initial?.contractCurrency ?? 'TRY',
+    budgetTotal: initial?.budgetTotal?.toString() ?? '',
+    startDate: initial?.startDate?.split('T')[0] ?? new Date().toISOString().split('T')[0],
+    plannedEndDate: initial?.plannedEndDate?.split('T')[0] ?? '',
+    status: (initial?.status ?? 'PLANNING') as ProjectStatus,
+    milestoneTemplate: initial?.type ?? 'HARDWARE',
   });
-  const [showNewProcurementReqModal, setShowNewProcurementReqModal] = useState(false);
-  const [newProcurementReq, setNewProcurementReq] = useState({
-    title: '',
-    description: '',
-    priority: 'MEDIUM'
-  });
-  const [showNewReportModal, setShowNewReportModal] = useState(false);
-  const [newReport, setNewReport] = useState({
-    notes: ''
-  });
-
-  const selectedProject = projects.find(p => p.id === selectedProjectId) || projects[0];
-  const projectTasks = MOCK_PROJECT_TASKS.filter(t => t.projectId === selectedProject?.id);
-  const relatedTasks = tasks?.filter(t => t.relatedModule === 'PROJECT' && t.relatedItemId === selectedProject?.id) || [];
-
-  const handleAddTask = () => {
-    setShowNewTaskModal(false);
-    setNewTask({ status: 'TODO' });
-  };
-
-  const handleCompleteProject = () => {
-    if (!selectedProject || !setProjects) return;
-    if (!window.confirm('Bu projenin saha kurulumlarını ve geçici kabulünü tamamlayıp kapatmak istediğinize emin misiniz?')) return;
-    
-    const updated = projects.map(p => {
-      if (p.id === selectedProject.id) {
-        return {
-          ...p,
-          progress: 100,
-          status: 'COMPLETED' as const
-        };
-      }
-      return p;
-    });
-    setProjects(updated);
-    alert('Tebrikler! Proje başarıyla tamamlandı. Islak imzalı evrakları Fiziksel Arşiv modülünden arşive teslim edebilirsiniz.');
-  };
-
-  const handleCreateProcurementReq = () => {
-    setShowNewProcurementReqModal(false);
-    setNewProcurementReq({ title: '', description: '', priority: 'MEDIUM' });
-  };
-
-  const handleSendReport = () => {
-    setShowNewReportModal(false);
-    setNewReport({ notes: '' });
-  };
+  const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(prev => ({ ...prev, [k]: e.target.value }));
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
-        <div>
-          <h3 className="text-2xl font-bold text-slate-900">Proje Yönetimi</h3>
-          <p className="text-slate-500">Operasyonel süreçler, saha kurulumları ve görev takibi.</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-card w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
+          <h4 className="text-lg font-bold">{initial?.id ? 'Proje Düzenle' : 'Yeni Proje'}</h4>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl transition-colors"><X size={18} /></button>
         </div>
-        <div className="flex gap-3">
-          <select 
-            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-indigo-500"
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-          >
-            <optgroup label="Bana Atanan Projeler">
-              {myProjects.map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </optgroup>
-            <optgroup label="Tüm Projeler">
-              {projects.filter(p => p.managerId !== currentUser.id).map(p => (
-                <option key={p.id} value={p.id}>{p.name}</option>
-              ))}
-            </optgroup>
-          </select>
-          <div className="flex bg-slate-100 p-1 rounded-xl">
-            <button 
-              onClick={() => setActiveTab('KANBAN')}
-              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", activeTab === 'KANBAN' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-            >
-              Görevler
-            </button>
-            <button 
-              onClick={() => setActiveTab('PROCUREMENT')}
-              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", activeTab === 'PROCUREMENT' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-            >
-              Satın Alma
-            </button>
-            <button 
-              onClick={() => setActiveTab('REPORTING')}
-              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", activeTab === 'REPORTING' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-            >
-              Raporlama
-            </button>
-            <button 
-              onClick={() => setActiveTab('TASKS')}
-              className={cn("px-4 py-2 rounded-lg text-xs font-bold transition-all", activeTab === 'TASKS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}
-            >
-              İş Emirleri & İlerlemeler
-            </button>
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Proje Adı *</label>
+              <input value={form.name} onChange={f('name')} className="input-glass w-full px-3 py-2 text-sm rounded-xl" placeholder="Proje başlığı" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Proje Tipi</label>
+              <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as ProjectType, milestoneTemplate: e.target.value }))}
+                className="input-glass w-full px-3 py-2 text-sm rounded-xl">
+                {Object.entries(PROJECT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Durum</label>
+              <select value={form.status} onChange={f('status')} className="input-glass w-full px-3 py-2 text-sm rounded-xl">
+                {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Müşteri</label>
+              <select value={form.customerId} onChange={e => {
+                const c = customers.find(c => c.id === e.target.value);
+                setForm(p => ({ ...p, customerId: e.target.value, customerName: c?.name ?? '' }));
+              }} className="input-glass w-full px-3 py-2 text-sm rounded-xl">
+                <option value="">Seçin…</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Proje Yöneticisi</label>
+              <select value={form.pmId} onChange={e => {
+                const u = users.find(u => u.id === e.target.value);
+                setForm(p => ({ ...p, pmId: e.target.value, pmName: u?.name ?? '' }));
+              }} className="input-glass w-full px-3 py-2 text-sm rounded-xl">
+                <option value="">Seçin…</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Sözleşme Bedeli</label>
+              <div className="flex gap-1">
+                <input type="number" value={form.totalValue} onChange={f('totalValue')} className="input-glass flex-1 px-3 py-2 text-sm rounded-l-xl" />
+                <select value={form.contractCurrency} onChange={f('contractCurrency')} className="input-glass px-2 py-2 text-sm rounded-r-xl">
+                  {['TRY','USD','EUR'].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Toplam Bütçe (TRY)</label>
+              <input type="number" value={form.budgetTotal} onChange={f('budgetTotal')} className="input-glass w-full px-3 py-2 text-sm rounded-xl" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Başlangıç Tarihi</label>
+              <input type="date" value={form.startDate} onChange={f('startDate')} className="input-glass w-full px-3 py-2 text-sm rounded-xl" />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 mb-1">Planlanan Bitiş</label>
+              <input type="date" value={form.plannedEndDate} onChange={f('plannedEndDate')} className="input-glass w-full px-3 py-2 text-sm rounded-xl" />
+            </div>
           </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Açıklama</label>
+            <textarea value={form.description} onChange={f('description')} rows={2}
+              className="input-glass w-full px-3 py-2 text-sm rounded-xl resize-none" />
+          </div>
+          {!initial?.id && (
+            <div className="bg-indigo-900/20 border border-indigo-500/30 rounded-xl p-3 text-xs text-indigo-300">
+              <span className="font-semibold">Milestone şablonu:</span> {PROJECT_TYPE_LABEL[form.type as ProjectType]} tipine göre otomatik oluşturulacak.
+            </div>
+          )}
+        </div>
+        <div className="p-5 border-t border-white/10 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="btn-secondary px-5 py-2 text-sm rounded-xl">İptal</button>
+          <button onClick={() => onSave({ ...form, totalValue: Number(form.totalValue), budgetTotal: Number(form.budgetTotal) })}
+            disabled={!form.name.trim()} className="btn-primary px-5 py-2 text-sm rounded-xl disabled:opacity-50">
+            {initial?.id ? 'Güncelle' : 'Proje Oluştur'}
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ── Maliyet Formu ──────────────────────────────────────────────────────────────
+
+interface CostFormProps {
+  projectId: string;
+  milestones: ProjectMilestone[];
+  onSave: (data: Record<string, unknown>) => void;
+  onClose: () => void;
+}
+const CostForm: React.FC<CostFormProps> = ({ milestones, onSave, onClose }) => {
+  const [form, setForm] = useState({
+    category: 'OTHER' as CostCategory, description: '',
+    plannedAmount: '', actualAmount: '', currency: 'TRY', amountTRY: '',
+    milestoneId: '', date: new Date().toISOString().split('T')[0],
+    invoiceNo: '', notes: '',
+  });
+  const f = (k: string) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setForm(p => ({ ...p, [k]: e.target.value }));
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-card w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="p-5 border-b border-white/10 flex items-center justify-between shrink-0">
+          <h4 className="font-bold">Maliyet Kalemi Ekle</h4>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl"><X size={18} /></button>
+        </div>
+        <div className="p-5 space-y-3 overflow-y-auto flex-1">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Kategori</label>
+              <select value={form.category} onChange={f('category')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1">
+                {Object.entries(COST_CAT_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Milestone</label>
+              <select value={form.milestoneId} onChange={f('milestoneId')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1">
+                <option value="">Genel</option>
+                {milestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}
+              </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 font-semibold">Açıklama *</label>
+              <input value={form.description} onChange={f('description')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Planlanan (TRY)</label>
+              <input type="number" value={form.plannedAmount} onChange={f('plannedAmount')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Gerçekleşen (TRY)</label>
+              <input type="number" value={form.actualAmount} onChange={f('actualAmount')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Tarih</label>
+              <input type="date" value={form.date} onChange={f('date')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 font-semibold">Fatura No</label>
+              <input value={form.invoiceNo} onChange={f('invoiceNo')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-slate-400 font-semibold">Not</label>
+              <textarea value={form.notes} onChange={f('notes')} rows={2} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1 resize-none" />
+            </div>
+          </div>
+        </div>
+        <div className="p-5 border-t border-white/10 flex justify-end gap-3 shrink-0">
+          <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm rounded-xl">İptal</button>
+          <button onClick={() => onSave({ ...form, plannedAmount: Number(form.plannedAmount), actualAmount: Number(form.actualAmount), amountTRY: Number(form.actualAmount) })}
+            disabled={!form.description} className="btn-primary px-4 py-2 text-sm rounded-xl disabled:opacity-50">
+            Ekle
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+// ── Proje Detay Çekmecesi ─────────────────────────────────────────────────────
+
+interface ProjectDetailProps {
+  project: Project;
+  users: User[];
+  currentUserRole?: string;
+  currentUserId?: string;
+  onClose: () => void;
+  onRefresh: () => void;
+  onPrintReport: (p: Project) => void;
+}
+
+const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, users, currentUserRole, currentUserId, onClose, onRefresh, onPrintReport }) => {
+  const [project, setProject] = useState(initialProject);
+  const [tab, setTab] = useState<'overview' | 'milestones' | 'costs' | 'profitability'>('overview');
+  const [loading, setLoading] = useState(false);
+  const [showCostForm, setShowCostForm] = useState(false);
+  const [expandedMs, setExpandedMs] = useState<string | null>(null);
+
+  useEffect(() => { setProject(initialProject); }, [initialProject]);
+
+  const fin = useMemo(() => calcFinancials(project), [project]);
+
+  const refreshProject = async () => {
+    const updated = await apiService.getProject(project.id) as Project;
+    setProject(updated);
+    onRefresh();
+  };
+
+  const handleMsStatus = async (ms: ProjectMilestone, status: MilestoneStatus) => {
+    setLoading(true);
+    try {
+      await apiService.updateProjectMilestone(project.id, ms.id, { status, progress: status === 'COMPLETED' ? 100 : ms.progress });
+      await refreshProject();
+    } finally { setLoading(false); }
+  };
+
+  const handleMsProgress = async (ms: ProjectMilestone, progress: number) => {
+    await apiService.updateProjectMilestone(project.id, ms.id, { progress });
+    await refreshProject();
+  };
+
+  const handleAddCost = async (data: Record<string, unknown>) => {
+    setLoading(true);
+    try {
+      await apiService.createProjectCost(project.id, data);
+      setShowCostForm(false);
+      await refreshProject();
+    } finally { setLoading(false); }
+  };
+
+  const handleDeleteCost = async (costId: string) => {
+    if (!confirm('Bu maliyet kalemi silinsin mi?')) return;
+    await apiService.deleteProjectCost(project.id, costId);
+    await refreshProject();
+  };
+
+  const MS_STATUS_NEXT: Partial<Record<MilestoneStatus, MilestoneStatus>> = {
+    NOT_STARTED: 'IN_PROGRESS',
+    IN_PROGRESS: 'COMPLETED',
+  };
+
+  const TABS = [
+    { key: 'overview',      label: 'Genel' },
+    { key: 'milestones',    label: `Milestones (${project.milestones.length})` },
+    { key: 'costs',         label: `Maliyetler (${project.projectCostItems.length})` },
+    { key: 'profitability', label: 'Karlılık' },
+  ] as const;
+
+  return (
+    <motion.div initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+      transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+      className="fixed inset-y-0 right-0 z-50 w-full max-w-2xl glass-card border-l border-white/10 shadow-2xl flex flex-col">
+
+      {/* Header */}
+      <div className="p-5 border-b border-white/10 flex items-start justify-between shrink-0">
+        <div className="flex-1 pr-4">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <StatusBadge status={project.status} />
+            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_TYPE_COLOR[project.type]}`}>
+              {PROJECT_TYPE_LABEL[project.type]}
+            </span>
+            {fin.delayedMs > 0 && (
+              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
+                <AlertCircle size={11} />{fin.delayedMs} gecikmiş
+              </span>
+            )}
+          </div>
+          <h3 className="font-bold text-lg leading-tight">{project.name}</h3>
+          <p className="text-xs text-slate-400 mt-0.5">
+            {project.customerName && <span>{project.customerName} · </span>}
+            PM: {project.pmName ?? '—'} · Faz: {project.phase}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
+          <button onClick={() => onPrintReport(project)} className="p-2 hover:bg-white/10 rounded-xl text-slate-400 hover:text-slate-200" title="Rapor">
+            <Printer size={16} />
+          </button>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-xl"><X size={18} /></button>
         </div>
       </div>
 
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeTab}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.2 }}
-        >
-          {activeTab === 'KANBAN' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {['TODO', 'IN_PROGRESS', 'DONE'].map((status) => (
-                <div key={status} className="bg-slate-50 p-6 rounded-3xl border border-slate-200 min-h-[500px] flex flex-col">
-                  <div className="flex items-center justify-between mb-6">
-                    <h4 className="font-bold text-slate-900 flex items-center gap-2">
-                      {status === 'TODO' && <Clock size={18} className="text-slate-400" />}
-                      {status === 'IN_PROGRESS' && <TrendingUp size={18} className="text-blue-500" />}
-                      {status === 'DONE' && <CheckCircle2 size={18} className="text-emerald-500" />}
-                      {status === 'TODO' ? 'Yapılacaklar' : status === 'IN_PROGRESS' ? 'Devam Edenler' : 'Tamamlananlar'}
-                    </h4>
-                    <span className="bg-white px-2 py-0.5 rounded-lg text-[10px] font-bold text-slate-400 border border-slate-100">
-                      {projectTasks.filter(t => t.status === status).length}
-                    </span>
-                  </div>
-                  
-                  <div className="space-y-4 flex-1">
-                    {projectTasks.filter(t => t.status === status).map((task) => (
-                      <motion.div 
-                        key={task.id}
-                        layoutId={task.id}
-                        className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all cursor-pointer group"
-                      >
-                        <h5 className="font-bold text-slate-900 text-sm mb-1 group-hover:text-indigo-600 transition-colors">{task.title}</h5>
-                        <p className="text-xs text-slate-500 mb-4 line-clamp-2">{task.description}</p>
-                        <div className="flex items-center justify-between">
-                          <div className="flex -space-x-2">
-                            <div className="w-6 h-6 rounded-full bg-indigo-100 border-2 border-white flex items-center justify-center text-[8px] font-bold text-indigo-600">
-                              {MOCK_SYSTEM_USERS.find(u => u.id === task.assignedTo)?.name.split(' ').map(n => n[0]).join('')}
-                            </div>
-                          </div>
-                          <button 
-                            onClick={() => {
-                              setHandOffTarget(task);
-                              setShowHandOffModal(true);
-                            }}
-                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors"
-                          >
-                            Aktar
-                          </button>
-                        </div>
-                      </motion.div>
-                    ))}
-                    <button 
-                      onClick={() => setShowNewTaskModal(true)}
-                      className="w-full py-3 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-xs font-bold hover:border-indigo-300 hover:text-indigo-500 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Plus size={16} /> Görev Ekle
-                    </button>
-                  </div>
+      {/* Progress bar */}
+      <div className="px-5 py-2 border-b border-white/5 shrink-0">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 bg-white/10 rounded-full h-2 overflow-hidden">
+            <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${project.progress}%` }} />
+          </div>
+          <span className="text-xs font-bold text-slate-300">%{project.progress}</span>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex border-b border-white/10 shrink-0 overflow-x-auto">
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`px-4 py-3 text-xs font-semibold whitespace-nowrap transition-colors ${tab === t.key ? 'border-b-2 border-indigo-400 text-indigo-300' : 'text-slate-400 hover:text-slate-200'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 overflow-y-auto p-5 space-y-4">
+
+        {/* GENEL */}
+        {tab === 'overview' && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              {[
+                ['Sözleşme Bedeli', fmt(project.totalValue, project.contractCurrency)],
+                ['Toplam Bütçe', fmt(project.budgetTotal)],
+                ['Başlangıç', fmtDate(project.startDate)],
+                ['Planlanan Bitiş', fmtDate(project.plannedEndDate)],
+                ['Gerçekleşen Maliyet', fmt(fin.totalActual)],
+                ['Kalan Bütçe', fmt(project.budgetTotal - fin.totalActual)],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="bg-white/5 rounded-xl p-3">
+                  <p className="text-xs text-slate-400 mb-1">{label}</p>
+                  <p className="text-sm font-bold">{value}</p>
                 </div>
               ))}
             </div>
-          )}
-
-          {activeTab === 'TASKS' && (
-            <div className="glass-panel rounded-3xl p-8">
-              <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                <Target size={20} className="text-indigo-600" />
-                İş Emirleri ve İlerlemeler
-              </h4>
-              <div className="space-y-4">
-                <TaskProgressTracker 
-                  tasks={tasks || []} 
-                  setTasks={setTasks!} 
-                  relatedModule="PROJECT" 
-                  relatedItemId={selectedProject?.id || ''} 
-                />
-              </div>
+            <div className="flex gap-2 flex-wrap">
+              <MarginBadge value={fin.plannedMargin} label="Planlanan Kar" />
+              <MarginBadge value={fin.actualMargin}  label="Gerçekleşen Kar" />
+              <MarginBadge value={fin.forecastMargin} label="Tahmini Kar" />
             </div>
-          )}
-
-          {activeTab === 'PROCUREMENT' && (
-            <div className="glass-panel rounded-3xl p-8">
-              <div className="flex items-center justify-between mb-8">
-                <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <ShoppingCart size={20} className="text-indigo-600" />
-                  Satın Alma Koordinasyonu
-                </h4>
-                <button 
-                  onClick={() => setShowNewProcurementReqModal(true)}
-                  className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all"
-                >
-                  Yeni Talep Oluştur
-                </button>
+            {project.description && (
+              <div className="bg-white/5 rounded-xl p-3">
+                <p className="text-xs text-slate-400 mb-1">Açıklama</p>
+                <p className="text-sm">{project.description}</p>
               </div>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="space-y-4">
-                  <h5 className="font-bold text-slate-900 mb-4">Sipariş Durumları</h5>
-                  <div className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between bg-slate-50">
-                    <div>
-                      <h5 className="font-bold text-slate-900">Sunucu Donanımları (BoM)</h5>
-                      <p className="text-xs text-slate-500 mt-1">Tedarikçi: Arena Bilgisayar</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs font-bold text-amber-600 bg-amber-100 px-3 py-1 rounded-lg">Sipariş Bekleniyor</span>
-                      <button className="text-indigo-600 text-sm font-bold hover:underline">Detay</button>
-                    </div>
-                  </div>
-                  <div className="p-4 border border-slate-100 rounded-2xl flex items-center justify-between bg-slate-50">
-                    <div>
-                      <h5 className="font-bold text-slate-900">Ağ Cihazları (BoM)</h5>
-                      <p className="text-xs text-slate-500 mt-1">Tedarikçi: Index Bilgisayar</p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <span className="text-xs font-bold text-emerald-600 bg-emerald-100 px-3 py-1 rounded-lg">Teslim Edildi</span>
-                      <button className="text-indigo-600 text-sm font-bold hover:underline">Detay</button>
-                    </div>
-                  </div>
-                </div>
+            )}
+          </>
+        )}
 
-                <div>
-                  <h5 className="font-bold text-slate-900 mb-4 flex items-center gap-2">
-                    <MessageSquare size={18} className="text-indigo-600" />
-                    Satın Alma Biriminden Notlar
-                  </h5>
-                  <div className="bg-slate-50 rounded-2xl p-6 border border-slate-100 min-h-[200px]">
-                    {selectedProject?.procurementNotes && selectedProject.procurementNotes.length > 0 ? (
-                      <div className="space-y-4">
-                        {selectedProject.procurementNotes.map(note => (
-                          <div key={note.id} className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                            <p className="text-sm text-slate-700">{note.note}</p>
-                            <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-50">
-                              <span className="text-[10px] font-bold text-slate-400">{note.author}</span>
-                              <span className="text-[10px] font-bold text-slate-400">{note.date}</span>
-                            </div>
+        {/* MİLESTONES */}
+        {tab === 'milestones' && (
+          <div className="space-y-2">
+            {project.milestones.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-6">Milestone yok.</p>
+            )}
+            {project.milestones.map(ms => {
+              const sc = MS_STATUS_CONFIG[ms.status];
+              const overdue = ms.status !== 'COMPLETED' && isOverdue(ms.plannedEnd);
+              const expanded = expandedMs === ms.id;
+              const nextStatus = MS_STATUS_NEXT[ms.status];
+              return (
+                <div key={ms.id} className={`rounded-xl border ${overdue ? 'border-red-500/30 bg-red-900/10' : 'border-white/10 bg-white/5'}`}>
+                  <div className="p-3 flex items-center gap-3 cursor-pointer" onClick={() => setExpandedMs(expanded ? null : ms.id)}>
+                    <span className={sc.color}>{sc.icon}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold truncate">{ms.title}</span>
+                        {ms.isParallel && <span className="text-[10px] bg-blue-900/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">Paralel</span>}
+                        {ms.requiresApproval && <span className="text-[10px] bg-amber-900/30 text-amber-300 px-1.5 py-0.5 rounded font-medium">Onay</span>}
+                        {overdue && <span className="text-[10px] bg-red-900/30 text-red-300 px-1.5 py-0.5 rounded font-medium">Gecikmiş</span>}
+                      </div>
+                      <p className="text-xs text-slate-400">{sc.label} · {fmtShort(ms.plannedEnd)}</p>
+                    </div>
+                    <div className="text-right shrink-0 flex items-center gap-2">
+                      <span className="text-xs font-bold text-slate-300">%{ms.progress}</span>
+                      {expanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                    </div>
+                  </div>
+                  {expanded && (
+                    <div className="px-3 pb-3 space-y-3 border-t border-white/5 pt-3">
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs text-slate-400 w-20">İlerleme</span>
+                        <input type="range" min="0" max="100" value={ms.progress}
+                          onChange={e => handleMsProgress(ms, Number(e.target.value))}
+                          className="flex-1 accent-indigo-500" />
+                        <span className="text-xs font-bold w-8 text-right text-slate-300">%{ms.progress}</span>
+                      </div>
+                      {ms.assignedToName && <p className="text-xs text-slate-400">Sorumlu: <span className="text-slate-200">{ms.assignedToName}</span></p>}
+                      {ms.budgetAmount && <p className="text-xs text-slate-400">Bütçe: <span className="text-slate-200">{fmt(ms.budgetAmount)}</span></p>}
+                      {ms.notes && <p className="text-xs text-slate-400 italic">{ms.notes}</p>}
+                      {nextStatus && (
+                        <button onClick={() => handleMsStatus(ms, nextStatus)} disabled={loading}
+                          className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-1 disabled:opacity-50">
+                          {loading ? <RefreshCw size={12} className="animate-spin" /> : MS_STATUS_CONFIG[nextStatus].icon}
+                          {MS_STATUS_CONFIG[nextStatus].label} Olarak İşaretle
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* MALİYETLER */}
+        {tab === 'costs' && (
+          <div className="space-y-3">
+            <button onClick={() => setShowCostForm(true)} className="btn-primary px-4 py-2 text-sm rounded-xl flex items-center gap-2 w-full justify-center">
+              <Plus size={14} /> Maliyet Kalemi Ekle
+            </button>
+            {['PROCUREMENT','TRAVEL','EXTERNAL_SERVICE','OTHER'].map(cat => {
+              const items = project.projectCostItems.filter(c => c.category === cat);
+              if (!items.length) return null;
+              return (
+                <div key={cat}>
+                  <p className={`text-xs font-bold px-2 py-0.5 rounded-full w-fit mb-2 ${COST_CAT_COLOR[cat as CostCategory]}`}>
+                    {COST_CAT_LABEL[cat as CostCategory]}
+                  </p>
+                  <div className="space-y-2">
+                    {items.map(c => (
+                      <div key={c.id} className="bg-white/5 rounded-xl p-3 flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold">{c.description}</p>
+                          <div className="flex gap-3 text-xs text-slate-400 mt-1">
+                            <span>Plan: {fmt(c.plannedAmount)}</span>
+                            <span>Gerç: {fmt(c.amountTRY)}</span>
+                            {c.invoiceNo && <span>Fatura: {c.invoiceNo}</span>}
                           </div>
-                        ))}
+                        </div>
+                        <button onClick={() => handleDeleteCost(c.id)} className="text-slate-500 hover:text-red-400 shrink-0">
+                          <Trash2 size={14} />
+                        </button>
                       </div>
-                    ) : (
-                      <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                        <MessageSquare size={32} className="mb-2 opacity-20" />
-                        <p className="text-sm italic">Henüz bir bilgi notu bulunmuyor.</p>
-                      </div>
-                    )}
+                    ))}
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'REPORTING' && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div className="bg-white rounded-3xl border border-slate-200 p-8 space-y-6">
-                <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <PieChart size={20} className="text-indigo-600" />
-                  Proje İlerleme Durumu
-                </h4>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="font-bold text-slate-700">Genel İlerleme</span>
-                    <span className="font-bold text-indigo-600">%{selectedProject?.progress || 0}</span>
-                  </div>
-                  <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                    <motion.div 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${selectedProject?.progress || 0}%` }}
-                      className="h-full bg-indigo-600 rounded-full"
-                    />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4 pt-4">
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Bitiş Tarihi</p>
-                    <p className="text-sm font-bold text-slate-900">{selectedProject?.deadline}</p>
-                  </div>
-                  <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase mb-1">Durum</p>
-                    <p className="text-sm font-bold text-slate-900">{selectedProject?.status}</p>
-                  </div>
-                </div>
-
-                {selectedProject && selectedProject.progress < 100 && (
-                  <button 
-                    onClick={handleCompleteProject}
-                    className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-2 mt-4"
-                  >
-                    <CheckCircle2 size={16} />
-                    Geçici Kabulü Onayla & Tamamla (%100)
-                  </button>
-                )}
-
-                {selectedProject && selectedProject.progress === 100 && (
-                  <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-2xl flex flex-col gap-3 mt-4">
-                    <p className="text-xs font-bold text-emerald-800 flex items-center gap-1">
-                      <CheckCircle2 size={16} className="text-emerald-600" />
-                      Proje Kurulumu ve Geçici Kabul Tamamlandı!
-                    </p>
-                    <p className="text-[10px] text-emerald-600 font-medium leading-relaxed">
-                      Sözleşme ve kabul evraklarını klasörleyip fiziksel arşive teslim edebilirsiniz.
-                    </p>
-                    {setGlobalActiveTab && (
-                      <button 
-                        onClick={() => setGlobalActiveTab('archive')}
-                        className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black transition-all shadow-md flex items-center justify-center gap-2 uppercase tracking-wider"
-                      >
-                        <Archive size={14} />
-                        Evrakları Fiziksel Arşive Teslim Et
-                      </button>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="bg-white rounded-3xl border border-slate-200 p-8">
-                <h4 className="text-lg font-bold text-slate-900 mb-6 flex items-center gap-2">
-                  <FileText size={20} className="text-amber-600" />
-                  Yönetim Raporu Oluştur
-                </h4>
-                <div className="space-y-4">
-                  <textarea 
-                    rows={4}
-                    placeholder="Üst yönetime sunulacak haftalık ilerleme notlarını buraya girin..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    value={newReport.notes}
-                    onChange={(e) => setNewReport({...newReport, notes: e.target.value})}
-                  />
-                  <button 
-                    onClick={() => setShowNewReportModal(true)}
-                    className="w-full py-3 bg-indigo-600 text-white rounded-xl text-sm font-bold hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-100 flex items-center justify-center gap-2"
-                  >
-                    <ArrowUpRight size={18} /> Raporu Gönder
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
-
-      {/* New Project Task Modal */}
-      <AnimatePresence>
-        {showHandOffModal && handOffTarget && (
-          <HandOffModal 
-            isOpen={showHandOffModal}
-            onClose={() => setShowHandOffModal(false)}
-            onConfirm={handleHandOff}
-            itemTitle={handOffTarget.title}
-          />
-        )}
-        {showNewTaskModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">Yeni Proje Görevi</h4>
-                <button onClick={() => setShowNewTaskModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Başlığı</label>
-                  <input 
-                    type="text" 
-                    placeholder="Örn: Saha Keşfi"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Atanan Kişi</label>
-                    <select 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewTask({...newTask, assignedTo: e.target.value})}
-                    >
-                      <option value="">Seçiniz</option>
-                      {MOCK_SYSTEM_USERS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Termin Tarihi</label>
-                    <input 
-                      type="date" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Görev Detayı</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="Görev açıklaması..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowNewTaskModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button 
-                  onClick={handleAddTask}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Görevi Kaydet
-                </button>
-              </div>
-            </motion.div>
+              );
+            })}
+            {project.projectCostItems.length === 0 && (
+              <p className="text-sm text-slate-400 text-center py-6">Henüz maliyet kalemi yok.</p>
+            )}
           </div>
         )}
-      </AnimatePresence>
 
-      {/* New Procurement Request Modal */}
-      <AnimatePresence>
-        {showNewProcurementReqModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">Yeni Satın Alma Talebi</h4>
-                <button onClick={() => setShowNewProcurementReqModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Talep Başlığı</label>
-                  <input 
-                    type="text" 
-                    placeholder="Örn: Ek Sunucu İhtiyacı"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewProcurementReq({...newProcurementReq, title: e.target.value})}
-                  />
+        {/* KARLILIK */}
+        {tab === 'profitability' && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3">
+              {[
+                { label: 'Sözleşme Bedeli', value: fmt(project.totalValue, project.contractCurrency), note: 'Kazanılan teklif' },
+                { label: 'Planlanan Maliyet', value: fmt(fin.totalPlanned), note: `Hedef kar: %${fin.plannedMargin.toFixed(1)}` },
+                { label: 'Gerçekleşen Maliyet', value: fmt(fin.totalActual), note: `Gerçek kar: %${fin.actualMargin.toFixed(1)}` },
+                { label: 'Tahmini Toplam Maliyet', value: fmt(fin.forecastCost), note: `Tahmini kar: %${fin.forecastMargin.toFixed(1)}` },
+              ].map(r => (
+                <div key={r.label} className="bg-white/5 rounded-xl p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-slate-400">{r.label}</p>
+                    <p className="text-sm font-bold mt-0.5">{r.value}</p>
+                  </div>
+                  <p className="text-xs text-slate-400">{r.note}</p>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Öncelik</label>
-                  <select 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewProcurementReq({...newProcurementReq, priority: e.target.value})}
-                    value={newProcurementReq.priority}
-                  >
-                    <option value="LOW">Düşük</option>
-                    <option value="MEDIUM">Orta</option>
-                    <option value="HIGH">Yüksek</option>
-                    <option value="URGENT">Acil</option>
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Talep Detayı</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Talebin detayları, teknik özellikler vb..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewProcurementReq({...newProcurementReq, description: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowNewProcurementReqModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button 
-                  onClick={handleCreateProcurementReq}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Talebi Gönder
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+              ))}
+            </div>
 
-      {/* Send Report Confirmation Modal */}
-      <AnimatePresence>
-        {showNewReportModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">Raporu Gönder</h4>
-                <button onClick={() => setShowNewReportModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <p className="text-sm text-slate-600">
-                  Bu rapor üst yönetime iletilecektir. Onaylıyor musunuz?
+            {/* Kategori dağılımı */}
+            <div className="bg-white/5 rounded-xl p-4">
+              <p className="text-xs font-semibold text-slate-400 mb-3 uppercase tracking-wide">Maliyet Dağılımı</p>
+              {Object.keys(COST_CAT_LABEL).map(cat => {
+                const items = project.projectCostItems.filter(c => c.category === cat);
+                const total = items.reduce((s, c) => s + c.amountTRY, 0);
+                const pct = fin.totalActual > 0 ? (total / fin.totalActual) * 100 : 0;
+                if (!total) return null;
+                return (
+                  <div key={cat} className="flex items-center gap-3 mb-2">
+                    <span className="text-xs text-slate-400 w-28 shrink-0">{COST_CAT_LABEL[cat as CostCategory]}</span>
+                    <div className="flex-1 bg-white/10 rounded-full h-2 overflow-hidden">
+                      <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-xs font-bold text-slate-300 w-16 text-right">{fmt(total)}</span>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Risk uyarısı */}
+            {fin.actualMargin < fin.plannedMargin - 5 && (
+              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-3 flex items-start gap-2">
+                <AlertTriangle size={16} className="text-red-400 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-300">
+                  Gerçekleşen karlılık plandan <strong>%{(fin.plannedMargin - fin.actualMargin).toFixed(1)}</strong> geride. Maliyet kontrolü önerilir.
                 </p>
               </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowNewReportModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button 
-                  onClick={handleSendReport}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Evet, Gönder
-                </button>
-              </div>
-            </motion.div>
+            )}
           </div>
+        )}
+      </div>
+
+      {/* Cost Form Modal */}
+      <AnimatePresence>
+        {showCostForm && (
+          <CostForm projectId={project.id} milestones={project.milestones} onSave={handleAddCost} onClose={() => setShowCostForm(false)} />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+};
+
+// ── PDF Rapor Yazdırma ────────────────────────────────────────────────────────
+
+const printProjectReport = (project: Project, forCustomer = false) => {
+  const fin = calcFinancials(project);
+  const w = window.open('', '_blank');
+  if (!w) return;
+  const msRows = project.milestones.map(m => {
+    const sc = MS_STATUS_CONFIG[m.status];
+    return `<tr><td>${m.title}</td><td>${sc.label}</td><td>%${m.progress}</td><td>${fmtDate(m.plannedStart)}</td><td>${fmtDate(m.plannedEnd)}</td><td>${fmtDate(m.actualEnd)}</td></tr>`;
+  }).join('');
+  const costRows = forCustomer ? '' : project.projectCostItems.map(c =>
+    `<tr><td>${COST_CAT_LABEL[c.category]}</td><td>${c.description}</td><td>${fmt(c.plannedAmount)}</td><td>${fmt(c.amountTRY)}</td></tr>`
+  ).join('');
+
+  w.document.write(`<!DOCTYPE html><html><head><title>Proje Raporu — ${project.name}</title>
+  <style>body{font-family:Arial,sans-serif;padding:40px;color:#1e293b;max-width:900px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin:24px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+  table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #e2e8f0;text-align:left}
+  th{background:#f8fafc;font-weight:600}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0}
+  .card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px}.label{font-size:11px;color:#64748b}
+  .val{font-size:16px;font-weight:700;margin-top:2px}.warn{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;color:#dc2626;font-size:12px}</style>
+  </head><body>
+  <h1>Proje Raporu${forCustomer ? ' (Müşteri)' : ''}</h1>
+  <p style="color:#64748b;font-size:13px">${project.name} · ${fmtDate(new Date().toISOString())}</p>
+  <div class="grid">
+    <div class="card"><p class="label">Müşteri</p><p class="val" style="font-size:14px">${project.customerName ?? '—'}</p></div>
+    <div class="card"><p class="label">Proje Yöneticisi</p><p class="val" style="font-size:14px">${project.pmName ?? '—'}</p></div>
+    <div class="card"><p class="label">Sözleşme Bedeli</p><p class="val">${fmt(project.totalValue, project.contractCurrency)}</p></div>
+    <div class="card"><p class="label">İlerleme</p><p class="val">%${project.progress}</p></div>
+    <div class="card"><p class="label">Planlanan Bitiş</p><p class="val" style="font-size:14px">${fmtDate(project.plannedEndDate)}</p></div>
+    <div class="card"><p class="label">Aktif Faz</p><p class="val" style="font-size:14px">${project.phase}</p></div>
+  </div>
+  <h2>Milestone Takibi</h2>
+  <table><tr><th>Milestone</th><th>Durum</th><th>İlerleme</th><th>Plan Başlangıç</th><th>Plan Bitiş</th><th>Gerçek Bitiş</th></tr>${msRows}</table>
+  ${!forCustomer ? `
+  <h2>Finansal Özet</h2>
+  <div class="grid">
+    <div class="card"><p class="label">Planlanan Maliyet</p><p class="val">${fmt(fin.totalPlanned)}</p></div>
+    <div class="card"><p class="label">Gerçekleşen Maliyet</p><p class="val">${fmt(fin.totalActual)}</p></div>
+    <div class="card"><p class="label">Planlanan Kar Marjı</p><p class="val" style="color:${fin.plannedMargin >= 0 ? '#16a34a' : '#dc2626'}">%${fin.plannedMargin.toFixed(1)}</p></div>
+    <div class="card"><p class="label">Gerçekleşen Kar Marjı</p><p class="val" style="color:${fin.actualMargin >= 0 ? '#16a34a' : '#dc2626'}">%${fin.actualMargin.toFixed(1)}</p></div>
+  </div>
+  ${costRows ? `<h2>Maliyet Kalemleri</h2><table><tr><th>Kategori</th><th>Açıklama</th><th>Planlanan</th><th>Gerçekleşen</th></tr>${costRows}</table>` : ''}
+  ${fin.actualMargin < fin.plannedMargin - 5 ? `<div class="warn">⚠ Gerçekleşen karlılık plandan %${(fin.plannedMargin - fin.actualMargin).toFixed(1)} geride.</div>` : ''}
+  ` : ''}
+  </body></html>`);
+  w.document.close();
+  w.print();
+};
+
+// ── Ana Modül ─────────────────────────────────────────────────────────────────
+
+interface ProjectManagementModuleProps {
+  users?: User[];
+  units?: Unit[];
+  customers?: { id: string; name: string }[];
+  setActiveTab?: (tab: string) => void;
+}
+
+const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users = [], customers = [], setActiveTab }) => {
+  const { currentUser } = useAuth();
+  const [view, setView] = useState<'dashboard' | 'list'>('dashboard');
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [wonOpportunities, setWonOpportunities] = useState<Opportunity[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [showOppPicker, setShowOppPicker] = useState(false);
+  const [showProjectForm, setShowProjectForm] = useState(false);
+  const [editProject, setEditProject] = useState<Project | null>(null);
+  const [prefilledProject, setPrefilledProject] = useState<Partial<Project> & { opportunityId?: string } | undefined>(undefined);
+
+  const loadProjects = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.getProjects() as Project[];
+      setProjects(data);
+      if (selectedProject) {
+        const upd = data.find(p => p.id === selectedProject.id);
+        if (upd) setSelectedProject(upd);
+      }
+    } finally { setLoading(false); }
+  }, [selectedProject?.id]);
+
+  const loadWonOpportunities = useCallback(async () => {
+    const data = await apiService.getOpportunities() as Opportunity[];
+    setWonOpportunities(data.filter(o => o.status === 'WON'));
+  }, []);
+
+  useEffect(() => { loadProjects(); loadWonOpportunities(); }, []);
+
+  const existingProjectOppIds = useMemo(
+    () => new Set(projects.map(p => p.opportunityId).filter(Boolean) as string[]),
+    [projects]
+  );
+
+  const handleNewProjectClick = () => {
+    setEditProject(null);
+    setPrefilledProject(undefined);
+    setShowOppPicker(true);
+  };
+
+  const handleOppSelect = (opp: Opportunity) => {
+    setShowOppPicker(false);
+    setPrefilledProject({
+      name: opp.title,
+      customerId: opp.customerId ?? undefined,
+      customerName: opp.customer?.name ?? undefined,
+      totalValue: opp.value ?? 0,
+      budgetTotal: opp.value ?? 0,
+      opportunityId: opp.id,
+    } as Partial<Project> & { opportunityId: string });
+    setShowProjectForm(true);
+  };
+
+  const handleCreateProject = async (data: Record<string, unknown>) => {
+    await apiService.createProject(data);
+    setShowProjectForm(false);
+    setPrefilledProject(undefined);
+    loadProjects();
+  };
+
+  const handleUpdateProject = async (data: Record<string, unknown>) => {
+    if (!editProject) return;
+    await apiService.updateProject(editProject.id, data);
+    setEditProject(null);
+    setShowProjectForm(false);
+    loadProjects();
+  };
+
+  const handleDeleteProject = async (id: string) => {
+    if (!confirm('Bu proje silinsin mi?')) return;
+    await apiService.deleteProject(id);
+    if (selectedProject?.id === id) setSelectedProject(null);
+    loadProjects();
+  };
+
+  const filtered = useMemo(() => projects.filter(p => {
+    const q = search.toLowerCase();
+    const matchQ = !q || p.name.toLowerCase().includes(q) || p.customerName?.toLowerCase().includes(q) || false;
+    const matchS = !filterStatus || p.status === filterStatus;
+    const matchT = !filterType || p.type === filterType;
+    return matchQ && matchS && matchT;
+  }), [projects, search, filterStatus, filterType]);
+
+  // Dashboard metrikleri
+  const metrics = useMemo(() => {
+    const active = projects.filter(p => p.status === 'IN_PROGRESS' || p.status === 'PLANNING');
+    const totalVal = active.reduce((s, p) => s + p.totalValue, 0);
+    const delayed = projects.filter(p => {
+      const fin = calcFinancials(p);
+      return fin.delayedMs > 0 && p.status !== 'COMPLETED' && p.status !== 'CANCELLED';
+    }).length;
+    const avgMargin = active.length
+      ? active.reduce((s, p) => s + calcFinancials(p).actualMargin, 0) / active.length
+      : 0;
+    return { active: active.length, totalVal, delayed, avgMargin };
+  }, [projects]);
+
+  // Kanban gruplandırma
+  const kanbanGroups = useMemo(() => {
+    const statuses: ProjectStatus[] = ['PLANNING','IN_PROGRESS','ON_HOLD','COMPLETED'];
+    return statuses.map(s => ({ status: s, projects: projects.filter(p => p.status === s) }));
+  }, [projects]);
+
+  // Risk paneli
+  const riskProjects = useMemo(() => projects.filter(p => {
+    if (p.status === 'COMPLETED' || p.status === 'CANCELLED') return false;
+    const fin = calcFinancials(p);
+    return fin.delayedMs > 0 || fin.actualMargin < fin.plannedMargin - 5 || (p.budgetTotal > 0 && fin.totalActual > p.budgetTotal * 0.85);
+  }), [projects]);
+
+  return (
+    <div className="flex h-full">
+      <div className={`flex-1 overflow-y-auto transition-all ${selectedProject ? 'mr-[640px]' : ''}`}>
+        <div className="p-6 space-y-6">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Proje Yönetimi</h2>
+              <p className="text-sm text-slate-400 mt-0.5">Satınalma'dan tahsilata tam proje yaşam döngüsü</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={loadProjects} className="p-2 hover:bg-white/10 rounded-xl text-slate-400">
+                <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
+              </button>
+              <button onClick={handleNewProjectClick}
+                className="btn-primary px-4 py-2 text-sm rounded-xl flex items-center gap-2">
+                <Plus size={16} /> Yeni Proje
+              </button>
+            </div>
+          </div>
+
+          {/* Metrik kartlar */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            {[
+              { label: 'Aktif Proje',     value: metrics.active,            icon: <Layers size={20} />,    color: 'text-indigo-400' },
+              { label: 'Toplam Değer',    value: fmt(metrics.totalVal),     icon: <DollarSign size={20} />,color: 'text-green-400'  },
+              { label: 'Ort. Kar Marjı',  value: `%${metrics.avgMargin.toFixed(1)}`, icon: <TrendingUp size={20} />, color: metrics.avgMargin >= 15 ? 'text-green-400' : 'text-amber-400' },
+              { label: 'Gecikmiş Proje',  value: metrics.delayed,           icon: <AlertCircle size={20} />,color: metrics.delayed > 0 ? 'text-red-400' : 'text-slate-400' },
+            ].map(m => (
+              <div key={m.label} className="glass-card rounded-2xl p-4">
+                <div className={`${m.color} mb-2`}>{m.icon}</div>
+                <p className="text-2xl font-bold">{m.value}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{m.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* View toggle */}
+          <div className="flex items-center justify-between">
+            <div className="flex gap-1 bg-white/5 rounded-xl p-1 w-fit">
+              {[{ key: 'dashboard', label: 'Kanban' }, { key: 'list', label: 'Liste' }].map(v => (
+                <button key={v.key} onClick={() => setView(v.key as typeof view)}
+                  className={`px-4 py-1.5 text-sm font-semibold rounded-lg transition-colors ${view === v.key ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}>
+                  {v.label}
+                </button>
+              ))}
+            </div>
+            {view === 'list' && (
+              <div className="flex gap-2">
+                <div className="relative">
+                  <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ara…"
+                    className="input-glass pl-8 pr-3 py-1.5 text-sm rounded-xl w-48" />
+                </div>
+                <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input-glass px-2 py-1.5 text-sm rounded-xl">
+                  <option value="">Tüm Durumlar</option>
+                  {Object.entries(STATUS_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+                <select value={filterType} onChange={e => setFilterType(e.target.value)} className="input-glass px-2 py-1.5 text-sm rounded-xl">
+                  <option value="">Tüm Tipler</option>
+                  {Object.entries(PROJECT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                </select>
+              </div>
+            )}
+          </div>
+
+          {/* KANBAN */}
+          {view === 'dashboard' && (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {kanbanGroups.map(({ status, projects: gProjects }) => {
+                const cfg = STATUS_CONFIG[status];
+                return (
+                  <div key={status} className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${cfg.bg} ${cfg.color}`}>{cfg.label}</span>
+                      <span className="text-xs text-slate-400 font-semibold">{gProjects.length}</span>
+                    </div>
+                    {gProjects.map(p => {
+                      const fin = calcFinancials(p);
+                      return (
+                        <div key={p.id} onClick={() => setSelectedProject(prev => prev?.id === p.id ? null : p)}
+                          className={`glass-card rounded-xl p-3 cursor-pointer transition-all hover:border-indigo-500/40 ${selectedProject?.id === p.id ? 'border-indigo-500/60 ring-1 ring-indigo-500/30' : ''}`}>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <p className="text-sm font-semibold leading-tight flex-1">{p.name}</p>
+                            <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${PROJECT_TYPE_COLOR[p.type]} shrink-0`}>
+                              {PROJECT_TYPE_LABEL[p.type].slice(0,3)}
+                            </span>
+                          </div>
+                          {p.customerName && <p className="text-xs text-slate-400 mb-2">{p.customerName}</p>}
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">
+                              <div className="h-full bg-indigo-500 rounded-full" style={{ width: `${p.progress}%` }} />
+                            </div>
+                            <span className="text-[10px] text-slate-400 font-bold">%{p.progress}</span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <MarginBadge value={fin.actualMargin} />
+                            {fin.delayedMs > 0 && (
+                              <span className="text-[10px] text-red-400 flex items-center gap-0.5">
+                                <AlertCircle size={10} />{fin.delayedMs}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {gProjects.length === 0 && (
+                      <div className="border border-dashed border-white/10 rounded-xl p-4 text-center text-xs text-slate-500">Proje yok</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* LİSTE */}
+          {view === 'list' && (
+            <div className="space-y-3">
+              {loading ? <div className="flex justify-center py-12"><RefreshCw size={20} className="animate-spin text-slate-400" /></div>
+                : filtered.length === 0 ? <div className="text-center py-12 text-slate-400 text-sm">Proje bulunamadı.</div>
+                : filtered.map(p => {
+                  const fin = calcFinancials(p);
+                  return (
+                    <div key={p.id} onClick={() => setSelectedProject(prev => prev?.id === p.id ? null : p)}
+                      className={`glass-card rounded-2xl p-4 cursor-pointer transition-all hover:border-indigo-500/40 ${selectedProject?.id === p.id ? 'border-indigo-500/60 ring-1 ring-indigo-500/30' : ''}`}>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-1">
+                            <StatusBadge status={p.status} />
+                            <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${PROJECT_TYPE_COLOR[p.type]}`}>{PROJECT_TYPE_LABEL[p.type]}</span>
+                            {fin.delayedMs > 0 && <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1"><AlertCircle size={11} />{fin.delayedMs} gecikmiş</span>}
+                          </div>
+                          <h4 className="font-semibold text-sm">{p.name}</h4>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {p.customerName && <span>{p.customerName} · </span>}
+                            PM: {p.pmName ?? '—'} · Faz: {p.phase}
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0 space-y-1">
+                          <p className="font-bold text-sm">{fmt(p.totalValue, p.contractCurrency)}</p>
+                          <div className="flex gap-1 justify-end">
+                            <MarginBadge value={fin.actualMargin} />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 mt-3">
+                        <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">
+                          <div className="h-full bg-indigo-500 rounded-full transition-all" style={{ width: `${p.progress}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-400 font-bold">%{p.progress}</span>
+                        <span className="text-xs text-slate-400">Bitiş: {fmtDate(p.plannedEndDate)}</span>
+                        <button onClick={e => { e.stopPropagation(); setEditProject(p); setShowProjectForm(true); }}
+                          className="p-1 text-slate-400 hover:text-slate-200 transition-colors"><Edit2 size={13} /></button>
+                        <button onClick={e => { e.stopPropagation(); handleDeleteProject(p.id); }}
+                          className="p-1 text-slate-400 hover:text-red-400 transition-colors"><Trash2 size={13} /></button>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+
+          {/* Risk Paneli */}
+          {riskProjects.length > 0 && (
+            <div className="glass-card rounded-2xl p-5 border-amber-500/20 border bg-amber-900/5">
+              <h4 className="text-sm font-bold text-amber-400 mb-3 flex items-center gap-2">
+                <AlertTriangle size={16} /> Risk Paneli
+              </h4>
+              <div className="space-y-2">
+                {riskProjects.map(p => {
+                  const fin = calcFinancials(p);
+                  const risks: string[] = [];
+                  if (fin.delayedMs > 0) risks.push(`${fin.delayedMs} gecikmiş milestone`);
+                  if (fin.actualMargin < fin.plannedMargin - 5) risks.push(`Kar %${(fin.plannedMargin - fin.actualMargin).toFixed(1)} geride`);
+                  if (p.budgetTotal > 0 && fin.totalActual > p.budgetTotal * 0.85) risks.push(`Bütçenin %${((fin.totalActual/p.budgetTotal)*100).toFixed(0)}'i kullanıldı`);
+                  return (
+                    <div key={p.id} className="flex items-center gap-3 cursor-pointer hover:bg-white/5 rounded-xl p-2 transition-colors"
+                      onClick={() => setSelectedProject(p)}>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-200 truncate">{p.name}</p>
+                        <p className="text-xs text-amber-400">{risks.join(' · ')}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-400 shrink-0" />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Detay Çekmecesi */}
+      <AnimatePresence>
+        {selectedProject && (
+          <>
+            <div className="fixed inset-0 z-40 bg-slate-900/30 backdrop-blur-[2px]" onClick={() => setSelectedProject(null)} />
+            <ProjectDetail
+              project={selectedProject}
+              users={users}
+              currentUserRole={currentUser?.role}
+              currentUserId={currentUser?.id}
+              onClose={() => setSelectedProject(null)}
+              onRefresh={loadProjects}
+              onPrintReport={printProjectReport}
+            />
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Fırsat Seçici */}
+      <AnimatePresence>
+        {showOppPicker && (
+          <OpportunityPicker
+            opportunities={wonOpportunities}
+            existingProjectOppIds={existingProjectOppIds}
+            onSelect={handleOppSelect}
+            onBlank={() => { setShowOppPicker(false); setPrefilledProject(undefined); setShowProjectForm(true); }}
+            onClose={() => setShowOppPicker(false)}
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Proje Formu */}
+      <AnimatePresence>
+        {showProjectForm && (
+          <ProjectForm
+            initial={editProject ?? prefilledProject as Partial<Project> | undefined}
+            users={users}
+            customers={customers}
+            onSave={editProject ? handleUpdateProject : handleCreateProject}
+            onClose={() => { setShowProjectForm(false); setEditProject(null); setPrefilledProject(undefined); }}
+          />
         )}
       </AnimatePresence>
     </div>

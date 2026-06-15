@@ -80,6 +80,7 @@ export const NAV_ITEMS = [
     icon: Users,
     requiredPermission: 'CRM_VIEW',
     subItems: [
+      { id: 'crm-dashboard',    label: 'Genel Bakış',        requiredPermission: 'CRM_VIEW' },
       { id: 'crm-opportunities', label: 'Fırsatlar',        requiredPermission: 'CRM_OPPS_VIEW' },
       { id: 'crm-proposals',    label: 'Teklifler',          requiredPermission: 'CRM_PROPOSALS_VIEW' },
       { id: 'crm-customers',    label: 'Müşteriler',         requiredPermission: 'CRM_CUSTOMERS_VIEW' },
@@ -115,8 +116,10 @@ export const NAV_ITEMS = [
       { id: 'settings-workflow',     label: 'İş Akışı',               requiredPermission: 'SETTINGS_PERMISSIONS' },
       { id: 'settings-permissions',  label: 'Yetkiler',               requiredPermission: 'SETTINGS_PERMISSIONS' },
       { id: 'settings-integrations', label: 'Entegrasyonlar',         requiredPermission: 'SETTINGS_INTEGRATIONS' },
-      { id: 'settings-subscription', label: 'Abonelik & Lisans',      requiredPermission: 'GENERAL_MANAGER' },
-      { id: 'settings-modules',      label: 'Modüller',               requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-subscription',      label: 'Abonelik & Kullanım',       requiredPermission: 'SETTINGS_VIEW' },
+      { id: 'settings-license-types',    label: 'Lisans Planları',            requiredPermission: 'SETTINGS_VIEW' },
+      { id: 'settings-license-generate', label: 'Lisans Anahtarı Oluştur',   requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
     ],
   },
 ];
@@ -136,27 +139,42 @@ export const MOCK_CUSTOMERS = [
 ];
 
 export const MOCK_PROJECTS: Project[] = [
-  { 
-    id: 'p1', 
-    name: 'Veri Merkezi Modernizasyonu', 
-    customerId: 'c1', 
-    status: 'IN_PROGRESS', 
-    totalValue: 450000, 
-    avgMargin: 14.5, 
+  {
+    id: 'p1',
+    name: 'Veri Merkezi Modernizasyonu',
+    customerId: 'c1',
+    type: 'HARDWARE',
+    phase: 'INSTALLATION',
+    status: 'IN_PROGRESS',
+    totalValue: 450000,
+    contractCurrency: 'TRY',
+    budgetTotal: 360000,
+    avgMargin: 14.5,
     deadline: '2026-06-15',
+    plannedEndDate: '2026-06-15',
     ownerId: 'u1',
     managerId: 'cmp5lhehc000259w33zxhyy0p',
-    progress: 35
+    progress: 35,
+    milestones: [],
+    projectCostItems: [],
   },
-  { 
-    id: 'p2', 
-    name: 'Siber Güvenlik Altyapısı', 
-    customerId: 'c2', 
-    status: 'AWAITING_APPROVAL', 
-    totalValue: 125000, 
-    avgMargin: 9.2, 
+  {
+    id: 'p2',
+    name: 'Siber Güvenlik Altyapısı',
+    customerId: 'c2',
+    type: 'SERVICE',
+    phase: 'PLANNING',
+    status: 'PLANNING',
+    totalValue: 125000,
+    contractCurrency: 'TRY',
+    budgetTotal: 100000,
+    avgMargin: 9.2,
     deadline: '2026-05-20',
-    ownerId: 'u2'
+    plannedEndDate: '2026-05-20',
+    ownerId: 'u2',
+    progress: 0,
+    milestones: [],
+    projectCostItems: [],
   }
 ];
 

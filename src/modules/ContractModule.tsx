@@ -130,15 +130,22 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
     const newProject: Project = {
       id: `proj-${Date.now()}`,
       name: targetName,
+      type: 'HARDWARE',
+      phase: 'PLANNING',
       customerId: opportunity?.customerId || project?.customerId || 'c1',
-      status: 'NOT_STARTED',
+      status: 'PLANNING',
       totalValue: opportunity?.value || 0,
+      contractCurrency: 'TRY',
+      budgetTotal: opportunity?.value || 0,
       avgMargin: 15,
       deadline: updatedContract.endDate || '2027-12-31',
+      plannedEndDate: updatedContract.endDate || '2027-12-31',
       ownerId: 'cmp5lhehc000259w33zxhyy0p',
       managerId: pmToAssign,
       progress: 0,
-      opportunityId: opportunity?.id
+      opportunityId: opportunity?.id,
+      milestones: [],
+      projectCostItems: [],
     };
     setProjects([...projects, newProject]);
 

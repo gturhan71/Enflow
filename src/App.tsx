@@ -303,6 +303,7 @@ const TenantAppInner = ({
     switch (activeTab) {
       case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} />;
       case 'crm':
+      case 'crm-dashboard':
       case 'crm-opportunities':
       case 'crm-customers':
       case 'crm-proposals':
@@ -339,8 +340,8 @@ const TenantAppInner = ({
       // Eski sözleşme modülü — erişim kapanmadı, sadece menüden çıkarıldı
       case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
 
-      case 'procurement': return <ProcurementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
-      case 'project-mgmt': return <ProjectManagementModule projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} setActiveTab={setActiveTab} />;
+      case 'procurement': return <ProcurementModule projects={projects} units={units} />;
+      case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} setProposals={setProposals} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;

@@ -659,7 +659,7 @@ const Dashboard = ({
                         "text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter",
                         p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" :
                         p.status === 'COMPLETED' ? "bg-blue-500/10 text-blue-600" :
-                        p.status === 'NOT_STARTED' ? "bg-amber-500/10 text-amber-600" :
+                        p.status === 'PLANNING' ? "bg-amber-500/10 text-amber-600" :
                         "bg-slate-100 text-slate-500"
                       )}>
                         {{ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' }[p.status] ?? p.status}

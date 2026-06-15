@@ -8,6 +8,7 @@ import { UserManagement } from '../components/settings/UserManagement';
 import { SubscriptionSettings } from '../components/settings/SubscriptionSettings';
 import { PermissionSettings } from '../components/settings/PermissionSettings';
 import LicenseGeneratorModule from './LicenseGeneratorModule';
+import LicenseTypesModule from './LicenseTypesModule';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { useModuleSettings } from '../hooks/useEnflowQueries';
@@ -232,7 +233,11 @@ const SettingsModule = ({
         return <UserManagement users={users} setUsers={setUsers} units={units} tenants={tenants} activeTenantId={activeTenantId} currentUser={currentUser} />;
       case 'subscription': // settings-subscription → 'subscription'
         return <SubscriptionSettings subscription={subscription} usage={usage} currentUser={currentUser} fetchSubscriptionData={fetchSubscriptionData} />;
-      case 'license': // settings-license
+      case 'license-types': // settings-license-types
+        return <LicenseTypesModule />;
+      case 'license-generate': // settings-license-generate
+        return <LicenseGeneratorModule />;
+      case 'license': // geriye dönük uyumluluk
         return <LicenseGeneratorModule />;
       case 'workflow':
         return <WorkflowBuilder units={units} />;

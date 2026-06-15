@@ -51,10 +51,45 @@ class ApiService {
   }
 
   // --- PROJECTS ---
-  async getProjects() { return projectService.getProjects(); }
-  async createProject(data: Omit<Project, 'id'>) { return projectService.createProject(data); }
-  async updateProject(id: string, data: Partial<Project>) { return projectService.updateProject(id, data); }
-  async deleteProject(id: string) { return projectService.deleteProject(id); }
+  async getProjects(params?: { status?: string; type?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/projects${qs}`);
+  }
+  async getProject(id: string) { return apiClient.fetchWithAuth(`/projects/${id}`); }
+  async createProject(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/projects', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateProject(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteProject(id: string) {
+    return apiClient.fetchWithAuth(`/projects/${id}`, { method: 'DELETE' });
+  }
+  async getProjectsSummary() { return apiClient.fetchWithAuth('/projects/summary/all'); }
+
+  // --- PROJECT MILESTONES ---
+  async getProjectMilestones(projectId: string) { return apiClient.fetchWithAuth(`/projects/${projectId}/milestones`); }
+  async createProjectMilestone(projectId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/milestones`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateProjectMilestone(projectId: string, msId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/milestones/${msId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteProjectMilestone(projectId: string, msId: string) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/milestones/${msId}`, { method: 'DELETE' });
+  }
+
+  // --- PROJECT COST ITEMS ---
+  async getProjectCosts(projectId: string) { return apiClient.fetchWithAuth(`/projects/${projectId}/costs`); }
+  async createProjectCost(projectId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/costs`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateProjectCost(projectId: string, costId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/costs/${costId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteProjectCost(projectId: string, costId: string) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/costs/${costId}`, { method: 'DELETE' });
+  }
 
   // --- TASKS ---
   async getTasks() { return taskService.getTasks(); }
@@ -94,6 +129,7 @@ class ApiService {
   // --- SUBSCRIPTION & USAGE ---
   async getSubscription() { return settingsService.getSubscription(); }
   async updateTenantSubscription(tenantId: string, plan: string) { return settingsService.updateTenantSubscription(tenantId, plan); }
+  async activateLicense(licenseKey: string) { return settingsService.activateLicense(licenseKey); }
   async getUsage() { return settingsService.getUsage(); }
 
   // --- TENANTS ---
@@ -123,6 +159,60 @@ class ApiService {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ promotedModules }),
     });
+  }
+
+  // --- PROCUREMENT ---
+  async getVendors() { return apiClient.fetchWithAuth('/vendors'); }
+  async createVendor(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/vendors', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateVendor(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/vendors/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteVendor(id: string) {
+    return apiClient.fetchWithAuth(`/vendors/${id}`, { method: 'DELETE' });
+  }
+
+  async getPurchaseRequests(params?: { status?: string; sourceType?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/purchase-requests${qs}`);
+  }
+  async getPurchaseRequest(id: string) { return apiClient.fetchWithAuth(`/purchase-requests/${id}`); }
+  async createPurchaseRequest(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/purchase-requests', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updatePurchaseRequest(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deletePurchaseRequest(id: string) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}`, { method: 'DELETE' });
+  }
+  async approvePurchaseRequest(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/approve`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async rejectPurchaseRequest(id: string, data: { rejectionNote: string }) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/reject`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async addPurchaseQuote(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/quotes`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updatePurchaseQuote(id: string, qid: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/quotes/${qid}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deletePurchaseQuote(id: string, qid: string) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/quotes/${qid}`, { method: 'DELETE' });
+  }
+  async selectPurchaseQuote(id: string, qid: string) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/quotes/${qid}/select`, { method: 'POST' });
+  }
+  async addDeliveryRecord(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/delivery`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updatePurchaseInvoice(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/invoice`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async closePurchaseRequest(id: string) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/close`, { method: 'POST' });
   }
 }
 

@@ -22,6 +22,8 @@ import proposalsRouter from './routes/proposals';
 import workflowsRouter from './routes/workflows';
 import contractWorkflowRouter from './routes/contractWorkflow';
 import adminTestRouter from './routes/adminTest';
+import vendorsRouter from './routes/vendors';
+import purchaseRequestsRouter from './routes/purchaseRequests';
 
 dotenv.config();
 
@@ -61,6 +63,8 @@ app.use('/api/proposals', proposalsRouter);
 app.use('/api/workflows', workflowsRouter);
 app.use('/api/contract-workflows', contractWorkflowRouter);
 app.use('/api/admin/security-test', adminTestRouter);
+app.use('/api/vendors', vendorsRouter);
+app.use('/api/purchase-requests', purchaseRequestsRouter);
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Error Detail]', err);

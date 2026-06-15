@@ -27,6 +27,8 @@ model Tenant {
   costItems          CostItem[]
   proposals          Proposal[]
   contractWorkflows  ContractWorkflow[]
+  vendors            Vendor[]
+  purchaseRequests   PurchaseRequest[]
 }
 
 enum SubscriptionPlan {
@@ -36,12 +38,17 @@ enum SubscriptionPlan {
 }
 
 model Subscription {
-  id        String           @id @default(cuid())
-  plan      SubscriptionPlan @default(STARTER)
-  tenantId  String           @unique
-  tenant    Tenant           @relation(fields: [tenantId], references: [id])
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id                   String           @id @default(cuid())
+  plan                 SubscriptionPlan @default(STARTER)
+  tenantId             String           @unique
+  tenant               Tenant           @relation(fields: [tenantId], references: [id])
+  licenseKey           String?
+  licenseModel         String?
+  licenseExpiryDate    DateTime?
+  licensedUserLimit    Int?
+  licensedStorageLimit Int?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 }
 
 model UsageMetric {
@@ -208,22 +215,89 @@ model WorkflowLog {
 }
 
 model Project {
-  id               String        @id @default(cuid())
-  name             String
-  status           String
-  totalValue       Float
-  avgMargin        Float
-  deadline         DateTime
-  progress         Int           @default(0)
-  customerId       String?
-  ownerId          String?
-  managerId        String?
-  opportunityId    String?       @unique
-  procurementNotes String?       // JSON string
-  tenantId         String
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  id                String        @id @default(cuid())
+  name              String
+  type              String        @default("HARDWARE") // HARDWARE | SOFTWARE | SERVICE | MIXED
+  description       String?
+  status            String        @default("PLANNING")
+  // PLANNING | IN_PROGRESS | ON_HOLD | COMPLETED | CANCELLED
+  phase             String        @default("PLANNING")
+  // Current active phase label for display
+  totalValue        Float         @default(0)   // contract value
+  contractCurrency  String        @default("TRY")
+  budgetTotal       Float         @default(0)
+  avgMargin         Float         @default(0)
+  deadline          DateTime?
+  plannedEndDate    DateTime?
+  actualEndDate     DateTime?
+  startDate         DateTime?
+  progress          Int           @default(0)
+  customerId        String?
+  customerName      String?
+  ownerId           String?
+  pmId              String?
+  pmName            String?
+  managerId         String?
+  opportunityId     String?       @unique
+  contractId        String?
+  procurementNotes  String?       // JSON string
+  tenantId          String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  milestones        ProjectMilestone[]
+  projectCostItems  ProjectCostItem[]
+}
+
+model ProjectMilestone {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title           String
+  description     String?
+  milestoneType   String   @default("CUSTOM")
+  // PLANNING | PROCUREMENT | SHIPMENT | INSTALLATION | DEVELOPMENT | TESTING | ACCEPTANCE | INVOICING | COLLECTION | WARRANTY | CUSTOM
+  status          String   @default("NOT_STARTED")
+  // NOT_STARTED | IN_PROGRESS | COMPLETED | BLOCKED | CANCELLED
+  progress        Int      @default(0)
+  assignedToId    String?
+  assignedToName  String?
+  plannedStart    DateTime?
+  plannedEnd      DateTime?
+  actualStart     DateTime?
+  actualEnd       DateTime?
+  budgetAmount    Float?
+  actualCost      Float?
+  currency        String   @default("TRY")
+  isParallel      Boolean  @default(false)
+  requiresApproval Boolean @default(false)
+  approvedById    String?
+  approvedAt      DateTime?
+  order           Int      @default(0)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model ProjectCostItem {
+  id              String   @id @default(cuid())
+  projectId       String
+  project         Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category        String   @default("OTHER")
+  // PROCUREMENT | TRAVEL | EXTERNAL_SERVICE | OTHER
+  description     String
+  plannedAmount   Float    @default(0)
+  actualAmount    Float    @default(0)
+  currency        String   @default("TRY")
+  amountTRY       Float    @default(0)
+  milestoneId     String?
+  purchaseRequestId String?
+  date            DateTime?
+  invoiceNo       String?
+  notes           String?
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Contract {
@@ -384,4 +458,117 @@ model ContractWorkflowDoc {
   tenantId      String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
+}
+
+// ── Satınalma Modülü ──────────────────────────────────────────────────────
+
+model Vendor {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  name         String
+  taxNo        String?
+  address      String?
+  phone        String?
+  email        String?
+  contactName  String?
+  iban         String?
+  bankName     String?
+  categories   String   @default("[]") // JSON string[]
+  rating       Float?
+  notes        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  quotes       PurchaseQuote[]
+}
+
+model PurchaseRequest {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  title           String
+  description     String?
+  sourceType      String   @default("MANUAL")
+  // MANUAL | BOM | PROJECT | UNIT
+  sourceBomId     String?  // Opportunity.id (BoM kaynaksa)
+  projectId       String?
+  requestedBy     String   // User.id
+  requestedByName String?
+  unitId          String?
+  unitName        String?
+  status          String   @default("DRAFT")
+  // DRAFT | PENDING_UNIT | PENDING_PROCUREMENT | PENDING_GM | PO_ISSUED | IN_DELIVERY | INVOICED | CLOSED | REJECTED
+  urgency         String   @default("NORMAL")
+  // LOW | NORMAL | HIGH | URGENT
+  neededBy        DateTime?
+  budgetAmount    Float?
+  currency        String   @default("TRY")
+  budgetAmountTRY Float?
+  selectedVendorId   String?
+  selectedVendorName String?
+  poNumber        String?
+  poIssuedAt      DateTime?
+  invoiceNo       String?
+  invoiceAmount   Float?
+  invoiceDate     DateTime?
+  invoicePaidAt   DateTime?
+  approvedByUnit  String?
+  approvedByProcurement String?
+  approvedByGM    String?
+  rejectedBy      String?
+  rejectionNote   String?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  items           PurchaseItem[]
+  quotes          PurchaseQuote[]
+  deliveries      DeliveryRecord[]
+}
+
+model PurchaseItem {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  name              String
+  description       String?
+  quantity          Float
+  unit              String  @default("adet")
+  estimatedUnitPrice Float?
+  currency          String  @default("TRY")
+  actualUnitPrice   Float?
+  createdAt         DateTime @default(now())
+}
+
+model PurchaseQuote {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  vendorId          String?
+  vendor            Vendor?         @relation(fields: [vendorId], references: [id])
+  vendorName        String
+  totalAmount       Float
+  currency          String  @default("TRY")
+  totalAmountTRY    Float?
+  deliveryDays      Int?
+  validUntil        DateTime?
+  notes             String?
+  isSelected        Boolean @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model DeliveryRecord {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  deliveredAt       DateTime        @default(now())
+  receivedBy        String?
+  quantityOrdered   Float?
+  quantityReceived  Float?
+  quantityDamaged   Float?
+  status            String  @default("RECEIVED")
+  // RECEIVED | PARTIAL | DAMAGED | REJECTED
+  notes             String?
+  createdAt         DateTime @default(now())
 }
