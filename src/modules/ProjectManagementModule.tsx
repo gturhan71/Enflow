@@ -951,6 +951,7 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
                               {PROJECT_TYPE_LABEL[p.type].slice(0,3)}
                             </span>
                           </div>
+                          {p.code && <p className="text-[10px] text-slate-500 font-mono mb-1">{p.code}</p>}
                           {p.customerName && <p className="text-xs text-slate-400 mb-2">{p.customerName}</p>}
                           <div className="flex items-center gap-2 mb-2">
                             <div className="flex-1 bg-white/10 rounded-full h-1.5 overflow-hidden">

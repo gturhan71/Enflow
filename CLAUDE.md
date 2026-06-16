@@ -323,7 +323,6 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 
 ## deps
 ```
-src/services/whatsappService.ts ← types, utils/logger
 src/services/nextcloudService.ts ← types, utils/logger
 src/services/exchangeService.ts ← types, utils/logger
 src/modules/SalesSupport.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
@@ -365,6 +364,7 @@ src/services/apiService.ts ← apiClient, crmService, projectService, taskServic
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
 backend/src/middleware.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient
+backend/src/services/projectCodeService.ts ← prismaClient
 ```
 
 ## changes (last 10 commits — 1 second ago)
@@ -375,7 +375,9 @@ src/modules/SecurityTestModule.tsx            +flattenSuite  +parseResults
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain
-.github/copilot-instructions.md               +ApiClient  +WhatsAppService  +NextcloudService  +ExchangeService
+backend/src/services/projectCodeService.ts    +nextProjectCode
+backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
+.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain  +ApiClient
 ```
 
 ## .github
@@ -392,21 +394,21 @@ h3 .github/copilot-instructions.md
 h2 backend
 h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
+h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
 h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
-h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
+h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 h3 backend/src/middleware.ts
+h3 backend/src/services/approvalChainService.ts
 h2 src
-h3 src/components/WorkflowSimulation.tsx
-h3 src/components/SaveButton.tsx
-h3 src/contexts/UnsavedChangesContext.tsx
 h3 src/services/apiClient.ts
 h3 src/services/whatsappService.ts
 h3 src/services/nextcloudService.ts
 h3 src/services/exchangeService.ts
 h3 src/modules/SalesSupport.tsx
+h3 src/modules/SubscriptionModule.tsx
 ```
 
 ## backend
@@ -474,25 +476,17 @@ export async function completeApprovalChain  :50-72
 export async function resetApprovalChain  :75-88
 ```
 
+### backend/src/services/projectCodeService.ts
+```
+export async function nextProjectCode  :16-28
+```
+
+### backend/src/utils/businessDays.ts
+```
+export function addBusinessDays  :5-22
+```
+
 ## src
-
-### src/services/apiClient.ts
-```
-class ApiClient  :3-70
-setAuth  :7-10
-async fetchWithAuth  :12-44
-async login  :46-55
-async forgotPassword  :57-69
-```
-
-### src/services/whatsappService.ts
-```
-class WhatsAppService  :4-37
-getConfig  :13-15
-updateConfig  :17-20
-testConnection  :22-26
-async sendMessage  :28-36
-```
 
 ### src/services/nextcloudService.ts
 ```
@@ -909,6 +903,8 @@ handler onData
 ```
 hook useAuth
 hook useState
+hook useCallback
+hook useEffect
 export TodoModule
 handler onClick
 handler onChange
