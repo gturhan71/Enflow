@@ -211,19 +211,47 @@ const CRMModule = ({
     }
   };
 
-  const handleLostProposal = async (proposal: Proposal) => {
-    if (!window.confirm('Bu teklifi KAYBEDİLDİ olarak işaretlemek istediğinize emin misiniz?')) return;
+  // Kaybedilen fırsat — neden seçimi modalı (Faz 1). Modal onaylanınca confirmLostReason çalışır.
+  const LOST_REASON_OPTIONS = [
+    'Fiyat rekabeti',
+    'Bütçe iptal edildi',
+    'Rakip firma seçildi',
+    'Teknik uygunsuzluk',
+    'Zamanlama / termin uyuşmazlığı',
+    'Müşteri vazgeçti',
+    'Diğer',
+  ];
+  const [lostReasonModal, setLostReasonModal] = useState<{ opp: Opportunity; proposal?: Proposal } | null>(null);
+  const [lostReasonChoice, setLostReasonChoice] = useState('');
+  const [lostReasonCustom, setLostReasonCustom] = useState('');
+
+  const confirmLostReason = async () => {
+    if (!lostReasonModal) return;
+    const reason = lostReasonChoice === 'Diğer' ? (lostReasonCustom.trim() || 'Diğer') : lostReasonChoice;
+    if (!reason) { alert('Lütfen bir kayıp nedeni seçin.'); return; }
     setLoading(true);
     try {
-      await apiService.updateProposal(proposal.id, { status: 'REJECTED' });
-      await apiService.updateOpportunity(proposal.opportunityId, { status: 'LOST' });
-      setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED' } : p));
-      setOpportunities(prev => prev.map(o => o.id === proposal.opportunityId ? { ...o, status: 'LOST' } : o));
+      const { opp, proposal } = lostReasonModal;
+      if (proposal) {
+        await apiService.updateProposal(proposal.id, { status: 'REJECTED' });
+        setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED' } : p));
+      }
+      await apiService.updateOpportunity(opp.id, { status: 'LOST', lostReason: reason });
+      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, status: 'LOST', lostReason: reason } : o));
+      setLostReasonModal(null);
+      setLostReasonChoice('');
+      setLostReasonCustom('');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'İşlem başarısız.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleLostProposal = (proposal: Proposal) => {
+    const opp = opportunities.find(o => o.id === proposal.opportunityId);
+    if (!opp) return;
+    setLostReasonModal({ opp, proposal });
   };
 
   // Teklif objesi olmadan direkt fırsat üzerinde kazanıldı/kaybedildi
@@ -242,17 +270,8 @@ const CRMModule = ({
     }
   };
 
-  const handleLostOpportunity = async (opp: Opportunity) => {
-    if (!window.confirm(`"${opp.title}" fırsatını KAYBEDİLDİ olarak işaretlemek istiyor musunuz?`)) return;
-    setLoading(true);
-    try {
-      await apiService.updateOpportunity(opp.id, { status: 'LOST' });
-      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, status: 'LOST' } : o));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
-    } finally {
-      setLoading(false);
-    }
+  const handleLostOpportunity = (opp: Opportunity) => {
+    setLostReasonModal({ opp });
   };
 
   const getContentJson = (proposal: Proposal): Record<string, unknown> => {
@@ -512,7 +531,7 @@ const CRMModule = ({
                       )}
                       {opp.status !== 'WON' && opp.status !== 'LOST' && (
                         <button
-                          onClick={() => handleProgressStatus(opp, 'LOST')}
+                          onClick={() => setLostReasonModal({ opp })}
                           className="flex items-center gap-1 bg-red-50 text-red-500 hover:bg-red-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
                         >
                           <XCircle size={11} /> Kaybedildi
@@ -1524,6 +1543,63 @@ const CRMModule = ({
             onConfirm={handleHandOff}
             itemTitle={handOffTarget.title}
           />
+        )}
+        {lostReasonModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="glass-card rounded-3xl p-8 w-full max-w-md space-y-6"
+            >
+              <div>
+                <h3 className="text-lg font-black uppercase italic tracking-tighter text-slate-900">Kaybedilen Fırsat — Neden</h3>
+                <p className="text-xs text-slate-500 font-bold mt-1">"{lostReasonModal.opp.title}" fırsatı KAYBEDİLDİ olarak işaretlenecek ve otomatik arşivlenecek.</p>
+              </div>
+              <div className="space-y-3">
+                {LOST_REASON_OPTIONS.map(reason => (
+                  <label key={reason} className={cn(
+                    "flex items-center gap-3 p-3 rounded-2xl border cursor-pointer transition-all text-sm font-bold",
+                    lostReasonChoice === reason ? "border-red-400 bg-red-50 text-red-700" : "border-slate-200 hover:border-slate-300"
+                  )}>
+                    <input
+                      type="radio"
+                      name="lostReason"
+                      value={reason}
+                      checked={lostReasonChoice === reason}
+                      onChange={() => setLostReasonChoice(reason)}
+                      className="accent-red-500"
+                    />
+                    {reason}
+                  </label>
+                ))}
+                {lostReasonChoice === 'Diğer' && (
+                  <input
+                    type="text"
+                    autoFocus
+                    placeholder="Nedeni yazın..."
+                    value={lostReasonCustom}
+                    onChange={(e) => setLostReasonCustom(e.target.value)}
+                    className="input-glass w-full"
+                  />
+                )}
+              </div>
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  onClick={() => { setLostReasonModal(null); setLostReasonChoice(''); setLostReasonCustom(''); }}
+                  className="px-6 py-3 text-xs font-black text-slate-500 uppercase tracking-widest"
+                >
+                  İptal
+                </button>
+                <button
+                  onClick={confirmLostReason}
+                  disabled={loading || !lostReasonChoice}
+                  className="bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Kaybedildi Olarak İşaretle
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
         {showNewOpportunityModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">

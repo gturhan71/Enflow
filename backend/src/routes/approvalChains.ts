@@ -5,8 +5,24 @@ import { asyncHandler, tenantMiddleware } from '../middleware';
 const router: Router = Router();
 
 // GET /?entityType=PROPOSAL&entityId=xxx → tek zincir bulma (yoksa null)
+// GET /?pendingForRole=FINANCE_MGR → o role ait, sırası gelmiş (PENDING) bekleyen onaylar
+// "Sırası gelmiş" = kendinden önceki tüm aşamalar APPROVED olan ilk PENDING aşama bu role ait.
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { entityType, entityId } = req.query as { entityType?: string; entityId?: string };
+  const { entityType, entityId, pendingForRole } = req.query as { entityType?: string; entityId?: string; pendingForRole?: string };
+
+  if (pendingForRole) {
+    const chains = await prisma.approvalChain.findMany({
+      where: { tenantId: req.tenantId, status: 'PENDING' },
+      include: { stages: { orderBy: { order: 'asc' } } },
+      orderBy: { createdAt: 'desc' }
+    });
+    const myTurn = chains.filter(c => {
+      const firstPending = c.stages.find(s => s.status === 'PENDING');
+      return firstPending?.role === pendingForRole;
+    });
+    return res.json(myTurn);
+  }
+
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (entityType) where.entityType = entityType;
   if (entityId) where.entityId = entityId;

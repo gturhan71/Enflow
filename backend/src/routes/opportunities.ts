@@ -53,7 +53,7 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, description, status, expectedCloseDate, updatedBy, technicalStatus, costConfig } = req.body;
+  const { title, value, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig } = req.body;
   const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
 
@@ -66,6 +66,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (probability !== undefined) updateData.probability = parseInt(probability as string) || 0;
   if (description !== undefined) updateData.description = description;
   if (status !== undefined) updateData.status = status;
+  if (lostReason !== undefined) updateData.lostReason = lostReason;
   if (expectedCloseDate !== undefined) updateData.expectedCloseDate = new Date(expectedCloseDate as string);
   if (customerId !== undefined) updateData.customerId = customerId;
   if (technicalStatus !== undefined) updateData.technicalStatus = technicalStatus;
@@ -90,6 +91,26 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
       })
     }
   });
+
+  // Faz 1 — kaybedilen fırsat otomatik arşivlenir (LOST'a yeni geçiş, tekrar tetiklenmesin)
+  if (status === 'LOST' && oldOpp.status !== 'LOST') {
+    await prisma.archiveItem.create({
+      data: {
+        boxNo: 'DİJİTAL',
+        shelfNo: 'DİJİTAL',
+        category: 'Kaybedilen Fırsat',
+        owner: updated.assignedTo?.name || updated.assignedToId,
+        description: [
+          `Fırsat: ${updated.title}`,
+          updated.customer ? `Müşteri: ${updated.customer.name}` : null,
+          `Değer: ${updated.value.toLocaleString('tr-TR')}`,
+          lostReason ? `Kayıp Nedeni: ${lostReason}` : null,
+        ].filter(Boolean).join(' · '),
+        tags: JSON.stringify(['opportunity', opportunityId, 'LOST']),
+        tenantId,
+      },
+    });
+  }
 
   res.json(updated);
 }));

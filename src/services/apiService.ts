@@ -7,7 +7,7 @@ import { settingsService } from './settingsService';
 import {
   Customer, Opportunity, BoMItem, CostItem, Proposal,
   Project, TodoTask, CorporateDocument, ArchiveItem, Contract,
-  Unit, User, Notification, Workflow
+  Unit, User, Notification, Workflow, ApprovalChain
 } from '../types';
 
 class ApiService {
@@ -219,6 +219,9 @@ class ApiService {
   async getApprovalChain(entityType: string, entityId: string) {
     const chains = await apiClient.fetchWithAuth(`/approval-chains?entityType=${entityType}&entityId=${entityId}`) as unknown[];
     return chains[0] || null;
+  }
+  async getPendingApprovalChainsForRole(role: string) {
+    return apiClient.fetchWithAuth(`/approval-chains?pendingForRole=${role}`) as Promise<ApprovalChain[]>;
   }
   async createApprovalChain(data: { entityType: string; entityId: string; stages: { role: string; order?: number }[] }) {
     return apiClient.fetchWithAuth('/approval-chains', { method: 'POST', body: JSON.stringify(data) });

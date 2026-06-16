@@ -462,6 +462,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, 
           </div>
           <h3 className="font-bold text-lg leading-tight">{project.name}</h3>
           <p className="text-xs text-slate-400 mt-0.5">
+            {project.code && <span className="font-mono text-slate-500">{project.code} · </span>}
             {project.customerName && <span>{project.customerName} · </span>}
             PM: {project.pmName ?? '—'} · Faz: {project.phase}
           </p>
@@ -996,6 +997,7 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
                           </div>
                           <h4 className="font-semibold text-sm">{p.name}</h4>
                           <p className="text-xs text-slate-400 mt-0.5">
+                            {p.code && <span className="font-mono text-slate-500">{p.code} · </span>}
                             {p.customerName && <span>{p.customerName} · </span>}
                             PM: {p.pmName ?? '—'} · Faz: {p.phase}
                           </p>

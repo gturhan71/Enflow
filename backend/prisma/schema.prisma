@@ -136,6 +136,7 @@ model Opportunity {
   expectedCloseDate DateTime?
   status            String
   description       String?
+  lostReason        String?       // status='LOST' olduğunda kapanış nedeni
   technicalStatus   String        @default("PENDING")
   bomStatus         String        @default("DRAFT")
   costConfig        String?       // JSON: { baseCurrency, rates, marginMode, globalMargin }
@@ -217,6 +218,7 @@ model WorkflowLog {
 
 model Project {
   id                String        @id @default(cuid())
+  code              String?       // insan-okunur proje kodu, örn. 2026-HW-00012 — sıra no üreticisi otomatik doldurur
   name              String
   type              String        @default("HARDWARE") // HARDWARE | SOFTWARE | SERVICE | MIXED
   description       String?
@@ -327,6 +329,7 @@ model TodoTask {
   priority      String   @default("MEDIUM")
   status        String   @default("PENDING")
   dueDate       DateTime?
+  slaBusinessDays Int?   // verildiyse dueDate bu kadar iş günü sonrasına otomatik hesaplanır
   progressNotes String?  // JSON string
   relatedModule String?  // PROJECT, OPPORTUNITY, CONTRACT, PROCUREMENT, GENERAL
   relatedItemId String?

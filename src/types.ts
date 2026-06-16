@@ -53,6 +53,7 @@ export interface Opportunity {
   expectedCloseDate?: string;
   status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
   description?: string;
+  lostReason?: string;
   technicalStatus?: string;
   bomStatus?: string;
   tenantId?: string;
@@ -228,6 +229,7 @@ export interface ProjectCostItem {
 
 export interface Project {
   id: string;
+  code?: string | null; // insan-okunur proje kodu — örn. 2026-HW-00012 (backend otomatik üretir)
   name: string;
   type: ProjectType;
   description?: string | null;
@@ -299,6 +301,7 @@ export interface TodoTask {
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate?: string;
+  slaBusinessDays?: number; // verilirse backend dueDate'i otomatik bu kadar iş günü sonrasına hesaplar
   relatedModule?: string;
   relatedItemId?: string;
   createdAt?: string;

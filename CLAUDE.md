@@ -270,20 +270,45 @@ POST   /:id/stages/:stageId/reject  → { approverId, note? }
 DELETE /:id
 ```
 
-Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI henüz yok — `frontend/src/services/workflowService.ts` artık bu API'leri çağıran async wrapper; Finans swimlane ekranı (Faz 1) `TodoModule.tsx`'e bir sekme olarak eklenecek.
+Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI **Faz 1'de eklendi** — bkz. aşağıdaki bölüm.
+
+## Bekleyen Onaylarım — Onay Zinciri Swimlane (Faz 1, 2026-06-16)
+
+`TodoModule.tsx`'e generic bir sekme eklendi: `currentUser.role` zincirin hangi aşamasındaysa (FINANCE_MGR/IGPD_MGR/GENERAL_MANAGER/KSU_MGR), o role ait sırası gelmiş onaylar burada listelenir. Finans'a özel sabit bir sayfa değil — `APPROVAL_CHAIN_TEMPLATES`'teki her rol için otomatik çalışır.
+
+- Backend: `GET /api/approval-chains?pendingForRole=<ROLE>` — "sırası gelmiş" = kendinden önceki tüm aşamalar `APPROVED` olan ilk `PENDING` aşama bu role ait
+- Frontend: `apiService.getPendingApprovalChainsForRole(role)`, `approveApprovalStage`, `rejectApprovalStage`
+- Test edilirken `GENERAL_MANAGER` rolü zincirin 3. aşaması olduğu için mevcut GM test hesabıyla da görünür/test edilebilir
+
+## Kayıp Fırsat Yönetimi (Faz 1)
+
+- `Opportunity.lostReason: String?` — CRM'de "Kaybedildi" işaretlenirken `LOST_REASON_OPTIONS` listesinden seçim yapan bir modal açılır (`CRMModule.tsx` — `lostReasonModal` state)
+- `status: 'LOST'`'a yeni geçişte (`oldOpp.status !== 'LOST'`) backend otomatik bir `ArchiveItem` kaydı oluşturur (`opportunities.ts` PUT handler) — `boxNo/shelfNo: 'DİJİTAL'`, `category: 'Kaybedilen Fırsat'`
+
+## İş Günü SLA Mekanizması (Faz 1)
+
+- `backend/src/utils/businessDays.ts` — `date-fns` **kullanılmıyor** (backend'in node_modules'unda yok, sadece frontend'de) — saf `Date` aritmetiği ile hafta sonu hariç gün hesabı
+- `TodoTask.slaBusinessDays: Int?` — `tasks.ts` POST'ta `dueDate` verilmemişse bu alandan otomatik hesaplanır
+- Presales "Onaya Gönder" akışı (`PresalesModule.tsx`) → `slaBusinessDays: 3` (diyagramdaki "en az 3 iş günü" kuralı)
+
+## Proje Kod Üreticisi (Faz 1)
+
+- `Project.code: String?` — format `{YIL}-{TİP_KISALTMA}-{SIRA}` örn. `2026-HW-00012`
+- `backend/src/services/projectCodeService.ts` → `nextProjectCode(tenantId, type)` — tenant+yıl bazında proje sayısından sıra no türetir
+- UI: `ProjectManagementModule.tsx` Kanban/Liste kartlarında proje adının yanında gösterilir
 
 ## Sonraki Adımlar (Planlanan)
 
 Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
 
 - [x] ApprovalChain/ApprovalStage kalıcı altyapı + Opportunity/ContractWorkflow onay akışlarına bağlandı (Faz 0)
-- [ ] Finans swimlane UI'sı (TodoModule'e "Bekleyen Finans Onayları" sekmesi)
-- [ ] Kayıp fırsat nedeni (`Opportunity.lostReason`) + otomatik arşivleme
-- [ ] İş günü SLA mekanizması (`date-fns` ile, TodoTask için)
-- [ ] Proje kod üreticisi (insan-okunur `Project.code`)
-- [ ] Ziyaret Planı + Günlük Rapor modülü (VisitPlan/Visit/DailyReport)
-- [ ] Proje Devir Paketi (11 zorunlu evrak — ContractWorkflowDoc pattern'inin klonu)
-- [ ] Form numaralandırma sistemi + Genel Hususlar (Lessons Learned/Risk/Metrik) modülü
+- [x] Aşama-bazlı onay swimlane UI'sı — TodoModule "Bekleyen Onaylarım" sekmesi (Faz 1)
+- [x] Kayıp fırsat nedeni (`Opportunity.lostReason`) + otomatik arşivleme (Faz 1)
+- [x] İş günü SLA mekanizması (Faz 1)
+- [x] Proje kod üreticisi (Faz 1)
+- [ ] Ziyaret Planı + Günlük Rapor modülü (VisitPlan/Visit/DailyReport) (Faz 2)
+- [ ] Proje Devir Paketi (11 zorunlu evrak — ContractWorkflowDoc pattern'inin klonu) (Faz 2)
+- [ ] Özgün, tenant-bazlı doküman kodlama sistemi + Genel Hususlar modülü (Faz 3 — **üçüncü taraf notasyonu ASLA kullanılmaz**, bkz. plan dosyası)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
 - [ ] İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
@@ -298,8 +323,6 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 
 ## deps
 ```
-src/components/WorkflowSimulation.tsx ← lib/utils, types
-src/components/SaveButton.tsx ← lib/utils
 src/services/whatsappService.ts ← types, utils/logger
 src/services/nextcloudService.ts ← types, utils/logger
 src/services/exchangeService.ts ← types, utils/logger
@@ -308,8 +331,6 @@ src/modules/SubscriptionModule.tsx ← types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
 src/contexts/AuthContext.tsx ← constants, types
 src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
-src/components/FinalProposalGenerator.tsx ← services/workflowService, types
-src/services/workflowService.ts ← whatsappService, exchangeService, types, utils/logger
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
@@ -321,6 +342,7 @@ src/modules/SpecAnalysis.tsx ← lib/utils, types
 src/modules/Login.tsx ← constants, services/apiService
 src/components/CustomerImportWizard.tsx ← lib/utils, types, services/apiService
 src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
+src/components/FinalProposalGenerator.tsx ← services/workflowService, types
 src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
@@ -329,8 +351,8 @@ src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTrac
 src/modules/ContractWorkflowTest.tsx ← services/apiClient, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
-src/modules/LicenseGeneratorModule.tsx ← types, contexts/AuthContext, services/apiService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
+src/modules/LicenseGeneratorModule.tsx ← types, contexts/AuthContext, services/apiService
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
@@ -340,7 +362,9 @@ src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
+src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
 backend/src/middleware.ts ← prismaClient
+backend/src/services/approvalChainService.ts ← prismaClient
 ```
 
 ## changes (last 10 commits — 1 second ago)
@@ -349,6 +373,8 @@ src/modules/ContractWorkflowTest.tsx          +apiFetch  +bestProposalPrice  +Co
 src/modules/ProjectManagementModule.tsx       +kar
 src/modules/SecurityTestModule.tsx            +flattenSuite  +parseResults
 src/services/apiService.ts                    ~ApiService
+src/services/workflowService.ts               ~WorkflowService
+backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain
 .github/copilot-instructions.md               +ApiClient  +WhatsAppService  +NextcloudService  +ExchangeService
 ```
 
@@ -366,8 +392,8 @@ h3 .github/copilot-instructions.md
 h2 backend
 h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
 h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
+h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
 h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
 h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
 h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
@@ -395,15 +421,20 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
+### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+```
+TABLE new_ContractWorkflowDoc
+```
+
 ### backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 ```
 TABLE ContractWorkflow
 TABLE ContractWorkflowDoc
 ```
 
-### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+### backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 ```
-TABLE new_ContractWorkflowDoc
+TABLE new_Tenant
 ```
 
 ### backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
@@ -423,9 +454,11 @@ TABLE PurchaseQuote
 TABLE DeliveryRecord
 ```
 
-### backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
+### backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 ```
-TABLE new_Tenant
+TABLE ApprovalChain
+TABLE ApprovalStage
+INDEX ApprovalChain_entityType_entityId_idx ON ApprovalChain
 ```
 
 ### backend/src/middleware.ts
@@ -434,30 +467,14 @@ export const asyncHandler  :5-7
 export const requireRole  :40-48
 ```
 
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain  :19-42
+export async function completeApprovalChain  :50-72
+export async function resetApprovalChain  :75-88
+```
+
 ## src
-
-### src/components/WorkflowSimulation.tsx
-```
-hook useState
-hook useEffect
-export WorkflowSimulation
-```
-
-### src/components/SaveButton.tsx
-```
-props SaveButtonProps
-export SaveButton
-handler onClick
-```
-
-### src/contexts/UnsavedChangesContext.tsx
-```
-hook useContext
-hook useState
-hook useEffect
-export UnsavedChangesProvider
-handler onClick
-```
 
 ### src/services/apiClient.ts
 ```
@@ -542,26 +559,6 @@ hook useState
 export HandOffModal
 handler onClick
 handler onChange
-```
-
-### src/components/FinalProposalGenerator.tsx
-```
-props Props
-hook useState
-hook useEffect
-export FinalProposalGenerator
-handler onClick
-```
-
-### src/services/workflowService.ts
-```
-class WorkflowService  :13-116
-createApprovalChain  :19-28
-getChainForEntity  :30-32
-approveStage  :34-49
-async triggerHandOff  :51-107
-getLogsForItem  :109-111
-getNotificationsForUser  :113-115
 ```
 
 ### src/components/settings/UnitManagement.tsx
@@ -684,6 +681,15 @@ handler onLogout
 handler onLogin
 ```
 
+### src/components/FinalProposalGenerator.tsx
+```
+props Props
+hook useState
+hook useEffect
+export FinalProposalGenerator
+handler onClick
+```
+
 ### src/hooks/useBoM.ts
 ```
 export const useBoM  :7-90
@@ -776,22 +782,22 @@ handler onValue
 handler onCount
 ```
 
-### src/modules/LicenseGeneratorModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export LicenseGeneratorModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/LicenseTypesModule.tsx
 ```
 hook useAuth
 hook useState
 hook useEffect
 export LicenseTypesModule
+handler onChange
+handler onClick
+```
+
+### src/modules/LicenseGeneratorModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseGeneratorModule
 handler onChange
 handler onClick
 ```
@@ -921,6 +927,18 @@ async deleteCustomer  :30-30
 async getOpportunities  :33-33
 ```
 
+### src/services/workflowService.ts
+```
+class WorkflowService  :14-101
+async createApprovalChain  :20-22
+async getChainForEntity  :24-26
+async approveStage  :28-30
+async rejectStage  :32-34
+async triggerHandOff  :36-92
+getLogsForItem  :94-96
+getNotificationsForUser  :98-100
+```
+
 ### src/types.ts
 ```
 export interface WorkflowStep  :1-9
@@ -931,21 +949,21 @@ type: 'AUTO' | 'MANUAL'  :5-5
 description: string  :6-6
 order: number  :7-7
 nextStepId: string | null  :8-8
-export interface ApprovalStage  :11-17
+export interface ApprovalStage  :11-19
 id: string  :12-12
 role: string  :13-13
 status: 'PENDING' | 'APPROVED' | 'REJECTED'  :14-14
 approverId?: string  :15-15
 note?: string  :16-16
-export interface Workflow  :19-25
-id: string  :20-20
-name: string  :21-21
-description: string  :22-22
-steps: WorkflowStep[]  :23-23
-stages: ApprovalStage[]  :24-24
-export interface User  :27-37
-id: string  :28-28
-name: string  :29-29
-email: string  :30-30
-phone?: string  :31-31
+order?: number  :17-17
+approvedAt?: string  :18-18
+export interface Workflow  :21-27
+id: string  :22-22
+name: string  :23-23
+description: string  :24-24
+steps: WorkflowStep[]  :25-25
+stages: ApprovalStage[]  :26-26
+export interface User  :29-39
+id: string  :30-30
+name: string  :31-31
 ```

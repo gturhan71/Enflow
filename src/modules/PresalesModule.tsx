@@ -164,6 +164,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
       if (setProposals) setProposals(prev => [newProposal, ...prev]);
 
       // 2. Yönetici onay görevi — relatedItemId = proposal.id
+      // SLA: Presales/onay birimine bu talep için en az 3 iş günü süre verilir (dueDate backend'de otomatik hesaplanır).
       const task = await apiService.createTask({
         title: `BoM Onayı v${version}: ${opp.title}`,
         description: `Presales tarafından hazırlanan v${version} BoM listesi onayınızı bekliyor. Toplam: ${totalPrice.toLocaleString('tr-TR')} ${opp.customer?.currency ?? ''}`,
@@ -173,6 +174,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
         status: 'PENDING',
         relatedModule: 'PROPOSAL',
         relatedItemId: newProposal.id,
+        slaBusinessDays: 3,
       });
       if (setTasks) setTasks(prev => [task, ...prev]);
     } catch (err) {

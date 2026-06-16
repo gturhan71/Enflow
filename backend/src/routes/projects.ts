@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { nextProjectCode } from '../services/projectCodeService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -95,9 +96,12 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
+  const code = await nextProjectCode(req.tenantId, type);
+
   const project = await prisma.project.create({
     data: {
       tenantId: req.tenantId,
+      code,
       name,
       type,
       description: description || null,

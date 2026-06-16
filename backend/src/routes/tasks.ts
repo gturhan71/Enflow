@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { computeSlaDueDate } from '../utils/businessDays';
 
 const router: Router = Router();
 
@@ -10,11 +11,17 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 }));
 
 router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { dueDate, progressNotes, ...rest } = req.body;
+  const { dueDate, progressNotes, slaBusinessDays, ...rest } = req.body;
+  // slaBusinessDays verilmiş ama dueDate verilmemişse, iş günü bazlı otomatik hesapla.
+  const resolvedDueDate = dueDate
+    ? new Date(dueDate as string)
+    : computeSlaDueDate(slaBusinessDays as number | undefined);
+
   const task = await prisma.todoTask.create({
     data: {
       ...rest,
-      dueDate: dueDate ? new Date(dueDate as string) : null,
+      dueDate: resolvedDueDate,
+      slaBusinessDays: slaBusinessDays ?? null,
       progressNotes: typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes || []),
       tenantId: req.tenantId
     }
