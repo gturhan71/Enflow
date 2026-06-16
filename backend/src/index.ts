@@ -25,6 +25,7 @@ import adminTestRouter from './routes/adminTest';
 import vendorsRouter from './routes/vendors';
 import purchaseRequestsRouter from './routes/purchaseRequests';
 import approvalChainsRouter from './routes/approvalChains';
+import visitsRouter from './routes/visits';
 
 dotenv.config();
 
@@ -67,6 +68,7 @@ app.use('/api/admin/security-test', adminTestRouter);
 app.use('/api/vendors', vendorsRouter);
 app.use('/api/purchase-requests', purchaseRequestsRouter);
 app.use('/api/approval-chains', approvalChainsRouter);
+app.use('/api/visits', visitsRouter);
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Error Detail]', err);

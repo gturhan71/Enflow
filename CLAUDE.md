@@ -85,12 +85,16 @@ Tüm modeller `tenantId` ile izole edilmiş.
 | `ActivityLog` | Değişiklik logu |
 | `Notification` | Kullanıcı bildirimi |
 | `ApprovalChain` / `ApprovalStage` | Kalıcı çok-aşamalı onay zinciri (Finans→İGPD→GM→KSU vb.) |
+| `VisitPlan` / `Visit` | Haftalık müşteri ziyaret planı (DEMO/TECHNICAL_MEETING/PRESENTATION/OTHER) |
+| `DailyReport` | Günlük saha raporu (yöneticiyle paylaşım flag'i) |
+| `ProjectHandoverDoc` | Proje devir paketi evrakları (ContractWorkflowDoc klonu, 11 zorunlu evrak) |
 
 ## Modüller ve Sidebar Menüsü
 
 | Sekme key | Bileşen | Açıklama |
 |-----------|---------|----------|
 | `dashboard` | `Dashboard` | Özet metrikler |
+| `visit-plan` | `VisitPlanModule` | Haftalık ziyaret planı + günlük rapor |
 | `crm-dashboard` | `CRMModule` | CRM Genel Bakış — alt modüllere kart üzerinden erişim |
 | `crm-opportunities` | `CRMModule` | Fırsatlar |
 | `crm-customers` | `CRMModule` | Müşteriler |
@@ -297,6 +301,24 @@ Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI **Faz 1'de eklendi** �
 - `backend/src/services/projectCodeService.ts` → `nextProjectCode(tenantId, type)` — tenant+yıl bazında proje sayısından sıra no türetir
 - UI: `ProjectManagementModule.tsx` Kanban/Liste kartlarında proje adının yanında gösterilir
 
+## Ziyaret Planı & Günlük Rapor Modülü (Faz 2, 2026-06-16)
+
+`visit-plan` sekmesi — diyagramdaki "süreç öncesi" katman. `src/modules/VisitPlanModule.tsx` (ContractWorkflowDoc konvansiyonuna uyarak `VisitPlan`/`Visit`/`DailyReport` tipleri lokal tanımlı, `types.ts`'e taşınmadı).
+
+- **Backend:** `/api/visits` — `visits.ts` (`/plans`, `/plans/:id`, `/plans/:id/visits`, `/visits/:visitId`, `/daily-reports`)
+- **Model:** `VisitPlan { weekOf, preparedById, status, visits[] }`, `Visit { type: DEMO|TECHNICAL_MEETING|PRESENTATION|OTHER, plannedDate, actualDate, status, needsCaptured }`, `DailyReport { date, content, sharedWithManager }`
+- **Önemli:** `customers` verisi App.tsx'te sadece `isCrmActive` aktifken çekiliyordu (`useCustomers` `enabled` koşulu) — `isVisitPlanActive` de eklendi, aksi halde müşteri seçici boş kalır
+
+## Proje Devir Paketi (Faz 2, 2026-06-16)
+
+`ProjectManagementModule.tsx` proje detayına 5. sekme: **Devir Paketi** — `ContractWorkflowDoc` pattern'inin doğrudan klonu.
+
+- **Model:** `ProjectHandoverDoc { projectId, name, docType, status, fileUrl, isRequired, sortOrder }`
+- **Backend:** `projects.ts`'e eklendi — `GET/POST /:id/handover-docs` (boşsa 11 zorunlu evrakı otomatik seed eder), `PUT/DELETE /:id/handover-docs/:docId`, `POST /:id/handover-docs/:docId/upload` (multer + opsiyonel Nextcloud — `backend/src/utils/fileUpload.ts`'teki paylaşılan yardımcılarla, **`contractWorkflow.ts`'e dokunulmadı**, regresyon riskine karşı kasıtlı kod tekrarı)
+- **11 zorunlu evrak:** Fizibilite, İhale Dokümanları, Sözleşme+Ekleri, Birim Fiyat Teklif Cetveli, Maliyet Tablosu, Kitlist Ağacı, Alınan Teklifler, İhale Kararı, Teminat Mektupları, Proje Devir Formu, Personel Listesi
+- **UI:** Header'da `!handoverComplete` ise amber "Devir Bekliyor" rozeti (tıklayınca Devir Paketi sekmesine gider); tüm `isRequired` evraklar `UPLOADED/VERIFIED/WAIVED` olunca tamamlanmış sayılır
+- Yüklenen dosyalar: `backend/uploads/project-handovers/{proje_kodu}/`
+
 ## Sonraki Adımlar (Planlanan)
 
 Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
@@ -306,8 +328,8 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [x] Kayıp fırsat nedeni (`Opportunity.lostReason`) + otomatik arşivleme (Faz 1)
 - [x] İş günü SLA mekanizması (Faz 1)
 - [x] Proje kod üreticisi (Faz 1)
-- [ ] Ziyaret Planı + Günlük Rapor modülü (VisitPlan/Visit/DailyReport) (Faz 2)
-- [ ] Proje Devir Paketi (11 zorunlu evrak — ContractWorkflowDoc pattern'inin klonu) (Faz 2)
+- [x] Ziyaret Planı + Günlük Rapor modülü (Faz 2)
+- [x] Proje Devir Paketi — 11 zorunlu evrak (Faz 2)
 - [ ] Özgün, tenant-bazlı doküman kodlama sistemi + Genel Hususlar modülü (Faz 3 — **üçüncü taraf notasyonu ASLA kullanılmaz**, bkz. plan dosyası)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
@@ -340,9 +362,9 @@ src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/api
 src/modules/SpecAnalysis.tsx ← lib/utils, types
 src/modules/Login.tsx ← constants, services/apiService
 src/components/CustomerImportWizard.tsx ← lib/utils, types, services/apiService
+src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
 src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
 src/components/FinalProposalGenerator.tsx ← services/workflowService, types
-src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
@@ -350,8 +372,8 @@ src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTrac
 src/modules/ContractWorkflowTest.tsx ← services/apiClient, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
-src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/LicenseGeneratorModule.tsx ← types, contexts/AuthContext, services/apiService
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
@@ -367,7 +389,7 @@ backend/src/services/approvalChainService.ts ← prismaClient
 backend/src/services/projectCodeService.ts ← prismaClient
 ```
 
-## changes (last 10 commits — 1 second ago)
+## changes (last 10 commits — 0 seconds ago)
 ```
 src/modules/ContractWorkflowTest.tsx          +apiFetch  +bestProposalPrice  +ContractWorkflowTest
 src/modules/ProjectManagementModule.tsx       +kar
@@ -377,7 +399,7 @@ src/services/workflowService.ts               ~WorkflowService
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain
 backend/src/services/projectCodeService.ts    +nextProjectCode
 backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
-.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain  +ApiClient
+.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain  +nextProjectCode
 ```
 
 ## .github
@@ -402,9 +424,9 @@ h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
 h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 h3 backend/src/middleware.ts
 h3 backend/src/services/approvalChainService.ts
+h3 backend/src/services/projectCodeService.ts
+h3 backend/src/utils/businessDays.ts
 h2 src
-h3 src/services/apiClient.ts
-h3 src/services/whatsappService.ts
 h3 src/services/nextcloudService.ts
 h3 src/services/exchangeService.ts
 h3 src/modules/SalesSupport.tsx
@@ -423,20 +445,15 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
-### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
-```
-TABLE new_ContractWorkflowDoc
-```
-
 ### backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 ```
 TABLE ContractWorkflow
 TABLE ContractWorkflowDoc
 ```
 
-### backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
+### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
 ```
-TABLE new_Tenant
+TABLE new_ContractWorkflowDoc
 ```
 
 ### backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
@@ -454,6 +471,11 @@ TABLE PurchaseRequest
 TABLE PurchaseItem
 TABLE PurchaseQuote
 TABLE DeliveryRecord
+```
+
+### backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
+```
+TABLE new_Tenant
 ```
 
 ### backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
@@ -654,6 +676,11 @@ handler onDrop
 handler onChange
 ```
 
+### src/hooks/useBoM.ts
+```
+export const useBoM  :7-90
+```
+
 ### src/App.tsx
 ```
 hook useState
@@ -682,11 +709,6 @@ hook useState
 hook useEffect
 export FinalProposalGenerator
 handler onClick
-```
-
-### src/hooks/useBoM.ts
-```
-export const useBoM  :7-90
 ```
 
 ### src/hooks/useEnflowQueries.ts
@@ -776,22 +798,22 @@ handler onValue
 handler onCount
 ```
 
-### src/modules/LicenseTypesModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export LicenseTypesModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/LicenseGeneratorModule.tsx
 ```
 hook useAuth
 hook useState
 hook useEffect
 export LicenseGeneratorModule
+handler onChange
+handler onClick
+```
+
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
 handler onChange
 handler onClick
 ```

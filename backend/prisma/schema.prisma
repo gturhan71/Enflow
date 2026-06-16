@@ -30,6 +30,8 @@ model Tenant {
   vendors            Vendor[]
   purchaseRequests   PurchaseRequest[]
   approvalChains     ApprovalChain[]
+  visitPlans         VisitPlan[]
+  dailyReports       DailyReport[]
 }
 
 enum SubscriptionPlan {
@@ -250,6 +252,7 @@ model Project {
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   milestones        ProjectMilestone[]
   projectCostItems  ProjectCostItem[]
+  handoverDocs      ProjectHandoverDoc[]
 }
 
 model ProjectMilestone {
@@ -593,6 +596,74 @@ model ApprovalStage {
   approvedAt DateTime?
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+}
+
+// ── Ziyaret Planı & Günlük Rapor (Faz 2) ────────────────────────────────────
+// Diyagramdaki "süreç öncesi" katman: haftalık müşteri ziyaret planı + günlük
+// rapor, haftalık olarak bağlı bulunan yöneticiyle (İGPD) paylaşılır.
+
+model VisitPlan {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  weekOf         DateTime // o haftanın Pazartesi tarihi
+  preparedById   String
+  preparedByName String?
+  status         String   @default("DRAFT") // DRAFT | APPROVED | COMPLETED
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  visits         Visit[]
+}
+
+model Visit {
+  id            String    @id @default(cuid())
+  visitPlanId   String
+  visitPlan     VisitPlan @relation(fields: [visitPlanId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customerName  String?
+  type          String    @default("OTHER") // DEMO | TECHNICAL_MEETING | PRESENTATION | OTHER
+  plannedDate   DateTime
+  actualDate    DateTime?
+  status        String    @default("PLANNED") // PLANNED | COMPLETED | CANCELLED
+  needsCaptured String?   // müşteri ihtiyaçları / görüşme notları
+  tenantId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model DailyReport {
+  id                String   @id @default(cuid())
+  tenantId          String
+  tenant            Tenant   @relation(fields: [tenantId], references: [id])
+  userId            String
+  userName          String?
+  date              DateTime
+  content           String   // serbest metin günlük rapor
+  sharedWithManager Boolean  @default(false) // haftalık olarak yöneticiyle paylaşıldı mı
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ── Proje Devir Paketi (Faz 2) ───────────────────────────────────────────────
+// ContractWorkflowDoc pattern'inin doğrudan klonu — zorunlu evrak checklist'i,
+// otomatik durum ilerletme ve multer/Nextcloud upload aynı şekilde çalışır.
+
+model ProjectHandoverDoc {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  docType     String   // FEASIBILITY | TENDER_DOCS | CONTRACT | PRICE_SCHEDULE | COST_TABLE | BOM_TREE | RECEIVED_QUOTES | TENDER_DECISION | GUARANTEE_LETTERS | HANDOVER_FORM | STAFF_LIST | OTHER
+  description String?
+  status      String   @default("PENDING") // PENDING | IN_PROGRESS | UPLOADED | VERIFIED | WAIVED
+  fileUrl     String?
+  isRequired  Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  notes       String?
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model DeliveryRecord {

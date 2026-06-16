@@ -1,7 +1,11 @@
 import { Router, Request, Response } from 'express';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { nextProjectCode } from '../services/projectCodeService';
+import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -338,6 +342,151 @@ router.delete('/:id/costs/:costId', asyncHandler(async (req: Request, res: Respo
   await prisma.projectCostItem.delete({ where: { id: String(req.params.costId) } });
   res.json({ ok: true });
 }));
+
+// ── PROJE DEVİR PAKETİ (Faz 2 — ContractWorkflowDoc pattern'inin klonu) ────────
+// Devir toplantısı öncesi zorunlu 11 evraklık checklist. isRequired:true olan
+// tüm evraklar UPLOADED/VERIFIED/WAIVED olmadan proje "devir tamamlandı"
+// sayılmaz (bu hesap frontend'de yapılır, burada sadece veri sağlanır).
+
+const DEFAULT_HANDOVER_DOCS: { name: string; docType: string }[] = [
+  { name: 'Onaylı Fizibilite', docType: 'FEASIBILITY' },
+  { name: 'İhale Dokümanları', docType: 'TENDER_DOCS' },
+  { name: 'İmzalanan Sözleşme + Ekleri', docType: 'CONTRACT' },
+  { name: 'Birim Fiyat Teklif Cetveli', docType: 'PRICE_SCHEDULE' },
+  { name: 'Fiyat Teklifi / Maliyet Tablosu', docType: 'COST_TABLE' },
+  { name: 'Ürün Kitlist Ağacı', docType: 'BOM_TREE' },
+  { name: 'Alınan Teklifler', docType: 'RECEIVED_QUOTES' },
+  { name: 'İhale Kararı ve Sözleşmeye Davet', docType: 'TENDER_DECISION' },
+  { name: 'Kesin + Avans Teminat Mektupları (Kopya)', docType: 'GUARANTEE_LETTERS' },
+  { name: 'Proje Devir Formu (imzasız)', docType: 'HANDOVER_FORM' },
+  { name: 'Proje Organizasyonu / Personel Listesi', docType: 'STAFF_LIST' },
+];
+
+const HANDOVER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/project-handovers');
+const handoverUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+
+function handoverFolder(p: { code?: string | null; name: string }): string {
+  return slugify(p.code || p.name);
+}
+
+// GET /:id/handover-docs → liste; hiç evrak yoksa 11 zorunlu evrakı otomatik seed eder
+router.get('/:id/handover-docs', asyncHandler(async (req: Request, res: Response) => {
+  const projectId = String(req.params.id);
+  const project = await prisma.project.findFirst({ where: { id: projectId, tenantId: req.tenantId } });
+  if (!project) return res.status(404).json({ error: 'Proje bulunamadı.' });
+
+  let docs = await prisma.projectHandoverDoc.findMany({
+    where: { projectId },
+    orderBy: { sortOrder: 'asc' },
+  });
+
+  if (docs.length === 0) {
+    await prisma.projectHandoverDoc.createMany({
+      data: DEFAULT_HANDOVER_DOCS.map((d, i) => ({
+        projectId,
+        name: d.name,
+        docType: d.docType,
+        isRequired: true,
+        sortOrder: i,
+        tenantId: req.tenantId,
+      })),
+    });
+    docs = await prisma.projectHandoverDoc.findMany({ where: { projectId }, orderBy: { sortOrder: 'asc' } });
+  }
+
+  res.json(docs);
+}));
+
+router.post('/:id/handover-docs', asyncHandler(async (req: Request, res: Response) => {
+  const projectId = String(req.params.id);
+  const project = await prisma.project.findFirst({ where: { id: projectId, tenantId: req.tenantId } });
+  if (!project) return res.status(404).json({ error: 'Proje bulunamadı.' });
+
+  const { name, docType, description, isRequired, sortOrder, notes } = req.body;
+  const doc = await prisma.projectHandoverDoc.create({
+    data: {
+      projectId,
+      name,
+      docType: docType || 'OTHER',
+      description: description || null,
+      notes: notes || null,
+      isRequired: isRequired !== false,
+      sortOrder: sortOrder ?? 99,
+      tenantId: req.tenantId,
+    },
+  });
+  res.status(201).json(doc);
+}));
+
+router.put('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res: Response) => {
+  const docId = String(req.params.docId);
+  const { status, fileUrl, notes, name, docType, description } = req.body;
+  const doc = await prisma.projectHandoverDoc.update({
+    where: { id: docId },
+    data: {
+      ...(status !== undefined && { status }),
+      ...(fileUrl !== undefined && { fileUrl }),
+      ...(notes !== undefined && { notes }),
+      ...(name !== undefined && { name }),
+      ...(docType !== undefined && { docType }),
+      ...(description !== undefined && { description }),
+      updatedAt: new Date(),
+    },
+  });
+  res.json(doc);
+}));
+
+router.delete('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res: Response) => {
+  await prisma.projectHandoverDoc.delete({ where: { id: String(req.params.docId) } });
+  res.json({ ok: true });
+}));
+
+router.post(
+  '/:id/handover-docs/:docId/upload',
+  handoverUpload.single('file'),
+  asyncHandler(async (req: Request, res: Response) => {
+    const projectId = String(req.params.id);
+    const docId = String(req.params.docId);
+    if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
+
+    const project = await prisma.project.findFirst({ where: { id: projectId, tenantId: req.tenantId } });
+    if (!project) return res.status(404).json({ error: 'Proje bulunamadı.' });
+
+    const folder = handoverFolder(project);
+    const uploadDir = getUploadDir(HANDOVER_UPLOADS_ROOT, folder);
+
+    const ext = path.extname(req.file.originalname);
+    const safeName = `${docId.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+    const localPath = path.join(uploadDir, safeName);
+    fs.writeFileSync(localPath, req.file.buffer);
+
+    const localUrl = `/uploads/project-handovers/${folder}/${safeName}`;
+    let fileUrl = localUrl;
+    let ncUrl: string | null = null;
+
+    const NC_URL = process.env.NEXTCLOUD_URL;
+    const NC_USER = process.env.NEXTCLOUD_USER;
+    const NC_PASS = process.env.NEXTCLOUD_PASS;
+
+    if (NC_URL && NC_USER && NC_PASS) {
+      try {
+        const remotePath = `/ENFLOW_DMS/ProjeDevir/${folder}`;
+        ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
+        fileUrl = ncUrl;
+      } catch (e) {
+        console.warn('[Nextcloud] Handover upload failed, using local:', (e as Error).message);
+        fileUrl = localUrl;
+      }
+    }
+
+    const doc = await prisma.projectHandoverDoc.update({
+      where: { id: docId },
+      data: { fileUrl, status: 'UPLOADED', updatedAt: new Date() },
+    });
+
+    res.json({ doc, localUrl, nextcloudUrl: ncUrl, folder, fileName: safeName });
+  })
+);
 
 // ── Milestone şablonları ──────────────────────────────────────────────────────
 type MilestoneTmpl = { title: string; milestoneType: string; requiresApproval: boolean; isParallel: boolean };

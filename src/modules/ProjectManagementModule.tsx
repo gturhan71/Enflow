@@ -5,7 +5,7 @@ import {
   TrendingDown, DollarSign, Calendar, Users, FileText, BarChart3,
   Package, Truck, Code2, CheckSquare, ShieldCheck, Receipt, Banknote,
   Wrench, ArrowRight, Target, Activity, Printer, AlertCircle, Flag,
-  MoreVertical, ChevronDown, ChevronUp
+  MoreVertical, ChevronDown, ChevronUp, Upload, Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
@@ -372,6 +372,44 @@ const CostForm: React.FC<CostFormProps> = ({ milestones, onSave, onClose }) => {
   );
 };
 
+// ── Proje Devir Paketi (Faz 2) — ContractWorkflowDoc pattern'inin klonu ───────
+// Tip burada lokal tanımlı (types.ts'e taşınmaz) — ContractWorkflowDoc/
+// ContractWorkflow'un ContractWorkflowTest.tsx'te lokal tanımlanma konvansiyonuna uyar.
+
+interface ProjectHandoverDoc {
+  id: string;
+  projectId: string;
+  name: string;
+  docType: string;
+  description?: string | null;
+  status: 'PENDING' | 'IN_PROGRESS' | 'UPLOADED' | 'VERIFIED' | 'WAIVED';
+  fileUrl?: string | null;
+  isRequired: boolean;
+  sortOrder: number;
+  notes?: string | null;
+}
+
+const HANDOVER_STATUS_BADGE: Record<ProjectHandoverDoc['status'], string> = {
+  PENDING: 'bg-amber-100 text-amber-700',
+  IN_PROGRESS: 'bg-blue-100 text-blue-700',
+  UPLOADED: 'bg-emerald-100 text-emerald-700',
+  VERIFIED: 'bg-emerald-600 text-white',
+  WAIVED: 'bg-slate-200 text-slate-500',
+};
+
+const HANDOVER_STATUS_LABEL: Record<ProjectHandoverDoc['status'], string> = {
+  PENDING: 'Bekliyor',
+  IN_PROGRESS: 'Devam Ediyor',
+  UPLOADED: 'Yüklendi',
+  VERIFIED: 'Onaylandı',
+  WAIVED: 'Muaf',
+};
+
+function isHandoverComplete(docs: ProjectHandoverDoc[]): boolean {
+  if (docs.length === 0) return false;
+  return docs.filter(d => d.isRequired).every(d => ['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status));
+}
+
 // ── Proje Detay Çekmecesi ─────────────────────────────────────────────────────
 
 interface ProjectDetailProps {
@@ -386,12 +424,53 @@ interface ProjectDetailProps {
 
 const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, users, currentUserRole, currentUserId, onClose, onRefresh, onPrintReport }) => {
   const [project, setProject] = useState(initialProject);
-  const [tab, setTab] = useState<'overview' | 'milestones' | 'costs' | 'profitability'>('overview');
+  const [tab, setTab] = useState<'overview' | 'milestones' | 'costs' | 'profitability' | 'handover'>('overview');
   const [loading, setLoading] = useState(false);
   const [showCostForm, setShowCostForm] = useState(false);
   const [expandedMs, setExpandedMs] = useState<string | null>(null);
+  const [handoverDocs, setHandoverDocs] = useState<ProjectHandoverDoc[]>([]);
+  const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
 
   useEffect(() => { setProject(initialProject); }, [initialProject]);
+
+  useEffect(() => {
+    apiService.getProjectHandoverDocs(project.id)
+      .then((docs) => setHandoverDocs(docs as ProjectHandoverDoc[]))
+      .catch(() => { /* sessizce geç */ });
+  }, [project.id]);
+
+  const handoverComplete = useMemo(() => isHandoverComplete(handoverDocs), [handoverDocs]);
+
+  const handleHandoverUpload = async (docId: string, file: File) => {
+    setUploadingDocId(docId);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const effectiveTenantId = localStorage.getItem('enflow_active_tenant_id') || '';
+      const effectiveToken = localStorage.getItem('enflow_auth_token') || 'mock-token';
+
+      const res = await fetch(`/api/projects/${project.id}/handover-docs/${docId}/upload`, {
+        method: 'POST',
+        headers: { 'x-tenant-id': effectiveTenantId, 'Authorization': `Bearer ${effectiveToken}` },
+        body: formData,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
+      }
+      const result = await res.json();
+      setHandoverDocs(prev => prev.map(d => d.id === result.doc.id ? result.doc : d));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Yükleme başarısız.');
+    } finally {
+      setUploadingDocId(null);
+    }
+  };
+
+  const handleHandoverWaive = async (docId: string) => {
+    const updated = await apiService.updateProjectHandoverDoc(project.id, docId, { status: 'WAIVED' }) as ProjectHandoverDoc;
+    setHandoverDocs(prev => prev.map(d => d.id === docId ? updated : d));
+  };
 
   const fin = useMemo(() => calcFinancials(project), [project]);
 
@@ -439,6 +518,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, 
     { key: 'milestones',    label: `Milestones (${project.milestones.length})` },
     { key: 'costs',         label: `Maliyetler (${project.projectCostItems.length})` },
     { key: 'profitability', label: 'Karlılık' },
+    { key: 'handover',      label: 'Devir Paketi' },
   ] as const;
 
   return (
@@ -458,6 +538,11 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, 
               <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex items-center gap-1">
                 <AlertCircle size={11} />{fin.delayedMs} gecikmiş
               </span>
+            )}
+            {!handoverComplete && (
+              <button onClick={() => setTab('handover')} className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 flex items-center gap-1 hover:bg-amber-200 transition-colors">
+                <AlertTriangle size={11} />Devir Bekliyor
+              </button>
             )}
           </div>
           <h3 className="font-bold text-lg leading-tight">{project.name}</h3>
@@ -673,6 +758,60 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, 
                 <p className="text-xs text-red-300">
                   Gerçekleşen karlılık plandan <strong>%{(fin.plannedMargin - fin.actualMargin).toFixed(1)}</strong> geride. Maliyet kontrolü önerilir.
                 </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* DEVİR PAKETİ */}
+        {tab === 'handover' && (
+          <div className="space-y-4">
+            <div className={`rounded-xl p-4 flex items-center gap-3 ${handoverComplete ? 'bg-emerald-900/20 border border-emerald-500/30' : 'bg-amber-900/20 border border-amber-500/30'}`}>
+              {handoverComplete
+                ? <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+                : <AlertTriangle size={18} className="text-amber-400 shrink-0" />}
+              <p className={`text-xs ${handoverComplete ? 'text-emerald-300' : 'text-amber-300'}`}>
+                {handoverComplete
+                  ? 'Tüm zorunlu devir evrakları tamamlandı — proje devir toplantısına hazır.'
+                  : `${handoverDocs.filter(d => d.isRequired && ['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status)).length} / ${handoverDocs.filter(d => d.isRequired).length} zorunlu evrak tamamlandı. Devir toplantısından en az 1 gün önce tüm evraklar yüklenmelidir.`}
+              </p>
+            </div>
+
+            {handoverDocs.length === 0 ? (
+              <div className="text-center py-10 text-slate-400 text-xs">Evrak listesi yükleniyor...</div>
+            ) : (
+              <div className="space-y-2">
+                {handoverDocs.map(doc => (
+                  <div key={doc.id} className="bg-white/5 rounded-xl p-4 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate">{doc.name}</p>
+                      <p className="text-[11px] text-slate-400">{doc.isRequired ? 'Zorunlu' : 'Opsiyonel'}</p>
+                    </div>
+                    <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${HANDOVER_STATUS_BADGE[doc.status]}`}>
+                      {HANDOVER_STATUS_LABEL[doc.status]}
+                    </span>
+                    {doc.fileUrl ? (
+                      <a href={doc.fileUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-indigo-400 hover:text-indigo-300 shrink-0">
+                        Görüntüle
+                      </a>
+                    ) : (
+                      <label className="shrink-0 cursor-pointer">
+                        <input type="file" className="hidden" onChange={e => {
+                          const file = e.target.files?.[0];
+                          if (file) handleHandoverUpload(doc.id, file);
+                        }} />
+                        <span className="flex items-center gap-1.5 bg-amber-500 text-white px-3 py-1.5 rounded-lg text-[11px] font-bold hover:bg-amber-600 transition-all">
+                          {uploadingDocId === doc.id ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Yükle
+                        </span>
+                      </label>
+                    )}
+                    {doc.status === 'PENDING' && !doc.fileUrl && (
+                      <button onClick={() => handleHandoverWaive(doc.id)} className="text-[10px] text-slate-400 hover:text-slate-200 shrink-0 underline">
+                        Muaf
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
             )}
           </div>

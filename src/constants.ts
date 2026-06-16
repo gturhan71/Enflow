@@ -78,6 +78,7 @@ export const MOCK_TENANTS: Tenant[] = [
 export const NAV_ITEMS = [
   // ── İş akışı sırasına göre düzenlenmiş ──────────────────────────────────
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
+  { id: 'visit-plan', label: 'Ziyaret Planı', icon: Calendar, requiredPermission: 'VISIT_PLAN_VIEW' },
   {
     id: 'crm',
     label: 'CRM & Müşteri',

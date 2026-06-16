@@ -232,6 +232,58 @@ class ApiService {
   async rejectApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string }) {
     return apiClient.fetchWithAuth(`/approval-chains/${chainId}/stages/${stageId}/reject`, { method: 'POST', body: JSON.stringify(data) });
   }
+
+  // --- VISIT PLAN & GÜNLÜK RAPOR (Faz 2) ---
+  async getVisitPlans(params?: { weekOf?: string; preparedById?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/visits/plans${qs}`);
+  }
+  async getVisitPlan(id: string) { return apiClient.fetchWithAuth(`/visits/plans/${id}`); }
+  async createVisitPlan(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/visits/plans', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateVisitPlan(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/visits/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteVisitPlan(id: string) {
+    return apiClient.fetchWithAuth(`/visits/plans/${id}`, { method: 'DELETE' });
+  }
+  async addVisit(planId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/visits/plans/${planId}/visits`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateVisit(visitId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/visits/visits/${visitId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteVisit(visitId: string) {
+    return apiClient.fetchWithAuth(`/visits/visits/${visitId}`, { method: 'DELETE' });
+  }
+  async getDailyReports(params?: { userId?: string; weekStart?: string; weekEnd?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/visits/daily-reports${qs}`);
+  }
+  async createDailyReport(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/visits/daily-reports', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateDailyReport(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/visits/daily-reports/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteDailyReport(id: string) {
+    return apiClient.fetchWithAuth(`/visits/daily-reports/${id}`, { method: 'DELETE' });
+  }
+
+  // --- PROJE DEVİR PAKETİ (Faz 2) ---
+  async getProjectHandoverDocs(projectId: string) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/handover-docs`);
+  }
+  async createProjectHandoverDoc(projectId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/handover-docs`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateProjectHandoverDoc(projectId: string, docId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/handover-docs/${docId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteProjectHandoverDoc(projectId: string, docId: string) {
+    return apiClient.fetchWithAuth(`/projects/${projectId}/handover-docs/${docId}`, { method: 'DELETE' });
+  }
 }
 
 export const apiService = new ApiService();
