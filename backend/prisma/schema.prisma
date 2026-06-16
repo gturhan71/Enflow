@@ -29,6 +29,7 @@ model Tenant {
   contractWorkflows  ContractWorkflow[]
   vendors            Vendor[]
   purchaseRequests   PurchaseRequest[]
+  approvalChains     ApprovalChain[]
 }
 
 enum SubscriptionPlan {
@@ -556,6 +557,39 @@ model PurchaseQuote {
   isSelected        Boolean @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+// ── Onay Zinciri (Faz 0 — kalıcı ApprovalChain altyapısı) ──────────────────
+// workflowService.ts'teki in-memory yapının DB-backed karşılığı.
+// Proposal ve ContractWorkflow kendi statü alanlarını korur; bu model
+// paralel/ek bir onay geçmişi katmanı olarak eklenir.
+
+model ApprovalChain {
+  id         String          @id @default(cuid())
+  entityType String          // OPPORTUNITY | PROPOSAL | CONTRACT_WORKFLOW
+  entityId   String
+  status     String          @default("PENDING") // PENDING | COMPLETED | REJECTED
+  tenantId   String
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  stages     ApprovalStage[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+model ApprovalStage {
+  id         String        @id @default(cuid())
+  chainId    String
+  chain      ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  role       String        // FINANCE_MGR | IGPD_MGR | GENERAL_MANAGER | KSU_MGR | ...
+  order      Int           @default(0)
+  status     String        @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
+  approverId String?
+  note       String?
+  approvedAt DateTime?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 }
 
 model DeliveryRecord {

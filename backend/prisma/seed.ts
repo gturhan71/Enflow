@@ -38,6 +38,55 @@ async function main() {
     },
   });
 
+  // 2b. Kurumsal süreç swimlane birimleri (Faz 0 — onay zinciri altyapısı)
+  const financeUnit = await prisma.unit.create({
+    data: {
+      name: 'Finans',
+      tenantId: tenant.id,
+      description: 'Maliyet ve finansman değerlendirmesi.',
+    },
+  });
+
+  const igpdUnit = await prisma.unit.create({
+    data: {
+      name: 'İGPD — İş Geliştirme & Pazarlama Direktörlüğü',
+      tenantId: tenant.id,
+      description: 'Fırsat programı yönetimi, ziyaret planı ve onay takibi.',
+    },
+  });
+
+  const topManagementUnit = await prisma.unit.create({
+    data: {
+      name: 'Üst Yönetim (GMÜ)',
+      tenantId: tenant.id,
+      description: 'Genel müdür üst yönetim onay aşaması.',
+    },
+  });
+
+  const ksuUnit = await prisma.unit.create({
+    data: {
+      name: 'KSU — Kontrat & Sözleşme Uzmanlığı',
+      tenantId: tenant.id,
+      description: 'Sözleşme evrak kontrolü ve imza süreci doğrulaması.',
+    },
+  });
+
+  const kgdUnit = await prisma.unit.create({
+    data: {
+      name: 'KGD — Kalite Güvence Direktörlüğü',
+      tenantId: tenant.id,
+      description: 'Öğrenilmiş dersler, risk/fırsat ve kurumsal metrik raporlaması.',
+    },
+  });
+
+  const isabUnit = await prisma.unit.create({
+    data: {
+      name: 'İSAB — İhale Satın Alma Birimi',
+      tenantId: tenant.id,
+      description: 'İhale takip ve EKAP süreçleri.',
+    },
+  });
+
   // 3. Create Admin User (Gökhan Turhan)
   const gokhan = await prisma.user.create({
     data: {

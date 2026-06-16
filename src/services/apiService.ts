@@ -214,6 +214,21 @@ class ApiService {
   async closePurchaseRequest(id: string) {
     return apiClient.fetchWithAuth(`/purchase-requests/${id}/close`, { method: 'POST' });
   }
+
+  // --- APPROVAL CHAINS (Faz 0 — kalıcı onay zinciri) ---
+  async getApprovalChain(entityType: string, entityId: string) {
+    const chains = await apiClient.fetchWithAuth(`/approval-chains?entityType=${entityType}&entityId=${entityId}`) as unknown[];
+    return chains[0] || null;
+  }
+  async createApprovalChain(data: { entityType: string; entityId: string; stages: { role: string; order?: number }[] }) {
+    return apiClient.fetchWithAuth('/approval-chains', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async approveApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string }) {
+    return apiClient.fetchWithAuth(`/approval-chains/${chainId}/stages/${stageId}/approve`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async rejectApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string }) {
+    return apiClient.fetchWithAuth(`/approval-chains/${chainId}/stages/${stageId}/reject`, { method: 'POST', body: JSON.stringify(data) });
+  }
 }
 
 export const apiService = new ApiService();

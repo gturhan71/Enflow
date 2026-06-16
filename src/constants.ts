@@ -62,7 +62,11 @@ export const ROLE_LABELS: Record<string, string> = {
   PROCUREMENT_MGR: 'Satın Alma Müdürü',
   FINANCE_MGR: 'Finans Müdürü',
   HR_MGR: 'İnsan Kaynakları Müdürü',
-  AUDITOR: 'Denetçi / Auditor'
+  AUDITOR: 'Denetçi / Auditor',
+  IGPD_MGR: 'İş Geliştirme & Pazarlama Direktörü (İGPD)',
+  KGD_MGR: 'Kalite Güvence Direktörü (KGD)',
+  KSU_MGR: 'Kontrat & Sözleşme Uzmanı (KSU)',
+  ISAB_MGR: 'İhale Satın Alma Birimi Yöneticisi (İSAB)'
 };
 
 export const MOCK_TENANTS: Tenant[] = [

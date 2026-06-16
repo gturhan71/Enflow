@@ -14,13 +14,14 @@ export const FinalProposalGenerator: React.FC<Props> = ({ entityId, onFinalized 
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    setChain(workflowService.getChainForEntity(entityId));
+    workflowService.getChainForEntity('OPPORTUNITY', entityId).then(setChain);
   }, [entityId]);
 
   const handleApprove = async (stageId: string) => {
+    if (!chain) return;
     setLoading(true);
     // Assuming currentUser is 'admin' for demo purposes
-    const updatedChain = workflowService.approveStage(entityId, stageId, 'user_admin', 'Onaylandı.');
+    const updatedChain = await workflowService.approveStage(chain.id, stageId, 'user_admin', 'Onaylandı.');
     setChain(updatedChain);
     setLoading(false);
   };

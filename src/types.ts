@@ -14,6 +14,8 @@ export interface ApprovalStage {
   status: 'PENDING' | 'APPROVED' | 'REJECTED';
   approverId?: string;
   note?: string;
+  order?: number;
+  approvedAt?: string;
 }
 
 export interface Workflow {
@@ -382,6 +384,7 @@ export interface Proposal {
 
 export interface ApprovalChain {
   id: string;
+  entityType?: string; // OPPORTUNITY | CONTRACT_WORKFLOW_SIGNING | ...
   entityId: string;
   stages: ApprovalStage[];
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';

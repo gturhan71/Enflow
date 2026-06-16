@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
+import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '../services/approvalChainService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -204,6 +205,9 @@ router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: 
     }
   });
 
+  // Faz 0 — kalıcı onay zinciri: Finans → İGPD → Üst Yönetim (GM) → KSU
+  await ensureApprovalChain(tenantId, 'OPPORTUNITY', opportunityId);
+
   res.json({ message: 'Teklif onay sürecine gönderildi.' });
 }));
 
@@ -225,6 +229,9 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
     data: { status: 'APPROVED', note: note || 'Onaylandı.' }
   });
 
+  // Faz 0 — kalıcı zincirin tüm aşamalarını tamamlanmış işaretle (tek-tık GM onayı geriye uyumlu)
+  await completeApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, req.userId, note || 'Onaylandı.');
+
   res.json(updated);
 }));
 
@@ -236,6 +243,9 @@ router.post('/:id/revert-approval', tenantMiddleware, asyncHandler(async (req: R
     where: { id: opportunityId },
     data: { technicalStatus: 'PENDING' }
   });
+
+  // Faz 0 — kalıcı onay zincirini de geri al
+  await resetApprovalChain(tenantId, 'OPPORTUNITY', opportunityId);
 
   await prisma.activityLog.create({
     data: {

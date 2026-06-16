@@ -7,6 +7,7 @@ import https from 'https';
 import http from 'http';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -160,6 +161,14 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     },
     include: { documents: { orderBy: { sortOrder: 'asc' } } },
   });
+
+  // Faz 0 — kalıcı onay zinciri: KSU (evrak kontrolü) → Üst Yönetim (imza onayı)
+  if (status === 'PENDING_SIGNATURE_APPROVAL') {
+    await ensureApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id);
+  } else if (status === 'SIGNED') {
+    await completeApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id, req.userId, 'Sözleşme imzalandı.');
+  }
+
   res.json(wf);
 }));
 

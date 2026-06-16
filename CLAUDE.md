@@ -6,6 +6,8 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 **Hedef kullanıcı rolleri:** GENERAL_MANAGER, SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL, PROJECT_MANAGER, ADMIN
 
+**Kurumsal onay swimlane rolleri (2026-06-16 eklendi):** FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma) — `src/constants.ts` ROLE_LABELS'ta tanımlı; karşılık gelen `Unit` kayıtları tenant-1'e eklendi.
+
 ## Tech Stack
 
 | Katman | Teknoloji |
@@ -82,6 +84,7 @@ Tüm modeller `tenantId` ile izole edilmiş.
 | `DeliveryRecord` | Teslimat kaydı |
 | `ActivityLog` | Değişiklik logu |
 | `Notification` | Kullanıcı bildirimi |
+| `ApprovalChain` / `ApprovalStage` | Kalıcı çok-aşamalı onay zinciri (Finans→İGPD→GM→KSU vb.) |
 
 ## Modüller ve Sidebar Menüsü
 
@@ -235,13 +238,56 @@ POST /:id/invoice          → fatura bilgisi
 POST /:id/close            → CLOSED yap
 ```
 
+## Onay Zinciri (ApprovalChain) — Faz 0 (2026-06-16)
+
+Kurumsal süreç boşluk analizine göre eklendi: `src/services/workflowService.ts`'teki eski in-memory (sayfa yenilenince kaybolan) yapı, kalıcı Prisma modeline taşındı.
+
+### Model
+```
+ApprovalChain  { entityType, entityId, status: PENDING|COMPLETED|REJECTED, stages[] }
+ApprovalStage  { chainId, role, order, status: PENDING|APPROVED|REJECTED, approverId, note, approvedAt }
+```
+
+### Varsayılan Şablonlar (`backend/src/services/approvalChainService.ts`)
+```
+OPPORTUNITY / PROPOSAL          → FINANCE_MGR → IGPD_MGR → GENERAL_MANAGER → KSU_MGR
+CONTRACT_WORKFLOW_SIGNING       → KSU_MGR → GENERAL_MANAGER
+```
+
+### Bağlandığı Yerler (mevcut statü alanları korunarak, paralel kayıt)
+- `opportunities.ts` `/request-approval` → `ensureApprovalChain` (chain oluşturur)
+- `opportunities.ts` `/approve` → `completeApprovalChain` (tüm aşamaları onaylanmış işaretler — tek-tık GM onayı geriye uyumlu)
+- `opportunities.ts` `/revert-approval` → `resetApprovalChain`
+- `contractWorkflow.ts` `PUT /:id` — `status: 'PENDING_SIGNATURE_APPROVAL'` → chain oluşturur; `status: 'SIGNED'` → chain tamamlar
+
+### Backend Endpoint'leri (`/api/approval-chains`)
+```
+GET    /?entityType=&entityId=     → zincir(leri) listele
+GET    /:id                         → tek zincir (stages dahil)
+POST   /                            → { entityType, entityId, stages: [{role, order?}] }
+POST   /:id/stages/:stageId/approve → { approverId, note? }
+POST   /:id/stages/:stageId/reject  → { approverId, note? }
+DELETE /:id
+```
+
+Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI henüz yok — `frontend/src/services/workflowService.ts` artık bu API'leri çağıran async wrapper; Finans swimlane ekranı (Faz 1) `TodoModule.tsx`'e bir sekme olarak eklenecek.
+
 ## Sonraki Adımlar (Planlanan)
 
-- ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
-- Birim yöneticisi onayı için gerçek TodoTask yaratma + bildirim gönderme
-- Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
-- İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
-- Proje → Satınalma otomatik bağlantısı (purchaseRequestId ↔ ProjectCostItem)
+Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
+
+- [x] ApprovalChain/ApprovalStage kalıcı altyapı + Opportunity/ContractWorkflow onay akışlarına bağlandı (Faz 0)
+- [ ] Finans swimlane UI'sı (TodoModule'e "Bekleyen Finans Onayları" sekmesi)
+- [ ] Kayıp fırsat nedeni (`Opportunity.lostReason`) + otomatik arşivleme
+- [ ] İş günü SLA mekanizması (`date-fns` ile, TodoTask için)
+- [ ] Proje kod üreticisi (insan-okunur `Project.code`)
+- [ ] Ziyaret Planı + Günlük Rapor modülü (VisitPlan/Visit/DailyReport)
+- [ ] Proje Devir Paketi (11 zorunlu evrak — ContractWorkflowDoc pattern'inin klonu)
+- [ ] Form numaralandırma sistemi + Genel Hususlar (Lessons Learned/Risk/Metrik) modülü
+- [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
+- [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
+- [ ] İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
+- [ ] Proje → Satınalma otomatik bağlantısı (purchaseRequestId ↔ ProjectCostItem)
 
 
 ---
@@ -321,13 +367,12 @@ h2 backend
 h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/pnpm-lock.yaml
 h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
-h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
 h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
-h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
+h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
+h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/src/middleware.ts
 h2 src
-h3 src/components/CostAnalysisModule.tsx
 h3 src/components/WorkflowSimulation.tsx
 h3 src/components/SaveButton.tsx
 h3 src/contexts/UnsavedChangesContext.tsx
@@ -335,6 +380,7 @@ h3 src/services/apiClient.ts
 h3 src/services/whatsappService.ts
 h3 src/services/nextcloudService.ts
 h3 src/services/exchangeService.ts
+h3 src/modules/SalesSupport.tsx
 ```
 
 ## backend
@@ -349,15 +395,15 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
-### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
-```
-TABLE new_ContractWorkflowDoc
-```
-
 ### backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 ```
 TABLE ContractWorkflow
 TABLE ContractWorkflowDoc
+```
+
+### backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
+```
+TABLE new_ContractWorkflowDoc
 ```
 
 ### backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
