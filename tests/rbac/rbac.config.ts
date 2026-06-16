@@ -271,7 +271,7 @@ export interface UiCase {
 export const uiMatrix: UiCase[] = [
   {
     name: "Test Ortamı bölümü (sadece GM)",
-    sidebarText: "Sözleşme (Test)",
+    sidebarText: "Güvenlik Testi",
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden" },
   },
   {
@@ -280,9 +280,15 @@ export const uiMatrix: UiCase[] = [
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden" },
   },
   {
+    // "Presales & Dizayn" üst menüsü, alt öğelerinden HERHANGİ BİRİ erişilebilir
+    // olduğunda görünür (bkz. Sidebar.tsx — parent OR child mantığı). Alt öğeler:
+    // "BoM & Tasarım" (PRESALES_VIEW) + "Maliyet Analizi" (COST_ANALYSIS_VIEW).
+    // sales_rep'te COST_ANALYSIS_VIEW olduğu için üst menü görünür — bu bir açık
+    // değil, Maliyet Analizi'ne erişimin doğru sonucu. PRESALES_VIEW (BoM) leaf'i
+    // ayrıca gizli kalır.
     name: "Presales menüsü",
     sidebarText: "Presales",
-    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "hidden" },
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible" },
   },
   {
     name: "CRM menüsü",

@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmp9s29090002h4o37jgwc4we\",\"name\":\"GOKTUG TURHAN\",\"email\":\"goktugturhan74@gmail.com\",\"role\":\"PRESALES_ENG\",\"permissions\":\"[\\\"[\\\",\\\"\\\\\\\"\\\",\\\"D\\\",\\\"A\\\",\\\"S\\\",\\\"H\\\",\\\"B\\\",\\\"O\\\",\\\"A\\\",\\\"R\\\",\\\"D\\\",\\\"_\\\",\\\"V\\\",\\\"I\\\",\\\"E\\\",\\\"W\\\",\\\"\\\\\\\"\\\",\\\"]\\\",\\\"PRESALES_VIEW\\\",\\\"DASHBOARD_VIEW\\\",\\\"DOCUMENTS_VIEW\\\",\\\"COST_ANALYSIS_VIEW\\\",\\\"PROJECT_MGMT_VIEW\\\",\\\"CRM_VIEW\\\",\\\"SALES_SUPPORT_VIEW\\\"]\",\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp5lheha000059w3rs1buoba\",\"createdAt\":\"2026-05-17T12:54:58.329Z\",\"updatedAt\":\"2026-05-17T16:36:44.636Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+          "value": "{\"id\":\"cmp9s29090002h4o37jgwc4we\",\"name\":\"GOKTUG TURHAN\",\"email\":\"goktugturhan74@gmail.com\",\"role\":\"PRESALES_ENG\",\"permissions\":[\"COST_ANALYSIS_VIEW\",\"CRM_VIEW\",\"DASHBOARD_VIEW\",\"DOCUMENTS_VIEW\",\"PRESALES_VIEW\",\"PROJECT_MGMT_VIEW\",\"SALES_SUPPORT_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp5lheha000059w3rs1buoba\",\"createdAt\":\"2026-05-17T12:54:58.329Z\",\"updatedAt\":\"2026-05-17T16:36:44.636Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
         },
         {
           "name": "enflow_auth_token",

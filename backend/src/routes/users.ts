@@ -5,12 +5,25 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
 
+// `permissions` DB'de JSON string olarak saklanır; frontend'e her zaman
+// parse edilmiş bir dizi olarak gönderilir. Aksi halde frontend tarafında
+// `[...user.permissions]` gibi bir spread, string'i karakter dizisine
+// bozar — geçmişte tam olarak bu corrupt veriye yol açmıştı (2026-06-16).
+function parsePermissions<T extends { permissions: string }>(user: T): Omit<T, 'permissions'> & { permissions: string[] } {
+  let parsed: unknown;
+  try { parsed = JSON.parse(user.permissions); } catch { parsed = []; }
+  const clean = Array.isArray(parsed)
+    ? Array.from(new Set(parsed.filter((p): p is string => typeof p === 'string' && p.length > 3)))
+    : [];
+  return { ...user, permissions: clean };
+}
+
 router.get('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     where: { tenantId: req.tenantId },
     include: { unit: true }
   });
-  res.json(users);
+  res.json(users.map(parsePermissions));
 }));
 
 router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
@@ -23,7 +36,7 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
       status: 'ACTIVE'
     }
   });
-  res.json(user);
+  res.json(parsePermissions(user));
 }));
 
 router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
@@ -39,7 +52,7 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
     data.permissions = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
   }
   const user = await prisma.user.update({ where: { id }, data });
-  res.json(user);
+  res.json(parsePermissions(user));
 }));
 
 router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
