@@ -340,6 +340,23 @@ Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI **Faz 1'de eklendi** �
 - **UI:** Risk sekmesinde skor matris rengi (1-7 yeşil / 8-14 amber / 15-25 kırmızı); KPI sekmesinde hedef/gerçekleşen yüzde; "Yeni Kayıt" formu aktif sekmeye göre alan değiştirir
 - **Migration:** `20260617142420_faz3_doc_coding_corporate_governance`
 
+## EKAP İskeleti + Hukuk Talebi (Faz 4, 2026-06-17)
+
+Faz 4 "opsiyonel/bölgesel" katman — iki küçük iş. Deskfor kapsam dışı bırakıldı.
+
+### EKAP — Kamu İhale Platformu entegrasyon iskeleti
+- `IntegrationWizard.tsx` `INTEGRATIONS` dizisine `ekap` kartı eklendi (`Gavel` ikonu, amber tema). **Gerçek EKAP web servisi bağlantısı YOK** — yalnızca manuel İKN takibi için yer tutucu.
+- Tek ekranlı özel sihirbaz bloğu (`selectedIntegration === 'ekap'`): opsiyonel "Varsayılan İKN Öneki" girişi (`ekapPrefix` local state, kalıcılık yok) + iskelet notu. EKAP için "Adım X / 3" stepper'ı ve adım göstergesi gizli; footer butonu "Tamam" diyerek kapatır.
+- İKN değerleri zaten ContractWorkflow kayıtlarında manuel tutuluyor; bu kart ileride otomatik senkronizasyon için zemin.
+
+### Hukuk / Şirket Avukatı talebi (ayrı tablo YOK)
+- Karar gereği yeni Prisma tablosu açılmadı — `TodoTask.relatedModule = 'LEGAL'` yeterli (`backend/src/routes/tasks.ts` POST `relatedModule`'ü passthrough kabul ediyor).
+- `TodoModule.tsx` "Yeni Görev Ata" modalındaki "İlgili Modül" dropdown'ına **"Hukuk / Şirket Avukatı"** seçeneği (`LEGAL`); görev kartında `relatedModule === 'LEGAL'` için "Hukuk Talebi" etiketi (ayrıca `PROCUREMENT` etiketi de eklendi).
+
+### Yan düzeltmeler (önceden var olan bug'lar — Görevler sekmesi)
+- `App.tsx` `case 'todo'` TodoModule'e **`units` prop'unu hiç geçmiyordu** → birim dropdown'ı/filtre çipleri boştu, hiçbir görev oluşturulamıyordu. `units={units}` eklendi.
+- `useUnits` `enabled` koşulu Görevler sekmesini kapsamıyordu → `|| isTodoActive` eklendi (sekmeye doğrudan girişte birimler yüklensin).
+
 ## Sonraki Adımlar (Planlanan)
 
 Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
@@ -352,6 +369,7 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [x] Ziyaret Planı + Günlük Rapor modülü (Faz 2)
 - [x] Proje Devir Paketi — 11 zorunlu evrak (Faz 2)
 - [x] Özgün, tenant-bazlı doküman kodlama sistemi + Genel Hususlar modülü (Faz 3 — **üçüncü taraf notasyonu ASLA kullanılmaz**, bkz. aşağıdaki bölüm)
+- [x] EKAP entegrasyon iskeleti (manuel İKN) + Hukuk talebi (`TodoTask.relatedModule='LEGAL'`) (Faz 4 — Deskfor kapsam dışı)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
 - [ ] İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
@@ -366,11 +384,6 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 
 ## deps
 ```
-src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
-src/contexts/AuthContext.tsx ← constants, types
-src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
-src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
 src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../services/apiService
@@ -382,11 +395,13 @@ src/components/CustomerImportWizard.tsx ← lib/utils, types, services/apiServic
 src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
 src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
 src/components/FinalProposalGenerator.tsx ← services/workflowService, types
+src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
 src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
 src/modules/ContractWorkflowTest.tsx ← services/apiClient, types
+src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
 src/modules/LicenseGeneratorModule.tsx ← types, contexts/AuthContext, services/apiService
@@ -394,8 +409,8 @@ src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ProposalEditor.tsx ← lib/utils, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ProposalEditor.tsx ← lib/utils, types
 src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext
@@ -403,11 +418,12 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
 backend/src/middleware.ts ← prismaClient
+backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient
 backend/src/services/projectCodeService.ts ← prismaClient
 ```
 
-## changes (last 10 commits — 1 second ago)
+## changes (last 10 commits — 0 seconds ago)
 ```
 src/modules/ContractWorkflowTest.tsx          +apiFetch  +bestProposalPrice  +ContractWorkflowTest
 src/modules/ProjectManagementModule.tsx       +isHandoverComplete  +kar
@@ -415,6 +431,7 @@ src/modules/SecurityTestModule.tsx            +flattenSuite  +parseResults
 src/modules/VisitPlanModule.tsx               +mondayOf
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
+backend/src/services/documentNumberService.ts +nextDocumentNumber  +previewDocumentNumber
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain
 backend/src/services/projectCodeService.ts    +nextProjectCode
 backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
@@ -436,21 +453,21 @@ h3 .github/copilot-instructions.md
 h2 backend
 h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
 h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
-h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
+h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
 h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
 h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
-h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
+h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
+h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/src/middleware.ts
 h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/projectCodeService.ts
 h3 backend/src/utils/businessDays.ts
 h3 backend/src/utils/fileUpload.ts
 h2 src
-h3 src/modules/SubscriptionModule.tsx
 h3 src/components/settings/TenantSettings.tsx
+h3 src/contexts/AuthContext.tsx
 ```
 
 ## backend
@@ -513,10 +530,31 @@ TABLE DailyReport
 TABLE ProjectHandoverDoc
 ```
 
+### backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
+```
+TABLE DocumentCodingProfile
+TABLE DocumentCategoryCode
+TABLE DocumentSequence
+TABLE LessonsLearned
+TABLE RiskOpportunity
+TABLE CorporateMetric
+TABLE ExternalDocumentRegister
+INDEX DocumentCodingProfile_tenantId_key ON DocumentCodingProfile
+INDEX DocumentCategoryCode_tenantId_code_key ON DocumentCategoryCode
+INDEX DocumentSequence_tenantId_categoryCode_year_key ON DocumentSequence
+INDEX CorporateMetric_tenantId_name_period_key ON CorporateMetric
+```
+
 ### backend/src/middleware.ts
 ```
 export const asyncHandler  :5-7
 export const requireRole  :40-48
+```
+
+### backend/src/services/documentNumberService.ts
+```
+export async function nextDocumentNumber  :18-57
+export async function previewDocumentNumber  :63-81
 ```
 
 ### backend/src/services/approvalChainService.ts
@@ -544,59 +582,6 @@ export async function uploadToNextcloud  :24-70
 ```
 
 ## src
-
-### src/components/settings/TenantSettings.tsx
-```
-props TenantSettingsProps
-export TenantSettings
-handler onChange
-handler onClick
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
-```
-
-### src/components/settings/SubscriptionSettings.tsx
-```
-props SubscriptionSettingsProps
-export SubscriptionSettings
-handler onChange
-```
-
-### src/components/HandOffModal.tsx
-```
-props HandOffModalProps
-hook useState
-export HandOffModal
-handler onClick
-handler onChange
-```
-
-### src/components/settings/UnitManagement.tsx
-```
-props UnitManagementProps
-hook useState
-export UnitManagement
-handler onSubmit
-handler onChange
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
-```
 
 ### src/components/settings/UserManagement.tsx
 ```
@@ -711,6 +696,17 @@ export FinalProposalGenerator
 handler onClick
 ```
 
+### src/components/settings/TenantSettings.tsx
+```
+props TenantSettingsProps
+hook useState
+hook useCallback
+hook useEffect
+export TenantSettings
+handler onChange
+handler onClick
+```
+
 ### src/hooks/useEnflowQueries.ts
 ```
 export const useOpportunities  :6-14
@@ -774,6 +770,19 @@ export ContractWorkflowTest
 handler onChange
 handler onClick
 handler onBlur
+```
+
+### src/modules/CorporateGovernanceModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export CorporateGovernanceModule
+handler onDelete
+handler onTrack
+handler onClick
+handler onChange
 ```
 
 ### src/modules/CostAnalysisModule.tsx
@@ -863,17 +872,6 @@ handler onRefresh
 handler onSave
 ```
 
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
 ### src/modules/ProjectManagementModule.tsx
 ```
 props OpportunityPickerProps
@@ -894,6 +892,17 @@ handler onOpportunities
 handler onRefresh
 handler onPrintReport
 handler onSelect
+```
+
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
+handler onClick
+handler onChange
 ```
 
 ### src/modules/SecurityTestModule.tsx

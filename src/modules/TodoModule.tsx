@@ -515,6 +515,8 @@ const TodoModule = ({
                         {todo.relatedModule === 'PROJECT' && `Proje: ${getRelatedItemName(todo)}`}
                         {todo.relatedModule === 'OPPORTUNITY' && `Fırsat: ${getRelatedItemName(todo)}`}
                         {todo.relatedModule === 'CONTRACT' && `Sözleşme: ${getRelatedItemName(todo)}`}
+                        {todo.relatedModule === 'LEGAL' && 'Hukuk Talebi'}
+                        {todo.relatedModule === 'PROCUREMENT' && `Satın Alma: ${getRelatedItemName(todo)}`}
                       </div>
                     )}
                     {todo.dueDate && (
@@ -822,6 +824,7 @@ const TodoModule = ({
                       <option value="OPPORTUNITY">CRM & Fırsat</option>
                       <option value="CONTRACT">Sözleşme</option>
                       <option value="PROCUREMENT">Satın Alma</option>
+                      <option value="LEGAL">Hukuk / Şirket Avukatı</option>
                     </select>
                   </div>
                   <div className="space-y-2">

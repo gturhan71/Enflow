@@ -229,7 +229,7 @@ const TenantAppInner = ({
     enabled: isDashboardActive || isCrmActive || isProjectActive || isContractsActive || isTodoActive
   });
   const { data: unitsData, isLoading: unitsLoading } = useUnits(tenantId, {
-    enabled: isSettingsActive || isPresalesActive || isDashboardActive
+    enabled: isSettingsActive || isPresalesActive || isDashboardActive || isTodoActive
   });
   const { data: systemUsersData, isLoading: systemUsersLoading } = useUsers(tenantId, {
     enabled: isSettingsActive || isPresalesActive
@@ -346,7 +346,7 @@ const TenantAppInner = ({
       case 'procurement': return <ProcurementModule projects={projects} units={units} />;
       case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} />;
       case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} />;
-      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} setProposals={setProposals} />;
+      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} proposals={proposals} setProposals={setProposals} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
       case 'corporate-governance': return <CorporateGovernanceModule />;
