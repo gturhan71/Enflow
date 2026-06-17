@@ -26,7 +26,8 @@ import {
   Calendar,
   CreditCard,
   Key,
-  FlaskConical
+  FlaskConical,
+  ShieldCheck
 } from 'lucide-react';
 
 import { 
@@ -109,6 +110,7 @@ export const NAV_ITEMS = [
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },
+  { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
   {
     id: 'settings',
     label: 'Şirket Ayarları',

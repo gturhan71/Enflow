@@ -1,7 +1,184 @@
-import React from 'react';
-import { Building, X, ShieldCheck } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Building, X, ShieldCheck, Hash, Plus, Trash2, Save } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Tenant } from '../../types';
+import { apiService } from '../../services/apiService';
+
+interface DocCodingProfile {
+  companyCode: string;
+  separator: string;
+  includeYear: boolean;
+  sequenceDigits: number;
+  isActive: boolean;
+}
+interface DocCategory { id: string; code: string; label: string; sortOrder: number; }
+
+// Özgün, tenant-yapılandırılabilir doküman kodlama notasyonu (Faz 3).
+// Hiçbir sabit önek/kategori gömülü değildir — şirket kendi standardını girer.
+const DocumentCodingSettings = () => {
+  const [profile, setProfile] = useState<DocCodingProfile>({
+    companyCode: '', separator: '-', includeYear: true, sequenceDigits: 5, isActive: true,
+  });
+  const [hasProfile, setHasProfile] = useState(false);
+  const [categories, setCategories] = useState<DocCategory[]>([]);
+  const [preview, setPreview] = useState<string | null>(null);
+  const [newCat, setNewCat] = useState({ code: '', label: '' });
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const res = await apiService.getDocCodingProfile() as { profile: (DocCodingProfile & { id: string }) | null; categories: DocCategory[]; preview: string | null };
+    if (res.profile) {
+      setProfile({
+        companyCode: res.profile.companyCode, separator: res.profile.separator,
+        includeYear: res.profile.includeYear, sequenceDigits: res.profile.sequenceDigits,
+        isActive: res.profile.isActive,
+      });
+      setHasProfile(true);
+    }
+    setCategories(res.categories || []);
+    setPreview(res.preview);
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Canlı önizleme — kaydetmeden formattan türet
+  const livePreview = (() => {
+    const sep = profile.separator || '-';
+    const seq = String(1).padStart(Math.max(1, profile.sequenceDigits || 5), '0');
+    const parts: string[] = [];
+    if (profile.companyCode) parts.push(profile.companyCode);
+    parts.push(categories[0]?.code || 'ÖRN');
+    if (profile.includeYear) parts.push(String(new Date().getFullYear()));
+    parts.push(seq);
+    return parts.join(sep);
+  })();
+
+  const saveProfile = async () => {
+    setSaving(true); setMsg(null);
+    try {
+      const res = await apiService.updateDocCodingProfile(profile as unknown as Record<string, unknown>) as { preview: string | null };
+      setPreview(res.preview); setHasProfile(true); setMsg('Profil kaydedildi.');
+    } catch { setMsg('Kaydetme hatası.'); }
+    setSaving(false);
+  };
+
+  const addCategory = async () => {
+    if (!newCat.code.trim() || !newCat.label.trim()) return;
+    try {
+      await apiService.createDocCategory({ code: newCat.code.trim(), label: newCat.label.trim() });
+      setNewCat({ code: '', label: '' });
+      await load();
+    } catch { setMsg('Kategori eklenemedi (kod benzersiz olmalı).'); }
+  };
+
+  const removeCategory = async (id: string) => {
+    await apiService.deleteDocCategory(id);
+    await load();
+  };
+
+  return (
+    <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 space-y-6 shadow-sm">
+      <div className="flex items-center gap-3">
+        <Hash size={20} className="text-primary" />
+        <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Doküman Kodlama Notasyonu</h4>
+      </div>
+      <p className="text-sm text-slate-500 italic leading-relaxed">
+        Şirketinizin ISO 9001 doküman kontrol standardını burada tanımlayın. Üretilen kod formatı:
+        <span className="font-mono not-italic font-bold text-slate-700"> {'{Şirket Kodu}'}{profile.separator}{'{Kategori}'}{profile.includeYear ? `${profile.separator}{Yıl}` : ''}{profile.separator}{'{Sıra}'}</span>
+      </p>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Profil ayarları */}
+        <div className="space-y-4">
+          <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Şirket Kodu</label>
+            <input
+              type="text" value={profile.companyCode}
+              onChange={(e) => setProfile(p => ({ ...p, companyCode: e.target.value.toUpperCase() }))}
+              placeholder="örn. ACME"
+              className="w-full mt-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm font-mono"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Ayraç</label>
+              <input
+                type="text" maxLength={3} value={profile.separator}
+                onChange={(e) => setProfile(p => ({ ...p, separator: e.target.value }))}
+                className="w-full mt-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm font-mono text-center"
+              />
+            </div>
+            <div>
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sıra Hane</label>
+              <input
+                type="number" min={1} max={10} value={profile.sequenceDigits}
+                onChange={(e) => setProfile(p => ({ ...p, sequenceDigits: Number(e.target.value) }))}
+                className="w-full mt-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={profile.includeYear}
+                onChange={(e) => setProfile(p => ({ ...p, includeYear: e.target.checked }))}
+                className="w-4 h-4 accent-primary" />
+              <span className="text-xs font-bold text-slate-700">Yıl dahil et</span>
+            </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={profile.isActive}
+                onChange={(e) => setProfile(p => ({ ...p, isActive: e.target.checked }))}
+                className="w-4 h-4 accent-primary" />
+              <span className="text-xs font-bold text-slate-700">Aktif</span>
+            </label>
+          </div>
+          <div className="p-4 bg-slate-900 rounded-2xl">
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/50">Canlı Önizleme</p>
+            <p className="text-lg font-mono font-black text-primary mt-1">{livePreview}</p>
+          </div>
+          <button onClick={saveProfile} disabled={saving}
+            className="w-full flex items-center justify-center gap-2 bg-primary text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-primary/90 transition-all disabled:opacity-50">
+            <Save size={14} /> {saving ? 'Kaydediliyor...' : (hasProfile ? 'Profili Güncelle' : 'Profili Oluştur')}
+          </button>
+          {msg && <p className="text-xs text-center font-bold text-primary">{msg}</p>}
+        </div>
+
+        {/* Kategori sözlüğü */}
+        <div className="space-y-4">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kategori Sözlüğü</p>
+          <div className="flex gap-2">
+            <input type="text" placeholder="KOD" value={newCat.code}
+              onChange={(e) => setNewCat(c => ({ ...c, code: e.target.value.toUpperCase() }))}
+              className="w-24 px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm font-mono" />
+            <input type="text" placeholder="Açıklama (örn. Sözleşme Evrakları)" value={newCat.label}
+              onChange={(e) => setNewCat(c => ({ ...c, label: e.target.value }))}
+              className="flex-1 px-3 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm" />
+            <button onClick={addCategory}
+              className="bg-slate-900 text-white px-3 rounded-xl hover:bg-slate-800 transition-all">
+              <Plus size={16} />
+            </button>
+          </div>
+          <div className="space-y-2 max-h-[260px] overflow-y-auto pr-2 custom-scrollbar">
+            {categories.length === 0 && (
+              <p className="text-xs text-slate-400 italic text-center py-6">Henüz kategori tanımlanmadı. Kendi notasyonunuzu girin.</p>
+            )}
+            {categories.map(cat => (
+              <div key={cat.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50/40">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono font-black text-primary bg-primary/10 px-2 py-1 rounded-lg">{cat.code}</span>
+                  <span className="text-xs font-bold text-slate-700">{cat.label}</span>
+                </div>
+                <button onClick={() => removeCategory(cat.id)} className="text-slate-300 hover:text-red-500 transition-colors">
+                  <Trash2 size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 interface TenantSettingsProps {
   companyLogo: string | null;
@@ -25,7 +202,8 @@ export const TenantSettings = ({
   handleCreateTenant
 }: TenantSettingsProps) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in duration-300">
+    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
       {/* Kurumsal Kimlik */}
       <div className="bg-white border border-slate-100 rounded-[2.5rem] p-8 space-y-8 shadow-sm">
         <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Kurumsal Kimlik</h4>
@@ -123,6 +301,10 @@ export const TenantSettings = ({
           </div>
         </div>
       </div>
+    </div>
+
+    {/* Doküman Kodlama Notasyonu (Faz 3) */}
+    <DocumentCodingSettings />
     </div>
   );
 };

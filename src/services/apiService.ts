@@ -284,6 +284,71 @@ class ApiService {
   async deleteProjectHandoverDoc(projectId: string, docId: string) {
     return apiClient.fetchWithAuth(`/projects/${projectId}/handover-docs/${docId}`, { method: 'DELETE' });
   }
+
+  // --- DOKÜMAN KODLAMA (Faz 3 — özgün, tenant-yapılandırılabilir) ---
+  async getDocCodingProfile() { return apiClient.fetchWithAuth('/document-coding/profile'); }
+  async updateDocCodingProfile(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/document-coding/profile', { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async getDocCategories() { return apiClient.fetchWithAuth('/document-coding/categories'); }
+  async createDocCategory(data: { code: string; label: string; sortOrder?: number }) {
+    return apiClient.fetchWithAuth('/document-coding/categories', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateDocCategory(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/document-coding/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteDocCategory(id: string) {
+    return apiClient.fetchWithAuth(`/document-coding/categories/${id}`, { method: 'DELETE' });
+  }
+
+  // --- KURUMSAL YÖNETİM / GENEL HUSUSLAR (Faz 3) ---
+  // Lessons Learned
+  async getLessons(params?: { projectId?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/corporate-governance/lessons${qs}`);
+  }
+  async createLesson(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/corporate-governance/lessons', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateLesson(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/corporate-governance/lessons/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteLesson(id: string) {
+    return apiClient.fetchWithAuth(`/corporate-governance/lessons/${id}`, { method: 'DELETE' });
+  }
+  // Risk & Opportunity
+  async getRisks() { return apiClient.fetchWithAuth('/corporate-governance/risks'); }
+  async createRisk(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/corporate-governance/risks', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateRisk(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/corporate-governance/risks/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteRisk(id: string) {
+    return apiClient.fetchWithAuth(`/corporate-governance/risks/${id}`, { method: 'DELETE' });
+  }
+  // Corporate Metrics
+  async getMetrics() { return apiClient.fetchWithAuth('/corporate-governance/metrics'); }
+  async createMetric(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/corporate-governance/metrics', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateMetric(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/corporate-governance/metrics/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteMetric(id: string) {
+    return apiClient.fetchWithAuth(`/corporate-governance/metrics/${id}`, { method: 'DELETE' });
+  }
+  // External Document Register
+  async getExternalDocs() { return apiClient.fetchWithAuth('/corporate-governance/external-docs'); }
+  async createExternalDoc(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/corporate-governance/external-docs', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateExternalDoc(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/corporate-governance/external-docs/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteExternalDoc(id: string) {
+    return apiClient.fetchWithAuth(`/corporate-governance/external-docs/${id}`, { method: 'DELETE' });
+  }
 }
 
 export const apiService = new ApiService();

@@ -319,6 +319,27 @@ Aşama-bazlı (Finans→İGPD→GM→KSU tek tek onay) UI **Faz 1'de eklendi** �
 - **UI:** Header'da `!handoverComplete` ise amber "Devir Bekliyor" rozeti (tıklayınca Devir Paketi sekmesine gider); tüm `isRequired` evraklar `UPLOADED/VERIFIED/WAIVED` olunca tamamlanmış sayılır
 - Yüklenen dosyalar: `backend/uploads/project-handovers/{proje_kodu}/`
 
+## Özgün Doküman Kodlama + Genel Hususlar (Faz 3, 2026-06-17)
+
+> ⚠️ **Kritik kısıtlama:** Referans alınan ISO 9001 diyagramı üçüncü bir şirkete aitti. O şirketin adı veya doküman kod notasyonu Enflow'un **hiçbir yerinde** (kod, migration, UI, docs) kullanılmaz. Doküman kodlama tamamen özgün ve **tenant-bazlı yapılandırılabilir**; sabit gömülü kategori/önek kodu yoktur.
+
+### Doküman Kodlama Sistemi (tenant-yapılandırılabilir)
+
+- **Modeller:** `DocumentCodingProfile { tenantId @unique, companyCode, separator (default "-"), includeYear, sequenceDigits (default 5), isActive }`, `DocumentCategoryCode { tenantId, code, label, @@unique([tenantId, code]) }` (tenant'ın kendi tanımladığı kategori sözlüğü), `DocumentSequence { tenantId, categoryCode, year, lastNumber, @@unique([tenantId, categoryCode, year]) }` (atomik artan sayaç)
+- **Servis:** `backend/src/services/documentNumberService.ts` → `nextDocumentNumber(tenantId, categoryCode)` (profil yoksa `null`; format `{companyCode}{sep}{categoryCode}[{sep}{year}]{sep}{paddedSeq}`, `prisma.$transaction` ile atomik artırır) + `previewDocumentNumber`
+- **Backend route:** `/api/document-coding` — `GET/PUT /profile` (separator default '-', sequenceDigits 1-10 clamp), `GET/POST/PUT/DELETE /categories` (409 dup code)
+- **UI:** Ayarlar → Şirket Profili → "Doküman Kodlama Notasyonu" bölümü (`TenantSettings.tsx` içindeki self-contained `DocumentCodingSettings` komponenti) — şirket kodu, ayraç, hane sayısı, yıl/aktif toggle, canlı önizleme, kategori sözlüğü CRUD
+- `ContractWorkflowDoc`, `ProjectHandoverDoc`, `CorporateDocument` ve aşağıdaki kurumsal modellere opsiyonel `docNumber` alanı eklendi; profil tanımlı değilse boş kalır (zorunlu değil)
+
+### Genel Hususlar Modülü (`corporate-governance` sekmesi)
+
+`src/modules/CorporateGovernanceModule.tsx` — tek modül, 4 sekme; kendi verisini apiService ile çeker. Sidebar'da `requiredPermission: 'CORPORATE_GOV_VIEW'` (GM superuser).
+
+- **Modeller:** `LessonsLearned { projectId? nullable, title, category, situation, rootCause, action, impact, status, docNumber? }`, `RiskOpportunity { type RISK|OPPORTUNITY, probability 1-5, impact 1-5, score (=p*i), response, owner, status, docNumber? }`, `CorporateMetric { name, period, targetValue?, actualValue?, unit, category, @@unique([tenantId, name, period]) }`, `ExternalDocumentRegister { name, source, externalRef, version, status ACTIVE|SUPERSEDED|WITHDRAWN, docNumber? }`
+- **Backend route:** `/api/corporate-governance` — `/lessons`, `/risks` (score otomatik p*i, 1-5 clamp), `/metrics` (409 dup name+period), `/external-docs`; her POST opsiyonel `categoryCode` ile docNumber üretir
+- **UI:** Risk sekmesinde skor matris rengi (1-7 yeşil / 8-14 amber / 15-25 kırmızı); KPI sekmesinde hedef/gerçekleşen yüzde; "Yeni Kayıt" formu aktif sekmeye göre alan değiştirir
+- **Migration:** `20260617142420_faz3_doc_coding_corporate_governance`
+
 ## Sonraki Adımlar (Planlanan)
 
 Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
@@ -330,7 +351,7 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [x] Proje kod üreticisi (Faz 1)
 - [x] Ziyaret Planı + Günlük Rapor modülü (Faz 2)
 - [x] Proje Devir Paketi — 11 zorunlu evrak (Faz 2)
-- [ ] Özgün, tenant-bazlı doküman kodlama sistemi + Genel Hususlar modülü (Faz 3 — **üçüncü taraf notasyonu ASLA kullanılmaz**, bkz. plan dosyası)
+- [x] Özgün, tenant-bazlı doküman kodlama sistemi + Genel Hususlar modülü (Faz 3 — **üçüncü taraf notasyonu ASLA kullanılmaz**, bkz. aşağıdaki bölüm)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
 - [ ] İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
@@ -345,10 +366,6 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 
 ## deps
 ```
-src/services/nextcloudService.ts ← types, utils/logger
-src/services/exchangeService.ts ← types, utils/logger
-src/modules/SalesSupport.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/SubscriptionModule.tsx ← types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types
 src/contexts/AuthContext.tsx ← constants, types
 src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
@@ -377,11 +394,12 @@ src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProposalEditor.tsx ← lib/utils, types
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
 backend/src/middleware.ts ← prismaClient
@@ -389,16 +407,18 @@ backend/src/services/approvalChainService.ts ← prismaClient
 backend/src/services/projectCodeService.ts ← prismaClient
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
 src/modules/ContractWorkflowTest.tsx          +apiFetch  +bestProposalPrice  +ContractWorkflowTest
-src/modules/ProjectManagementModule.tsx       +kar
+src/modules/ProjectManagementModule.tsx       +isHandoverComplete  +kar
 src/modules/SecurityTestModule.tsx            +flattenSuite  +parseResults
+src/modules/VisitPlanModule.tsx               +mondayOf
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain
 backend/src/services/projectCodeService.ts    +nextProjectCode
 backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
+backend/src/utils/fileUpload.ts               +slugify  +getUploadDir  +uploadToNextcloud
 .github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +resetApprovalChain  +nextProjectCode
 ```
 
@@ -421,16 +441,16 @@ h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
 h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
 h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
 h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
+h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 h3 backend/src/middleware.ts
 h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/projectCodeService.ts
 h3 backend/src/utils/businessDays.ts
+h3 backend/src/utils/fileUpload.ts
 h2 src
-h3 src/services/nextcloudService.ts
-h3 src/services/exchangeService.ts
-h3 src/modules/SalesSupport.tsx
 h3 src/modules/SubscriptionModule.tsx
+h3 src/components/settings/TenantSettings.tsx
 ```
 
 ## backend
@@ -485,6 +505,14 @@ TABLE ApprovalStage
 INDEX ApprovalChain_entityType_entityId_idx ON ApprovalChain
 ```
 
+### backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
+```
+TABLE VisitPlan
+TABLE Visit
+TABLE DailyReport
+TABLE ProjectHandoverDoc
+```
+
 ### backend/src/middleware.ts
 ```
 export const asyncHandler  :5-7
@@ -508,42 +536,14 @@ export async function nextProjectCode  :16-28
 export function addBusinessDays  :5-22
 ```
 
+### backend/src/utils/fileUpload.ts
+```
+export function slugify  :11-16
+export function getUploadDir  :18-22
+export async function uploadToNextcloud  :24-70
+```
+
 ## src
-
-### src/services/nextcloudService.ts
-```
-class NextcloudService  :8-66
-async syncUser  :21-26
-async uploadFile  :44-53
-updateConfig  :58-61
-getConfig  :63-65
-```
-
-### src/services/exchangeService.ts
-```
-class ExchangeService  :4-42
-getConfig  :15-17
-updateConfig  :19-23
-testConnection  :25-29
-async sendEmail  :31-35
-async syncCalendar  :37-41
-```
-
-### src/modules/SalesSupport.tsx
-```
-hook useState
-export SalesSupport
-handler onChange
-handler onClick
-```
-
-### src/modules/SubscriptionModule.tsx
-```
-hook useState
-export SubscriptionModule
-handler onChange
-handler onClick
-```
 
 ### src/components/settings/TenantSettings.tsx
 ```
@@ -863,6 +863,17 @@ handler onRefresh
 handler onSave
 ```
 
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
+handler onClick
+handler onChange
+```
+
 ### src/modules/ProjectManagementModule.tsx
 ```
 props OpportunityPickerProps
@@ -883,17 +894,6 @@ handler onOpportunities
 handler onRefresh
 handler onPrintReport
 handler onSelect
-```
-
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
 ```
 
 ### src/modules/SecurityTestModule.tsx
@@ -930,6 +930,19 @@ hook useEffect
 export TodoModule
 handler onClick
 handler onChange
+```
+
+### src/modules/VisitPlanModule.tsx
+```
+props VisitPlanModuleProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VisitPlanModule
+handler onChange
+handler onClick
+handler onBlur
 ```
 
 ### src/services/apiService.ts

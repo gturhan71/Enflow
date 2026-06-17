@@ -32,6 +32,13 @@ model Tenant {
   approvalChains     ApprovalChain[]
   visitPlans         VisitPlan[]
   dailyReports       DailyReport[]
+  docCodingProfile   DocumentCodingProfile?
+  docCategoryCodes   DocumentCategoryCode[]
+  docSequences       DocumentSequence[]
+  lessonsLearned     LessonsLearned[]
+  riskOpportunities  RiskOpportunity[]
+  corporateMetrics   CorporateMetric[]
+  externalDocuments  ExternalDocumentRegister[]
 }
 
 enum SubscriptionPlan {
@@ -389,6 +396,7 @@ model CorporateDocument {
   expiryDate DateTime?
   fileUrl    String?
   tags       String?
+  docNumber  String?  // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
   tenantId   String
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
@@ -462,6 +470,7 @@ model ContractWorkflowDoc {
   isAiGenerated Boolean          @default(false)
   sortOrder     Int              @default(0)
   notes         String?
+  docNumber     String?          // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
   tenantId      String
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
@@ -661,6 +670,7 @@ model ProjectHandoverDoc {
   isRequired  Boolean  @default(true)
   sortOrder   Int      @default(0)
   notes       String?
+  docNumber   String?  // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
   tenantId    String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -679,4 +689,122 @@ model DeliveryRecord {
   // RECEIVED | PARTIAL | DAMAGED | REJECTED
   notes             String?
   createdAt         DateTime @default(now())
+}
+
+// ── Özgün Doküman Kodlama Sistemi (Faz 3) ────────────────────────────────────
+// Hiçbir üçüncü-taraf notasyonu gömülmez. Her tenant kendi ISO 9001 doküman
+// kontrol standardını Ayarlar → Şirket Profili'nden tanımlar. Varsayılan
+// kategori/önek YOKTUR — tenant ilk kurulumda kendi notasyonunu girer.
+
+model DocumentCodingProfile {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companyCode    String   @default("")   // örn. tenant'ın kendi belirlediği şirket kısaltması
+  separator      String   @default("-")  // kod parçaları arasındaki ayraç
+  includeYear    Boolean  @default(true) // koda yıl eklensin mi
+  sequenceDigits Int      @default(5)    // sıra no kaç haneli sıfır-dolgulu
+  isActive       Boolean  @default(true) // kapalıysa docNumber üretilmez
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DocumentCategoryCode {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code      String   // tenant'ın kendi tanımladığı kategori kodu (örn. "SOZ")
+  label     String   // insan-okunur açıklama (örn. "Sözleşme Evrakları")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+}
+
+model DocumentSequence {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryCode String   // hangi kategori için sayaç
+  year         Int      // yıl bazlı sıfırlama için
+  lastNumber   Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, categoryCode, year])
+}
+
+// ── Genel Hususlar / Kurumsal Yönetim (Faz 3) ────────────────────────────────
+
+model LessonsLearned {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId   String?  // proje seviyesinde veya null → kurumsal seviye
+  title       String
+  category    String   @default("OTHER") // TECHNICAL | COMMERCIAL | PROCESS | CUSTOMER | SUPPLIER | OTHER
+  situation   String   // ne oldu
+  rootCause   String?  // kök neden
+  action      String?  // alınan/önerilen aksiyon
+  impact      String   @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status      String   @default("OPEN")   // OPEN | APPLIED | CLOSED
+  createdById String?
+  createdByName String?
+  docNumber   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model RiskOpportunity {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String   @default("RISK") // RISK | OPPORTUNITY
+  title       String
+  description String?
+  category    String   @default("OTHER")
+  probability Int      @default(3) // 1..5
+  impact      Int      @default(3) // 1..5
+  score       Int      @default(9) // probability * impact (uygulamada hesaplanır)
+  response    String?  // azaltma/değerlendirme aksiyonu
+  owner       String?
+  status      String   @default("OPEN") // OPEN | MITIGATING | CLOSED
+  docNumber   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CorporateMetric {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String   // KPI adı (örn. "Müşteri Memnuniyeti")
+  period      String   // örn. "2026-Q2" veya "2026-06"
+  targetValue Float?
+  actualValue Float?
+  unit        String?  // "%", "adet", "gün", "₺" vb.
+  category    String   @default("OTHER")
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, name, period])
+}
+
+model ExternalDocumentRegister {
+  id           String    @id @default(cuid())
+  tenantId     String
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name         String    // dış kaynaklı doküman adı (standart/şartname/yönetmelik)
+  source       String?   // kaynak kurum/yayıncı
+  externalRef  String?   // dış referans/doküman no
+  version      String?
+  publishedAt  DateTime?
+  reviewedAt   DateTime?
+  status       String    @default("ACTIVE") // ACTIVE | SUPERSEDED | WITHDRAWN
+  fileUrl      String?
+  notes        String?
+  docNumber    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 }

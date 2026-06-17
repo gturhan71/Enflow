@@ -53,6 +53,7 @@ import SubscriptionModule from './modules/SubscriptionModule';
 import ContractWorkflowTest from './modules/ContractWorkflowTest';
 import SecurityTestModule from './modules/SecurityTestModule';
 import LicenseGeneratorModule from './modules/LicenseGeneratorModule';
+import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -348,6 +349,7 @@ const TenantAppInner = ({
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} proposals={proposals} setProposals={setProposals} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
+      case 'corporate-governance': return <CorporateGovernanceModule />;
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
 
       // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
