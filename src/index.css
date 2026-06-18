@@ -103,6 +103,25 @@
     @apply bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:bg-primary/90 active:scale-95 transition-all;
   }
 
+  /* Tasarım sistemi buton/input sınıfları (modüller genelinde kullanılıyor) */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold bg-primary text-white shadow-lg shadow-primary/20 hover:shadow-primary/40 hover:bg-primary/90 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none;
+  }
+
+  .btn-secondary {
+    background-color: var(--card-bg);
+    color: var(--foreground-glass);
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold border backdrop-blur-xl hover:bg-primary/5 active:scale-95 transition-all disabled:opacity-50 disabled:pointer-events-none;
+    border-color: var(--glass-border);
+  }
+
+  .input-glass {
+    background-color: var(--input-bg);
+    @apply px-3 py-2 rounded-xl backdrop-blur-md border focus:ring-4 focus:ring-primary/10 focus:border-primary/40 transition-all outline-none text-foreground placeholder:text-slate-400;
+    border-color: var(--glass-border);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
   /* Custom Scrollbar */
   ::-webkit-scrollbar {
     width: 6px;

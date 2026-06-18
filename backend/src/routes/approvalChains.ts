@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { autoSkipOrphanStages } from '../services/approvalChainService';
 
 const router: Router = Router();
 
@@ -16,7 +17,11 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
       include: { stages: { orderBy: { order: 'asc' } } },
       orderBy: { createdAt: 'desc' }
     });
-    const myTurn = chains.filter(c => {
+    // Self-heal: tenant'ta aktif olmayan role sahip öncü aşamaları atla, böylece
+    // "sırası gelmiş" aşama doğru role düşer ve kaldırılan rol swimlane'i tıkamaz.
+    const healed = await Promise.all(chains.map(c => autoSkipOrphanStages(req.tenantId, c.id)));
+    const myTurn = (healed.filter(Boolean) as NonNullable<typeof healed[number]>[]).filter(c => {
+      if (c.status !== 'PENDING') return false;
       const firstPending = c.stages.find(s => s.status === 'PENDING');
       return firstPending?.role === pendingForRole;
     });
@@ -90,16 +95,9 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
     data: { status: 'APPROVED', approverId, note, approvedAt: new Date() }
   });
 
-  const remaining = chain.stages.filter(s => s.id !== stageId);
-  const allApproved = remaining.every(s => s.status === 'APPROVED');
-  if (allApproved) {
-    await prisma.approvalChain.update({ where: { id }, data: { status: 'COMPLETED' } });
-  }
-
-  const updated = await prisma.approvalChain.findFirst({
-    where: { id },
-    include: { stages: { orderBy: { order: 'asc' } } }
-  });
+  // Kalan aşamalarda tenant'ta aktif olmayan rolleri atla; geriye PENDING
+  // kalmazsa zincir COMPLETED olur (SKIPPED aşamalar bloklamaz).
+  const updated = await autoSkipOrphanStages(req.tenantId, id);
   res.json(updated);
 }));
 

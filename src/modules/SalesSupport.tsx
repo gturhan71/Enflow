@@ -1,402 +1,459 @@
-import React, { useState } from 'react';
-import { 
-  LayoutDashboard, 
-  Users, 
-  FileSearch, 
-  FileText, 
-  ShoppingCart, 
-  Archive, 
-  Settings,
-  Bell,
-  Search,
-  Plus,
-  ArrowUpRight,
-  Clock,
-  CheckCircle2,
-  AlertCircle,
-  FileCheck,
-  ChevronRight,
-  Menu,
-  X,
-  LogOut,
-  TrendingUp,
-  DollarSign,
-  Briefcase,
-  Truck,
-  Package,
-  History,
-  FileDown,
-  Calendar,
-  ShieldCheck,
-  MapPin,
-  UserCheck,
-  ExternalLink,
-  Download,
-  Filter,
-  MoreVertical,
-  BarChart3,
-  PieChart,
-  ArrowDownRight,
-  Target,
-  Percent,
-  FileSignature,
-  Gavel,
-  Kanban,
-  Wand2,
-  Puzzle,
-  Cpu,
-  Mail,
-  MessageSquare,
-  ListTodo,
-  UserPlus,
-  FileCheck2
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import {
+  Gavel, Plus, Calendar, ClipboardCheck, ShieldCheck, Landmark, Trash2,
+  CheckCircle2, Clock, AlertTriangle, Upload, FileText, X, ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { cn } from '@/src/lib/utils';
-import { 
-  NAV_ITEMS, 
-  MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
-  MOCK_SYSTEM_USERS,
-  MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
-} from '../constants';
-import { 
-  CorporateDocument, 
-  Unit, 
-  User, 
-  Permission, 
-  BoMItem, 
-  CostRequirement,
-  Contract,
-  ContractDocumentRequirement,
-  ProjectTask,
-  TodoTask,
-  Opportunity,
-  Project,
-  NextcloudConfig,
-  ExchangeConfig,
-  WhatsAppConfig
-} from '../types';
-import { nextcloudService } from '../services/nextcloudService';
-import { exchangeService } from '../services/exchangeService';
-import { whatsappService } from '../services/whatsappService';
+import { apiService } from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
+import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
+interface SalesSupportProps {
+  opportunities?: Opportunity[];
+}
 
-const SalesSupport = () => {
-  const [showNewBidModal, setShowNewBidModal] = useState(false);
-  const [newBid, setNewBid] = useState({
-    name: '',
-    deadline: '',
-    budget: 0,
-    description: ''
-  });
+type TabKey = 'list' | 'calendar' | 'checklist' | 'guarantees' | 'ekap';
 
-  const [showPetitionModal, setShowPetitionModal] = useState(false);
-  const [newPetition, setNewPetition] = useState({
-    projectId: '',
-    notes: ''
-  });
+const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
+  { key: 'list', label: 'İhale Listesi', icon: Gavel },
+  { key: 'calendar', label: 'İhale Takvimi', icon: Calendar },
+  { key: 'checklist', label: 'Uygunluk Denetimi', icon: ClipboardCheck },
+  { key: 'guarantees', label: 'Teminat', icon: ShieldCheck },
+  { key: 'ekap', label: 'EKAP', icon: Landmark },
+];
 
-  const handleCreateBid = () => {
-    setShowNewBidModal(false);
-    setNewBid({ name: '', deadline: '', budget: 0, description: '' });
-  };
+const METHOD_LABELS: Record<string, string> = {
+  OPEN: 'Açık İhale', RESTRICTED: 'Belli İstekliler', NEGOTIATED: 'Pazarlık', DIRECT: 'Doğrudan Temin',
+};
+const STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Taslak', PREPARING: 'Hazırlık', SUBMITTED: 'Teklif Verildi', EVALUATING: 'Değerlendirme',
+  WON: 'Kazanıldı', LOST: 'Kaybedildi', CANCELLED: 'İptal',
+};
+const STATUS_STYLES: Record<string, string> = {
+  DRAFT: 'bg-slate-100 text-slate-600 border-slate-200',
+  PREPARING: 'bg-blue-100 text-blue-700 border-blue-200',
+  SUBMITTED: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  EVALUATING: 'bg-amber-100 text-amber-700 border-amber-200',
+  WON: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  LOST: 'bg-red-100 text-red-700 border-red-200',
+  CANCELLED: 'bg-slate-100 text-slate-400 border-slate-200',
+};
 
-  const handleCreatePetition = () => {
-    setShowPetitionModal(false);
-    setNewPetition({ projectId: '', notes: '' });
-  };
+const fmt = (n: number, c = 'TRY') =>
+  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
+const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('tr-TR') : '—');
+const daysUntil = (d?: string | null) => {
+  if (!d) return null;
+  return Math.ceil((new Date(d).getTime() - Date.now()) / 86400000);
+};
+
+const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
+  const { currentUser } = useAuth();
+  const [tab, setTab] = useState<TabKey>('list');
+  const [tenders, setTenders] = useState<Tender[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [ekapPrefix, setEkapPrefix] = useState('');
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await apiService.getTenders();
+      const list = (data as Tender[]) || [];
+      setTenders(list);
+      if (!selectedId && list.length > 0) setSelectedId(list[0].id);
+    } finally { setLoading(false); }
+  }, [selectedId]);
+  useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const selected = useMemo(() => tenders.find(t => t.id === selectedId) || null, [tenders, selectedId]);
 
   return (
-    <div className="p-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="p-8 space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
-          <h3 className="text-2xl font-bold text-slate-900">Satış Destek & İhale Yönetimi</h3>
-          <p className="text-slate-500">İhale dosyaları, deadline takibi ve idari uygunluk denetimi.</p>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+            <Gavel className="text-primary" /> Satış Destek & İhale (İSAB)
+          </h2>
+          <p className="text-slate-500 italic">İhale dosyaları, takvim, idari uygunluk denetimi ve geçici teminat takibi</p>
         </div>
-        <div className="flex gap-3">
-          <button className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold shadow-sm hover:bg-slate-50 transition-all flex items-center gap-2">
-            <Calendar size={18} />
-            Takvim
-          </button>
-          <button 
-            onClick={() => setShowNewBidModal(true)}
-            className="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center gap-2"
-          >
-            <Plus size={18} />
-            Yeni İhale Dosyası
-          </button>
-        </div>
+        <button onClick={() => setShowForm(true)} className="btn-primary">
+          <Plus className="w-4 h-4" /> Yeni İhale
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Active Bids */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="glass-panel rounded-3xl overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-              <h4 className="font-bold text-slate-900">Aktif İhaleler & Teklifler</h4>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-slate-400">Sırala:</span>
-                <select className="text-xs font-bold text-slate-600 bg-slate-50 border-none rounded-lg focus:ring-0">
-                  <option>Deadline (En Yakın)</option>
-                  <option>Bütçe (En Yüksek)</option>
-                </select>
-              </div>
-            </div>
-            <div className="divide-y divide-slate-100">
-              {[
-                { id: 'b1', name: 'E-Devlet Altyapı Genişletme', deadline: '2026-04-12 14:00', status: 'URGENT', progress: 85, value: 12500000 },
-                { id: 'b2', name: 'Üniversite Kampüs Network', deadline: '2026-04-25 10:30', status: 'ON_TRACK', progress: 40, value: 4200000 },
-                { id: 'b3', name: 'Banka Güvenlik Duvarı Güncelleme', deadline: '2026-05-05 16:00', status: 'ON_TRACK', progress: 10, value: 850000 },
-              ].map((bid) => (
-                <div key={bid.id} className="p-6 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-3">
-                      <div className={cn(
-                        "w-10 h-10 rounded-xl flex items-center justify-center",
-                        bid.status === 'URGENT' ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"
-                      )}>
-                        <Clock size={20} />
-                      </div>
-                      <div>
-                        <h5 className="font-bold text-slate-900">{bid.name}</h5>
-                        <p className="text-xs text-slate-500 flex items-center gap-1">
-                          <Calendar size={12} /> Deadline: {bid.deadline}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-slate-900">${bid.value.toLocaleString()}</p>
-                      <span className={cn(
-                        "text-[10px] font-bold px-2 py-0.5 rounded-md uppercase",
-                        bid.status === 'URGENT' ? "bg-red-100 text-red-700 animate-pulse" : "bg-blue-100 text-blue-700"
-                      )}>
-                        {bid.status === 'URGENT' ? 'Kritik Süre' : 'Normal'}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-500">Dosya Hazırlık İlerlemesi</span>
-                      <span className="text-indigo-600">{bid.progress}%</span>
-                    </div>
-                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${bid.progress}%` }}
-                        className={cn(
-                          "h-full rounded-full",
-                          bid.status === 'URGENT' ? "bg-red-500" : "bg-indigo-600"
-                        )}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 flex items-center gap-3">
-                    <button className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-lg hover:bg-indigo-600 hover:text-white transition-all">
-                      Dosyayı İncele
-                    </button>
-                    <button className="text-xs font-bold text-slate-600 bg-slate-100 px-3 py-1.5 rounded-lg hover:bg-slate-200 transition-all">
-                      Evrak Listesi
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Compliance & Certs */}
-        <div className="space-y-6">
-          <div className="glass-panel rounded-3xl p-6">
-            <h4 className="font-bold text-slate-900 mb-6 flex items-center gap-2">
-              <ShieldCheck size={20} className="text-emerald-600" />
-              Sertifika & Yetkinlik
-            </h4>
-            <div className="space-y-4">
-              {MOCK_CERTIFICATES.map((cert) => (
-                <div key={cert.id} className="p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">{cert.person}</span>
-                    <span className={cn(
-                      "text-[10px] font-bold px-2 py-0.5 rounded-md",
-                      cert.status === 'VALID' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                    )}>
-                      {cert.status === 'VALID' ? 'Geçerli' : 'Yenileme Gerek'}
-                    </span>
-                  </div>
-                  <h5 className="text-sm font-bold text-slate-900">{cert.name}</h5>
-                  <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
-                    <Clock size={12} /> {cert.expiryDate}
-                  </p>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-3 border-2 border-dashed border-slate-200 rounded-2xl text-sm font-bold text-slate-400 hover:border-indigo-300 hover:text-indigo-600 transition-all">
-              Tüm Sertifikaları Yönet
-            </button>
-          </div>
-
-          <div className="glass-panel p-6 text-white shadow-xl shadow-indigo-200 rounded-[40px]">
-            <h4 className="font-bold mb-2 flex items-center gap-2">
-              <FileCheck size={20} />
-              İş Bitirme Talebi
-            </h4>
-            <p className="text-indigo-100 text-xs mb-6 leading-relaxed">
-              Tamamlanan projeler için otomatik iş bitirme dilekçesi oluşturun ve takibini yapın.
-            </p>
-            <button 
-              onClick={() => setShowPetitionModal(true)}
-              className="w-full py-3 bg-white text-indigo-600 rounded-2xl text-sm font-bold hover:bg-indigo-50 transition-all"
-            >
-              Dilekçe Oluştur
-            </button>
-          </div>
-        </div>
+      <div className="flex gap-2 flex-wrap">
+        {TABS.map(t => (
+          <button key={t.key} onClick={() => setTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+              tab === t.key ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'
+            }`}>
+            <t.icon className="w-4 h-4" /> {t.label}
+          </button>
+        ))}
       </div>
 
-      {/* New Bid Modal */}
-      <AnimatePresence>
-        {showNewBidModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">Yeni İhale Dosyası</h4>
-                <button onClick={() => setShowNewBidModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">İhale Adı</label>
-                  <input 
-                    type="text" 
-                    placeholder="Örn: E-Devlet Altyapı Genişletme"
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewBid({...newBid, name: e.target.value})}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Son Teslim Tarihi (Deadline)</label>
-                    <input 
-                      type="datetime-local" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewBid({...newBid, deadline: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Tahmini Bütçe ($)</label>
-                    <input 
-                      type="number" 
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                      onChange={(e) => setNewBid({...newBid, budget: Number(e.target.value)})}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Açıklama</label>
-                  <textarea 
-                    rows={3}
-                    placeholder="İhale detayları..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewBid({...newBid, description: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowNewBidModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button 
-                  onClick={handleCreateBid}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Dosyayı Oluştur
-                </button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+      {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
 
-      {/* New Petition Modal */}
+      {tab === 'list' && <TenderList tenders={tenders} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} />}
+      {tab === 'calendar' && <TenderCalendar tenders={tenders} />}
+      {tab === 'checklist' && <ChecklistTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} />}
+      {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
+      {tab === 'ekap' && <EkapTab prefix={ekapPrefix} setPrefix={setEkapPrefix} />}
+
       <AnimatePresence>
-        {showPetitionModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              className="glass-panel w-full max-w-xl rounded-3xl shadow-2xl overflow-hidden"
-            >
-              <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                <h4 className="text-xl font-bold text-slate-900">İş Bitirme Dilekçesi Oluştur</h4>
-                <button onClick={() => setShowPetitionModal(false)} className="p-2 hover:bg-slate-100 rounded-xl transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">İlgili Proje</label>
-                  <select 
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    onChange={(e) => setNewPetition({...newPetition, projectId: e.target.value})}
-                  >
-                    <option value="">Seçiniz</option>
-                    {MOCK_PROJECTS.filter(p => p.status === 'COMPLETED').map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Ek Notlar</label>
-                  <textarea 
-                    rows={4}
-                    placeholder="Dilekçeye eklenecek özel notlar..."
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500 resize-none"
-                    onChange={(e) => setNewPetition({...newPetition, notes: e.target.value})}
-                  />
-                </div>
-              </div>
-              <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
-                <button 
-                  onClick={() => setShowPetitionModal(false)}
-                  className="px-6 py-2 text-sm font-bold text-slate-500 hover:text-slate-700"
-                >
-                  İptal
-                </button>
-                <button 
-                  onClick={handleCreatePetition}
-                  className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
-                >
-                  Dilekçeyi Oluştur
-                </button>
-              </div>
-            </motion.div>
-          </div>
+        {showForm && (
+          <TenderForm
+            opportunities={opportunities}
+            onClose={() => setShowForm(false)}
+            onSaved={() => { setShowForm(false); load(); }}
+          />
         )}
       </AnimatePresence>
     </div>
   );
 };
+
+// ── İhale Listesi ────────────────────────────────────────────────────────────────
+function TenderList({ tenders, selectedId, onSelect, onChanged }: {
+  tenders: Tender[]; selectedId: string | null; onSelect: (id: string) => void; onChanged: () => void;
+}) {
+  if (tenders.length === 0)
+    return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz ihale yok. "Yeni İhale" ile başlayın.</div>;
+  return (
+    <div className="space-y-3">
+      {tenders.map(t => {
+        const dleft = daysUntil(t.submissionDeadline);
+        return (
+          <div key={t.id} onClick={() => onSelect(t.id)}
+            className={`glass-card p-5 cursor-pointer transition-all ${selectedId === t.id ? 'ring-2 ring-primary/40' : 'hover:shadow-lg'}`}>
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES[t.status] || ''}`}>{STATUS_LABELS[t.status] || t.status}</span>
+                  {t.docNumber && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg">{t.docNumber}</span>}
+                </div>
+                <p className="text-xs text-slate-500">
+                  {t.ikn ? `İKN: ${t.ikn} · ` : ''}{t.authority ? `${t.authority} · ` : ''}{METHOD_LABELS[t.method] || t.method}
+                </p>
+                <p className="text-sm font-bold text-slate-700">{fmt(t.estimatedValue, t.currency)}</p>
+              </div>
+              <div className="flex items-center gap-3 flex-shrink-0">
+                <div className="text-right">
+                  <p className="text-xs text-slate-400">Son teklif</p>
+                  <p className="text-sm font-bold text-slate-700">{fmtDate(t.submissionDeadline)}</p>
+                  {dleft !== null && (
+                    <span className={`text-[10px] font-bold ${dleft < 0 ? 'text-red-600' : dleft <= 7 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      {dleft < 0 ? `${Math.abs(dleft)} gün geçti` : `${dleft} gün kaldı`}
+                    </span>
+                  )}
+                </div>
+                <button onClick={async (e) => { e.stopPropagation(); if (confirm('İhale silinsin mi?')) { await apiService.deleteTender(t.id); onChanged(); } }}
+                  className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── İhale Takvimi ────────────────────────────────────────────────────────────────
+function TenderCalendar({ tenders }: { tenders: Tender[] }) {
+  const upcoming = [...tenders]
+    .filter(t => t.submissionDeadline && !['WON', 'LOST', 'CANCELLED'].includes(t.status))
+    .sort((a, b) => new Date(a.submissionDeadline!).getTime() - new Date(b.submissionDeadline!).getTime());
+  if (upcoming.length === 0)
+    return <div className="glass-card p-16 text-center text-slate-400 italic">Yaklaşan son tarihi olan aktif ihale yok.</div>;
+  return (
+    <div className="space-y-3">
+      {upcoming.map(t => {
+        const dleft = daysUntil(t.submissionDeadline)!;
+        const tone = dleft < 0 ? 'red' : dleft <= 7 ? 'amber' : 'emerald';
+        return (
+          <div key={t.id} className="glass-card p-5 flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+              tone === 'red' ? 'bg-red-50 text-red-600' : tone === 'amber' ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
+              {tone === 'red' ? <AlertTriangle size={22} /> : <Clock size={22} />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
+              <p className="text-xs text-slate-500">{fmtDate(t.submissionDeadline)} · {STATUS_LABELS[t.status]}</p>
+            </div>
+            <span className={`text-sm font-black ${tone === 'red' ? 'text-red-600' : tone === 'amber' ? 'text-amber-600' : 'text-emerald-600'}`}>
+              {dleft < 0 ? `${Math.abs(dleft)} gün geçti` : `${dleft} gün`}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Uygunluk Denetimi (Checklist) ────────────────────────────────────────────────
+function ChecklistTab({ tender, tenders, onSelectTender }: {
+  tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void;
+}) {
+  const [items, setItems] = useState<TenderChecklistItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!tender) { setItems([]); return; }
+    setLoading(true);
+    try { setItems((await apiService.getTenderChecklist(tender.id)) as TenderChecklistItem[]); }
+    finally { setLoading(false); }
+  }, [tender]);
+  useEffect(() => { load(); }, [load]);
+
+  const setStatus = async (item: TenderChecklistItem, status: string) => {
+    if (!tender) return;
+    await apiService.updateTenderChecklistItem(tender.id, item.id, { status });
+    load();
+  };
+
+  const upload = async (item: TenderChecklistItem, file: File) => {
+    if (!tender) return;
+    setUploadingId(item.id);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
+      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+      const res = await fetch(`/api/tenders/${tender.id}/checklist/${item.id}/upload`, {
+        method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      await load();
+    } catch (e) { alert('Yükleme hatası: ' + (e instanceof Error ? e.message : '')); }
+    finally { setUploadingId(null); }
+  };
+
+  if (!tender)
+    return <TenderSelectorEmpty tenders={tenders} onSelectTender={onSelectTender} text="Uygunluk denetimi için bir ihale seçin." />;
+
+  const required = items.filter(i => i.isRequired);
+  const done = required.filter(i => ['DONE', 'WAIVED'].includes(i.status));
+  const pct = required.length ? Math.round((done.length / required.length) * 100) : 0;
+
+  return (
+    <div className="space-y-4">
+      <div className="glass-card p-5">
+        <div className="flex items-center justify-between mb-2">
+          <h4 className="font-black text-slate-900">{tender.name}</h4>
+          <span className="text-sm font-bold text-primary">{done.length}/{required.length} zorunlu ({pct}%)</span>
+        </div>
+        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+      {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
+      <div className="space-y-2">
+        {items.map(item => (
+          <div key={item.id} className="glass-card p-4 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0">
+              {item.status === 'DONE' ? <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                : item.status === 'WAIVED' ? <CheckCircle2 className="w-5 h-5 text-slate-300 flex-shrink-0" />
+                : <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />}
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900 truncate">{item.name}
+                  {item.isRequired && <span className="ml-2 text-[10px] font-bold text-red-500">ZORUNLU</span>}</p>
+                {item.fileUrl && (
+                  <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
+                    <FileText className="w-3 h-3" /> Yüklenen dosya <ExternalLink className="w-3 h-3" />
+                  </a>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <label className="btn-secondary text-xs cursor-pointer">
+                <Upload className="w-3.5 h-3.5" /> {uploadingId === item.id ? '...' : item.fileUrl ? 'Değiştir' : 'Yükle'}
+                <input type="file" className="hidden" disabled={uploadingId === item.id}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) upload(item, f); e.target.value = ''; }} />
+              </label>
+              {item.status !== 'DONE'
+                ? <button onClick={() => setStatus(item, 'DONE')} className="text-xs text-emerald-600 hover:underline">Tamam</button>
+                : <button onClick={() => setStatus(item, 'PENDING')} className="text-xs text-slate-400 hover:underline">Geri Al</button>}
+              {item.status !== 'WAIVED' && <button onClick={() => setStatus(item, 'WAIVED')} className="text-xs text-slate-400 hover:underline">Muaf</button>}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Teminat (BID_BOND — Finans ile paylaşımlı) ───────────────────────────────────
+function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
+  tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; userName?: string;
+}) {
+  const [guarantees, setGuarantees] = useState<GuaranteeLetter[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [f, setF] = useState<Record<string, string>>({ bankName: '', amount: '', expiryDate: '', refNo: '' });
+
+  const load = useCallback(async () => {
+    if (!tender) { setGuarantees([]); return; }
+    setLoading(true);
+    try { setGuarantees((await apiService.getGuarantees({ tenderId: tender.id, type: 'BID_BOND' })) as GuaranteeLetter[]); }
+    finally { setLoading(false); }
+  }, [tender]);
+  useEffect(() => { load(); }, [load]);
+
+  const save = async () => {
+    if (!tender) return;
+    await apiService.createGuarantee({
+      type: 'BID_BOND', tenderId: tender.id, bankName: f.bankName || null,
+      amount: parseFloat(f.amount) || 0, expiryDate: f.expiryDate || null, refNo: f.refNo || null,
+      notes: userName ? `Oluşturan: ${userName}` : null,
+    });
+    setShowForm(false); setF({ bankName: '', amount: '', expiryDate: '', refNo: '' }); load();
+  };
+
+  if (!tender)
+    return <TenderSelectorEmpty tenders={tenders} onSelectTender={onSelectTender} text="Geçici teminat için bir ihale seçin." />;
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-slate-500"><b className="text-slate-700">{tender.name}</b> — geçici teminat mektupları (Finans modülüyle paylaşımlı)</p>
+        <button onClick={() => setShowForm(true)} className="btn-primary text-sm"><Plus className="w-4 h-4" /> Teminat Ekle</button>
+      </div>
+      {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
+      {guarantees.length === 0
+        ? <div className="glass-card p-12 text-center text-slate-400 italic">Bu ihaleye bağlı geçici teminat yok.</div>
+        : guarantees.map(g => {
+            const dleft = daysUntil(g.expiryDate);
+            return (
+              <div key={g.id} className="glass-card p-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="font-bold text-slate-900">{g.bankName || 'Banka belirtilmedi'} · {fmt(g.amount, g.currency)}</p>
+                  <p className="text-xs text-slate-500">{g.refNo ? `Ref: ${g.refNo} · ` : ''}Geçerlilik: {fmtDate(g.expiryDate)}
+                    {dleft !== null && <span className={`ml-1 font-bold ${dleft < 0 ? 'text-red-600' : dleft <= 30 ? 'text-amber-600' : 'text-slate-400'}`}>
+                      ({dleft < 0 ? 'süresi doldu' : `${dleft} gün`})</span>}</p>
+                </div>
+                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200">{g.status}</span>
+              </div>
+            );
+          })}
+
+      <AnimatePresence>
+        {showForm && (
+          <Modal title="Geçici Teminat (BID_BOND)" onClose={() => setShowForm(false)}>
+            <input className="input-glass w-full text-sm" placeholder="Banka adı" value={f.bankName} onChange={e => setF({ ...f, bankName: e.target.value })} />
+            <input className="input-glass w-full text-sm" type="number" placeholder="Tutar" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} />
+            <input className="input-glass w-full text-sm" placeholder="Referans No" value={f.refNo} onChange={e => setF({ ...f, refNo: e.target.value })} />
+            <label className="text-xs text-slate-500">Geçerlilik sonu</label>
+            <input className="input-glass w-full text-sm" type="date" value={f.expiryDate} onChange={e => setF({ ...f, expiryDate: e.target.value })} />
+            <button onClick={save} className="btn-primary w-full text-sm">Kaydet</button>
+          </Modal>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ── EKAP iskeleti ────────────────────────────────────────────────────────────────
+function EkapTab({ prefix, setPrefix }: { prefix: string; setPrefix: (v: string) => void }) {
+  return (
+    <div className="glass-card p-8 max-w-2xl space-y-4">
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><Landmark size={24} /></div>
+        <div>
+          <h4 className="font-black text-slate-900">EKAP — Kamu İhale Platformu</h4>
+          <p className="text-xs text-slate-500">Manuel İKN takibi için yer tutucu. Gerçek EKAP web servisi bağlantısı henüz yok.</p>
+        </div>
+      </div>
+      <div className="space-y-1">
+        <label className="text-xs font-semibold text-slate-600">Varsayılan İKN Öneki (opsiyonel)</label>
+        <input className="input-glass w-full text-sm" placeholder="örn. 2026/" value={prefix} onChange={e => setPrefix(e.target.value)} />
+        <p className="text-[11px] text-slate-400 italic">İKN değerleri ihale kayıtlarında manuel tutulur; bu alan ileride otomatik senkronizasyon için zemindir (kalıcılık yok).</p>
+      </div>
+    </div>
+  );
+}
+
+// ── Yardımcılar ──────────────────────────────────────────────────────────────────
+function TenderSelectorEmpty({ tenders, onSelectTender, text }: { tenders: Tender[]; onSelectTender: (id: string) => void; text: string }) {
+  return (
+    <div className="glass-card p-12 text-center space-y-4">
+      <p className="text-slate-400 italic">{text}</p>
+      {tenders.length > 0 && (
+        <select className="input-glass text-sm mx-auto" onChange={e => e.target.value && onSelectTender(e.target.value)} defaultValue="">
+          <option value="" disabled>İhale seç...</option>
+          {tenders.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+        </select>
+      )}
+    </div>
+  );
+}
+
+function Modal({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+        className="glass-card p-6 w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><X className="w-5 h-5" /></button>
+        </div>
+        {children}
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function TenderForm({ opportunities, onClose, onSaved }: {
+  opportunities: Opportunity[]; onClose: () => void; onSaved: () => void;
+}) {
+  const [f, setF] = useState<Record<string, string>>({ name: '', ikn: '', authority: '', method: 'OPEN', estimatedValue: '', submissionDeadline: '', opportunityId: '', categoryCode: 'IHL' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const set = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    setSaving(true); setErr(null);
+    try {
+      if (!f.name) throw new Error('İhale adı zorunlu.');
+      await apiService.createTender({
+        name: f.name, ikn: f.ikn || null, authority: f.authority || null, method: f.method,
+        estimatedValue: parseFloat(f.estimatedValue) || 0,
+        submissionDeadline: f.submissionDeadline || null,
+        opportunityId: f.opportunityId || null,
+        categoryCode: f.categoryCode || 'IHL',
+      });
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Kaydetme hatası.'); setSaving(false); }
+  };
+
+  return (
+    <Modal title="Yeni İhale" onClose={onClose}>
+      <input className="input-glass w-full text-sm" placeholder="İhale adı" value={f.name} onChange={e => set('name', e.target.value)} />
+      <div className="grid grid-cols-2 gap-3">
+        <input className="input-glass w-full text-sm" placeholder="İKN (örn. 2026/123456)" value={f.ikn} onChange={e => set('ikn', e.target.value)} />
+        <input className="input-glass w-full text-sm" placeholder="İdare adı" value={f.authority} onChange={e => set('authority', e.target.value)} />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <select className="input-glass w-full text-sm" value={f.method} onChange={e => set('method', e.target.value)}>
+          {Object.entries(METHOD_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <input className="input-glass w-full text-sm" type="number" placeholder="Yaklaşık maliyet" value={f.estimatedValue} onChange={e => set('estimatedValue', e.target.value)} />
+      </div>
+      <label className="text-xs text-slate-500">Son teklif tarihi</label>
+      <input className="input-glass w-full text-sm" type="date" value={f.submissionDeadline} onChange={e => set('submissionDeadline', e.target.value)} />
+      {opportunities.length > 0 && (
+        <select className="input-glass w-full text-sm" value={f.opportunityId} onChange={e => set('opportunityId', e.target.value)}>
+          <option value="">İlgili fırsat (opsiyonel)</option>
+          {opportunities.map(o => <option key={o.id} value={o.id}>{o.title || o.id}</option>)}
+        </select>
+      )}
+      {err && <p className="text-xs text-red-500 font-bold">{err}</p>}
+      <button onClick={save} disabled={saving} className="btn-primary w-full text-sm disabled:opacity-50">{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+    </Modal>
+  );
+}
 
 export default SalesSupport;

@@ -134,5 +134,13 @@ export const settingsService = {
       method: 'PUT',
       body: JSON.stringify(data)
     });
+  },
+
+  async getDefaultWorkflow() {
+    return apiClient.fetchWithAuth('/workflows/default');
+  },
+
+  async resolveNextStep(workflowId: string, stepId: string) {
+    return apiClient.fetchWithAuth(`/workflows/${workflowId}/steps/${stepId}/resolve-next`);
   }
 };

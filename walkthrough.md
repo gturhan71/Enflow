@@ -1,6 +1,6 @@
 # Enflow — Kapsamlı Kullanım Kılavuzu
 
-> **Sürüm:** 2026-06-15  
+> **Sürüm:** 2026-06-18  
 > **Hedef Kitle:** Uygulama yöneticileri, proje sahibi, yeni kullanıcılar
 
 ---
@@ -24,6 +24,15 @@
 15. [Fiziksel Arşiv](#15-fiziksel-arşiv)
 16. [Şirket Ayarları](#16-şirket-ayarları)
 17. [Teknik Referans](#17-teknik-referans)
+18. [Ziyaret Planı & Günlük Rapor](#18-ziyaret-planı--günlük-rapor)
+19. [Proje Devir Paketi](#19-proje-devir-paketi)
+20. [Genel Hususlar & Doküman Kodlama](#20-genel-hususlar--doküman-kodlama)
+21. [Finans Modülü](#21-finans-modülü)
+22. [Hukuk Görünümü](#22-hukuk-görünümü)
+23. [İhale / İSAB Modülü](#23-ihale--isab-modülü)
+24. [Yönetim Raporları](#24-yönetim-raporları)
+25. [Onay Zinciri & Bekleyen Onaylarım](#25-onay-zinciri--bekleyen-onaylarım)
+26. [Sanal Agentlar (Eklenti)](#26-sanal-agentlar-eklenti)
 
 ---
 
@@ -72,6 +81,13 @@ Enflow, B2B teknoloji şirketleri için tasarlanmış **çok kiracılı (multi-t
 | `OPERATIONS_MGR` | Operasyon Müdürü | Proje, Satın Alma, Görevler |
 | `AUDITOR` | Denetçi | Salt okunur erişim |
 | `ADMIN` | Sistem Yöneticisi | Tüm ayarlar |
+| `LEGAL_MGR` | Hukuk Müdürü / Şirket Avukatı | Hukuk görünümü, vaka takibi |
+| `IGPD_MGR` | İş Geliştirme & Pazarlama Müdürü | Onay zinciri aşaması |
+| `KGD_MGR` | Kalite Güvence Müdürü | Onay zinciri aşaması |
+| `KSU_MGR` | Kontrat & Sözleşme Müdürü | Onay zinciri aşaması |
+| `ISAB_MGR` | İhale Satın Alma Müdürü | İhale/İSAB modülü |
+
+> **Kurumsal onay swimlane rolleri** (FINANCE_MGR, İGPD, KGD, KSU, İSAB) `ApprovalChain` onay aşamalarında kullanılır. Her birim yöneticisi "Bekleyen Onaylarım" sekmesinde kendi sırası gelmiş onayları görür (bkz. § 25). İzinler kullanıcının `permissions` JSON'undan verilir; GM tüm modülleri görür (superuser).
 
 ### İzin Kodları
 
@@ -101,7 +117,10 @@ SETTINGS_UNITS      → Birim yönetimi
 SETTINGS_USERS      → Kullanıcı yönetimi
 SETTINGS_PERMISSIONS→ İzin yönetimi
 SETTINGS_INTEGRATIONS→ Entegrasyon ayarları
-GENERAL_MANAGER     → GM-only özellikler (lisans üretme, modül tanıtım)
+FINANCE_VIEW        → Finans modülü erişimi
+CORPORATE_GOV_VIEW  → Genel Hususlar (kurumsal yönetim) erişimi
+MANAGEMENT_REPORTS_VIEW → Yönetim Raporları erişimi
+GENERAL_MANAGER     → GM-only özellikler (lisans üretme, modül tanıtım, sanal agent, gelen raporlar)
 ```
 
 Roller ve izinler **Ayarlar → Kullanıcılar** ve **Ayarlar → Yetkiler** sekmelerinden yönetilir.
@@ -1176,7 +1195,143 @@ No any              → TypeScript strict mode
 lucide-react chunk  → vite manualChunks'ta react kontrolünden ÖNCE gelmeli
 GET /summary/all    → /:id route'undan ÖNCE tanımlanmalı (route conflict)
 opportunityId POST  → Backend fırsatı çekip eksik alanları otomatik tamamlar
+PLUGIN_LICENSE_SECRET → Sanal agent lisans imzası; canlıda mutlaka değiştir
 ```
+
+---
+
+## 18. Ziyaret Planı & Günlük Rapor
+
+Süreç öncesi katman — sidebar'da **Ziyaret Planı** (Dashboard'dan sonra).
+
+### Haftalık Ziyaret Planı
+1. Hafta seç → "Yeni Ziyaret" ile satır ekle.
+2. Her satır: **müşteri**, **tip** (Demo / Teknik Toplantı / Sunum / Diğer), **planlanan tarih**, ihtiyaç notu.
+3. Ziyaret gerçekleşince **gerçekleşen tarih** + durum işaretlenir; yakalanan ihtiyaç notu eklenir.
+
+### Günlük Saha Raporu
+- Serbest metin günlük rapor + **"Yöneticiyle Paylaş"** flag'i. Paylaşılan raporlar yönetici görünümünde listelenir.
+
+> **Not:** Müşteri seçici, müşteri verisi yüklendiğinde dolar — Ziyaret Planı sekmesi açıkken `useCustomers` otomatik etkinleşir.
+
+---
+
+## 19. Proje Devir Paketi
+
+Proje Yönetimi → proje detayı → **Devir Paketi** sekmesi (5. sekme).
+
+- **11 zorunlu evrak** checklist'i: Fizibilite, İhale Dokümanları, Sözleşme + Ekleri, Birim Fiyat Teklif Cetveli, Maliyet Tablosu, Kitlist Ağacı, Alınan Teklifler, İhale Kararı, Teminat Mektupları, Proje Devir Formu, Personel Listesi.
+- Her evrak: **Yükle** (dosya) / **Muaf** (waive) işaretlenebilir. Yüklenen dosyalar `uploads/project-handovers/{proje_kodu}/`.
+- Tüm zorunlu evraklar tamamlanınca devir hazır; aksi halde proje header'ında amber **"Devir Bekliyor"** rozeti (tıklayınca bu sekmeye götürür).
+
+---
+
+## 20. Genel Hususlar & Doküman Kodlama
+
+### Genel Hususlar (Kurumsal Yönetim)
+Sidebar'da **Genel Hususlar** — 4 sekme:
+
+| Sekme | Ne için |
+|-------|---------|
+| Alınan Dersler | Proje sonrası ders kaydı (durum / kök neden / aksiyon / etki) |
+| Risk & Fırsat | Risk/fırsat kaydı; **skor = olasılık (1-5) × etki (1-5)**, renk: 1-7 yeşil / 8-14 amber / 15-25 kırmızı |
+| KPI | Dönemsel kurumsal metrik (hedef vs gerçekleşen %) |
+| Dış Doküman Sicili | Dış kaynaklı dokümanlar (kaynak, versiyon, durum) |
+
+"Yeni Kayıt" formu aktif sekmeye göre alan değiştirir.
+
+### Doküman Kodlama Notasyonu (tenant-yapılandırılabilir)
+**Ayarlar → Şirket Profili → Doküman Kodlama Notasyonu:**
+- **Şirket kodu** (örn. ENF), **ayraç** (varsayılan `-`), **hane sayısı** (1-10), **yıl** ve **aktif** toggle.
+- Kategori sözlüğü CRUD (örn. `SOZ → Sözleşme Evrakları`).
+- Canlı önizleme: `ENF-SOZ-2026-00001`. Sözleşme/devir/kurumsal kayıtlara opsiyonel `docNumber` otomatik üretilir.
+
+> Doküman kodlama tamamen özgündür ve her tenant kendi notasyonunu tanımlar — sabit gömülü önek yoktur.
+
+---
+
+## 21. Finans Modülü
+
+Sidebar'da **Finans** (Proje Yönetimi'nden sonra). FINANCE_MGR operasyonel birimi; GM superuser görür.
+
+| Sekme | Kullanım |
+|-------|----------|
+| Faturalar | Satış/Alış faturası oluştur; durum DRAFT→ISSUED→SENT→PARTIAL→PAID→OVERDUE |
+| Tahsilat | Faturaya kısmi/tam ödeme ekle; `paidAmount` ve durum otomatik güncellenir; aging görünümü |
+| Teminat Mektupları | Teminat ekle (Geçici/Kesin/Avans/Garanti); yaklaşan & geçmiş vade renk kodu |
+| Maliyet Onayı | Bekleyen proje maliyet kalemlerini **Onayla / Reddet** |
+| Özet | Toplam alacak, tahsilat, vadesi geçen, aktif teminat, bekleyen onay kartları |
+
+---
+
+## 22. Hukuk Görünümü
+
+**Sözleşme Yönetimi** modülünde üstteki **Sözleşmeler ↔ Hukuk** geçiş çubuğundan erişilir. LEGAL_MGR birimi.
+
+- **Hukuki Vakalar:** tip (Sözleşme İncelemesi / Hukuki Görüş / Uyuşmazlık / Dava / Diğer), durum (Açık→İncelemede→Yanıtlandı→Tırmandırıldı→Kapalı), öncelik. Kapat / Sil.
+- **Gelen Talepler:** "Hukuk / Şirket Avukatı" etiketli görevler (TodoModule'den gelen LEGAL talepleri) → **"Vakaya Dönüştür"** → docNumber `ENF-HUK-YYYY-NNNNN`.
+
+---
+
+## 23. İhale / İSAB Modülü
+
+Sidebar'da **Satış Destek** — backend destekli ihale yönetimi (ISAB_MGR). 5 sekme:
+
+| Sekme | Kullanım |
+|-------|----------|
+| İhale Listesi | İhale oluştur (İKN, idare, yöntem, tahmini bedel, deadline); durum & kalan gün rozetleri |
+| İhale Takvimi | Aktif ihaleler son teslim tarihine göre sıralı |
+| Uygunluk Denetimi | Seçili ihalenin evrak checklist'i (otomatik 10 kalem); **Tamam / Muaf / Geri Al**, dosya yükle |
+| Teminat | Geçici teminat (Finans modülüyle paylaşımlı `BID_BOND`) |
+| EKAP | Manuel İKN öneki yer tutucu (gerçek EKAP servisi yok) |
+
+Durum: `DRAFT → PREPARING → SUBMITTED → EVALUATING → WON / LOST / CANCELLED`. Doküman no `ENF-IHL-YYYY-NNNNN`.
+
+---
+
+## 24. Yönetim Raporları
+
+Sidebar'da **Yönetim Raporları** (Dashboard'dan sonra). Her birimin metrikleri mevcut veriden otomatik hesaplanır. Üstte esnek tarih aralığı seçici (varsayılan: bu ay).
+
+| Sekme | İçerik |
+|-------|--------|
+| Genel Bakış | **İş akışı darboğazı paneli** (hangi birim onay bekliyor + en eski bekleyiş) + 7 birimin başlık metrik kartları |
+| Birim Detayı | Birim seç → tüm metrikler + grafikler (bar/pasta/çizgi) |
+| Raporlarım | Birim yöneticisi: dönem seç → otomatik metrik ön-izleme + yorum alanları (öne çıkanlar / sorunlar / aksiyon / risk / özet) → **Yönetime Sun** |
+| Gelen Raporlar (GM) | Sunulan raporları incele (metrik snapshot + yorumlar) → **Onayla / İade Et** |
+
+Rapor durumu: `DRAFT → SUBMITTED → REVIEWED / RETURNED`. Doküman no `ENF-RPR-YYYY-NNNNN`.
+
+---
+
+## 25. Onay Zinciri & Bekleyen Onaylarım
+
+Çok-aşamalı kurumsal onay (`ApprovalChain`) — örn. Fırsat/Teklif için **Finans → İGPD → GM → KSU**, Sözleşme imzası için **KSU → GM**.
+
+- **Görevler** modülünde **"Bekleyen Onaylarım"** sekmesi: rolünüz zincirin hangi aşamasındaysa ve **sırası geldiyse** (önceki tüm aşamalar onaylı) o onay burada görünür. **Onayla / Reddet**.
+- **Boş koltuk (deadlock önleme):** aktif kullanıcısı olmayan role ait aşama otomatik **atlanır (SKIPPED)**; lisanslı **otonom** bir sanal agent varsa aşamayı agent onaylar (§ 26).
+- **Köken görünürlüğü:** bir aşama sanal agent tarafından onaylandıysa, sonraki onaylayan **"🤖 {agent} tarafından yapıldı"** rozetini görür ve kendi aşamasında zinciri reddederek kontrol edebilir.
+
+---
+
+## 26. Sanal Agentlar (Eklenti)
+
+> **TEST · Eklenti** — ticari sürümün dışında, ayrı lisanslanabilir upsell. Yalnızca GM görür (`virtual-agents-test`).
+
+Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (deterministik kural seti — LLM gerektirmez), gerçek kişiye **devreder (handoff)**. Varsayılan mod **Danışman (ADVISORY)** — çıktı insan onayı bekler.
+
+### Eklenti Kataloğu
+- 7 agent: İhale, Proje, Presales, Satınalma, Finans **(hazır/AVAILABLE)**; Hukuk, CRM **(yakında)**.
+- **Finans ve Hukuk asla otonom çalışamaz** (yalnızca Danışman modu).
+- **Lisans:** aktivasyon anahtarı `ENF-PLUGIN-<KEY>[-D<gün>]-<İMZA>`. GM "Lisans Anahtarı Üret" kartından imzalı anahtar üretir → "Aktivasyona aktar" → Etkinleştir.
+
+### Çalıştırmalar
+1. Agent + ilgili kayıt seç → **Çalıştır**.
+2. Agent denetim yapar (örn. İhale checklist eksiksizliği / deadline; Presales BoM tutarlılığı; Finans eşik-altı maliyet onay önerisi) → handoff görevi + çalıştırma kaydı oluşur.
+3. **Onayla & Devral** ile gerçek kişi işi üstlenir (ratifikasyon) veya **Reddet**.
+4. Her çalıştırma `AGENT:<key>` köken etiketiyle damgalanır; rozet tıklanınca gerekçe + çıktı detayı açılır.
+
+> ⚠️ **Production:** `PLUGIN_LICENSE_SECRET` ortam değişkeni canlıya çıkışta mutlaka değiştirilmelidir.
 
 ---
 

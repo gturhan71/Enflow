@@ -32,6 +32,8 @@ import {
 } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import AgentTag from '../components/AgentTag';
+import { isAgentActor } from '../lib/agentProvenance';
 
 // Onay zincirindeki rol kodları için görünen ad — Ayarlar'daki ROLE_LABELS ile tutarlı.
 const CHAIN_ROLE_LABEL: Record<string, string> = {
@@ -314,6 +316,15 @@ const TodoModule = ({
                     <p className="text-xs text-slate-500 font-bold mt-1">
                       Zincir: {chain.stages.map(s => CHAIN_ROLE_LABEL[s.role] || s.role).join(' → ')}
                     </p>
+                    {/* Köken etiketi — önceki aşamalardan sanal agent tarafından onaylananlar */}
+                    {chain.stages.filter(s => isAgentActor(s.approverId)).map(s => (
+                      <div key={s.id} className="mt-1.5 flex items-center gap-2 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          {CHAIN_ROLE_LABEL[s.role] || s.role} aşaması:
+                        </span>
+                        <AgentTag actorId={s.approverId} agentRunId={s.agentRunId} />
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <button
@@ -524,6 +535,9 @@ const TodoModule = ({
                         <Calendar size={13} />
                         Termin: {todo.dueDate}
                       </div>
+                    )}
+                    {isAgentActor(todo.assignedBy) && (
+                      <AgentTag actorId={todo.assignedBy} agentRunId={todo.agentRunId} />
                     )}
                   </div>
                 </div>

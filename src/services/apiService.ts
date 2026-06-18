@@ -148,6 +148,8 @@ class ApiService {
   async getWorkflows() { return settingsService.getWorkflows(); }
   async createWorkflow(data: Omit<Workflow, 'id'>) { return settingsService.createWorkflow(data); }
   async updateWorkflow(id: string, data: Partial<Workflow>) { return settingsService.updateWorkflow(id, data); }
+  async getDefaultWorkflow() { return settingsService.getDefaultWorkflow(); }
+  async resolveNextStep(workflowId: string, stepId: string) { return settingsService.resolveNextStep(workflowId, stepId); }
 
   // --- MODULE SETTINGS ---
   async getModuleSettings(): Promise<{ promotedModules: string[] }> {
@@ -348,6 +350,157 @@ class ApiService {
   }
   async deleteExternalDoc(id: string) {
     return apiClient.fetchWithAuth(`/corporate-governance/external-docs/${id}`, { method: 'DELETE' });
+  }
+
+  // --- FINANCE: Invoices ---
+  async getInvoices(params?: { projectId?: string; status?: string; type?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/finance/invoices${qs}`);
+  }
+  async createInvoice(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/finance/invoices', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateInvoice(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/finance/invoices/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteInvoice(id: string) {
+    return apiClient.fetchWithAuth(`/finance/invoices/${id}`, { method: 'DELETE' });
+  }
+
+  // --- FINANCE: Payments ---
+  async getInvoicePayments(invoiceId: string) {
+    return apiClient.fetchWithAuth(`/finance/invoices/${invoiceId}/payments`);
+  }
+  async addInvoicePayment(invoiceId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/finance/invoices/${invoiceId}/payments`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async deletePayment(id: string) {
+    return apiClient.fetchWithAuth(`/finance/payments/${id}`, { method: 'DELETE' });
+  }
+
+  // --- FINANCE: Guarantee Letters ---
+  async getGuarantees(params?: { status?: string; type?: string; projectId?: string; tenderId?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/finance/guarantees${qs}`);
+  }
+  async createGuarantee(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/finance/guarantees', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateGuarantee(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/finance/guarantees/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteGuarantee(id: string) {
+    return apiClient.fetchWithAuth(`/finance/guarantees/${id}`, { method: 'DELETE' });
+  }
+
+  // --- FINANCE: Cost approvals & summary ---
+  async getCostApprovals() { return apiClient.fetchWithAuth('/finance/cost-approvals'); }
+  async approveCostItem(id: string, data: { decision: 'APPROVE' | 'REJECT'; approvedById?: string; approvalNote?: string }) {
+    return apiClient.fetchWithAuth(`/finance/costs/${id}/approve`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async getFinanceSummary() { return apiClient.fetchWithAuth('/finance/summary'); }
+
+  // --- LEGAL: Cases & requests ---
+  async getLegalCases(params?: { status?: string; type?: string; relatedEntityId?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/legal/cases${qs}`);
+  }
+  async createLegalCase(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/legal/cases', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateLegalCase(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/legal/cases/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteLegalCase(id: string) {
+    return apiClient.fetchWithAuth(`/legal/cases/${id}`, { method: 'DELETE' });
+  }
+  async getLegalRequests() { return apiClient.fetchWithAuth('/legal/requests'); }
+
+  // --- TENDERS: İhale / İSAB ---
+  async getTenders(params?: { status?: string; method?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/tenders${qs}`);
+  }
+  async getTender(id: string) { return apiClient.fetchWithAuth(`/tenders/${id}`); }
+  async createTender(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/tenders', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateTender(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/tenders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteTender(id: string) {
+    return apiClient.fetchWithAuth(`/tenders/${id}`, { method: 'DELETE' });
+  }
+  async getTenderChecklist(id: string) { return apiClient.fetchWithAuth(`/tenders/${id}/checklist`); }
+  async addTenderChecklistItem(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/checklist`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateTenderChecklistItem(id: string, itemId: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/checklist/${itemId}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteTenderChecklistItem(id: string, itemId: string) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/checklist/${itemId}`, { method: 'DELETE' });
+  }
+
+  // --- REPORTS: Yönetim Raporlama ---
+  async getReportUnits() { return apiClient.fetchWithAuth('/reports/units'); }
+  async getReportOverview(params?: { start?: string; end?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/reports/overview${qs}`);
+  }
+  async getUnitMetrics(unitKey: string, params?: { start?: string; end?: string }) {
+    const qs = new URLSearchParams({ unitKey, ...(params || {}) } as Record<string, string>).toString();
+    return apiClient.fetchWithAuth(`/reports/unit-metrics?${qs}`);
+  }
+  async getWorkflowBottlenecks() { return apiClient.fetchWithAuth('/reports/bottlenecks'); }
+  async getUnitReports(params?: { unitKey?: string; status?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/reports/unit-reports${qs}`);
+  }
+  async getUnitReport(id: string) { return apiClient.fetchWithAuth(`/reports/unit-reports/${id}`); }
+  async createUnitReport(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/reports/unit-reports', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateUnitReport(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/reports/unit-reports/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteUnitReport(id: string) {
+    return apiClient.fetchWithAuth(`/reports/unit-reports/${id}`, { method: 'DELETE' });
+  }
+  async submitUnitReport(id: string) {
+    return apiClient.fetchWithAuth(`/reports/unit-reports/${id}/submit`, { method: 'POST' });
+  }
+  async reviewUnitReport(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/reports/unit-reports/${id}/review`, { method: 'POST', body: JSON.stringify(data) });
+  }
+
+  // --- PLUGINS: Sanal Agent Eklentileri (Faz 8 — ticari sürüm dışı upsell) ---
+  async getPluginCatalog() { return apiClient.fetchWithAuth('/plugins/catalog'); }
+  async getPluginEntitlements() { return apiClient.fetchWithAuth('/plugins/entitlements'); }
+  async generatePluginLicenseKey(pluginKey: string, days?: number) {
+    return apiClient.fetchWithAuth('/plugins/generate-key', { method: 'POST', body: JSON.stringify({ pluginKey, days }) });
+  }
+  async activatePluginLicense(licenseKey: string, activatedById?: string) {
+    return apiClient.fetchWithAuth('/plugins/activate', { method: 'POST', body: JSON.stringify({ licenseKey, activatedById }) });
+  }
+  async updatePluginEntitlement(pluginKey: string, data: { mode?: string; status?: string; config?: string }) {
+    return apiClient.fetchWithAuth(`/plugins/entitlements/${pluginKey}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async disablePluginEntitlement(pluginKey: string) {
+    return apiClient.fetchWithAuth(`/plugins/entitlements/${pluginKey}`, { method: 'DELETE' });
+  }
+  async runAgent(pluginKey: string, entityId: string, triggeredById?: string) {
+    return apiClient.fetchWithAuth(`/plugins/agents/${pluginKey}/run`, { method: 'POST', body: JSON.stringify({ entityId, triggeredById }) });
+  }
+  async getAgentRuns(params?: { status?: string; pluginKey?: string }) {
+    const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    return apiClient.fetchWithAuth(`/plugins/runs${qs}`);
+  }
+  async getAgentRun(id: string) {
+    return apiClient.fetchWithAuth(`/plugins/runs/${id}`);
+  }
+  async ratifyAgentRun(id: string, data: { decision: 'RATIFY' | 'REJECT'; ratifiedById?: string; ratifyNote?: string }) {
+    return apiClient.fetchWithAuth(`/plugins/runs/${id}/ratify`, { method: 'POST', body: JSON.stringify(data) });
   }
 }
 

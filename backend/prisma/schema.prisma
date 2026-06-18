@@ -39,6 +39,14 @@ model Tenant {
   riskOpportunities  RiskOpportunity[]
   corporateMetrics   CorporateMetric[]
   externalDocuments  ExternalDocumentRegister[]
+  invoices           Invoice[]
+  payments           Payment[]
+  guaranteeLetters   GuaranteeLetter[]
+  legalCases         LegalCase[]
+  tenders            Tender[]
+  unitReports        UnitReport[]
+  pluginEntitlements PluginEntitlement[]
+  agentRuns          AgentRun[]
 }
 
 enum SubscriptionPlan {
@@ -309,6 +317,11 @@ model ProjectCostItem {
   invoiceNo       String?
   notes           String?
   createdById     String?
+  // Finans onayı (Faz 6) — geriye uyumlu: eski kayıtlar APPROVED
+  approvalStatus  String   @default("APPROVED") // PENDING | APPROVED | REJECTED
+  approvedById    String?
+  approvedAt      DateTime?
+  approvalNote    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
@@ -343,6 +356,7 @@ model TodoTask {
   progressNotes String?  // JSON string
   relatedModule String?  // PROJECT, OPPORTUNITY, CONTRACT, PROCUREMENT, GENERAL
   relatedItemId String?
+  agentRunId    String?  // bu görevi üreten sanal agent çalıştırması (köken etiketi)
   tenantId      String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -372,6 +386,8 @@ model ActivityLog {
   entityId      String
   details       String?     // Değişiklik detayları (JSON string)
   userId        String
+  actorType     String?     // HUMAN | AGENT — işlemi yapan aktörün tipi (köken etiketi)
+  agentRunId    String?     // AGENT ise ilgili sanal agent çalıştırması
   tenantId      String
   timestamp     DateTime    @default(now())
 }
@@ -408,6 +424,7 @@ model Workflow {
   name        String
   description String?
   isActive    Boolean        @default(true)
+  isDefault   Boolean        @default(false) // tenant başına tek varsayılan şablon
   tenantId    String
   tenant      Tenant         @relation(fields: [tenantId], references: [id])
   steps       WorkflowStep[]
@@ -416,17 +433,20 @@ model Workflow {
 }
 
 model WorkflowStep {
-  id          String   @id @default(cuid())
-  workflowId  String
-  workflow    Workflow @relation(fields: [workflowId], references: [id])
-  unitId      String
-  unit        Unit     @relation(fields: [unitId], references: [id])
-  order       Int
-  type        String   @default("AUTO") // AUTO, MANUAL
-  description String
-  nextStepId  String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  workflowId         String
+  workflow           Workflow @relation(fields: [workflowId], references: [id])
+  unitId             String
+  unit               Unit     @relation(fields: [unitId], references: [id])
+  order              Int
+  type               String   @default("AUTO") // AUTO, MANUAL
+  description        String
+  nextStepId         String?
+  enabled            Boolean  @default(true)  // false = birim akıştan çıkarıldı, görevler sıradaki aktif birime yönlenir
+  requiresCompletion Boolean  @default(false) // devretmeden önce birimin gereklilikleri tamamlaması gerekir
+  completionNote     String?  // gereklilik açıklaması (uyarıda gösterilir)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 }
 
 // ── CONTRACT WORKFLOW (TEST MODULE) ─────────────────────────────────────────
@@ -600,9 +620,10 @@ model ApprovalStage {
   role       String        // FINANCE_MGR | IGPD_MGR | GENERAL_MANAGER | KSU_MGR | ...
   order      Int           @default(0)
   status     String        @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
-  approverId String?
+  approverId String?       // 'AGENT:<pluginKey>' ise sanal agent onayladı
   note       String?
   approvedAt DateTime?
+  agentRunId String?       // bu aşamayı onaylayan sanal agent çalıştırması (köken etiketi)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
 }
@@ -807,4 +828,219 @@ model ExternalDocumentRegister {
   docNumber    String?
   createdAt    DateTime  @default(now())
   updatedAt    DateTime  @updatedAt
+}
+
+// ── Faz 6 — Finans Modülü ────────────────────────────────────────────────
+model Invoice {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String?
+  contractId    String?
+  type          String    @default("SALES") // SALES | PURCHASE
+  invoiceNo     String?
+  amount        Float     @default(0)
+  currency      String    @default("TRY")
+  issueDate     DateTime?
+  dueDate       DateTime?
+  status        String    @default("DRAFT") // DRAFT|ISSUED|SENT|PARTIAL|PAID|OVERDUE|CANCELLED
+  paidAmount    Float     @default(0)
+  paidAt        DateTime?
+  milestoneId   String?
+  customerName  String?
+  vendorName    String?
+  docNumber     String?
+  notes         String?
+  createdById   String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  payments      Payment[]
+  @@index([tenantId, status])
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount      Float    @default(0)
+  currency    String   @default("TRY")
+  paidAt      DateTime @default(now())
+  method      String?  // BANK_TRANSFER | CHEQUE | CASH | OTHER
+  reference   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  @@index([tenantId])
+}
+
+// ── Faz 6b — Hukuk (Sözleşme Yönetimi modülüne sekme) ────────────────────────
+model LegalCase {
+  id                String    @id @default(cuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type              String    @default("CONTRACT_REVIEW") // CONTRACT_REVIEW|LEGAL_OPINION|DISPUTE|LITIGATION|OTHER
+  title             String
+  status            String    @default("OPEN") // OPEN|IN_REVIEW|RESPONDED|ESCALATED|CLOSED
+  priority          String    @default("MEDIUM") // LOW|MEDIUM|HIGH
+  relatedEntityType String?   // contract | project | opportunity | contractWorkflow
+  relatedEntityId   String?
+  summary           String?
+  opinion           String?
+  assignedToId      String?
+  assignedToName    String?
+  requestedById     String?
+  requestedByName   String?
+  sourceTaskId      String?   // LEGAL TodoTask'tan dönüştürülmüşse
+  dueDate           DateTime?
+  docNumber         String?
+  fileUrl           String?
+  closedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  @@index([tenantId, status])
+}
+
+model GuaranteeLetter {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId   String?
+  contractId  String?
+  tenderId    String?   // Faz 3 İhale (BID_BOND) ile paylaşımlı
+  type        String    @default("PERFORMANCE") // BID_BOND|PERFORMANCE|ADVANCE|WARRANTY
+  bankName    String?
+  amount      Float     @default(0)
+  currency    String    @default("TRY")
+  issueDate   DateTime?
+  expiryDate  DateTime?
+  status      String    @default("ACTIVE") // ACTIVE|RELEASED|EXPIRED|CALLED
+  refNo       String?
+  docNumber   String?
+  fileUrl     String?
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@index([tenantId, status])
+}
+
+// Faz 6c — İhale / İSAB (SalesSupport backend modeli)
+model Tender {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                String
+  ikn                 String?   // İhale Kayıt Numarası (manuel, EKAP yer tutucu)
+  authority           String?   // idare adı
+  method              String    @default("OPEN") // OPEN|RESTRICTED|NEGOTIATED|DIRECT
+  status              String    @default("DRAFT") // DRAFT|PREPARING|SUBMITTED|EVALUATING|WON|LOST|CANCELLED
+  submissionDeadline  DateTime?
+  estimatedValue      Float     @default(0)
+  currency            String    @default("TRY")
+  opportunityId       String?
+  contractWorkflowId  String?
+  ekapRef             String?
+  ownerId             String?
+  ownerName           String?
+  docNumber           String?
+  notes               String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  checklist           TenderChecklistItem[]
+  @@index([tenantId, status])
+}
+
+model TenderChecklistItem {
+  id          String   @id @default(cuid())
+  tenderId    String
+  tender      Tender   @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  name        String
+  isRequired  Boolean  @default(true)
+  status      String   @default("PENDING") // PENDING|DONE|WAIVED
+  fileUrl     String?
+  sortOrder   Int      @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@index([tenderId])
+}
+
+// ── Faz 7 — Birim Raporu (yönetici-yazımı + gönderim/inceleme) ───────────────
+model UnitReport {
+  id              String    @id @default(cuid())
+  tenantId        String
+  tenant          Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unitKey         String    // UNIT_DEFINITIONS key: CRM|PRESALES|PROCUREMENT|FINANCE|LEGAL|TENDER|PROJECT
+  unitLabel       String
+  periodStart     DateTime
+  periodEnd       DateTime
+  periodLabel     String?
+  status          String    @default("DRAFT") // DRAFT|SUBMITTED|REVIEWED|RETURNED
+  authorId        String?
+  authorName      String?
+  metricsSnapshot String?   // gönderim anında computeUnitMetrics JSON snapshot'ı
+  highlights      String?   // öne çıkanlar
+  issues          String?   // sorunlar
+  plannedActions  String?   // planlanan aksiyonlar
+  risks           String?   // riskler
+  summary         String?   // genel değerlendirme
+  submittedAt     DateTime?
+  reviewedById    String?
+  reviewedByName  String?
+  reviewedAt      DateTime?
+  reviewNote      String?
+  docNumber       String?   // opsiyonel ENF-RPR-...
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  @@index([tenantId, unitKey])
+  @@index([tenantId, status])
+}
+
+// ── Eklenti Lisanslama (Plugin Entitlement) ──────────────────────────────────
+// Çekirdek abonelik planından (STARTER/PRO/ENTERPRISE) BAĞIMSIZ add-on katmanı.
+// Her satılabilir eklenti (örn. sanal agent) tenant bazında ayrı lisanslanır.
+// Katalog kod-seviyesinde (PLUGIN_CATALOG) tanımlı; burada sadece tenant'ın
+// hangi eklentiye sahip olduğu + durumu + ayarı tutulur.
+model PluginEntitlement {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pluginKey   String    // PLUGIN_CATALOG.key (örn. AGENT_TENDER)
+  status      String    @default("DISABLED") // ACTIVE|TRIAL|EXPIRED|DISABLED
+  licenseKey  String?   // aktivasyonda kullanılan anahtar
+  mode        String    @default("ADVISORY") // agent eklentileri için: ADVISORY|AUTONOMOUS
+  config      String?   // eklenti-özel ayar JSON (eşikler, fallback rol vb.)
+  activatedById String?
+  activatedAt   DateTime?
+  expiresAt     DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@unique([tenantId, pluginKey])
+  @@index([tenantId, status])
+}
+
+// ── Sanal Agent Çalıştırması (Agent Run) ─────────────────────────────────────
+// Bir sanal agent bir birimin işini yaptığında üretilen çıktı + ratifikasyon kaydı.
+// Danışman modunda: PENDING_RATIFICATION → gerçek kişi RATIFIED/REJECTED yapar.
+model AgentRun {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pluginKey     String    // hangi agent eklentisi
+  unitKey       String    // hangi birim adına çalıştı
+  entityType    String    // TENDER|PROJECT|... işlenen varlık tipi
+  entityId      String
+  mode          String    @default("ADVISORY") // ADVISORY|AUTONOMOUS
+  status        String    @default("PENDING_RATIFICATION") // PENDING_RATIFICATION|RATIFIED|REJECTED
+  rationale     String?   // agent gerekçesi (insan-okunur)
+  outputJson    String?   // yapısal çıktı (eksik kalemler, risk vb.)
+  triggeredById String?   // çalıştıran (manuel) veya null (otomatik)
+  handoffTaskId String?   // oluşturulan devir TodoTask id'si
+  ratifiedById  String?
+  ratifiedAt    DateTime?
+  ratifyNote    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  @@index([tenantId, status])
+  @@index([tenantId, pluginKey])
 }

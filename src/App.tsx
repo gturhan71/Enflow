@@ -54,6 +54,9 @@ import ContractWorkflowTest from './modules/ContractWorkflowTest';
 import SecurityTestModule from './modules/SecurityTestModule';
 import LicenseGeneratorModule from './modules/LicenseGeneratorModule';
 import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
+import FinanceModule from './modules/FinanceModule';
+import ManagementReportingModule from './modules/ManagementReportingModule';
+import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -350,7 +353,10 @@ const TenantAppInner = ({
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
       case 'corporate-governance': return <CorporateGovernanceModule />;
+      case 'finance': return <FinanceModule />;
+      case 'management-reports': return <ManagementReportingModule />;
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
+      case 'virtual-agents-test': return <VirtualAgentsTestModule />;
 
       // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
       case 'subscription': return <SubscriptionModule />;

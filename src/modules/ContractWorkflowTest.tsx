@@ -9,7 +9,8 @@ import {
   UserCheck, UserX, Clock
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
-import { Opportunity, Proposal } from '../types';
+import { apiService } from '../services/apiService';
+import { Opportunity, Proposal, LegalCase, LegalRequest } from '../types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -129,6 +130,7 @@ function bestProposalPrice(opportunityId: string, proposals: Proposal[]): number
 }
 
 export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Props) {
+  const [mode, setMode] = useState<'contracts' | 'legal'>('contracts');
   const [tab, setTab] = useState<TabId>('context');
   const [workflows, setWorkflows] = useState<ContractWorkflow[]>([]);
   const [selected, setSelected] = useState<ContractWorkflow | null>(null);
@@ -452,7 +454,27 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
   // ── Render ─────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="flex h-full gap-4 p-4">
+    <div className="flex flex-col h-full p-4 gap-3">
+      {/* Mod geçişi: Sözleşmeler ↔ Hukuk (Faz 6b) */}
+      <div className="flex gap-2 flex-shrink-0">
+        <button
+          onClick={() => setMode('contracts')}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+            mode === 'contracts' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'
+          }`}>
+          <FileText className="w-4 h-4" /> Sözleşmeler
+        </button>
+        <button
+          onClick={() => setMode('legal')}
+          className={`flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-semibold transition-all ${
+            mode === 'legal' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'
+          }`}>
+          <Shield className="w-4 h-4" /> Hukuk
+        </button>
+      </div>
+
+      {mode === 'legal' ? <LegalView /> : (
+      <div className="flex flex-1 min-h-0 gap-4">
       {/* Left Panel — Workflow List */}
       <div className="w-72 flex-shrink-0 flex flex-col gap-3">
         <div className="glass-card p-4">
@@ -1298,7 +1320,179 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
           </div>
         )}
       </div>
+      </div>
+      )}
     </div>
+  );
+}
+
+// ── Hukuk Görünümü (Faz 6b) ─────────────────────────────────────────────────────
+
+const LEGAL_TYPE_LABELS: Record<string, string> = {
+  CONTRACT_REVIEW: 'Sözleşme İncelemesi', LEGAL_OPINION: 'Hukuki Görüş',
+  DISPUTE: 'Uyuşmazlık', LITIGATION: 'Dava', OTHER: 'Diğer',
+};
+const LEGAL_STATUS_STYLES: Record<string, string> = {
+  OPEN: 'bg-amber-100 text-amber-700 border-amber-200',
+  IN_REVIEW: 'bg-blue-100 text-blue-700 border-blue-200',
+  RESPONDED: 'bg-purple-100 text-purple-700 border-purple-200',
+  ESCALATED: 'bg-red-100 text-red-700 border-red-200',
+  CLOSED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+};
+const PRIORITY_STYLES: Record<string, string> = {
+  LOW: 'text-slate-500', MEDIUM: 'text-amber-600', HIGH: 'text-red-600',
+};
+
+function LegalView() {
+  const [view, setView] = useState<'requests' | 'cases'>('cases');
+  const [cases, setCases] = useState<LegalCase[]>([]);
+  const [requests, setRequests] = useState<LegalRequest[]>([]);
+  const [showForm, setShowForm] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [c, r] = await Promise.all([apiService.getLegalCases(), apiService.getLegalRequests()]);
+      setCases(c as LegalCase[]); setRequests(r as LegalRequest[]);
+    } finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const convertToCase = async (req: LegalRequest) => {
+    await apiService.createLegalCase({
+      title: req.title, type: 'CONTRACT_REVIEW', priority: req.priority || 'MEDIUM',
+      summary: req.description, sourceTaskId: req.id, categoryCode: 'HUK',
+    });
+    setMsg('Talep hukuki vakaya dönüştürüldü.');
+    setView('cases');
+    load();
+  };
+
+  const pendingRequests = requests.filter(r => !r.converted);
+
+  return (
+    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-2">
+          <button onClick={() => setView('cases')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${view === 'cases' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'}`}>
+            Hukuki Vakalar <span className="ml-1 text-xs opacity-70">({cases.length})</span>
+          </button>
+          <button onClick={() => setView('requests')}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${view === 'requests' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'}`}>
+            Gelen Talepler <span className="ml-1 text-xs opacity-70">({pendingRequests.length})</span>
+          </button>
+        </div>
+        {view === 'cases' && (
+          <button onClick={() => setShowForm(true)} className="btn-primary text-sm flex items-center gap-2">
+            <Plus className="w-4 h-4" /> Yeni Vaka
+          </button>
+        )}
+      </div>
+
+      {msg && <div className="glass-card p-3 text-sm text-emerald-600 flex items-center gap-2"><CheckCircle2 className="w-4 h-4" /> {msg}</div>}
+      {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
+
+      {view === 'requests' && (
+        pendingRequests.length === 0
+          ? <div className="glass-card p-12 text-center text-slate-400 italic">Bekleyen hukuk talebi yok. (Görevler modülünde "Hukuk / Şirket Avukatı" modülüyle görev oluşturulduğunda burada görünür.)</div>
+          : <div className="space-y-3">
+              {pendingRequests.map(r => (
+                <div key={r.id} className="glass-card p-4 flex items-center justify-between gap-4">
+                  <div>
+                    <h4 className="font-semibold text-slate-900">{r.title}</h4>
+                    {r.description && <p className="text-xs text-slate-600 mt-1">{r.description}</p>}
+                    <p className="text-xs text-slate-500 mt-1">Öncelik: <span className={PRIORITY_STYLES[r.priority] || 'text-slate-400'}>{r.priority}</span> · {r.status}</p>
+                  </div>
+                  <button onClick={() => convertToCase(r)} className="btn-secondary text-xs flex items-center gap-1 whitespace-nowrap">
+                    <ArrowRightCircle className="w-3.5 h-3.5" /> Vakaya Dönüştür
+                  </button>
+                </div>
+              ))}
+            </div>
+      )}
+
+      {view === 'cases' && (
+        cases.length === 0
+          ? <div className="glass-card p-12 text-center text-slate-400 italic">Henüz hukuki vaka yok. Sözleşme incelemesi, hukuki görüş veya uyuşmazlık kaydı ekleyin.</div>
+          : <div className="space-y-3">
+              {cases.map(c => (
+                <div key={c.id} className="glass-card p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-semibold text-slate-900">{c.title}</h4>
+                        <span className="text-xs text-slate-500">{LEGAL_TYPE_LABELS[c.type] || c.type}</span>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${LEGAL_STATUS_STYLES[c.status] || ''}`}>{c.status}</span>
+                        <span className={`text-[10px] font-bold uppercase ${PRIORITY_STYLES[c.priority]}`}>{c.priority}</span>
+                        {c.docNumber && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg">{c.docNumber}</span>}
+                      </div>
+                      {c.summary && <p className="text-xs text-slate-600">{c.summary}</p>}
+                      {c.opinion && <p className="text-xs text-slate-600"><span className="font-bold">Görüş:</span> {c.opinion}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {c.status !== 'CLOSED' && (
+                        <button onClick={async () => { await apiService.updateLegalCase(c.id, { status: 'CLOSED' }); load(); }}
+                          className="text-xs text-emerald-600 hover:underline">Kapat</button>
+                      )}
+                      <button onClick={async () => { await apiService.deleteLegalCase(c.id); load(); }}
+                        className="text-slate-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+      )}
+
+      <AnimatePresence>
+        {showForm && <LegalCaseForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function LegalCaseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState<Record<string, string>>({ type: 'CONTRACT_REVIEW', priority: 'MEDIUM' });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const set = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+
+  const save = async () => {
+    setSaving(true); setErr(null);
+    try {
+      if (!f.title) throw new Error('Başlık zorunlu.');
+      await apiService.createLegalCase({ ...f, categoryCode: f.categoryCode || 'HUK' });
+      onSaved();
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Kaydetme hatası.'); setSaving(false); }
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] flex items-center justify-center p-4" onClick={onClose}>
+      <motion.div initial={{ scale: 0.95, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 20 }}
+        className="glass-card p-6 w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-slate-900">Yeni Hukuki Vaka</h3>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-700"><XCircle className="w-5 h-5" /></button>
+        </div>
+        <input className="input-glass w-full text-sm" placeholder="Başlık" value={f.title || ''} onChange={e => set('title', e.target.value)} />
+        <div className="grid grid-cols-2 gap-3">
+          <select className="input-glass w-full text-sm" value={f.type} onChange={e => set('type', e.target.value)}>
+            {Object.entries(LEGAL_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+          <select className="input-glass w-full text-sm" value={f.priority} onChange={e => set('priority', e.target.value)}>
+            {['LOW', 'MEDIUM', 'HIGH'].map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
+        <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Özet / durum" value={f.summary || ''} onChange={e => set('summary', e.target.value)} />
+        <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Hukuki görüş (opsiyonel)" value={f.opinion || ''} onChange={e => set('opinion', e.target.value)} />
+        <input className="input-glass w-full text-sm" placeholder="Doküman Kategori Kodu (vars. HUK)" value={f.categoryCode || ''} onChange={e => set('categoryCode', e.target.value.toUpperCase())} />
+        {err && <p className="text-xs text-red-400 font-bold">{err}</p>}
+        <button onClick={save} disabled={saving} className="btn-primary w-full text-sm disabled:opacity-50">{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
+      </motion.div>
+    </motion.div>
   );
 }
 

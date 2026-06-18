@@ -1,4 +1,6 @@
 import { prisma } from '../prismaClient';
+import { getAgentPluginForRole } from './pluginCatalog';
+import { agentActorId } from './agentProvenance';
 
 // Faz 0 — diyagramdaki kurumsal onay sırası:
 // Presales hazırlar → Finans değerlendirir → İGPD onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
@@ -67,6 +69,126 @@ export async function completeApprovalChain(
   return prisma.approvalChain.update({
     where: { id: chain.id },
     data: { status: 'COMPLETED' },
+    include: { stages: { orderBy: { order: 'asc' } } },
+  });
+}
+
+/**
+ * Skip-logic: tenant'ta **hiçbir aktif kullanıcıya** karşılık gelmeyen role
+ * sahip PENDING aşamaları `SKIPPED` işaretler ve geriye PENDING aşama
+ * kalmadıysa zinciri COMPLETED yapar. Böylece akıştan çıkarılan bir
+ * rol/birim onay zincirini tıkayamaz (deadlock önlenir). İdempotent.
+ *
+ * Güncellenmiş zinciri (stages dahil) döner.
+ */
+export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
+  const chain = await prisma.approvalChain.findFirst({
+    where: { id: chainId, tenantId },
+    include: { stages: { orderBy: { order: 'asc' } } },
+  });
+  if (!chain || chain.status !== 'PENDING') return chain;
+
+  const activeRoleRows = await prisma.user.findMany({
+    where: { tenantId, status: 'ACTIVE' },
+    select: { role: true },
+    distinct: ['role'],
+  });
+  const activeRoles = new Set(activeRoleRows.map(r => r.role));
+
+  const orphanStages = chain.stages.filter(
+    s => s.status === 'PENDING' && !activeRoles.has(s.role)
+  );
+
+  // Faz 8.2 — Sanal agent dalı: boş koltuğu (aktif kullanıcısı olmayan rol)
+  // lisanslı bir sanal agent dolduruyorsa ve mod OTONOM ise, aşamayı atlamak
+  // yerine agent "onaylar" (boş koltuğu tam doldurur). Danışman modunda veya
+  // agent yoksa eski skip davranışı korunur (deadlock önlenir).
+  const agentApprovedIds: string[] = [];
+  const skippedIds: string[] = [];
+  for (const stage of orphanStages) {
+    const plugin = getAgentPluginForRole(stage.role);
+    let autonomousAgent = false;
+    if (plugin) {
+      const ent = await prisma.pluginEntitlement.findUnique({
+        where: { tenantId_pluginKey: { tenantId, pluginKey: plugin.key } },
+      });
+      const active =
+        !!ent &&
+        (ent.status === 'ACTIVE' || ent.status === 'TRIAL') &&
+        (!ent.expiresAt || ent.expiresAt.getTime() >= Date.now());
+      autonomousAgent = active && ent!.mode === 'AUTONOMOUS';
+    }
+    if (autonomousAgent && plugin) {
+      // Köken etiketi: her agent-onaylı aşama için bir AgentRun (RATIFIED) oluştur,
+      // aşamayı bu çalıştırmaya bağla → bir sonraki adım kimin onayladığını görür.
+      const actorId = agentActorId(plugin.key);
+      const rationale = `Boş koltuk (${stage.role}) — ${plugin.name} otonom modda onayladı.`;
+      const run = await prisma.agentRun.create({
+        data: {
+          tenantId,
+          pluginKey: plugin.key,
+          unitKey: plugin.unitKey ?? '',
+          entityType: 'APPROVAL_STAGE',
+          entityId: stage.id,
+          mode: 'AUTONOMOUS',
+          status: 'RATIFIED',
+          rationale,
+          outputJson: JSON.stringify({ chainEntityType: chain.entityType, chainEntityId: chain.entityId, role: stage.role }),
+          ratifiedById: actorId,
+          ratifiedAt: new Date(),
+        },
+      });
+      await prisma.approvalStage.update({
+        where: { id: stage.id },
+        data: {
+          status: 'APPROVED',
+          approverId: actorId,
+          note: 'Boş koltuk — sanal agent (otonom) onayladı',
+          approvedAt: new Date(),
+          agentRunId: run.id,
+        },
+      });
+      await prisma.activityLog.create({
+        data: {
+          action: 'APPROVAL_STAGE_APPROVE',
+          entityType: 'APPROVAL_STAGE',
+          entityId: stage.id,
+          details: JSON.stringify({ pluginKey: plugin.key, role: stage.role, rationale }),
+          userId: actorId,
+          actorType: 'AGENT',
+          agentRunId: run.id,
+          tenantId,
+        },
+      });
+      agentApprovedIds.push(stage.id);
+    } else {
+      skippedIds.push(stage.id);
+    }
+  }
+
+  if (skippedIds.length > 0) {
+    await prisma.approvalStage.updateMany({
+      where: { id: { in: skippedIds } },
+      data: { status: 'SKIPPED', note: 'Rol tenant\'ta aktif değil — otomatik atlandı', approvedAt: new Date() },
+    });
+  }
+
+  const resolvedIds = [...agentApprovedIds, ...skippedIds];
+
+  // Çözüm sonrası PENDING kalan var mı?
+  const stillPending = chain.stages.some(
+    s => s.status === 'PENDING' && !resolvedIds.includes(s.id)
+  );
+  if (!stillPending) {
+    const hasRejected = chain.stages.some(s => s.status === 'REJECTED');
+    await prisma.approvalChain.update({
+      where: { id: chainId },
+      data: { status: hasRejected ? 'REJECTED' : 'COMPLETED' },
+    });
+  }
+
+  return prisma.approvalChain.findFirst({
+    where: { id: chainId },
     include: { stages: { orderBy: { order: 'asc' } } },
   });
 }

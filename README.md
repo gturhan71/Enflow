@@ -12,6 +12,7 @@ Bu klasör, Enflow projesinin tüm bellek, doküman ve geçmiş kayıtlarını i
 
 ## Sürüm Takibi
 
+- **v2.x (18.06.2026):** Kurumsal süreç genişlemesi (Faz 0–8.4) — kalıcı ApprovalChain, Ziyaret Planı, Proje Devir Paketi, tenant-bazlı doküman kodlama + Genel Hususlar, varsayılan iş akışı + skip-logic, **Finans / Hukuk / İhale (İSAB)** operasyonel modülleri, **Yönetim Raporları** (birim metrik + UnitReport), **Sanal Agent** eklenti/lisans altyapısı (provenance + 5 handler). Detay: `enflowdoc.md`, `walkthrough.md`, `CLAUDE.md`.
 - **v1.6.3 (09.06.2026):** TypeScript strict-mode refactoring — 128 `any` temizlendi, 27 `console.log` → logger, backend `index.ts` 17 router'a bölündü. tsc frontend+backend sıfır hata.
 - **v1.6.2 (08.06.2026):** Backend TypeScript derleme sorunu giderildi. Express `Request` typing pattern normalize edildi. Backend 3002, Frontend 3000 portları stabilize.
 - **v1.6.1 (05.06.2026):** Teklif onay akışı, Approval Chain, SaveButton entegrasyonu.

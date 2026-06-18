@@ -100,7 +100,7 @@ Enflow, bir B2B işletmenin tüm iç süreçlerini tek bir platform üzerinde y�
 
 ## 3. Veri Modeli
 
-Prisma schema'da 26 model:
+Prisma schema'da 50+ model. Çekirdek modeller:
 
 ```
 Tenant              — Şirket/kiracı kaydı
@@ -129,8 +129,31 @@ ArchiveItem         — Fiziksel arşiv kaydı (raf, kutu, ödünç durumu)
 ActivityLog         — Denetim izi
 Notification        — Sistem bildirimleri
 CorporateDocument   — Kurumsal doküman (ISO, sertifika, vb.)
-Workflow            — İş akışı tanımı
-WorkflowStep        — İş akışı adımı
+Workflow            — İş akışı tanımı (isDefault, varsayılan şablon)
+WorkflowStep        — İş akışı adımı (enabled, requiresCompletion — skip-logic)
+```
+
+**Kurumsal süreç & operasyonel birim modelleri (Faz 0–8):**
+
+```
+VisitPlan / Visit       — Haftalık müşteri ziyaret planı (DEMO/TECHNICAL_MEETING/...)
+DailyReport             — Günlük saha raporu (yöneticiyle paylaşım flag'i)
+ProjectHandoverDoc      — Proje devir paketi evrakları (11 zorunlu evrak)
+ApprovalChain / Stage   — Kalıcı çok-aşamalı onay zinciri (Finans→İGPD→GM→KSU)
+DocumentCodingProfile   — Tenant-bazlı doküman kodlama profili (özgün notasyon)
+DocumentCategoryCode    — Tenant'ın tanımladığı kategori sözlüğü
+DocumentSequence        — Atomik artan doküman sayacı (kategori+yıl)
+LessonsLearned          — Alınan dersler (Genel Hususlar)
+RiskOpportunity         — Risk & Fırsat kaydı (skor = olasılık × etki)
+CorporateMetric         — Dönemsel KPI (hedef/gerçekleşen)
+ExternalDocumentRegister— Dış kaynak doküman sicili
+Invoice / Payment       — Fatura (SALES/PURCHASE) + kısmi ödeme (Finans)
+GuaranteeLetter         — Teminat mektubu (BID_BOND/PERFORMANCE/...; İhale ile paylaşımlı)
+LegalCase               — Hukuki vaka (inceleme/görüş/dava; talep→vaka dönüşümü)
+Tender / ChecklistItem  — İhale/İSAB (İKN, idare, yöntem + uygunluk denetimi)
+UnitReport              — Birim dönemsel performans raporu (otomatik metrik + yönetici yorumu)
+PluginEntitlement       — Sanal agent eklenti/lisans kapısı (ADVISORY/AUTONOMOUS)
+AgentRun                — Sanal agent çalıştırma kaydı (köken etiketi, ratifikasyon)
 ```
 
 ---
@@ -257,6 +280,8 @@ DRAFT
 - Tüm `isRequired: true` evraklar `UPLOADED/VERIFIED/WAIVED` → `READY_TO_SIGN`
 - "Onayla & Aktar" → `SIGNED` + `/transfer` çağrısı → `TRANSFERRED`
 
+**Hukuk Görünümü (mod geçişi):** Modül üstünde `Sözleşmeler ↔ Hukuk` geçiş çubuğu. Hukuk modunda `LegalCase` takibi (tip CONTRACT_REVIEW/LEGAL_OPINION/DISPUTE/LITIGATION; durum OPEN→IN_REVIEW→RESPONDED→ESCALATED→CLOSED; öncelik) + "Gelen Talepler" (LEGAL etiketli TodoTask'lar) → "Vakaya Dönüştür". Doküman no `ENF-HUK-YYYY-NNNNN`. (LEGAL_MGR operasyonel birimi.)
+
 ---
 
 ### 4.6 Satın Alma Modülü
@@ -354,14 +379,20 @@ Birim ve kullanıcı bazlı görev yönetimi + teklif onay kuyruğu.
 
 ---
 
-### 4.9 Satış Destek (SalesSupport)
+### 4.9 İhale / İSAB Modülü (Satış Destek)
 
-İhale yönetimi ve iş bitirme belgeleri.
+Backend destekli ihale yönetimi (ISAB_MGR operasyonel birimi). 5 sekme:
 
-**Yapabilecekleri:**
-- İhale dosyası takibi: deadline sayacı, hazırlık % , URGENT flag
-- Personel sertifikaları (VALID / RENEWAL_NEEDED)
-- İş bitirme dilekçesi: tamamlanmış projeden otomatik şablon oluşturma
+| Sekme | İçerik |
+|-------|--------|
+| İhale Listesi | `Tender` CRUD — İKN, idare, yöntem (OPEN/RESTRICTED/NEGOTIATED/DIRECT), durum, deadline + kalan gün rozeti |
+| İhale Takvimi | Aktif ihaleler `submissionDeadline` sıralı, SLA renk tonu |
+| Uygunluk Denetimi | Seçili ihalenin checklist'i (auto-seed 10 kalem), zorunlu sayaç + progress, dosya yükleme |
+| Teminat | Geçici teminat (`GuaranteeLetter` `type=BID_BOND`+`tenderId` — Finans modülüyle paylaşımlı) |
+| EKAP | Manuel İKN öneki yer tutucu (gerçek EKAP web servisi yok) |
+
+**Durum Makinesi:** `DRAFT → PREPARING → SUBMITTED → EVALUATING → WON / LOST / CANCELLED`  
+**Doküman no:** opsiyonel `categoryCode='IHL'` → `ENF-IHL-YYYY-NNNNN`
 
 ---
 
@@ -413,6 +444,86 @@ Birimler arası iş akışlarının görsel tasarım aracı. WorkflowStep: birim
 ### 4.15 Abonelik Modülü
 
 Aktif plan bilgisi, kullanım metrikleri, plan yükseltme, lisans anahtar yönetimi.
+
+---
+
+### 4.16 Ziyaret Planı & Günlük Rapor (Faz 2)
+
+Süreç öncesi katman — `visit-plan` sekmesi (Dashboard'dan sonra, CRM'den önce).
+
+- **Haftalık ziyaret tablosu:** müşteri / tip (DEMO/TECHNICAL_MEETING/PRESENTATION/OTHER) / planlanan tarih + ihtiyaç notu; gerçekleşen tarih & durum.
+- **Günlük saha raporu:** serbest metin + "Yöneticiyle Paylaş" flag'i.
+- Modeller: `VisitPlan` / `Visit` / `DailyReport`. Backend `/api/visits`.
+
+---
+
+### 4.17 Proje Devir Paketi (Faz 2)
+
+Proje Yönetimi detayında 5. sekme. `ContractWorkflowDoc` pattern'inin klonu — **11 zorunlu evrak** (Fizibilite, İhale Dokümanları, Sözleşme+Ekleri, Birim Fiyat Cetveli, Maliyet Tablosu, Kitlist Ağacı, Alınan Teklifler, İhale Kararı, Teminat Mektupları, Devir Formu, Personel Listesi). Tüm zorunlu evraklar `UPLOADED/VERIFIED/WAIVED` olunca devir tamamlanır; aksi halde header'da amber "Devir Bekliyor" rozeti. Model: `ProjectHandoverDoc`.
+
+---
+
+### 4.18 Genel Hususlar (Kurumsal Yönetim) (Faz 3)
+
+`corporate-governance` sekmesi — 4 sekme, kurumsal yönetişim:
+
+| Sekme | Model | İçerik |
+|-------|-------|--------|
+| Alınan Dersler | `LessonsLearned` | Durum / kök neden / aksiyon / etki |
+| Risk & Fırsat | `RiskOpportunity` | Olasılık×Etki skoru (1-7 yeşil / 8-14 amber / 15-25 kırmızı) |
+| KPI | `CorporateMetric` | Hedef / gerçekleşen yüzde |
+| Dış Doküman Sicili | `ExternalDocumentRegister` | Kaynak, versiyon, durum |
+
+**Doküman Kodlama Sistemi (tenant-yapılandırılabilir):** Ayarlar → Şirket Profili → "Doküman Kodlama Notasyonu". Şirket kodu + ayraç + hane + yıl/aktif toggle + kategori sözlüğü. Format: `{companyCode}{sep}{categoryCode}[{sep}{year}]{sep}{paddedSeq}` (örn. `ENF-SOZ-2026-00001`). **Sabit gömülü kategori/önek yoktur — tamamen özgün ve tenant-bazlı.**
+
+---
+
+### 4.19 Finans Modülü (Faz 6a)
+
+`finance` sekmesi (FINANCE_MGR operasyonel birimi). 5 sekme:
+
+| Sekme | İçerik |
+|-------|--------|
+| Faturalar | `Invoice` (SALES/PURCHASE) CRUD; durum DRAFT→ISSUED→SENT→PARTIAL→PAID→OVERDUE |
+| Tahsilat | `Payment` kısmi ödeme; `paidAmount`/`status` otomatik türetilir (`recalcInvoice`) |
+| Teminat Mektupları | `GuaranteeLetter` (BID_BOND/PERFORMANCE/ADVANCE/WARRANTY) — yaklaşan/geçmiş renk kodu |
+| Maliyet Onayı | PENDING `ProjectCostItem` onay/red |
+| Özet | Alacak / tahsilat / vadesi-geçen / teminat / bekleyen-onay metrikleri |
+
+Backend `/api/finance`. POST'lar opsiyonel `categoryCode` ile docNumber üretir.
+
+---
+
+### 4.20 Yönetim Raporları (Faz 7)
+
+`management-reports` sekmesi — konsolide birim performansı. Her operasyonel birimin metrikleri mevcut veriden **otomatik** hesaplanır.
+
+- **Genel Bakış:** iş akışı darboğazı paneli (açık `ApprovalChain`'lerin sırası gelmiş ilk PENDING aşaması role göre = iş akışı hangi birimde bekliyor) + 7 birimin başlık metrik kartları.
+- **Birim Detayı:** seçili birimin tüm metrikleri + recharts grafikleri (bar/pie/line), esnek tarih aralığı.
+- **Raporlarım:** birim yöneticisi `UnitReport` taslağı — otomatik metrik ön-izleme + narrative (öne çıkanlar/sorunlar/aksiyon/risk/özet) → "Yönetime Sun" (gönderim anı `metricsSnapshot` JSON).
+- **Gelen Raporlar (GM-only):** SUBMITTED raporları incele → Onayla / İade. Durum: `DRAFT → SUBMITTED → REVIEWED / RETURNED`.
+
+Backend `/api/reports` (`unitReportingService.ts`). Doküman no `ENF-RPR-YYYY-NNNNN`.
+
+---
+
+### 4.21 Sanal Agentlar [TEST · Eklenti] (Faz 8)
+
+Boş birim koltuğunu dolduran sanal agent altyapısı — **ticari sürüm dışında, ayrı lisanslanabilir upsell**. GM-only `virtual-agents-test` sekmesi. Varsayılan mod **ADVISORY** (çıktı insan ratifikasyonu bekler).
+
+- **Eklenti Kataloğu:** 7 agent (AGENT_TENDER, AGENT_PROJECT, AGENT_PRESALES, AGENT_PROCUREMENT, AGENT_FINANCE AVAILABLE; AGENT_LEGAL, AGENT_CRM COMING_SOON). **AGENT_FINANCE/LEGAL `allowedModes=['ADVISORY']` — para/hukuk asla otonom.** Lisans aktivasyonu + GM-only anahtar üretimi (imzalı HMAC: `ENF-PLUGIN-<KEY>[-D<gün>]-<İMZA>`).
+- **Çalıştırmalar:** agent çalıştır → deterministik handler (LLM gerektirmez) tutarlılık/risk denetimi → handoff `TodoTask` (gerçek kişiye devir) + `AgentRun` + `ActivityLog`. "Onayla & Devral" ile ratifiye edilir.
+- **Köken etiketi (provenance):** her işlem `AGENT:<pluginKey>` ile damgalanır; `AgentTag` rozeti ("🤖 {agent} tarafından yapıldı") + drill-down popover. Sonraki onaylayan agent-onaylı aşamayı görür ve kontrol eder.
+
+Backend `/api/plugins` (catalog/entitlements/activate/generate-key/run/runs/ratify; lisans yoksa **402 upsell sinyali**).
+
+> ⚠️ **Production:** `PLUGIN_LICENSE_SECRET` ortam değişkeni canlıya çıkışta mutlaka değiştirilmelidir.
+
+---
+
+### 4.22 Bekleyen Onaylarım — Onay Zinciri Swimlane (Faz 1)
+
+TodoModule içinde generic sekme: `currentUser.role` zincirin hangi aşamasındaysa (FINANCE_MGR/IGPD_MGR/GENERAL_MANAGER/KSU_MGR vb.), sırası gelmiş onaylar listelenir. Backend `GET /api/approval-chains?pendingForRole=<ROLE>` — "sırası gelmiş" = önceki tüm aşamalar `APPROVED`. Boş koltuk (aktif kullanıcısı olmayan rol) → `autoSkipOrphanStages` ile SKIPPED (deadlock önleme) veya lisanslı otonom agent varsa agent-onaylı.
 
 ---
 
@@ -516,6 +627,13 @@ Dashboard Header'da kırmızı bayraklı uyarı ikonu + bildirim paneli.
 | `OPERATIONS_MGR` | Operasyon Müdürü |
 | `AUDITOR` | Denetçi |
 | `ADMIN` | Sistem Yöneticisi |
+| `LEGAL_MGR` | Hukuk Müdürü / Şirket Avukatı |
+| `IGPD_MGR` | İş Geliştirme & Pazarlama Müdürü |
+| `KGD_MGR` | Kalite Güvence Müdürü |
+| `KSU_MGR` | Kontrat & Sözleşme Müdürü |
+| `ISAB_MGR` | İhale Satın Alma Müdürü |
+
+> Kurumsal onay swimlane rolleri (FINANCE_MGR, İGPD, KGD, KSU, İSAB) `ApprovalChain` aşamalarında kullanılır; karşılık gelen `Unit` kayıtları tenant'a eklenir. İzin kullanıcı `permissions` JSON'undan verilir (kod-seviyesi rol→izin haritası yok); GM superuser tüm modülleri görür.
 
 ### PermissionGate Bileşeni
 
@@ -656,8 +774,17 @@ Tüm endpoint'ler `/api/` prefix'li. Tenant gerektiren route'larda `x-tenant-id`
 | Archive | `/api/archive` | GET, POST, PUT /:id, DELETE /:id |
 | Notifications | `/api/notifications` | GET, POST, PUT /:id, DELETE /:id |
 | Documents | `/api/documents` | GET, POST, PUT /:id, DELETE /:id |
-| Workflows | `/api/workflows` | GET, POST, PUT /:id |
+| Workflows | `/api/workflows` | GET, POST, PUT /:id, GET /default, GET /:id/steps/:stepId/resolve-next |
 | Logs | `/api/logs/notifications` | GET, POST |
+| Visits | `/api/visits` | plans + visits + daily-reports CRUD |
+| ApprovalChains | `/api/approval-chains` | GET (?entityType / ?pendingForRole), POST, stages/:id/approve, /reject, DELETE |
+| DocumentCoding | `/api/document-coding` | GET/PUT /profile, kategori CRUD |
+| CorporateGovernance | `/api/corporate-governance` | /lessons, /risks, /metrics, /external-docs |
+| Finance | `/api/finance` | /invoices + /payments + /guarantees + /cost-approvals + /summary |
+| Legal | `/api/legal` | /cases CRUD + /upload + /requests |
+| Tenders | `/api/tenders` | CRUD + /:id/checklist (auto-seed) + upload |
+| Reports | `/api/reports` | /units, /unit-metrics, /bottlenecks, /overview, /unit-reports (+submit/review) |
+| Plugins | `/api/plugins` | /catalog, /entitlements, /activate, /generate-key [GM], /agents/:key/run, /runs, /runs/:id/ratify |
 | Static | `/uploads/...` | Yüklenen dosyalar |
 
 ### Kritik Route Sırası

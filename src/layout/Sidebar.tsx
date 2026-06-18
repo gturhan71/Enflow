@@ -3,7 +3,8 @@ import {
   Zap,
   ChevronRight,
   LogOut,
-  ShieldCheck
+  ShieldCheck,
+  Bot
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -174,6 +175,19 @@ const Sidebar = ({
             >
               <ShieldCheck size={16} strokeWidth={2.5} />
               <span className="text-[10px] font-black uppercase tracking-widest flex-1 text-left">Güvenlik Testi</span>
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 font-black">TEST</span>
+            </button>
+            <button
+              onClick={() => handleNavigate(() => setActiveTab('virtual-agents-test'))}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 border mt-2",
+                activeTab === 'virtual-agents-test'
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                  : "border-dashed border-amber-500/30 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-400"
+              )}
+            >
+              <Bot size={16} strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-widest flex-1 text-left">Sanal Agentlar</span>
               <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 font-black">TEST</span>
             </button>
           </div>

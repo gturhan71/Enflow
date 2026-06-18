@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { logger } from '../utils/logger';
 import { motion, AnimatePresence } from 'motion/react';
-import { 
-  GitBranch, ArrowRight, Plus, Trash2, Settings2, Activity, CheckCircle2, 
+import {
+  GitBranch, ArrowRight, Plus, Settings2, Activity, CheckCircle2,
   AlertCircle, Save, Zap, Info, ChevronRight, Play, Pause, RefreshCw, ListTodo,
-  Building, Mail
+  Building, Mail, Power, ShieldAlert, X
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Unit, Workflow, WorkflowStep, ApprovalStage } from '../types';
@@ -22,6 +22,17 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
 
   const [currentSimStep, setCurrentSimStep] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+
+  // Devir simülasyonu: hangi adımların gereklilikleri "tamamlandı" işaretlendi (kalıcı değil)
+  const [simCompleted, setSimCompleted] = useState<Set<string>>(new Set());
+  const [handoffModal, setHandoffModal] = useState<{
+    step: WorkflowStep;
+    nextUnitName: string | null;
+    nextDescription: string | null;
+    fallbackUsed: boolean;
+    removedUnitName: string | null;
+    blocked: boolean;
+  } | null>(null);
 
   useEffect(() => {
     fetchWorkflows();
@@ -42,11 +53,22 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     try {
       const data = await apiService.getWorkflows();
       const safeData = Array.isArray(data) ? data : [];
-      setWorkflows(safeData);
       if (safeData.length > 0) {
-        setActiveWorkflow(safeData[0]);
+        setWorkflows(safeData);
+        // Tüm birimleri kapsayan varsayılan şablon varsa onu öne çıkar (seçici UI yok);
+        // yoksa ilk workflow'u göster.
+        const preferred = safeData.find(w => w.isDefault) ?? safeData[0];
+        setActiveWorkflow(preferred);
       } else {
-        setActiveWorkflow(null);
+        // Tüm birimleri kapsayan varsayılan şablonu getir (yoksa backend oluşturur)
+        const def = await apiService.getDefaultWorkflow();
+        if (def && def.id) {
+          setWorkflows([def]);
+          setActiveWorkflow(def);
+        } else {
+          setWorkflows([]);
+          setActiveWorkflow(null);
+        }
       }
     } catch (error) {
       logger.error('Workflows could not be loaded', error);
@@ -91,7 +113,10 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
       type: 'AUTO',
       description: 'Yeni işlem adımı',
       order: activeWorkflow ? (activeWorkflow.steps?.length || 0) : 0,
-      nextStepId: null
+      nextStepId: null,
+      enabled: true,
+      requiresCompletion: false,
+      completionNote: null
     };
 
     if (!activeWorkflow) {
@@ -112,9 +137,13 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     }
   };
 
-  const handleRemoveStep = (id: string) => {
+  // Birim akıştan çıkarılınca step silinmez; enabled=false yapılır → sıra korunur,
+  // skip-logic onu atlar (görevler bir sonraki aktif birime yönlenir).
+  const handleToggleEnabled = (id: string) => {
     if (!activeWorkflow) return;
-    const updatedSteps = (activeWorkflow.steps || []).filter(s => s.id !== id);
+    const updatedSteps = (activeWorkflow.steps || []).map(s =>
+      s.id === id ? { ...s, enabled: s.enabled === false } : s
+    );
     setActiveWorkflow({ ...activeWorkflow, steps: updatedSteps });
   };
 
@@ -122,6 +151,49 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     if (!activeWorkflow) return;
     const updatedSteps = (activeWorkflow.steps || []).map(s => s.id === id ? { ...s, ...data } : s);
     setActiveWorkflow({ ...activeWorkflow, steps: updatedSteps });
+  };
+
+  const unitName = (id: string) => units.find(u => u.id === id)?.name ?? 'Bilinmeyen Birim';
+
+  // Skip-resolution (backend resolveNextStep ile aynı mantık — anlık UI için lokal hesap):
+  // bir adımdan sonra görevin aktarılacağı ilk AKTİF (enabled) adımı bulur.
+  const getNextInfo = (step: WorkflowStep) => {
+    const steps = activeWorkflow?.steps ?? [];
+    const sorted = [...steps].sort((a, b) => a.order - b.order);
+    const nextActive = sorted.find(s => s.order > step.order && s.enabled !== false) ?? null;
+    let fallbackUsed = false;
+    let removedUnitName: string | null = null;
+    if (step.nextStepId) {
+      const literal = sorted.find(s => s.id === step.nextStepId);
+      if (literal && literal.enabled === false) {
+        fallbackUsed = true;
+        removedUnitName = unitName(literal.unitId);
+      }
+    }
+    return { nextActive, fallbackUsed, removedUnitName };
+  };
+
+  const toggleSimCompleted = (id: string) => {
+    setSimCompleted(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  // "Sonraki birime aktar": hangi birime gideceğini gösterir; hazırlayan birim
+  // gerekliliklerini tamamlamadıysa (requiresCompletion) önce uyarı verir.
+  const handleForward = (step: WorkflowStep) => {
+    const { nextActive, fallbackUsed, removedUnitName } = getNextInfo(step);
+    const blocked = !!step.requiresCompletion && !simCompleted.has(step.id);
+    setHandoffModal({
+      step,
+      nextUnitName: nextActive ? unitName(nextActive.unitId) : null,
+      nextDescription: nextActive ? nextActive.description : null,
+      fallbackUsed,
+      removedUnitName,
+      blocked
+    });
   };
 
   const handleSave = async () => {
@@ -186,9 +258,14 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
             <GitBranch size={28} />
           </div>
           <div>
-            <h4 className="text-xl font-black text-slate-900 tracking-tighter uppercase italic leading-none mb-1">
-              Akış Yönetimi & Simülasyon
-            </h4>
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="text-xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
+                Akış Yönetimi & Simülasyon
+              </h4>
+              {activeWorkflow?.isDefault && (
+                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-tighter">Varsayılan Şablon</span>
+              )}
+            </div>
             <p className="text-xs text-slate-500 font-bold">Fırsattan teslimata uçtan uca tüm operasyonel süreci izleyin ve simüle edin.</p>
           </div>
         </div>
@@ -240,16 +317,33 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
             {activeWorkflow ? (
               <div className="relative min-h-[400px] flex flex-wrap gap-8 items-start justify-center lg:justify-start pt-4 pb-12 overflow-x-auto custom-scrollbar">
                 <AnimatePresence mode="popLayout">
-                  {activeWorkflow.steps?.map((step, index) => (
+                  {activeWorkflow.steps?.map((step, index) => {
+                    const isDisabled = step.enabled === false;
+                    const { nextActive, fallbackUsed, removedUnitName } = getNextInfo(step);
+                    const simDone = simCompleted.has(step.id);
+                    return (
                     <motion.div key={step.id} layout initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative group">
-                      <div className="w-72 glass-panel p-6 rounded-[32px] bg-white border border-slate-100 shadow-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300 relative z-10">
+                      <div className={cn(
+                        "w-72 glass-panel p-6 rounded-[32px] bg-white border shadow-sm transition-all duration-300 relative z-10",
+                        isDisabled ? "border-slate-200 opacity-60 grayscale" : "border-slate-100 hover:shadow-xl hover:border-primary/30"
+                      )}>
                         <div className="flex items-center justify-between mb-6">
                           <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 bg-primary/10 text-primary rounded-xl flex items-center justify-center font-black text-xs">{index + 1}</div>
-                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aşama</span>
+                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs", isDisabled ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary")}>{index + 1}</div>
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isDisabled ? 'Çıkarıldı' : 'Aşama'}</span>
                           </div>
-                          <button onClick={() => handleRemoveStep(step.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"><Trash2 size={16} /></button>
+                          <button
+                            onClick={() => handleToggleEnabled(step.id)}
+                            title={isDisabled ? 'Akışa geri al' : 'Akıştan çıkar (görevler sıradaki birime yönlenir)'}
+                            className={cn("p-2 rounded-xl transition-all", isDisabled ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" : "text-slate-300 hover:text-red-500 hover:bg-red-50")}
+                          ><Power size={16} /></button>
                         </div>
+                        {isDisabled && (
+                          <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2">
+                            <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                            <p className="text-[10px] font-bold text-amber-700 leading-tight">Birim akıştan çıkarıldı — görevler otomatik olarak sıradaki aktif birime yönlendirilir.</p>
+                          </div>
+                        )}
                         <div className="space-y-5">
                           <div className="space-y-2">
                             <div className="flex items-center justify-between px-1"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Sorumlu Birim</label><Info size={12} className="text-slate-300" /></div>
@@ -268,10 +362,60 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                             </div>
                             <button onClick={() => handleUpdateStep(step.id, { type: step.type === 'AUTO' ? 'MANUAL' : 'AUTO' })} className="p-2 hover:bg-slate-50 rounded-lg text-primary transition-all"><Settings2 size={16} /></button>
                           </div>
+
+                          {/* Devir gerekliliği: hazırlayan birim, devretmeden önce tamamlamalı mı? */}
+                          <div className="space-y-2">
+                            <button
+                              onClick={() => handleUpdateStep(step.id, { requiresCompletion: !step.requiresCompletion })}
+                              className={cn("w-full flex items-center justify-between px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-tighter transition-all", step.requiresCompletion ? "bg-indigo-50 text-indigo-600 border border-indigo-100" : "bg-slate-50 text-slate-400 border border-slate-100")}
+                            >
+                              <span className="flex items-center gap-1.5"><ShieldAlert size={12} /> Devir öncesi tamamlanmalı</span>
+                              <span className={cn("w-7 h-4 rounded-full flex items-center transition-all px-0.5", step.requiresCompletion ? "bg-indigo-500 justify-end" : "bg-slate-300 justify-start")}>
+                                <span className="w-3 h-3 bg-white rounded-full" />
+                              </span>
+                            </button>
+                            {step.requiresCompletion && (
+                              <>
+                                <input type="text" value={step.completionNote ?? ''} placeholder="Gereklilik notu (örn. BoM tamamlanmalı)" onChange={(e) => handleUpdateStep(step.id, { completionNote: e.target.value })} className="w-full bg-white border border-indigo-100 rounded-xl px-3 py-2 text-[11px] font-medium text-slate-700 outline-none focus:border-indigo-300 transition-all" />
+                                <button
+                                  onClick={() => toggleSimCompleted(step.id)}
+                                  className={cn("w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all", simDone ? "bg-emerald-500 text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200")}
+                                >
+                                  <CheckCircle2 size={12} /> {simDone ? 'Gereklilikler tamamlandı' : 'Tamamlandı işaretle (sim.)'}
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Sıradaki birim uyarısı (skip-logic önizleme) */}
+                          <div className="pt-3 border-t border-slate-50 space-y-2">
+                            <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tighter text-slate-400">
+                              <ArrowRight size={12} className="text-primary" />
+                              {nextActive
+                                ? <span className="text-slate-600">Sıradaki: <span className="text-primary">{unitName(nextActive.unitId)}</span></span>
+                                : <span className="text-slate-400">Akış sonu (devir yok)</span>}
+                            </div>
+                            {fallbackUsed && (
+                              <div className="p-2.5 bg-amber-50 border border-amber-100 rounded-xl flex items-start gap-2">
+                                <AlertCircle size={12} className="text-amber-500 mt-0.5 shrink-0" />
+                                <p className="text-[10px] font-bold text-amber-700 leading-tight">
+                                  Tanımlı sonraki birim ({removedUnitName}) akıştan çıkarılmış — görev {nextActive ? unitName(nextActive.unitId) : 'akış sonuna'} yönlendirilecek.
+                                </p>
+                              </div>
+                            )}
+                            {!isDisabled && (
+                              <button
+                                onClick={() => handleForward(step)}
+                                className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-black uppercase tracking-tighter hover:bg-primary transition-all"
+                              >
+                                <ArrowRight size={12} /> Sonraki birime aktar
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                  );})}
                 </AnimatePresence>
               </div>
             ) : (
@@ -395,6 +539,80 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
           </div>
         </div>
       )}
+
+      {/* Devir uyarı modalı — sıradaki birim + hazırlayan birim gereklilik kontrolü */}
+      <AnimatePresence>
+        {handoffModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+            onClick={() => setHandoffModal(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md glass-panel bg-white rounded-[32px] p-8 shadow-2xl border border-slate-100"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", handoffModal.blocked ? "bg-amber-50 text-amber-500" : "bg-primary/10 text-primary")}>
+                    {handoffModal.blocked ? <ShieldAlert size={24} /> : <ArrowRight size={24} />}
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-black text-slate-900 uppercase italic tracking-tighter leading-none">Görev Devri</h4>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">{unitName(handoffModal.step.unitId)}</p>
+                  </div>
+                </div>
+                <button onClick={() => setHandoffModal(null)} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition-all"><X size={18} /></button>
+              </div>
+
+              {handoffModal.blocked && (
+                <div className="mb-4 p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+                  <AlertCircle size={18} className="text-amber-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-xs font-black text-amber-700 uppercase tracking-tighter mb-1">Hazırlayan birim gereklilikleri tamamlamadı</p>
+                    <p className="text-[11px] font-medium text-amber-700 leading-relaxed">
+                      {unitName(handoffModal.step.unitId)} birimi henüz akış gerekliliklerini tamamlamadı{handoffModal.step.completionNote ? ` (${handoffModal.step.completionNote})` : ''}. Yine de sonraki birime aktarmak istiyor musunuz?
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 mb-2">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Görev şu birime aktarılacak</p>
+                {handoffModal.nextUnitName ? (
+                  <div className="flex items-center gap-2">
+                    <ArrowRight size={16} className="text-primary" />
+                    <span className="text-sm font-black text-slate-900">{handoffModal.nextUnitName}</span>
+                  </div>
+                ) : (
+                  <p className="text-sm font-bold text-slate-500 italic">Akışın son adımı — devredilecek başka birim yok.</p>
+                )}
+                {handoffModal.nextDescription && <p className="text-[11px] text-slate-500 font-medium mt-1.5">{handoffModal.nextDescription}</p>}
+              </div>
+
+              {handoffModal.fallbackUsed && (
+                <div className="p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2 mb-2">
+                  <AlertCircle size={14} className="text-amber-500 mt-0.5 shrink-0" />
+                  <p className="text-[10px] font-bold text-amber-700 leading-tight">
+                    Tanımlı sonraki birim ({handoffModal.removedUnitName}) akıştan çıkarılmış — görev otomatik olarak yukarıdaki aktif birime yönlendiriliyor.
+                  </p>
+                </div>
+              )}
+
+              <div className="flex items-center gap-3 mt-6">
+                <button onClick={() => setHandoffModal(null)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Vazgeç</button>
+                <button
+                  onClick={() => setHandoffModal(null)}
+                  className={cn("flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all", handoffModal.blocked ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-primary text-white hover:bg-primary/90")}
+                >
+                  {handoffModal.blocked ? 'Yine de Aktar' : 'Aktar'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

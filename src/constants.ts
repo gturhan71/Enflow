@@ -25,6 +25,7 @@ import {
   ListTodo,
   Calendar,
   CreditCard,
+  Banknote,
   Key,
   FlaskConical,
   ShieldCheck
@@ -67,7 +68,8 @@ export const ROLE_LABELS: Record<string, string> = {
   IGPD_MGR: 'İş Geliştirme & Pazarlama Direktörü (İGPD)',
   KGD_MGR: 'Kalite Güvence Direktörü (KGD)',
   KSU_MGR: 'Kontrat & Sözleşme Uzmanı (KSU)',
-  ISAB_MGR: 'İhale Satın Alma Birimi Yöneticisi (İSAB)'
+  ISAB_MGR: 'İhale Satın Alma Birimi Yöneticisi (İSAB)',
+  LEGAL_MGR: 'Hukuk Müdürü / Şirket Avukatı'
 };
 
 export const MOCK_TENANTS: Tenant[] = [
@@ -79,6 +81,7 @@ export const MOCK_TENANTS: Tenant[] = [
 export const NAV_ITEMS = [
   // ── İş akışı sırasına göre düzenlenmiş ──────────────────────────────────
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
+  { id: 'management-reports', label: 'Yönetim Raporları', icon: BarChart3, requiredPermission: 'MANAGEMENT_REPORTS_VIEW' },
   { id: 'visit-plan', label: 'Ziyaret Planı', icon: Calendar, requiredPermission: 'VISIT_PLAN_VIEW' },
   {
     id: 'crm',
@@ -107,6 +110,7 @@ export const NAV_ITEMS = [
   { id: 'contract-workflow', label: 'Sözleşme Yönetimi',  icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
   { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
+  { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },

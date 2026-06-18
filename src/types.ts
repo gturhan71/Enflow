@@ -6,24 +6,35 @@ export interface WorkflowStep {
   description: string;
   order: number;
   nextStepId: string | null;
+  enabled?: boolean;
+  requiresCompletion?: boolean;
+  completionNote?: string | null;
 }
 
 export interface ApprovalStage {
   id: string;
   role: string;
-  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'SKIPPED';
   approverId?: string;
   note?: string;
   order?: number;
   approvedAt?: string;
+  agentRunId?: string | null;
 }
 
 export interface Workflow {
   id: string;
   name: string;
   description: string;
+  isDefault?: boolean;
   steps: WorkflowStep[];
   stages: ApprovalStage[];
+}
+
+export interface ResolveNextStepResult {
+  nextStep: { id: string; unitId: string; unitName: string | null; description: string } | null;
+  fallbackUsed: boolean;
+  removedUnitName: string | null;
 }
 
 export interface User {
@@ -304,6 +315,7 @@ export interface TodoTask {
   slaBusinessDays?: number; // verilirse backend dueDate'i otomatik bu kadar iş günü sonrasına hesaplar
   relatedModule?: string;
   relatedItemId?: string;
+  agentRunId?: string | null;
   createdAt?: string;
 }
 
@@ -584,4 +596,273 @@ export interface PurchaseRequest {
   items: PurchaseItem[];
   quotes: PurchaseQuote[];
   deliveries: DeliveryRecord[];
+}
+
+// ── Finans Modülü (Faz 6) ──────────────────────────────────────────────────
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  currency: string;
+  paidAt: string;
+  method?: string | null;
+  reference?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface Invoice {
+  id: string;
+  type: 'SALES' | 'PURCHASE';
+  invoiceNo?: string | null;
+  amount: number;
+  currency: string;
+  issueDate?: string | null;
+  dueDate?: string | null;
+  status: 'DRAFT' | 'ISSUED' | 'SENT' | 'PARTIAL' | 'PAID' | 'OVERDUE' | 'CANCELLED';
+  paidAmount: number;
+  paidAt?: string | null;
+  projectId?: string | null;
+  contractId?: string | null;
+  milestoneId?: string | null;
+  customerName?: string | null;
+  vendorName?: string | null;
+  docNumber?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  payments?: Payment[];
+}
+
+export interface GuaranteeLetter {
+  id: string;
+  type: 'BID_BOND' | 'PERFORMANCE' | 'ADVANCE' | 'WARRANTY';
+  bankName?: string | null;
+  amount: number;
+  currency: string;
+  issueDate?: string | null;
+  expiryDate?: string | null;
+  status: 'ACTIVE' | 'RELEASED' | 'EXPIRED' | 'CALLED';
+  refNo?: string | null;
+  projectId?: string | null;
+  contractId?: string | null;
+  tenderId?: string | null;
+  docNumber?: string | null;
+  fileUrl?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinanceSummary {
+  totalReceivable: number;
+  totalCollected: number;
+  overdue: number;
+  invoiceCount: number;
+  salesCount: number;
+  activeGuarantees: number;
+  expiringGuarantees: number;
+  pendingCostApprovals: number;
+}
+
+// ── Hukuk Modülü (Faz 6b) ───────────────────────────────────────────────────
+export interface LegalCase {
+  id: string;
+  type: 'CONTRACT_REVIEW' | 'LEGAL_OPINION' | 'DISPUTE' | 'LITIGATION' | 'OTHER';
+  title: string;
+  status: 'OPEN' | 'IN_REVIEW' | 'RESPONDED' | 'ESCALATED' | 'CLOSED';
+  priority: 'LOW' | 'MEDIUM' | 'HIGH';
+  relatedEntityType?: string | null;
+  relatedEntityId?: string | null;
+  summary?: string | null;
+  opinion?: string | null;
+  assignedToName?: string | null;
+  requestedByName?: string | null;
+  sourceTaskId?: string | null;
+  dueDate?: string | null;
+  docNumber?: string | null;
+  fileUrl?: string | null;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LegalRequest {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: string;
+  priority: string;
+  relatedItemId?: string | null;
+  converted: boolean;
+  createdAt: string;
+}
+
+// Faz 6c — İhale / İSAB
+export interface TenderChecklistItem {
+  id: string;
+  tenderId: string;
+  name: string;
+  isRequired: boolean;
+  status: 'PENDING' | 'DONE' | 'WAIVED';
+  fileUrl?: string | null;
+  sortOrder: number;
+  notes?: string | null;
+}
+
+export interface Tender {
+  id: string;
+  tenantId: string;
+  name: string;
+  ikn?: string | null;
+  authority?: string | null;
+  method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED' | 'DIRECT';
+  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED';
+  submissionDeadline?: string | null;
+  estimatedValue: number;
+  currency: string;
+  opportunityId?: string | null;
+  contractWorkflowId?: string | null;
+  ekapRef?: string | null;
+  ownerId?: string | null;
+  ownerName?: string | null;
+  docNumber?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  checklist?: TenderChecklistItem[];
+}
+
+// ── Yönetim Raporlama (Faz 7) ────────────────────────────────────────────────
+export interface ReportMetric {
+  label: string;
+  value: number | string;
+  unit?: string;
+  hint?: string;
+  tone?: 'default' | 'positive' | 'warning' | 'danger';
+}
+
+export interface ReportChartSeries {
+  title: string;
+  type: 'bar' | 'pie' | 'line';
+  data: { name: string; value: number }[];
+}
+
+export interface UnitMetrics {
+  unitKey: string;
+  label: string;
+  role: string;
+  period: { start: string; end: string };
+  metrics: ReportMetric[];
+  charts: ReportChartSeries[];
+}
+
+export interface WorkflowBottleneck {
+  role: string;
+  pendingCount: number;
+  oldestWaitingDays: number;
+}
+
+export interface OverviewUnit {
+  unitKey: string;
+  label: string;
+  role: string;
+  headline: ReportMetric[];
+  charts: ReportChartSeries[];
+}
+
+export interface ReportOverview {
+  period: { start: string; end: string };
+  units: OverviewUnit[];
+  bottlenecks: WorkflowBottleneck[];
+}
+
+export interface UnitDefinition {
+  key: string;
+  label: string;
+  role: string;
+}
+
+export interface UnitReport {
+  id: string;
+  tenantId: string;
+  unitKey: string;
+  unitLabel: string;
+  periodStart: string;
+  periodEnd: string;
+  periodLabel?: string | null;
+  status: 'DRAFT' | 'SUBMITTED' | 'REVIEWED' | 'RETURNED';
+  authorId?: string | null;
+  authorName?: string | null;
+  metricsSnapshot?: string | null;
+  highlights?: string | null;
+  issues?: string | null;
+  plannedActions?: string | null;
+  risks?: string | null;
+  summary?: string | null;
+  submittedAt?: string | null;
+  reviewedById?: string | null;
+  reviewedByName?: string | null;
+  reviewedAt?: string | null;
+  reviewNote?: string | null;
+  docNumber?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Faz 8: Sanal Agent Eklentileri (plugin/entitlement) ──────────────────────
+export interface PluginDefinition {
+  key: string;
+  name: string;
+  category: 'VIRTUAL_AGENT';
+  description: string;
+  unitKey?: string;
+  role?: string;
+  defaultMode?: 'ADVISORY' | 'AUTONOMOUS';
+  allowedModes?: ('ADVISORY' | 'AUTONOMOUS')[];
+  entityType?: string;
+  priceNote?: string;
+  status: 'AVAILABLE' | 'COMING_SOON';
+  hasHandler?: boolean;
+}
+
+export interface PluginEntitlement {
+  id: string;
+  tenantId: string;
+  pluginKey: string;
+  status: 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'DISABLED';
+  licenseKey?: string | null;
+  mode: 'ADVISORY' | 'AUTONOMOUS';
+  config?: string | null;
+  activatedById?: string | null;
+  activatedAt?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EntitlementWithCatalog {
+  plugin: PluginDefinition;
+  entitlement: PluginEntitlement | null;
+  active: boolean;
+}
+
+export interface AgentRun {
+  id: string;
+  tenantId: string;
+  pluginKey: string;
+  unitKey: string;
+  entityType: string;
+  entityId: string;
+  mode: 'ADVISORY' | 'AUTONOMOUS';
+  status: 'PENDING_RATIFICATION' | 'RATIFIED' | 'REJECTED';
+  rationale?: string | null;
+  outputJson?: string | null;
+  triggeredById?: string | null;
+  handoffTaskId?: string | null;
+  ratifiedById?: string | null;
+  ratifiedAt?: string | null;
+  ratifyNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

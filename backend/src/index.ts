@@ -28,6 +28,11 @@ import approvalChainsRouter from './routes/approvalChains';
 import visitsRouter from './routes/visits';
 import documentCodingRouter from './routes/documentCoding';
 import corporateGovernanceRouter from './routes/corporateGovernance';
+import financeRouter from './routes/finance';
+import legalRouter from './routes/legal';
+import tendersRouter from './routes/tenders';
+import reportsRouter from './routes/reports';
+import pluginsRouter from './routes/plugins';
 
 dotenv.config();
 
@@ -73,6 +78,11 @@ app.use('/api/approval-chains', approvalChainsRouter);
 app.use('/api/visits', visitsRouter);
 app.use('/api/document-coding', documentCodingRouter);
 app.use('/api/corporate-governance', corporateGovernanceRouter);
+app.use('/api/finance', financeRouter);
+app.use('/api/legal', legalRouter);
+app.use('/api/tenders', tendersRouter);
+app.use('/api/reports', reportsRouter);
+app.use('/api/plugins', pluginsRouter);
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Error Detail]', err);
