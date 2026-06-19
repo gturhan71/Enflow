@@ -25,13 +25,13 @@ class ApiService {
 
   // --- CUSTOMERS ---
   async getCustomers() { return crmService.getCustomers(); }
-  async createCustomer(data: Omit<Customer, 'id'>) { return crmService.createCustomer(data); }
+  async createCustomer(data: Partial<Customer>) { return crmService.createCustomer(data); }
   async updateCustomer(id: string, data: Partial<Customer>) { return crmService.updateCustomer(id, data); }
   async deleteCustomer(id: string) { return crmService.deleteCustomer(id); }
 
   // --- OPPORTUNITIES ---
   async getOpportunities() { return crmService.getOpportunities(); }
-  async createOpportunity(data: Omit<Opportunity, 'id'>) { return crmService.createOpportunity(data); }
+  async createOpportunity(data: Partial<Opportunity>) { return crmService.createOpportunity(data); }
   async updateOpportunity(id: string, data: Partial<Opportunity>) { return crmService.updateOpportunity(id, data); }
   async deleteOpportunity(id: string) { return crmService.deleteOpportunity(id); }
   async saveBoMItems(oppId: string, items: BoMItem[]) { return crmService.saveBoMItems(oppId, items); }
@@ -93,19 +93,19 @@ class ApiService {
 
   // --- TASKS ---
   async getTasks() { return taskService.getTasks(); }
-  async createTask(data: Omit<TodoTask, 'id'>) { return taskService.createTask(data); }
+  async createTask(data: Partial<TodoTask>) { return taskService.createTask(data); }
   async updateTask(id: string, data: Partial<TodoTask>) { return taskService.updateTask(id, data); }
   async deleteTask(id: string) { return taskService.deleteTask(id); }
 
   // --- DOCUMENTS ---
   async getDocuments() { return documentService.getDocuments(); }
-  async createDocument(data: Omit<CorporateDocument, 'id'>) { return documentService.createDocument(data); }
+  async createDocument(data: Partial<Omit<CorporateDocument, 'tags'>> & { tags?: string }) { return documentService.createDocument(data); }
   async updateDocument(id: string, data: Partial<CorporateDocument>) { return documentService.updateDocument(id, data); }
   async deleteDocument(id: string) { return documentService.deleteDocument(id); }
 
   // --- ARCHIVE ---
   async getArchiveItems() { return documentService.getArchiveItems(); }
-  async createArchiveItem(data: Omit<ArchiveItem, 'id'>) { return documentService.createArchiveItem(data); }
+  async createArchiveItem(data: Partial<ArchiveItem>) { return documentService.createArchiveItem(data); }
   async updateArchiveItem(id: string, data: Partial<ArchiveItem>) { return documentService.updateArchiveItem(id, data); }
   async deleteArchiveItem(id: string) { return documentService.deleteArchiveItem(id); }
 

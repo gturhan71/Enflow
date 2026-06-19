@@ -148,7 +148,7 @@ const LicenseTypesModule: React.FC = () => {
     if (!isGM || planId === sub.plan || !isPlanUnlocked(planId)) return;
     setSaving(true);
     try {
-      await apiService.updateTenantSubscription(currentUser!.tenantId, planId);
+      await apiService.updateTenantSubscription(currentUser!.tenantId ?? '', planId);
       setSub((prev) => ({ ...prev, plan: planId }));
     } catch { /* sessiz */ }
     finally { setSaving(false); }

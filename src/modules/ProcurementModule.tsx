@@ -112,7 +112,7 @@ const VendorForm: React.FC<VendorFormProps> = ({ initial, onSave, onClose }) => 
             {[['name','Firma Adı *'],['taxNo','Vergi No'],['contactName','İlgili Kişi'],['phone','Telefon'],['email','E-posta'],['bankName','Banka Adı'],['iban','IBAN'],['taxNo','Vergi No']].filter((v,i,a)=>a.findIndex(x=>x[0]===v[0])===i).map(([key, lbl]) => (
               <div key={key}>
                 <label className="block text-xs font-semibold text-slate-400 mb-1">{lbl}</label>
-                <input value={(form as Record<string,string>)[key] ?? ''} onChange={f(key)}
+                <input value={(form as unknown as Record<string,string>)[key] ?? ''} onChange={f(key)}
                   className="input-glass w-full px-3 py-2 text-sm rounded-xl" />
               </div>
             ))}

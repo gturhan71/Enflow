@@ -7,7 +7,7 @@ export const documentService = {
     return apiClient.fetchWithAuth('/documents');
   },
 
-  async createDocument(data: Omit<CorporateDocument, 'id'>) {
+  async createDocument(data: Partial<Omit<CorporateDocument, 'tags'>> & { tags?: string }) {
     return apiClient.fetchWithAuth('/documents', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -32,7 +32,7 @@ export const documentService = {
     return apiClient.fetchWithAuth('/archive');
   },
 
-  async createArchiveItem(data: Omit<ArchiveItem, 'id'>) {
+  async createArchiveItem(data: Partial<ArchiveItem>) {
     return apiClient.fetchWithAuth('/archive', {
       method: 'POST',
       body: JSON.stringify(data)

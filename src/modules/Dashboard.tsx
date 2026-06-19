@@ -662,7 +662,7 @@ const Dashboard = ({
                         p.status === 'PLANNING' ? "bg-amber-500/10 text-amber-600" :
                         "bg-slate-100 text-slate-500"
                       )}>
-                        {{ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' }[p.status] ?? p.status}
+                        {({ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' } as Record<string, string>)[p.status] ?? p.status}
                       </span>
                     </div>
                   </div>
@@ -724,7 +724,7 @@ const Dashboard = ({
                       <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
                     </span>
                   )}
-                  <dev.icon size={22} />
+                  {dev.icon && <dev.icon size={22} />}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2 mb-1.5">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Unit, User } from '../types';
+import { Unit, User, Subscription, UsageMetric } from '../types';
 import IntegrationWizard from './IntegrationWizard';
 import WorkflowBuilder from './WorkflowBuilder';
 import { TenantSettings } from '../components/settings/TenantSettings';
@@ -176,8 +176,8 @@ const SettingsModule = ({
   const { currentUser } = useAuth();
   const [tenants, setTenants] = useState<{ id: string; name: string }[]>([]);
   const [newTenantName, setNewTenantName] = useState('');
-  const [subscription, setSubscription] = useState<unknown>(null);
-  const [usage, setUsage] = useState<unknown[]>([]);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
+  const [usage, setUsage] = useState<UsageMetric[]>([]);
 
   useEffect(() => { fetchTenants(); }, []);
 
@@ -188,8 +188,8 @@ const SettingsModule = ({
   const fetchSubscriptionData = async () => {
     try {
       const [sub, use] = await Promise.all([apiService.getSubscription(), apiService.getUsage()]);
-      setSubscription(sub);
-      setUsage(use as unknown[]);
+      setSubscription(sub as Subscription | null);
+      setUsage(use as UsageMetric[]);
     } catch { /* sessiz */ }
   };
 

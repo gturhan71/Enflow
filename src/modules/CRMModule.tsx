@@ -726,10 +726,10 @@ const CRMModule = ({
                       animate={{ width: `${(count / maxStageCount) * 100}%` }}
                       transition={{ duration: 0.6, ease: 'easeOut' }}
                       className={`h-full rounded-full ${getStatusStyle(status).split(' ')[0].replace('bg-', 'bg-').replace('-50', '-400')}`}
-                      style={{ backgroundColor: {
+                      style={{ backgroundColor: ({
                         NEW: '#60a5fa', CONTACTED: '#38bdf8', QUALIFIED: '#818cf8',
                         PROPOSAL: '#fbbf24', NEGOTIATION: '#c084fc',
-                      }[status] ?? '#94a3b8' }}
+                      } as Record<string, string>)[status] ?? '#94a3b8' }}
                     />
                   </div>
                   <span className="text-xs font-bold text-slate-600 w-5 text-right">{count}</span>

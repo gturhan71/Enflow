@@ -209,7 +209,7 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
       }
       alert('İş akışı başarıyla kaydedildi.');
     } catch (error) {
-      alert(error.message || 'Kayıt sırasında hata oluştu.');
+      alert((error instanceof Error ? error.message : '') || 'Kayıt sırasında hata oluştu.');
     } finally {
       setSaving(false);
     }

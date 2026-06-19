@@ -7,7 +7,7 @@ export const crmService = {
     return apiClient.fetchWithAuth('/customers');
   },
 
-  async createCustomer(data: Omit<Customer, 'id'>) {
+  async createCustomer(data: Partial<Customer>) {
     return apiClient.fetchWithAuth('/customers', {
       method: 'POST',
       body: JSON.stringify(data)
@@ -32,7 +32,7 @@ export const crmService = {
     return apiClient.fetchWithAuth('/opportunities');
   },
 
-  async createOpportunity(data: Omit<Opportunity, 'id'>) {
+  async createOpportunity(data: Partial<Opportunity>) {
     return apiClient.fetchWithAuth('/opportunities', {
       method: 'POST',
       body: JSON.stringify(data)

@@ -616,15 +616,16 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 
 ## deps
 ```
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
-src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
-src/modules/ContractWorkflowTest.tsx ← services/apiClient, services/apiService, types
-src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, constants, types
+src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ProposalEditor.tsx ← lib/utils, types
+src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
@@ -632,38 +633,36 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
+backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
 backend/src/services/documentNumberService.ts ← prismaClient
-backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
 backend/src/services/projectCodeService.ts ← prismaClient
-backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/workflowTemplateService.ts ← prismaClient
+backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
-src/lib/agentProvenance.ts                    +isAgentActor  +parseAgentActor  +agentDisplayLabel
-src/modules/ContractWorkflowTest.tsx          +LegalView  +LegalCaseForm  ~bestProposalPrice  ~ContractWorkflowTest
 src/modules/ManagementReportingModule.tsx     +fmtValue  +MetricCard  +ChartBlock  +BottleneckPanel
 src/modules/ProjectManagementModule.tsx       +isHandoverComplete
 src/modules/SalesSupport.tsx                  +TenderList  +TenderCalendar  +ChecklistTab  +GuaranteesTab
 src/modules/VisitPlanModule.tsx               +mondayOf
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
+backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
 backend/src/services/documentNumberService.ts +nextDocumentNumber  +previewDocumentNumber
-backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 backend/src/services/entitlementService.ts    +signaturePart  +generateLicenseKey  +isPluginEntitled  +listEntitlementsWithCatalog
 backend/src/services/projectCodeService.ts    +nextProjectCode
 backend/src/services/pluginCatalog.ts         +getPlugin  +getAgentPluginForRole
-backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
 backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
 backend/src/services/workflowTemplateService.ts +ensureDefaultWorkflow  +resolveNextStep
+backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
 backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
 backend/src/utils/fileUpload.ts               +slugify  +getUploadDir  +uploadToNextcloud
-.github/copilot-instructions.md               +nextDocumentNumber  +previewDocumentNumber  +ensureApprovalChain  +completeApprovalChain
+.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
 ```
 
 ## .github
@@ -674,30 +673,43 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
-h2 changes (last 10 commits — 1 second ago)
+h2 changes (last 10 commits — 0 seconds ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
-h3 backend/prisma/migrations/20260613000000_add_contract_workflow/migration.sql
-h3 backend/pnpm-lock.yaml
-h3 backend/src/middleware.ts
-h3 backend/prisma/migrations/20260614202029_add_module_settings/migration.sql
-h3 backend/prisma/migrations/20260614202051_add_tenant_module_settings/migration.sql
-h3 backend/prisma/migrations/migration_lock.toml
-h3 backend/prisma/migrations/20260615143052_add_project_milestones_and_costs/migration.sql
-h3 backend/prisma/migrations/20260615121855_add_procurement_module/migration.sql
-h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
+h3 backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
+h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
+h3 backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
+h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 h3 backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
-h3 backend/src/services/documentNumberService.ts
+h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
+h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
+h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
 h3 backend/src/services/approvalChainService.ts
+h3 backend/src/services/documentNumberService.ts
+h3 backend/src/services/agentProvenance.ts
+h3 backend/src/services/entitlementService.ts
 h3 backend/src/services/projectCodeService.ts
-h3 backend/src/utils/businessDays.ts
-h3 backend/src/utils/fileUpload.ts
-h2 src
+h3 backend/src/services/pluginCatalog.ts
+h3 backend/src/services/virtualAgentService.ts
+h3 backend/src/services/unitReportingService.ts
 ```
 
 ## backend
+
+### backend/pnpm-lock.yaml
+```
+keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
+### backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
+```
+TABLE VisitPlan
+TABLE Visit
+TABLE DailyReport
+TABLE ProjectHandoverDoc
+```
 
 ### backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 ```
@@ -710,14 +722,6 @@ INDEX ApprovalChain_entityType_entityId_idx ON ApprovalChain
 ```
 TABLE new_Workflow
 TABLE new_WorkflowStep
-```
-
-### backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
-```
-TABLE VisitPlan
-TABLE Visit
-TABLE DailyReport
-TABLE ProjectHandoverDoc
 ```
 
 ### backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
@@ -777,6 +781,15 @@ INDEX AgentRun_tenantId_status_idx ON AgentRun
 INDEX AgentRun_tenantId_pluginKey_idx ON AgentRun
 ```
 
+### backend/src/services/agentProvenance.ts
+```
+export function agentActorId  :17-19
+export function isAgentActor  :22-25
+export function parseAgentActor  :28-28
+export function actorType  :40-42
+export function agentDisplayLabel  :45-52
+```
+
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain  :21-44
@@ -789,15 +802,6 @@ export async function resetApprovalChain  :197-210
 ```
 export async function nextDocumentNumber  :18-57
 export async function previewDocumentNumber  :63-81
-```
-
-### backend/src/services/agentProvenance.ts
-```
-export function agentActorId  :17-19
-export function isAgentActor  :22-25
-export function parseAgentActor  :28-28
-export function actorType  :40-42
-export function agentDisplayLabel  :45-52
 ```
 
 ### backend/src/services/entitlementService.ts
@@ -829,17 +833,6 @@ export type PluginCategory  :10-10
 export type AgentMode  :11-11
 export function getPlugin  :131-133
 export function getAgentPluginForRole  :137-141
-```
-
-### backend/src/services/virtualAgentService.ts
-```
-export interface AgentOutput  :13-18
-rationale: string  :14-14
-output: Record<string, unknown>  :15-15
-taskTitle: string  :17-17
-export function hasHandler  :284-286
-export async function runAgent  :292-297
-export async function ratifyAgentRun  :379-385
 ```
 
 ### backend/src/services/unitReportingService.ts
@@ -877,6 +870,17 @@ export async function ensureDefaultWorkflow  :92-150
 export function resolveNextStep  :160-164
 ```
 
+### backend/src/services/virtualAgentService.ts
+```
+export interface AgentOutput  :13-18
+rationale: string  :14-14
+output: Record<string, unknown>  :15-15
+taskTitle: string  :17-17
+export function hasHandler  :284-286
+export async function runAgent  :292-297
+export async function ratifyAgentRun  :379-385
+```
+
 ### backend/src/utils/businessDays.ts
 ```
 export function addBusinessDays  :5-22
@@ -891,89 +895,22 @@ export async function uploadToNextcloud  :24-70
 
 ## src
 
-### src/index.css
-```
-var --background
-var --foreground
-var --primary
-var --primary-foreground
-var --glass-bg
-var --glass-border
-var --sidebar-bg
-var --header-bg
-var --card-bg
-var --input-bg
-var --foreground-glass
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-export Sidebar
-handler onClick
-```
-
-### src/lib/agentProvenance.ts
-```
-export function isAgentActor  :19-22
-export function parseAgentActor  :24-24
-export function agentDisplayLabel  :34-41
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useSearch
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onClick
-handler onOpps
-handler onValue
-handler onChange
-handler onSave
-handler onImported
-handler onConfirm
-handler onSubmit
-```
-
-### src/modules/ContractWorkflowTest.tsx
-```
-component ContractWorkflowTest
-component LegalView
-component LegalCaseForm
-props Props
-hook useState
-hook useCallback
-hook useEffect
-export ContractWorkflowTest
-handler onChange
-handler onClick
-handler onBlur
-```
-
-### src/modules/CorporateGovernanceModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export CorporateGovernanceModule
-handler onDelete
-handler onTrack
-handler onClick
-handler onChange
-```
-
 ### src/modules/IntegrationWizard.tsx
 ```
 hook useState
 export IntegrationWizard
 handler onClick
 handler onChange
+```
+
+### src/modules/DocumentsModule.tsx
+```
+props DocumentsModuleProps
+hook useState
+hook useMemo
+export DocumentsModule
+handler onChange
+handler onSubmit
 ```
 
 ### src/modules/FinanceModule.tsx
@@ -1006,6 +943,38 @@ hook useCallback
 handler onClick
 handler onChange
 handler onReviewed
+```
+
+### src/modules/NegotiationModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+hook useRef
+export NegotiationModule
+handler onDeal
+handler onChange
+handler onClick
+handler onSubmit
+```
+
+### src/modules/ProcurementModule.tsx
+```
+props VendorFormProps
+props PRDetailDrawerProps
+props PRFormProps
+props ProcurementModuleProps
+hook useState
+hook useAuth
+hook useCallback
+hook useEffect
+export ProcurementModule
+handler onClick
+handler onChange
+handler onKeyDown
+handler onRefresh
+handler onSave
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -1041,6 +1010,30 @@ handler onOpportunities
 handler onRefresh
 handler onPrintReport
 handler onSelect
+```
+
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
+handler onClick
+handler onChange
+```
+
+### src/modules/SecurityTestModule.tsx
+```
+props ReportProps
+props Props
+hook useState
+hook useEffect
+hook useCallback
+export SecurityTestModule
+handler onSec
+handler onClick
+handler onDone
 ```
 
 ### src/modules/SalesSupport.tsx

@@ -218,7 +218,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ initial, users, customers, on
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-400 mb-1">Proje Tipi</label>
-              <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as ProjectType, milestoneTemplate: e.target.value }))}
+              <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value as ProjectType, milestoneTemplate: e.target.value as ProjectType }))}
                 className="input-glass w-full px-3 py-2 text-sm rounded-xl">
                 {Object.entries(PROJECT_TYPE_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>

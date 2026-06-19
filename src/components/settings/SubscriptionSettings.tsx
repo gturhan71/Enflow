@@ -28,7 +28,7 @@ export const SubscriptionSettings = ({
               <select
                 onChange={async (e) => {
                   try {
-                    await apiService.updateTenantSubscription(currentUser.tenantId, e.target.value);
+                    await apiService.updateTenantSubscription(currentUser.tenantId ?? '', e.target.value);
                     fetchSubscriptionData();
                     alert('Plan güncellendi.');
                   } catch (err) {

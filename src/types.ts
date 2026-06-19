@@ -74,6 +74,7 @@ export interface Opportunity {
   presalesId?: string;
   createdAt?: string;
   updatedAt?: string;
+  updatedBy?: string;
   customer?: Customer;
   assignedTo?: User;
   createdBy?: User;
@@ -316,6 +317,7 @@ export interface TodoTask {
   relatedModule?: string;
   relatedItemId?: string;
   agentRunId?: string | null;
+  progressNotes?: { date: string; note: string; author: string }[];
   createdAt?: string;
 }
 
@@ -462,7 +464,7 @@ export interface ArchiveItem {
   owner: string;
   date: string;
   status: string;
-  tags?: string;
+  tags?: string[];
   tenantId: string;
   createdAt?: string;
   updatedAt?: string;

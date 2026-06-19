@@ -208,7 +208,6 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
       });
       setWorkflows(prev => [wf, ...prev]);
       selectWorkflow(wf);
-      setForm({ title: '', opportunityId: '', contractValue: '', deadline: '', notes: '' });
       notify('Sözleşme süreci oluşturuldu.');
       setForm({ title: '', opportunityId: '', contractValue: '', deadline: '', notes: '', tenderName: '', tenderNo: '' });
       setTab('analysis');

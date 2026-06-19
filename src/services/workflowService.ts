@@ -73,7 +73,7 @@ class WorkflowService {
       <hr/>
       <p>Bu e-posta Enflow İş Akış Yönetimi tarafından otomatik olarak gönderilmiştir.</p>
     `;
-    await exchangeService.sendEmail(toUser.email, emailSubject, emailBody);
+    await exchangeService.sendEmail(toUser.email ?? '', emailSubject, emailBody);
 
     // 4. Create System Notification
     const sysNotification: Notification = {

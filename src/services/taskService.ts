@@ -6,7 +6,7 @@ export const taskService = {
     return apiClient.fetchWithAuth('/tasks');
   },
 
-  async createTask(data: Omit<TodoTask, 'id'>) {
+  async createTask(data: Partial<TodoTask>) {
     return apiClient.fetchWithAuth('/tasks', {
       method: 'POST',
       body: JSON.stringify(data)

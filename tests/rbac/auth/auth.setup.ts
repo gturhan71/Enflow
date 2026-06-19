@@ -4,7 +4,7 @@
 // localStorage ayarlanarak oturum auth/<rol>.json + auth/<rol>.token olarak kaydedilir.
 // ============================================================================
 
-import { test as setup } from "@playwright/test";
+import { test as setup, type Page } from "@playwright/test";
 import { roles, crossTenantUser, ROLE_NAMES, baseURL, apiBaseURL } from "../rbac.config";
 import fs from "fs";
 import path from "path";
@@ -15,7 +15,7 @@ async function loginAndSave(
   email: string,
   tenantId: string,
   saveName: string,
-  page: Parameters<Parameters<typeof setup>[1]>[0]["page"]
+  page: Page
 ) {
   // Backend'den token al (Enflow auth şifresiz mock-JWT)
   const loginRes = await page.evaluate(

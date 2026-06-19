@@ -11,31 +11,32 @@ export default defineConfig(({mode}) => {
       chunkSizeWarningLimit: 600,
       rollupOptions: {
         output: {
-          manualChunks: (id) => {
-            if (id.includes('node_modules')) {
-              // Specific checks BEFORE generic 'react' match
-              if (id.includes('lucide-react'))   return 'vendor-lucide';
-              if (id.includes('victory-vendor') || id.includes('recharts') || id.includes('/d3') || id.includes('/d3-')) return 'vendor-charts';
-              if (id.includes('@tanstack'))       return 'vendor-query';
-              if (id.includes('motion') || id.includes('framer')) return 'vendor-motion';
-              if (id.includes('pdfjs-dist'))      return 'vendor-pdfjs';
-              if (id.includes('jspdf') || id.includes('canvg')) return 'vendor-pdf';
-              if (id.includes('mammoth') || id.includes('jszip') || id.includes('bluebird')) return 'vendor-mammoth';
-              if (id.includes('/xlsx'))           return 'vendor-xlsx';
-              if (id.includes('@google/genai') || id.includes('google-auth-library') || id.includes('protobufjs') || id.includes('@anthropic')) return 'vendor-ai';
-              if (id.includes('@reduxjs') || id.includes('react-redux') || id.includes('/redux') || id.includes('immer') || id.includes('reselect')) return 'vendor-redux';
-              if (id.includes('html2canvas') || id.includes('dompurify') || id.includes('date-fns') || id.includes('sonner')) return 'vendor-misc';
-              if (id.includes('react-dom') || id.includes('/react/') || id.includes('scheduler') || id.includes('react-is')) return 'vendor-react';
-              return 'vendor';
-            }
-            if (id.includes('/src/modules/')) return 'modules';
-            if (id.includes('/src/components/')) return 'components';
+          // Vite 8 / Rolldown: manualChunks fonksiyonu yerine advancedChunks.groups
+          // (regex `test` tabanlı). İlk eşleşen grup kazanır — spesifik vendor'lar
+          // genel `vendor` (node_modules) catch-all'ından ÖNCE. minSize:0 → küçük
+          // shared modüller de inline edilmeyip kendi adlı chunk'ına gider.
+          advancedChunks: {
+            minSize: 0,
+            groups: [
+              { name: 'vendor-lucide',  test: /lucide-react/ },
+              { name: 'vendor-charts',  test: /victory-vendor|recharts|[/]d3[/-]?/ },
+              { name: 'vendor-query',   test: /@tanstack/ },
+              { name: 'vendor-motion',  test: /node_modules[/](motion|framer)/ },
+              { name: 'vendor-pdfjs',   test: /pdfjs-dist/ },
+              { name: 'vendor-pdf',     test: /jspdf|canvg/ },
+              { name: 'vendor-mammoth', test: /mammoth|jszip|bluebird/ },
+              { name: 'vendor-xlsx',    test: /[/]xlsx/ },
+              { name: 'vendor-ai',      test: /@google[/]genai|google-auth-library|protobufjs|@anthropic/ },
+              { name: 'vendor-redux',   test: /@reduxjs|react-redux|[/]redux|immer|reselect/ },
+              { name: 'vendor-misc',    test: /html2canvas|dompurify|date-fns|sonner/ },
+              { name: 'vendor-react',   test: /react-dom|[/]react[/]|scheduler|react-is/ },
+              { name: 'vendor',         test: /node_modules/ },
+              { name: 'modules',        test: /[/]src[/]modules[/]/ },
+              { name: 'components',     test: /[/]src[/]components[/]/ },
+            ],
           },
         },
       },
-    },
-    esbuild: {
-      target: 'es2015'
     },
     plugins: [react(), tailwindcss()],
     define: {
