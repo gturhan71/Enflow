@@ -11,6 +11,10 @@ interface State {
 }
 
 export class ErrorBoundary extends Component<Props, State> {
+  // @types/react kurulu olmadığından Component'in `props` üyesi tip olarak görünmüyor;
+  // `state` gibi açıkça tanımlanır (any kullanılmaz).
+  public declare readonly props: Readonly<Props>;
+
   public state: State = {
     hasError: false,
     error: null
@@ -26,7 +30,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public render() {
     const { hasError, error } = this.state;
-    const { children } = (this as any).props;
+    const { children } = this.props;
 
     if (hasError) {
       return (

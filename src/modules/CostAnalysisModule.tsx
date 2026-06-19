@@ -237,7 +237,7 @@ const CostAnalysisModule = ({
         <select
           value={selectedOppId}
           onChange={(e) => setSelectedOppId(e.target.value)}
-          className="bg-white/40 border border-white/40 backdrop-blur-md px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none min-w-[300px]"
+          className="bg-white/40 border border-white/40 backdrop-blur-md px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none w-full sm:w-auto sm:min-w-[300px]"
         >
           <option value="">Analiz Edilecek Fırsatı Seçin</option>
           {opportunities.map(opp => (

@@ -1729,7 +1729,7 @@ const CRMModule = ({
 
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Finansal & Vergi</p>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <input
                         type="text" name="taxOffice"
                         value={customerForm.values.taxOffice ?? ''}

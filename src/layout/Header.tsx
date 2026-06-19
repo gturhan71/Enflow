@@ -121,7 +121,7 @@ const Header = ({
   };
 
   return (
-    <header className="h-20 glass-header px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100] font-geist">
+    <header className="min-h-20 pt-[env(safe-area-inset-top)] glass-header px-4 md:px-8 flex items-center justify-between sticky top-0 z-[100] font-geist">
       <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
         <button 
           onClick={onMenuToggle}

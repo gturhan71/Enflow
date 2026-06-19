@@ -710,7 +710,7 @@ const TodoModule = ({
                       )}
 
                       {/* Maliyet Özeti */}
-                      <div className="grid grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                         <div className="p-5 bg-slate-50 border border-slate-200 rounded-2xl text-center">
                           <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Toplam Maliyet</p>
                           <p className="text-xl font-black text-slate-700">{detail.totalCost.toLocaleString('tr-TR')}</p>
@@ -831,7 +831,7 @@ const TodoModule = ({
                     <select 
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none appearance-none"
                       value={newTask.relatedModule || 'GENERAL'}
-                      onChange={(e) => setNewTask({...newTask, relatedModule: e.target.value as any, relatedItemId: ''})}
+                      onChange={(e) => setNewTask({...newTask, relatedModule: e.target.value, relatedItemId: ''})}
                     >
                       <option value="GENERAL">Genel Görev</option>
                       <option value="PROJECT">Proje Yönetimi</option>
@@ -858,7 +858,7 @@ const TodoModule = ({
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Öncelik</label>
                     <select 
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none"
-                      onChange={(e) => setNewTask({...newTask, priority: e.target.value as any})}
+                      onChange={(e) => setNewTask({...newTask, priority: e.target.value as TodoTask['priority']})}
                     >
                       <option value="LOW">Düşük</option>
                       <option value="MEDIUM">Orta</option>

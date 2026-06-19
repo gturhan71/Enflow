@@ -2,13 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { MOCK_BOM_ITEMS } from '../constants';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
-import type { BoMItem } from '../types';
+import type { BoMItem, Opportunity } from '../types';
+
+// BoM kalemlerinin UI'da kullanılan kısaltılmış biçimi (API'ye gönderilmeden önce BoMItem'a dönüştürülür)
+export interface AbbreviatedBoMItem {
+  id?: string;
+  pn: string;
+  desc: string;
+  qty: number;
+  cost: number;
+  margin: number;
+}
 
 export const useBoM = (
   selectedOppId: string,
-  setOpportunities: React.Dispatch<React.SetStateAction<any[]>>
+  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>
 ) => {
-  const [bomItems, setBomItems] = useState<any[]>([]);
+  const [bomItems, setBomItems] = useState<AbbreviatedBoMItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setHasUnsavedChanges } = useUnsavedChanges();
 
@@ -29,7 +39,7 @@ export const useBoM = (
     }
   }, [selectedOppId]);
 
-  const addBoMItem = (item: { pn: string; desc: string; qty: number; cost: number; margin: number }) => {
+  const addBoMItem = (item: AbbreviatedBoMItem) => {
     setBomItems(prev => [...prev, item]);
     setHasUnsavedChanges(true);
   };

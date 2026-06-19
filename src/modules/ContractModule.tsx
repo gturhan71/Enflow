@@ -89,9 +89,9 @@ const ContractModule = ({ opportunities, contracts, setContracts, projects, setP
       ] : MOCK_CONTRACT_DOCS.filter(doc => doc.contractId === selectedContractId).map(doc => ({
         id: doc.id,
         contractId: doc.contractId,
-        name: (doc as any).name || 'Gerekli Evrak',
+        name: doc.name || 'Gerekli Evrak',
         status: doc.status === 'VERIFIED' ? 'APPROVED' : doc.status,
-        description: (doc as any).description || 'Sözleşme için idari evrak.'
+        description: doc.description || 'Sözleşme için idari evrak.'
       }));
       setDocsList(initialDocs);
     } else {

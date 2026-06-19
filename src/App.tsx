@@ -35,7 +35,6 @@ import {
 
 import Sidebar from './layout/Sidebar';
 import Header from './layout/Header';
-import MobileNav from './layout/MobileNav';
 import Dashboard from './modules/Dashboard';
 import PresalesModule from './modules/PresalesModule';
 import SalesSupport from './modules/SalesSupport';
@@ -147,13 +146,15 @@ const HealthBanner = () => {
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: -50, opacity: 0 }}
-        className="fixed top-2 left-8 z-[9999]"
+        className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] lg:right-auto lg:bottom-auto lg:left-8 lg:top-[calc(0.5rem+env(safe-area-inset-top))] z-[9999] pointer-events-none"
       >
-        <div className={`px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 border backdrop-blur-md transition-all ${
-          status === 'ok' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-red-500/10 border-red-500/20 text-red-600 animate-pulse'
+        <div className={`flex items-center gap-0 lg:gap-2 p-2 lg:px-4 lg:py-2 rounded-full lg:rounded-xl shadow-lg border backdrop-blur-md transition-all ${
+          status === 'ok'
+            ? 'bg-emerald-500 lg:bg-emerald-500/10 border-emerald-500/30 lg:border-emerald-500/20 text-white lg:text-emerald-600'
+            : 'bg-red-500 lg:bg-red-500/10 border-red-500/30 lg:border-red-500/20 text-white lg:text-red-600 animate-pulse'
         }`}>
           {status === 'ok' ? <CheckCircle2 size={14} /> : <Loader2 size={14} className="animate-spin" />}
-          <span className="text-[10px] font-black uppercase tracking-widest italic font-sans">
+          <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest italic font-sans">
             {status === 'ok' ? 'System Online' : isRestarting ? 'Sistem Yeniden Başlatılıyor...' : 'System Offline'}
           </span>
         </div>
@@ -385,7 +386,7 @@ const TenantAppInner = ({
             onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             isSidebarOpen={isSidebarOpen}
           />
-          <div className="flex-1 overflow-y-auto relative custom-scrollbar">
+          <div className="flex-1 overflow-y-auto relative custom-scrollbar pb-[env(safe-area-inset-bottom)]">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -399,7 +400,6 @@ const TenantAppInner = ({
               </motion.div>
             </AnimatePresence>
           </div>
-          <MobileNav activeTab={activeTab} setActiveTab={setActiveTab} />
         </main>
       </div>
     </UnsavedChangesProvider>

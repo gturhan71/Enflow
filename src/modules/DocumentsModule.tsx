@@ -222,7 +222,7 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Kategori</label>
                     <select 
                       value={newDoc.category}
-                      onChange={e => setNewDoc({...newDoc, category: e.target.value as any})}
+                      onChange={e => setNewDoc({...newDoc, category: e.target.value as CorporateDocument['category']})}
                       className="w-full px-6 py-4 bg-white/40 border border-white/40 rounded-2xl outline-none appearance-none"
                     >
                       <option value="LEGAL">Yasal</option>

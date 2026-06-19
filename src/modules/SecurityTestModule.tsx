@@ -208,7 +208,7 @@ const ReportScreen: React.FC<ReportProps> = ({ data, onDone }) => {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-5 divide-x divide-white/10 border-t border-white/10">
+          <div className="grid grid-cols-2 sm:grid-cols-5 divide-x divide-white/10 border-t border-white/10">
             {[
               { label: 'Toplam',    value: total,         color: 'text-white' },
               { label: 'Geçti',     value: passed,        color: 'text-emerald-400' },

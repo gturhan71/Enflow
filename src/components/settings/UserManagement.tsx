@@ -120,7 +120,7 @@ export const UserManagement = ({
                       {ROLE_LABELS[user.role] || user.role}
                     </span>
                     <span className="text-[10px] text-slate-400 font-bold uppercase flex items-center gap-1">
-                      <Building2 size={10} /> {tenants && tenants.length > 0 ? (tenants.find(t => t.id === (user as any).tenantId)?.name || 'Şirket Tanımsız') : 'Yükleniyor...'}
+                      <Building2 size={10} /> {tenants && tenants.length > 0 ? (tenants.find(t => t.id === user.tenantId)?.name || 'Şirket Tanımsız') : 'Yükleniyor...'}
                     </span>
                   </div>
                 </td>

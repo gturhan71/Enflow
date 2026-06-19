@@ -123,7 +123,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
     const version = (proposals?.filter(p => p.opportunityId === selectedOppId) ?? []).length + 1;
 
     // Abbreviated bomItems → proper BoMItem
-    const properItems: BoMItem[] = bomItems.map((item: any, idx: number) => ({
+    const properItems: BoMItem[] = bomItems.map((item, idx) => ({
       id: item.id ?? item.pn ?? String(idx),
       partNumber: item.pn,
       description: item.desc,
@@ -152,11 +152,11 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
           description: `BoM bazlı maliyet teklifi — v${version}`,
           isBomApproval: true,
           // Maliyet analizinde ayarlanan döviz/kur/marj bilgisi varsa taşı
-          ...((opp as any).costConfig
+          ...(opp.costConfig
             ? {
-                baseCurrency: (opp as any).costConfig.baseCurrency,
-                exchangeRates: (opp as any).costConfig.rates,
-                marginMode: (opp as any).costConfig.marginMode,
+                baseCurrency: opp.costConfig.baseCurrency,
+                exchangeRates: opp.costConfig.rates,
+                marginMode: opp.costConfig.marginMode,
               }
             : {}),
         }),

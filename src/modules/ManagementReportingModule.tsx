@@ -182,7 +182,7 @@ function ReportForm({ report, units, onClose, onSaved }: {
           <button onClick={onClose} className="text-slate-400 hover:text-slate-900"><X size={20} /></button>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div>
             <label className="text-[10px] font-bold uppercase text-slate-400">Birim</label>
             <select value={unitKey} disabled={isEditing} onChange={e => setUnitKey(e.target.value)} className="input-glass w-full px-3 py-2 rounded-xl text-sm disabled:opacity-60">

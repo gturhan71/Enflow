@@ -570,7 +570,7 @@ const NegotiationModule = ({
               setAuctionState('IDLE');
               setAuctionLog([]);
             }}
-            className="bg-white border border-slate-100 px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none min-w-[320px] transition-all cursor-pointer disabled:opacity-50"
+            className="bg-white border border-slate-100 px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none w-full sm:w-auto sm:min-w-[320px] transition-all cursor-pointer disabled:opacity-50"
           >
             <option value="">Pazarlığa Açık Tekliflerden Seçin</option>
             {openProposals.map(p => {

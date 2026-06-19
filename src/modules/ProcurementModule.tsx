@@ -482,7 +482,7 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
                   </span>
                   <span className="text-xs text-slate-400">{formatDate(d.deliveredAt)}</span>
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs text-slate-400">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs text-slate-400">
                   <span>Sipariş: <strong className="text-slate-200">{d.quantityOrdered ?? '—'}</strong></span>
                   <span>Teslim: <strong className="text-slate-200">{d.quantityReceived ?? '—'}</strong></span>
                   <span>Hasarlı: <strong className="text-slate-200">{d.quantityDamaged ?? '0'}</strong></span>

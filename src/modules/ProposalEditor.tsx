@@ -67,6 +67,10 @@ interface ProposalEditorProps {
   onCancel: () => void;
 }
 
+// BoM kalemleri çalışma zamanında maliyet analizinden türetilen salePrice/purchaseCostBase
+// alanlarıyla zenginleştirilir (bkz. items useMemo). Bu alanlar BoMItem'da yok.
+type PricedBoMItem = BoMItem & { salePrice: number; purchaseCostBase?: number };
+
 // ── Component ─────────────────────────────────────────────────────────────────
 const ProposalEditor = ({
   opportunity,
@@ -81,12 +85,7 @@ const ProposalEditor = ({
   const customer = customers.find(c => c.id === opportunity.customerId);
 
   // ── Maliyet analizinden döviz & kur bilgisi ───────────────────────────────
-  const costConfig = (opportunity as any).costConfig as {
-    baseCurrency?: string;
-    rates?: Record<string, number>;
-    marginMode?: 'PER_ITEM' | 'PROJECT_WIDE';
-    globalMargin?: number;
-  } | undefined;
+  const costConfig = opportunity.costConfig;
 
   const baseCurrency = initialData?.currency ?? costConfig?.baseCurrency ?? 'USD';
   const exchangeRates: Record<string, number> = costConfig?.rates ?? {};
@@ -177,7 +176,7 @@ const ProposalEditor = ({
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [openForNegotiation, setOpenForNegotiation] = useState(
-    (initialData as any)?.openForNegotiation ?? false
+    initialData?.openForNegotiation ?? false
   );
   const [terms, setTerms] = useState(
     initialData?.terms ||
@@ -203,7 +202,7 @@ const ProposalEditor = ({
 
   // PER_ITEM: her kalemin salePrice'ından toplam
   const perItemTotal = useMemo(() =>
-    items.reduce((s, i) => s + (i as any).salePrice * i.quantity, 0),
+    items.reduce((s, i) => s + (i as PricedBoMItem).salePrice * i.quantity, 0),
   [items]);
 
   // PROJECT_WIDE: toplam maliyete tek marj
@@ -345,7 +344,7 @@ const ProposalEditor = ({
         ...items.map((item, i) => {
           const it = item as BoMItem & { salePrice: number };
           const unitPrice = marginMode === 'PROJECT_WIDE'
-            ? (item as any).purchaseCostBase ?? item.purchaseCost
+            ? (item as PricedBoMItem).purchaseCostBase ?? item.purchaseCost
             : it.salePrice;
           return [i + 1, ct(item.partNumber), ct(item.description), item.quantity, priceFmt(unitPrice), priceFmt(unitPrice * item.quantity)];
         }),
@@ -367,7 +366,7 @@ const ProposalEditor = ({
         alternateRowStyles: { font },
       });
 
-      const lastTable = (doc as any).lastAutoTable;
+      const lastTable = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable;
       let finalY = lastTable ? lastTable.finalY + 10 : 200;
 
       doc.setFontSize(10);
@@ -436,9 +435,9 @@ const ProposalEditor = ({
                 purchaseCost: item.purchaseCost,
                 marginPercentage: item.marginPercentage,
                 currency: item.currency,
-                unitSalePrice: (item as any).salePrice ?? item.unitSalePrice,
-                totalSalePrice: ((item as any).salePrice ?? item.unitSalePrice ?? item.purchaseCost) * item.quantity,
-                purchaseCostBase: (item as any).purchaseCostBase,
+                unitSalePrice: (item as PricedBoMItem).salePrice ?? item.unitSalePrice,
+                totalSalePrice: ((item as PricedBoMItem).salePrice ?? item.unitSalePrice ?? item.purchaseCost) * item.quantity,
+                purchaseCostBase: (item as PricedBoMItem).purchaseCostBase,
                 vendor: item.vendor,
                 source: item.source,
               }));
