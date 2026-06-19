@@ -1335,4 +1335,80 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 ---
 
-*Bu belge Enflow v2026-06-15 sürümüne aittir. Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve [MEMORY](https://github.com) için proje memory dosyalarını inceleyin.*
+## 27. Bileşen Envanteri & Uçtan Uca Akış (Enflow-Wiki Kaynağı)
+
+> 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
+>
+> Ölçek (2026-06-19): **51 veri modeli · 29 ekran modülü · 28 API alanı · 11 servis · 7 katman.**
+
+### 27.1 Enflow nedir? (tek paragraf)
+
+Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sözleşme → proje → satınalma → faturalama**ya kadar tüm yolculuğunu tek platformda yöneten, **çok-kiracılı (multi-tenant)** bir kurumsal **süreç yönetim yazılımıdır**. Her aşama bir **birime** (Satış, Presales, İhale, Hukuk, Proje, Satınalma, Finans…) aittir. İşler birimler arasında **görevler**, **onay zincirleri** ve **hand-off (devir)** mekanizmasıyla akar; her adım kayıt altına alınır (log/bildirim).
+
+### 27.2 Uçtan uca akış — bir işin yolculuğu (newcomer anlatımı)
+
+```
+[Saha/Ziyaret]    Müşteri ziyaret planlanır, günlük rapor girilir
+     │
+     ▼
+[CRM]             Fırsat açılır (müşteri + tahmini değer). Kazanılır/kaybedilir.
+     │
+     ▼
+[Presales]        Fırsata BoM (malzeme listesi) + maliyet/marj hazırlanır → Teklif
+     │            (Şartname varsa SpecAnalysis ile AI analizi)
+     ▼
+[Teklif/Müzakere] Teklif versiyonlanır, onaya gönderilir (Onay Zinciri devreye girer),
+     │            müşteriyle pazarlık turları yürütülür
+     ▼
+[İhale/İSAB]      (Kamu işi ise) İhale dosyası + uygunluk checklist + geçici teminat
+     │
+     ▼
+[Sözleşme]        ContractWorkflow: evrak hazırlık → imza onayı → SIGNED
+     │            (Birim yöneticisi onayı; AI ile sözleşme/şartname analizi)
+     ▼
+[Proje Yönetimi]  Kazanılan iş projeye döner: milestone'lar, maliyet, karlılık,
+     │            11 zorunlu evrakla "Devir Paketi"
+     ▼
+[Satınalma]       Talep → tedarikçi teklifi → PO → teslimat → fatura (9 statü)
+     │
+     ▼
+[Finans]          Faturalama, tahsilat (kısmi), teminat mektupları, maliyet onayı
+```
+
+Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGPD→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller).
+
+> ⚙️ **Not (akış olgunluğu):** Bazı birimler-arası geçişler bugün **manuel/yarı-otomatik**tir (örn. Sözleşme→Proje kaydı, Satınalma faturası→Finans, İhale→Sözleşme, Proje→Satınalma maliyet bağı). Bunlar tasarımda var; otomatik akış halkaları geliştirme yol haritasındadır (bkz. `CLAUDE.md` Sonraki Adımlar).
+
+### 27.3 Katmanlı bileşen haritası
+
+| Katman | Bileşenler (model → modül → API) |
+|---|---|
+| **0 · Platform/SaaS** | Tenant, Subscription, UsageMetric → SubscriptionModule / LicenseTypes / LicenseGenerator / ProvisionWizard → `/tenants` |
+| **1 · Kimlik & Yetki (RBAC)** | User, Unit → UserManagement / UnitManagement / PermissionSettings → `/auth`, `/users`, `/units` |
+| **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
+| **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter · LegalCase → ilgili modüller → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal` |
+| **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
+| **5 · AI / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis(Gemini)/ContractWorkflow(Claude) → `/plugins` |
+| **6 · Entegrasyon & Admin** | IntegrationWizard, SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
+
+### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"
+
+Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:
+
+- **İş Akışı Şablonu (Workflow/WorkflowStep):** Tenant'ın aktif birimlerinden türeyen kanonik sıra; bir birim çıkarılınca iş otomatik bir sonraki **aktif** birime yönlenir (skip-logic, deadlock olmaz).
+- **Görevler (TodoTask):** Birimler-arası iş, görev olarak atanır. `relatedModule` etiketi işin hangi modüle ait olduğunu söyler: **OPPORTUNITY · PROPOSAL · CONTRACT · PROJECT · PROCUREMENT · DELIVERY · LEGAL · GENERAL**. İş günü SLA ile termin otomatik hesaplanır.
+- **Hand-off / Devir (`workflowService.triggerHandOff`):** Bir birim işini bitirince sonraki birime devreder → e-posta + bildirim + log üretilir.
+- **Onay Zinciri (ApprovalChain/Stage):** Çok-aşamalı onay (Finans→İGPD→GM→KSU). "Bekleyen Onaylarım" sekmesi role göre sırası gelmiş onayları gösterir; aktif kullanıcısı olmayan rol otomatik atlanır (orphan-skip).
+- **Bildirim & Log (Notification / ActivityLog):** Kullanıcı bildirimleri + değişiklik/denetim izi (provenance: `AGENT:<key>` ile agent kökeni dahil).
+
+### 27.5 Roller & birimler
+
+GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma). İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
+
+### 27.6 Wiki kılavuzluk notu
+
+Yapılacak statik **enflow-wiki** how-to sayfası bu bölümü kaynak alacak: (a) 27.1–27.2 → "Enflow nedir / iş nasıl akar" giriş sayfası; (b) 27.3 → bileşen referansı; (c) 27.4 → "birimler nasıl bağlanır" teknik how-to; (d) her domain modülü için bu belgenin ilgili bölümleri (§1–§26) adım-adım kullanım kılavuzu olur. Hedef: **yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.**
+
+---
+
+*Bu belge Enflow v2026-06-19 sürümüne aittir. Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = gelecek enflow-wiki kaynağı.*

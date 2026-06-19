@@ -606,6 +606,7 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [ ] Sözleşme → Proje otomatik bağlantısı (Project kaydı oluşturma)
 - [ ] İhale yönetimi (SalesSupport → ContractWorkflow bağlantısı)
 - [ ] Proje → Satınalma otomatik bağlantısı (purchaseRequestId ↔ ProjectCostItem)
+- [ ] **Enflow-Wiki** — yazılımı hiç bilmeyene anlatan statik how-to/referans sayfası; kaynağı `walkthrough.md` §27 (Bileşen Envanteri & Uçtan Uca Akış). Hazırlık tamam (envanter+akış belgelendi), yapım ilerde.
 
 
 ---
@@ -617,8 +618,7 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 ## deps
 ```
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
-src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, constants, types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
@@ -626,21 +626,22 @@ src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAna
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProposalEditor.tsx ← lib/utils, types
 src/modules/SecurityTestModule.tsx ← services/apiClient
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
-src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
-backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
+backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/projectCodeService.ts ← prismaClient
-backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/workflowTemplateService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
+backend/src/services/unitReportingService.ts ← prismaClient
 ```
 
 ## changes (last 10 commits — 1 second ago)
@@ -651,18 +652,18 @@ src/modules/SalesSupport.tsx                  +TenderList  +TenderCalendar  +Che
 src/modules/VisitPlanModule.tsx               +mondayOf
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
-backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 backend/src/services/approvalChainService.ts  +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
 backend/src/services/documentNumberService.ts +nextDocumentNumber  +previewDocumentNumber
 backend/src/services/entitlementService.ts    +signaturePart  +generateLicenseKey  +isPluginEntitled  +listEntitlementsWithCatalog
+backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 backend/src/services/projectCodeService.ts    +nextProjectCode
 backend/src/services/pluginCatalog.ts         +getPlugin  +getAgentPluginForRole
-backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
 backend/src/services/workflowTemplateService.ts +ensureDefaultWorkflow  +resolveNextStep
 backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
+backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
 backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
 backend/src/utils/fileUpload.ts               +slugify  +getUploadDir  +uploadToNextcloud
-.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
+.github/copilot-instructions.md               +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 ```
 
 ## .github
@@ -673,26 +674,26 @@ h2 Auto-generated signatures
 h2 SigMap commands
 h1 Code signatures
 h2 deps
-h2 changes (last 10 commits — 0 seconds ago)
+h2 changes (last 10 commits — 1 second ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
+h3 backend/pnpm-lock.yaml
+h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
 h3 backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
-h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
 h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 h3 backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
 h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
 h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
 h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
+h3 backend/src/services/agentProvenance.ts
 h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/documentNumberService.ts
-h3 backend/src/services/agentProvenance.ts
 h3 backend/src/services/entitlementService.ts
 h3 backend/src/services/projectCodeService.ts
 h3 backend/src/services/pluginCatalog.ts
-h3 backend/src/services/virtualAgentService.ts
 h3 backend/src/services/unitReportingService.ts
 ```
 
@@ -718,6 +719,21 @@ TABLE ApprovalStage
 INDEX ApprovalChain_entityType_entityId_idx ON ApprovalChain
 ```
 
+### backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
+```
+TABLE DocumentCodingProfile
+TABLE DocumentCategoryCode
+TABLE DocumentSequence
+TABLE LessonsLearned
+TABLE RiskOpportunity
+TABLE CorporateMetric
+TABLE ExternalDocumentRegister
+INDEX DocumentCodingProfile_tenantId_key ON DocumentCodingProfile
+INDEX DocumentCategoryCode_tenantId_code_key ON DocumentCategoryCode
+INDEX DocumentSequence_tenantId_categoryCode_year_key ON DocumentSequence
+INDEX CorporateMetric_tenantId_name_period_key ON CorporateMetric
+```
+
 ### backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
 ```
 TABLE new_Workflow
@@ -739,21 +755,6 @@ INDEX GuaranteeLetter_tenantId_status_idx ON GuaranteeLetter
 ```
 TABLE LegalCase
 INDEX LegalCase_tenantId_status_idx ON LegalCase
-```
-
-### backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
-```
-TABLE DocumentCodingProfile
-TABLE DocumentCategoryCode
-TABLE DocumentSequence
-TABLE LessonsLearned
-TABLE RiskOpportunity
-TABLE CorporateMetric
-TABLE ExternalDocumentRegister
-INDEX DocumentCodingProfile_tenantId_key ON DocumentCodingProfile
-INDEX DocumentCategoryCode_tenantId_code_key ON DocumentCategoryCode
-INDEX DocumentSequence_tenantId_categoryCode_year_key ON DocumentSequence
-INDEX CorporateMetric_tenantId_name_period_key ON CorporateMetric
 ```
 
 ### backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
@@ -781,15 +782,6 @@ INDEX AgentRun_tenantId_status_idx ON AgentRun
 INDEX AgentRun_tenantId_pluginKey_idx ON AgentRun
 ```
 
-### backend/src/services/agentProvenance.ts
-```
-export function agentActorId  :17-19
-export function isAgentActor  :22-25
-export function parseAgentActor  :28-28
-export function actorType  :40-42
-export function agentDisplayLabel  :45-52
-```
-
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain  :21-44
@@ -813,6 +805,15 @@ export async function activatePluginLicense  :78-82
 export async function updateEntitlement  :118-122
 ```
 
+### backend/src/services/agentProvenance.ts
+```
+export function agentActorId  :17-19
+export function isAgentActor  :22-25
+export function parseAgentActor  :28-28
+export function actorType  :40-42
+export function agentDisplayLabel  :45-52
+```
+
 ### backend/src/services/projectCodeService.ts
 ```
 export async function nextProjectCode  :16-28
@@ -833,6 +834,23 @@ export type PluginCategory  :10-10
 export type AgentMode  :11-11
 export function getPlugin  :131-133
 export function getAgentPluginForRole  :137-141
+```
+
+### backend/src/services/workflowTemplateService.ts
+```
+export async function ensureDefaultWorkflow  :92-150
+export function resolveNextStep  :160-164
+```
+
+### backend/src/services/virtualAgentService.ts
+```
+export interface AgentOutput  :13-18
+rationale: string  :14-14
+output: Record<string, unknown>  :15-15
+taskTitle: string  :17-17
+export function hasHandler  :284-286
+export async function runAgent  :292-297
+export async function ratifyAgentRun  :379-385
 ```
 
 ### backend/src/services/unitReportingService.ts
@@ -864,23 +882,6 @@ charts: ChartSeries[]  :61-61
 export interface WorkflowBottleneck  :404-408
 ```
 
-### backend/src/services/workflowTemplateService.ts
-```
-export async function ensureDefaultWorkflow  :92-150
-export function resolveNextStep  :160-164
-```
-
-### backend/src/services/virtualAgentService.ts
-```
-export interface AgentOutput  :13-18
-rationale: string  :14-14
-output: Record<string, unknown>  :15-15
-taskTitle: string  :17-17
-export function hasHandler  :284-286
-export async function runAgent  :292-297
-export async function ratifyAgentRun  :379-385
-```
-
 ### backend/src/utils/businessDays.ts
 ```
 export function addBusinessDays  :5-22
@@ -903,29 +904,14 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/DocumentsModule.tsx
-```
-props DocumentsModuleProps
-hook useState
-hook useMemo
-export DocumentsModule
-handler onChange
-handler onSubmit
-```
-
-### src/modules/FinanceModule.tsx
+### src/modules/LicenseTypesModule.tsx
 ```
 hook useAuth
 hook useState
-hook useCallback
 hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onDecide
-handler onClick
-handler onClose
+export LicenseTypesModule
 handler onChange
+handler onClick
 ```
 
 ### src/modules/ManagementReportingModule.tsx
@@ -1036,6 +1022,18 @@ handler onClick
 handler onDone
 ```
 
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useAuth
+hook useEffect
+export SettingsModule
+handler onData
+```
+
 ### src/modules/SalesSupport.tsx
 ```
 component TenderList
@@ -1072,6 +1070,18 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useEffect
+hook useMemo
+export WorkflowBuilder
+handler onChange
+handler onClick
+handler onPath
+```
+
 ### src/modules/VirtualAgentsTestModule.tsx
 ```
 hook useAuth
@@ -1097,18 +1107,6 @@ export VisitPlanModule
 handler onChange
 handler onClick
 handler onBlur
-```
-
-### src/modules/WorkflowBuilder.tsx
-```
-hook useUnsavedChanges
-hook useState
-hook useEffect
-hook useMemo
-export WorkflowBuilder
-handler onChange
-handler onClick
-handler onPath
 ```
 
 ### src/services/apiService.ts
