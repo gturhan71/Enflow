@@ -6,6 +6,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -58,6 +59,7 @@ router.post('/cases', tenantMiddleware, asyncHandler(async (req: Request, res: R
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'LEGAL_CASE', entityId: item.id, details: { title: item.title, type: item.type } });
   res.json(item);
 }));
 
@@ -78,6 +80,7 @@ router.put('/cases/:id', tenantMiddleware, asyncHandler(async (req: Request, res
       closedAt: status === 'CLOSED' && !record.closedAt ? new Date() : record.closedAt,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'LEGAL_CASE', entityId: id, details: { title: item.title, status: item.status } });
   res.json(item);
 }));
 
@@ -86,6 +89,7 @@ router.delete('/cases/:id', tenantMiddleware, asyncHandler(async (req: Request, 
   const record = await prisma.legalCase.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Vaka bulunamadı.' });
   await prisma.legalCase.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'LEGAL_CASE', entityId: id });
   res.json({ message: 'Silindi.' });
 }));
 

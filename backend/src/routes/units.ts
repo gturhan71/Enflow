@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_PRESALES = requireRole(['GENERAL_MANAGER', 'PRESALES_ENG']);
@@ -19,6 +20,7 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
   const unit = await prisma.unit.create({
     data: { name, description, managerId, tenantId: req.tenantId }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'UNIT', entityId: unit.id, details: { name: unit.name } });
   res.json(unit);
 }));
 
@@ -55,6 +57,7 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
     await tx.unit.delete({ where: { id } });
   });
 
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'UNIT', entityId: id, details: { name: unit.name, transferToUnitId: transferToUnitId || null } });
   res.json({ message: 'Kullanıcılar başarıyla taşındı ve birim silindi.' });
 }));
 

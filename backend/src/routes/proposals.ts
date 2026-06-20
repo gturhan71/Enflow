@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -51,6 +52,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     });
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROPOSAL', entityId: proposal.id, details: { opportunityId: proposal.opportunityId, version: proposal.version } });
   res.json(proposal);
 }));
 
@@ -72,6 +74,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     include: { opportunity: { include: { customer: true } } }
   });
 
+  await logActivity({ tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'PROPOSAL', entityId: id, details: { status: proposal.status, version: proposal.version } });
   res.json(proposal);
 }));
 
@@ -83,6 +86,7 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.proposal.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'PROPOSAL', entityId: id });
   res.json({ message: 'Teklif silindi.' });
 }));
 

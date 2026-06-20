@@ -9,6 +9,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
 import { createProjectWithMilestones } from '../services/projectFactory';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -170,6 +171,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     await completeApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id, req.userId, 'Sözleşme imzalandı.');
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { title: wf.title, status: wf.status } });
   res.json(wf);
 }));
 
@@ -344,6 +346,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const id = pid(req);
   await prisma.contractWorkflowDoc.deleteMany({ where: { workflowId: id } });
   await prisma.contractWorkflow.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'CONTRACT_WORKFLOW', entityId: id });
   res.json({ success: true });
 }));
 
@@ -506,6 +509,7 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     data: { status: 'TRANSFERRED', projectId: project?.id ?? wf.projectId ?? null, updatedAt: new Date() },
   });
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TRANSFER_TO_PROJECT', entityType: 'CONTRACT_WORKFLOW', entityId: id, details: { projectId: project?.id ?? null, projectCode: project?.code ?? null, tasksCreated: createdTasks.length } });
   res.json({ success: true, project, tasksCreated: createdTasks.length, tasks: createdTasks });
 }));
 

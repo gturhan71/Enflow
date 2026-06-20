@@ -4,6 +4,7 @@ import fs from 'fs';
 import multer from 'multer';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
@@ -83,6 +84,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'TENDER', entityId: item.id, details: { name: item.name, ikn: item.ikn } });
   res.json(item);
 }));
 
@@ -119,8 +121,10 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
       },
     });
     item = await prisma.tender.update({ where: { id }, data: { contractWorkflowId: wf.id } });
+    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CONTRACT_WORKFLOW_CREATED', entityType: 'TENDER', entityId: id, details: { contractWorkflowId: wf.id } });
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'TENDER', entityId: id, details: { name: item.name, status: item.status } });
   res.json(item);
 }));
 
@@ -129,6 +133,7 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
   const record = await prisma.tender.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'İhale bulunamadı.' });
   await prisma.tender.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'TENDER', entityId: id });
   res.json({ message: 'Silindi.' });
 }));
 

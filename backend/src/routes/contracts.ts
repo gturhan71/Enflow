@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -20,6 +21,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
       tenantId: req.tenantId
     }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'CONTRACT', entityId: contract.id });
   res.json(contract);
 }));
 
@@ -36,6 +38,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (endDate) data.endDate = new Date(endDate as string);
   if (guaranteeExpiry) data.guaranteeExpiry = new Date(guaranteeExpiry as string);
   const contract = await prisma.contract.update({ where: { id }, data });
+  await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'CONTRACT', entityId: id });
   res.json(contract);
 }));
 
@@ -47,6 +50,7 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.contract.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'CONTRACT', entityId: id });
   res.json({ message: 'Sözleşme silindi.' });
 }));
 

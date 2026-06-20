@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { autoSkipOrphanStages } from '../services/approvalChainService';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -98,6 +99,7 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   // Kalan aşamalarda tenant'ta aktif olmayan rolleri atla; geriye PENDING
   // kalmazsa zincir COMPLETED olur (SKIPPED aşamalar bloklamaz).
   const updated = await autoSkipOrphanStages(req.tenantId, id);
+  await logActivity({ tenantId: req.tenantId, userId: approverId || req.userId, action: 'STAGE_APPROVE', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, role: stage.role, chainStatus: updated?.status } });
   res.json(updated);
 }));
 
@@ -119,6 +121,7 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
     where: { id },
     include: { stages: { orderBy: { order: 'asc' } } }
   });
+  await logActivity({ tenantId: req.tenantId, userId: approverId || req.userId, action: 'STAGE_REJECT', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, note: note || null } });
   res.json(updated);
 }));
 

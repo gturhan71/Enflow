@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -19,6 +20,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
       tenantId: req.tenantId
     }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'DOCUMENT', entityId: doc.id, details: { name: doc.name, category: doc.category } });
   res.json(doc);
 }));
 
@@ -36,6 +38,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     data.tags = typeof tags === 'string' ? tags : JSON.stringify(tags);
   }
   const doc = await prisma.corporateDocument.update({ where: { id }, data });
+  await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'DOCUMENT', entityId: id });
   res.json(doc);
 }));
 
@@ -47,6 +50,7 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.corporateDocument.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'DOCUMENT', entityId: id });
   res.json({ message: 'Doküman silindi.' });
 }));
 

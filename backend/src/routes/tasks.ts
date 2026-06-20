@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { computeSlaDueDate } from '../utils/businessDays';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -26,6 +27,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
       tenantId: req.tenantId
     }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'TASK', entityId: task.id, details: { title: task.title, relatedModule: task.relatedModule } });
   res.json(task);
 }));
 
@@ -43,6 +45,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     data.progressNotes = typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes);
   }
   const task = await prisma.todoTask.update({ where: { id }, data });
+  await logActivity({ tenantId, userId: req.userId, action: rest.status && rest.status !== record.status ? `STATUS_${rest.status}` : 'UPDATE', entityType: 'TASK', entityId: id, details: { title: task.title, status: task.status } });
   res.json(task);
 }));
 
@@ -54,6 +57,7 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.todoTask.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'TASK', entityId: id });
   res.json({ message: 'Görev silindi.' });
 }));
 

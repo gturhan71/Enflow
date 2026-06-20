@@ -4,6 +4,7 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 
 import logsRouter from './routes/logs';
+import activityLogsRouter from './routes/activityLogs';
 import authRouter from './routes/auth';
 import tenantsRouter from './routes/tenants';
 import subscriptionRouter from './routes/subscription';
@@ -54,6 +55,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/logs/notifications', logsRouter);
+app.use('/api/activity-logs', activityLogsRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/tenants', tenantsRouter);
 app.use('/api', subscriptionRouter);

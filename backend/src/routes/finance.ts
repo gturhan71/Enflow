@@ -6,6 +6,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -82,6 +83,7 @@ router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'INVOICE', entityId: item.id, details: { type: item.type, amount: item.amount, invoiceNo: item.invoiceNo } });
   res.json(item);
 }));
 
@@ -147,6 +149,7 @@ router.post('/invoices/:id/payments', tenantMiddleware, asyncHandler(async (req:
   });
   await recalcInvoice(id);
   const invoice = await prisma.invoice.findUnique({ where: { id }, include: { payments: true } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'PAYMENT', entityType: 'INVOICE', entityId: id, details: { amount: payment.amount, paidTotal: invoice?.paidAmount, status: invoice?.status } });
   res.json({ payment, invoice });
 }));
 
@@ -198,6 +201,7 @@ router.post('/guarantees', tenantMiddleware, asyncHandler(async (req: Request, r
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'GUARANTEE', entityId: item.id, details: { type: item.type, amount: item.amount } });
   res.json(item);
 }));
 
@@ -297,6 +301,7 @@ router.put('/costs/:id/approve', tenantMiddleware, asyncHandler(async (req: Requ
       approvalNote: approvalNote || null,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: approvedById || req.userId, action: `COST_${approvalStatus}`, entityType: 'PROJECT_COST', entityId: id, details: { description: item.description, amount: item.amountTRY } });
   res.json(item);
 }));
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -83,6 +84,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     },
     include: { items: true, quotes: true, deliveries: true },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PURCHASE_REQUEST', entityId: pr.id, details: { title: pr.title, projectId: pr.projectId } });
   res.status(201).json(pr);
 }));
 
@@ -217,6 +219,7 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     }).catch(() => {});
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `STATUS_${next}`, entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { title: updated.title, status: updated.status } });
   res.json(updated);
 }));
 
@@ -231,6 +234,7 @@ router.post('/:id/reject', asyncHandler(async (req: Request, res: Response) => {
     },
     include: { items: true, quotes: true, deliveries: true },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_REJECTED', entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { rejectionNote: rejectionNote || null } });
   res.json(updated);
 }));
 
@@ -392,6 +396,7 @@ router.post('/:id/invoice', asyncHandler(async (req: Request, res: Response) => 
     }
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `STATUS_${updated.status}`, entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { invoiceNo: invoiceNo || null, invoiceAmount: invoiceAmount ?? null } });
   res.json(updated);
 }));
 
@@ -402,6 +407,7 @@ router.post('/:id/close', asyncHandler(async (req: Request, res: Response) => {
     data: { status: 'CLOSED' },
     include: { items: true, quotes: true, deliveries: true },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_CLOSED', entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id) });
   res.json(updated);
 }));
 

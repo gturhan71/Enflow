@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
@@ -36,6 +37,7 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
       status: 'ACTIVE'
     }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'USER', entityId: user.id, details: { email: user.email, role: user.role } });
   res.json(parsePermissions(user));
 }));
 
@@ -52,6 +54,7 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
     data.permissions = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
   }
   const user = await prisma.user.update({ where: { id }, data });
+  await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'USER', entityId: id, details: { email: user.email, role: user.role, status: user.status } });
   res.json(parsePermissions(user));
 }));
 
@@ -63,6 +66,7 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.user.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'USER', entityId: id, details: { email: record.email } });
   res.json({ message: 'Kullanıcı silindi.' });
 }));
 

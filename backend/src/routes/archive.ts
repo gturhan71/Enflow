@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
@@ -20,6 +21,7 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
       tenantId: req.tenantId
     }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'ARCHIVE', entityId: item.id, details: { category: item.category } });
   res.json(item);
 }));
 
@@ -37,6 +39,7 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
     data.tags = typeof tags === 'string' ? tags : JSON.stringify(tags);
   }
   const item = await prisma.archiveItem.update({ where: { id }, data });
+  await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'ARCHIVE', entityId: id });
   res.json(item);
 }));
 
@@ -48,6 +51,7 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   await prisma.archiveItem.delete({ where: { id } });
+  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'ARCHIVE', entityId: id });
   res.json({ message: 'Arşiv kaydı silindi.' });
 }));
 

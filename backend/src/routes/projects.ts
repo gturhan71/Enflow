@@ -5,6 +5,7 @@ import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { createProjectWithMilestones } from '../services/projectFactory';
+import { logActivity } from '../services/activityLog';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
@@ -75,6 +76,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 // ── CREATE ────────────────────────────────────────────────────────────────────
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const full = await createProjectWithMilestones(req.tenantId, req.body, req.userId);
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROJECT', entityId: full?.id ?? '', details: { code: full?.code, name: full?.name } });
   res.status(201).json(full);
 }));
 
@@ -129,6 +131,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     }
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: req.body.status && req.body.status !== existing.status ? `STATUS_${req.body.status}` : 'UPDATE', entityType: 'PROJECT', entityId: id, details: { name: updated.name, status: updated.status, phase: updated.phase } });
   res.json(updated);
 }));
 
@@ -138,6 +141,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.project.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!existing) return res.status(404).json({ error: 'Proje bulunamadı.' });
   await prisma.project.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'PROJECT', entityId: id });
   res.json({ ok: true });
 }));
 

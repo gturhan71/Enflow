@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '../services/approvalChainService';
+import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -78,18 +79,13 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     include: { customer: true, assignedTo: true, createdBy: true }
   });
 
-  await prisma.activityLog.create({
-    data: {
-      action: 'UPDATE',
-      entityType: 'OPPORTUNITY',
-      entityId: opportunityId,
-      userId: updatedBy || updated.assignedToId,
-      tenantId,
-      details: JSON.stringify({
-        before: { title: oldOpp.title, value: oldOpp.value, status: oldOpp.status },
-        after: { title: updated.title, value: updated.value, status: updated.status }
-      })
-    }
+  await logActivity({
+    tenantId, userId: updatedBy || updated.assignedToId,
+    action: 'UPDATE', entityType: 'OPPORTUNITY', entityId: opportunityId,
+    details: {
+      before: { title: oldOpp.title, value: oldOpp.value, status: oldOpp.status },
+      after: { title: updated.title, value: updated.value, status: updated.status },
+    },
   });
 
   // Faz 1 — kaybedilen fırsat otomatik arşivlenir (LOST'a yeni geçiş, tekrar tetiklenmesin)
@@ -268,15 +264,10 @@ router.post('/:id/revert-approval', tenantMiddleware, asyncHandler(async (req: R
   // Faz 0 — kalıcı onay zincirini de geri al
   await resetApprovalChain(tenantId, 'OPPORTUNITY', opportunityId);
 
-  await prisma.activityLog.create({
-    data: {
-      action: 'REVERT_APPROVAL',
-      entityType: 'OPPORTUNITY',
-      entityId: opportunityId,
-      userId: req.userId || 'system',
-      tenantId,
-      details: JSON.stringify({ message: 'Teknik onay kullanıcı tarafından geri çekildi.' })
-    }
+  await logActivity({
+    tenantId, userId: req.userId,
+    action: 'REVERT_APPROVAL', entityType: 'OPPORTUNITY', entityId: opportunityId,
+    details: { message: 'Teknik onay kullanıcı tarafından geri çekildi.' },
   });
 
   res.json(updated);

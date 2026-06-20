@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -32,6 +33,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       notes: notes || null,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'VENDOR', entityId: vendor.id, details: { name: vendor.name } });
   res.status(201).json(vendor);
 }));
 
@@ -54,6 +56,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       isActive: isActive ?? true,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'VENDOR', entityId: String(req.params.id), details: { name: vendor.name } });
   res.json(vendor);
 }));
 
@@ -63,6 +66,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
     where: { id: String(req.params.id), tenantId: req.tenantId },
     data: { isActive: false },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'VENDOR', entityId: String(req.params.id) });
   res.json({ ok: true });
 }));
 
