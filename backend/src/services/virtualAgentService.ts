@@ -313,6 +313,80 @@ const legalHandler: AgentHandler = async (tenantId, entityId) => {
   };
 };
 
+const DAY_MS = 86400000;
+
+const crmHandler: AgentHandler = async (tenantId, entityId) => {
+  const opp = await prisma.opportunity.findFirst({
+    where: { id: entityId, tenantId },
+    include: { proposals: true },
+  });
+  if (!opp) return null;
+
+  const isOpen = !['WON', 'LOST', 'CANCELLED'].includes(opp.status);
+  const ageDays = Math.floor((Date.now() - new Date(opp.updatedAt).getTime()) / DAY_MS);
+  const proposalCount = opp.proposals.length;
+  const duePast = !!opp.expectedCloseDate && new Date(opp.expectedCloseDate) < new Date();
+
+  const issues: string[] = [];
+  if (isOpen && ageDays > 30) issues.push(`${ageDays} gündür güncellenmemiş (bayat).`);
+  if (isOpen && (!opp.probability || opp.probability <= 0)) issues.push('Kazanma olasılığı girilmemiş.');
+  if (isOpen && (!opp.expectedCloseDate || duePast)) issues.push('Beklenen kapanış tarihi yok/geçmiş.');
+  if (isOpen && ['QUALIFIED', 'PROPOSAL', 'NEGOTIATION'].includes(opp.status) && proposalCount === 0) issues.push('Bu aşamada henüz teklif yok.');
+  const atRisk = isOpen && opp.probability > 0 && opp.probability < 30 && opp.value >= 250000;
+  if (atRisk) issues.push(`Düşük olasılık (%${opp.probability}) + yüksek değer (${opp.value.toLocaleString('tr-TR')} ₺).`);
+
+  const recommendation = !isOpen
+    ? 'NO_ACTION'
+    : atRisk
+      ? 'AT_RISK'
+      : (['QUALIFIED', 'PROPOSAL', 'NEGOTIATION'].includes(opp.status) && proposalCount === 0)
+        ? 'PROPOSAL_NEEDED'
+        : (!opp.probability || !opp.expectedCloseDate || duePast)
+          ? 'UPDATE_FIELDS'
+          : (ageDays > 30 ? 'FOLLOW_UP' : 'NO_ACTION');
+
+  const recLabel = recommendation === 'AT_RISK' ? 'risk bayrağı — yakın takip'
+    : recommendation === 'PROPOSAL_NEEDED' ? 'teklif hazırlanması öneriliyor'
+    : recommendation === 'UPDATE_FIELDS' ? 'eksik alanların güncellenmesi öneriliyor'
+    : recommendation === 'FOLLOW_UP' ? 'takip teması öneriliyor'
+    : 'işlem gerekmiyor';
+
+  return {
+    rationale: `CRM fırsat triyajı: "${opp.title}" (durum ${opp.status}, %${opp.probability}, ${opp.value.toLocaleString('tr-TR')} ₺, ${proposalCount} teklif). ${issues.length ? issues.join(' ') : 'Belirgin eksik yok.'} → ${recLabel}. (Danışman modu — insan ratifiye eder.)`,
+    output: { status: opp.status, probability: opp.probability, value: opp.value, ageDays, proposalCount, issues, recommendation },
+    taskTitle: `CRM önerisi: ${opp.title} (${recommendation === 'AT_RISK' ? 'risk' : recommendation === 'PROPOSAL_NEEDED' ? 'teklif' : recommendation === 'UPDATE_FIELDS' ? 'alan güncelle' : recommendation === 'FOLLOW_UP' ? 'takip' : 'işlem yok'})`,
+  };
+};
+
+const igpdHandler: AgentHandler = async (tenantId, entityId) => {
+  const opp = await prisma.opportunity.findFirst({ where: { id: entityId, tenantId } });
+  if (!opp) return null;
+
+  const isOpen = !['WON', 'LOST', 'CANCELLED'].includes(opp.status);
+  const expectedValue = Math.round((opp.probability / 100) * opp.value);
+  const valueTier = opp.value >= 1_000_000 ? 'HIGH' : opp.value >= 250_000 ? 'MEDIUM' : 'LOW';
+  const ageDays = Math.floor((Date.now() - new Date(opp.createdAt).getTime()) / DAY_MS);
+
+  const recommendation = !isOpen
+    ? 'NO_ACTION'
+    : (valueTier === 'HIGH' && opp.probability >= 50)
+      ? 'PRIORITIZE'
+      : (opp.value >= 250000 && opp.probability < 40)
+        ? 'NURTURE'
+        : 'REVIEW';
+
+  const recLabel = recommendation === 'PRIORITIZE' ? 'stratejik öncelik — kaynak ayır'
+    : recommendation === 'NURTURE' ? 'yüksek değer/düşük olasılık — besleme/pazarlama dokunuşu'
+    : recommendation === 'REVIEW' ? 'gözden geçirme'
+    : 'işlem gerekmiyor';
+
+  return {
+    rationale: `İş Geliştirme değerlendirmesi: "${opp.title}" — değer ${opp.value.toLocaleString('tr-TR')} ₺ (${valueTier} kademe), olasılık %${opp.probability}, beklenen değer ≈ ${expectedValue.toLocaleString('tr-TR')} ₺, yaş ${ageDays} gün. → ${recLabel}. (Danışman modu — insan ratifiye eder.)`,
+    output: { value: opp.value, probability: opp.probability, expectedValue, valueTier, ageDays, recommendation },
+    taskTitle: `İş Geliştirme önerisi: ${opp.title} (${recommendation === 'PRIORITIZE' ? 'önceliklendir' : recommendation === 'NURTURE' ? 'besle' : recommendation === 'REVIEW' ? 'gözden geçir' : 'işlem yok'})`,
+  };
+};
+
 const HANDLERS: Record<string, AgentHandler> = {
   AGENT_TENDER: tenderHandler,
   AGENT_PROJECT: projectHandler,
@@ -320,6 +394,8 @@ const HANDLERS: Record<string, AgentHandler> = {
   AGENT_PROCUREMENT: procurementHandler,
   AGENT_FINANCE: financeHandler,
   AGENT_LEGAL: legalHandler,
+  AGENT_CRM: crmHandler,
+  AGENT_IGPD: igpdHandler,
 };
 
 export function hasHandler(pluginKey: string): boolean {

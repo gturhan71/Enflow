@@ -613,7 +613,14 @@ Birimler-arası geçiş denetiminin (önceki tur) bulduğu 4 eksikten **2 akış
 - `pluginCatalog.ts` `AGENT_LEGAL`: COMING_SOON → **AVAILABLE** (`allowedModes:['ADVISORY']` korunur — hukuk asla otonom).
 - `virtualAgentService.ts` `legalHandler` (entityType LEGAL_CASE): deterministik denetim — opinion eksik / dueDate geçmiş / HIGH öncelik → `recommendation: DRAFT_OPINION|ESCALATE|REVIEW|NO_ACTION` + handoff TodoTask (`AGENT:AGENT_LEGAL` köken). `HANDLERS`'a kayıt.
 
-**Doğrulama:** Legal curl (lisans→LegalCase→run PENDING_RATIFICATION+ESCALATE+handoff `AGENT:AGENT_LEGAL`, **entitlement AUTONOMOUS→400** "izin verilmeyen mod", ratify) + Playwright (Konsolide Yazdır popup "Konsolide Yönetim Raporu", Birim Detayı Yazdır, ▲/▼ delta, 0 hata) + **RBAC 69/69**. Test verisi temizlendi (AgentRun/entitlement prisma ile). **Kalan:** AGENT_CRM (COMING_SOON), İGPD danışman.
+**Doğrulama:** Legal curl (lisans→LegalCase→run PENDING_RATIFICATION+ESCALATE+handoff `AGENT:AGENT_LEGAL`, **entitlement AUTONOMOUS→400** "izin verilmeyen mod", ratify) + Playwright (Konsolide Yazdır popup "Konsolide Yönetim Raporu", Birim Detayı Yazdır, ▲/▼ delta, 0 hata) + **RBAC 69/69**. Test verisi temizlendi (AgentRun/entitlement prisma ile).
+
+### Faz 8.6 — Son agent eksikleri: CRM + İGPD (backend-only, şema yok)
+- `pluginCatalog.ts`: **AGENT_CRM** COMING_SOON→AVAILABLE; **AGENT_IGPD yeni giriş** (role IGPD_MGR, entityType OPPORTUNITY, ADVISORY+AUTONOMOUS, AVAILABLE) → katalog **8 agent**.
+- `virtualAgentService.ts`: **`crmHandler`** (Opportunity satış hijyeni: bayat>30g / eksik probability/closeDate / aşamada teklif yok / düşük-olasılık+yüksek-değer → FOLLOW_UP|PROPOSAL_NEEDED|UPDATE_FIELDS|AT_RISK|NO_ACTION) + **`igpdHandler`** (BD/pazarlama merceği: beklenen değer=olasılık×değer, değer kademesi HIGH/MED/LOW, yaş → PRIORITIZE|NURTURE|REVIEW|NO_ACTION). `HANDLERS`'a kayıt.
+- **Tüm birim agent'ları artık çalışır** (Tender/Project/Presales/Procurement/Finance/Legal/CRM/İGPD).
+
+**Doğrulama:** curl (CRM→UPDATE_FIELDS, İGPD→REVIEW+expectedValue+tier, handoff `AGENT:AGENT_CRM`/`AGENT:AGENT_IGPD`) + Playwright (katalog CRM+İGPD kartları, 0 hata) + **RBAC 69/69**. Test verisi (2 AgentRun + 2 entitlement + handoff) temizlendi.
 
 ## Sonraki Adımlar (Planlanan)
 
@@ -640,7 +647,7 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [x] Sanal Agent köken etiketi (provenance) — `AGENT:<pluginKey>` kanonik etiket + AgentRun/ActivityLog/ApprovalStage/TodoTask bağı + AgentTag rozeti/drill-down (Faz 8.3)
 - [x] Sanal Agent — Presales/Procurement/Finance handler'ları (önceki agent kural setiyle aynı; Finans ADVISORY-only) (Faz 8.4)
 - [x] Sanal Agent — **Hukuk handler** (AGENT_LEGAL AVAILABLE, ADVISORY-only, Faz 8.5, 2026-06-20)
-- [ ] Sanal Agent — kalan handler (CRM) + İGPD danışman çıktıları (Faz 8.x)
+- [x] Sanal Agent — **CRM + İGPD handler** (AGENT_CRM AVAILABLE, AGENT_IGPD yeni; tüm birim agent'ları tamam — Faz 8.6, 2026-06-20)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [x] **Sözleşme → Proje otomatik bağlantısı** (Project kaydı oluşturma) — Faz 9 / T4 (2026-06-20)
 - [x] **Satınalma faturası → Finans Invoice** (type=PURCHASE, idempotent) — Faz 9 / T6 (2026-06-20)
@@ -680,14 +687,14 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
 backend/src/services/projectFactory.ts ← prismaClient, projectCodeService
-backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/workflowTemplateService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
+backend/src/services/unitReportingService.ts ← prismaClient
 ```
 
 ## changes (last 10 commits — 1 second ago)
 ```
-src/modules/ManagementReportingModule.tsx     +fmtValue  +MetricCard  +ChartBlock  +BottleneckPanel
+src/modules/ManagementReportingModule.tsx     +fmtValue  +prevRange  +printReportWindow  +printUnitReport
 src/modules/ProjectManagementModule.tsx       +isHandoverComplete
 src/modules/SalesSupport.tsx                  +TenderList  +TenderCalendar  +ChecklistTab  +GuaranteesTab
 src/modules/VisitPlanModule.tsx               +mondayOf
@@ -697,13 +704,13 @@ backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +par
 backend/src/services/approvalChainService.ts  +autoSkipOrphanStages  ~completeApprovalChain  ~resetApprovalChain
 backend/src/services/documentNumberService.ts +nextDocumentNumber  +previewDocumentNumber
 backend/src/services/entitlementService.ts    +signaturePart  +generateLicenseKey  +isPluginEntitled  +listEntitlementsWithCatalog
-backend/src/services/projectFactory.ts        +getMilestoneTemplate  +createProjectWithMilestones
 backend/src/services/pluginCatalog.ts         +getPlugin  +getAgentPluginForRole
-backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
+backend/src/services/projectFactory.ts        +getMilestoneTemplate  +createProjectWithMilestones
 backend/src/services/workflowTemplateService.ts +ensureDefaultWorkflow  +resolveNextStep
 backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
+backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
 backend/src/utils/fileUpload.ts               +slugify  +getUploadDir  +uploadToNextcloud
-.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
+.github/copilot-instructions.md               +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 ```
 
 ## .github
@@ -722,16 +729,16 @@ h3 backend/pnpm-lock.yaml
 h3 backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
 h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
-h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 h3 backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
-h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
+h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
+h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
 h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
-h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/agentProvenance.ts
+h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/documentNumberService.ts
 h3 backend/src/services/entitlementService.ts
-h3 backend/src/services/projectCodeService.ts
+h3 backend/src/services/projectFactory.ts
 h3 backend/src/services/pluginCatalog.ts
 h3 backend/src/services/unitReportingService.ts
 h3 backend/src/services/workflowTemplateService.ts
@@ -769,6 +776,12 @@ INDEX Payment_tenantId_idx ON Payment
 INDEX GuaranteeLetter_tenantId_status_idx ON GuaranteeLetter
 ```
 
+### backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
+```
+TABLE LegalCase
+INDEX LegalCase_tenantId_status_idx ON LegalCase
+```
+
 ### backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
 ```
 TABLE DocumentCodingProfile
@@ -782,12 +795,6 @@ INDEX DocumentCodingProfile_tenantId_key ON DocumentCodingProfile
 INDEX DocumentCategoryCode_tenantId_code_key ON DocumentCategoryCode
 INDEX DocumentSequence_tenantId_categoryCode_year_key ON DocumentSequence
 INDEX CorporateMetric_tenantId_name_period_key ON CorporateMetric
-```
-
-### backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
-```
-TABLE LegalCase
-INDEX LegalCase_tenantId_status_idx ON LegalCase
 ```
 
 ### backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
@@ -847,21 +854,6 @@ export async function activatePluginLicense  :78-82
 export async function updateEntitlement  :118-122
 ```
 
-### backend/src/services/projectFactory.ts
-```
-export interface ProjectFactoryInput  :58-79
-name?: string  :59-59
-type?: string  :60-60
-description?: string  :61-61
-customerId?: string  :62-62
-customerName?: string  :63-63
-opportunityId?: string  :64-64
-contractId?: string  :65-65
-pmId?: string  :66-66
-export function getMilestoneTemplate  :14-56
-export async function createProjectWithMilestones  :81-150
-```
-
 ### backend/src/services/pluginCatalog.ts
 ```
 export interface PluginDefinition  :13-27
@@ -877,6 +869,38 @@ export type PluginCategory  :10-10
 export type AgentMode  :11-11
 export function getPlugin  :131-133
 export function getAgentPluginForRole  :137-141
+```
+
+### backend/src/services/projectFactory.ts
+```
+export interface ProjectFactoryInput  :58-79
+name?: string  :59-59
+type?: string  :60-60
+description?: string  :61-61
+customerId?: string  :62-62
+customerName?: string  :63-63
+opportunityId?: string  :64-64
+contractId?: string  :65-65
+pmId?: string  :66-66
+export function getMilestoneTemplate  :14-56
+export async function createProjectWithMilestones  :81-150
+```
+
+### backend/src/services/workflowTemplateService.ts
+```
+export async function ensureDefaultWorkflow  :92-150
+export function resolveNextStep  :160-164
+```
+
+### backend/src/services/virtualAgentService.ts
+```
+export interface AgentOutput  :13-18
+rationale: string  :14-14
+output: Record<string, unknown>  :15-15
+taskTitle: string  :17-17
+export function hasHandler  :325-327
+export async function runAgent  :333-338
+export async function ratifyAgentRun  :420-426
 ```
 
 ### backend/src/services/unitReportingService.ts
@@ -906,23 +930,6 @@ period: { start: string  :59-59
 metrics: Metric[]  :60-60
 charts: ChartSeries[]  :61-61
 export interface WorkflowBottleneck  :404-408
-```
-
-### backend/src/services/workflowTemplateService.ts
-```
-export async function ensureDefaultWorkflow  :92-150
-export function resolveNextStep  :160-164
-```
-
-### backend/src/services/virtualAgentService.ts
-```
-export interface AgentOutput  :13-18
-rationale: string  :14-14
-output: Record<string, unknown>  :15-15
-taskTitle: string  :17-17
-export function hasHandler  :284-286
-export async function runAgent  :292-297
-export async function ratifyAgentRun  :379-385
 ```
 
 ### backend/src/utils/fileUpload.ts
