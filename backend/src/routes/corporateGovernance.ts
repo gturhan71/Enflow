@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 
 const router: Router = Router();
@@ -40,6 +41,7 @@ router.post('/lessons', tenantMiddleware, asyncHandler(async (req: Request, res:
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'LESSON', entityId: item.id });
   res.json(item);
 }));
 
@@ -52,6 +54,7 @@ router.put('/lessons/:id', tenantMiddleware, asyncHandler(async (req: Request, r
     where: { id },
     data: { title, situation, projectId, category, rootCause, action, impact, status },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'LESSON', entityId: String(req.params.id) });
   res.json(item);
 }));
 
@@ -60,6 +63,7 @@ router.delete('/lessons/:id', tenantMiddleware, asyncHandler(async (req: Request
   const record = await prisma.lessonsLearned.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   await prisma.lessonsLearned.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'LESSON', entityId: String(req.params.id) });
   res.json({ message: 'Silindi.' });
 }));
 
@@ -92,6 +96,7 @@ router.post('/risks', tenantMiddleware, asyncHandler(async (req: Request, res: R
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'RISK', entityId: item.id });
   res.json(item);
 }));
 
@@ -106,6 +111,7 @@ router.put('/risks/:id', tenantMiddleware, asyncHandler(async (req: Request, res
     where: { id },
     data: { type, title, description, category, probability: p, impact: i, score: p * i, response, owner, status },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'RISK', entityId: String(req.params.id) });
   res.json(item);
 }));
 
@@ -114,6 +120,7 @@ router.delete('/risks/:id', tenantMiddleware, asyncHandler(async (req: Request, 
   const record = await prisma.riskOpportunity.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   await prisma.riskOpportunity.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'RISK', entityId: String(req.params.id) });
   res.json({ message: 'Silindi.' });
 }));
 
@@ -142,6 +149,7 @@ router.post('/metrics', tenantMiddleware, asyncHandler(async (req: Request, res:
       note: note || null,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'METRIC', entityId: item.id });
   res.json(item);
 }));
 
@@ -159,6 +167,7 @@ router.put('/metrics/:id', tenantMiddleware, asyncHandler(async (req: Request, r
       unit, category, note,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'METRIC', entityId: String(req.params.id) });
   res.json(item);
 }));
 
@@ -167,6 +176,7 @@ router.delete('/metrics/:id', tenantMiddleware, asyncHandler(async (req: Request
   const record = await prisma.corporateMetric.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   await prisma.corporateMetric.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'METRIC', entityId: String(req.params.id) });
   res.json({ message: 'Silindi.' });
 }));
 
@@ -198,6 +208,7 @@ router.post('/external-docs', tenantMiddleware, asyncHandler(async (req: Request
       docNumber,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'EXTERNAL_DOC', entityId: item.id });
   res.json(item);
 }));
 
@@ -215,6 +226,7 @@ router.put('/external-docs/:id', tenantMiddleware, asyncHandler(async (req: Requ
       status, fileUrl, notes,
     },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'EXTERNAL_DOC', entityId: String(req.params.id) });
   res.json(item);
 }));
 
@@ -223,6 +235,7 @@ router.delete('/external-docs/:id', tenantMiddleware, asyncHandler(async (req: R
   const record = await prisma.externalDocumentRegister.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   await prisma.externalDocumentRegister.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'EXTERNAL_DOC', entityId: String(req.params.id) });
   res.json({ message: 'Silindi.' });
 }));
 

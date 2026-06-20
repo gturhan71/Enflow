@@ -56,6 +56,7 @@ import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
 import FinanceModule from './modules/FinanceModule';
 import ManagementReportingModule from './modules/ManagementReportingModule';
 import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
+import ActivityLogModule from './modules/ActivityLogModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
@@ -358,6 +359,7 @@ const TenantAppInner = ({
       case 'management-reports': return <ManagementReportingModule />;
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
       case 'virtual-agents-test': return <VirtualAgentsTestModule />;
+      case 'activity-log': return <ActivityLogModule />;
 
       // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
       case 'subscription': return <SubscriptionModule />;

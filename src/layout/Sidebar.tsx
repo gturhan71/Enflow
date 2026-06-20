@@ -4,7 +4,8 @@ import {
   ChevronRight,
   LogOut,
   ShieldCheck,
-  Bot
+  Bot,
+  ScrollText
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -188,6 +189,19 @@ const Sidebar = ({
             >
               <Bot size={16} strokeWidth={2.5} />
               <span className="text-[10px] font-black uppercase tracking-widest flex-1 text-left">Sanal Agentlar</span>
+              <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 font-black">TEST</span>
+            </button>
+            <button
+              onClick={() => handleNavigate(() => setActiveTab('activity-log'))}
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 border mt-2",
+                activeTab === 'activity-log'
+                  ? "bg-amber-500/20 border-amber-500/40 text-amber-300"
+                  : "border-dashed border-amber-500/30 text-amber-500/70 hover:bg-amber-500/10 hover:text-amber-400"
+              )}
+            >
+              <ScrollText size={16} strokeWidth={2.5} />
+              <span className="text-[10px] font-black uppercase tracking-widest flex-1 text-left">Denetim İzi</span>
               <span className="text-[8px] px-1.5 py-0.5 rounded bg-amber-500/20 border border-amber-500/30 font-black">TEST</span>
             </button>
           </div>

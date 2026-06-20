@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { ensureDefaultWorkflow, resolveNextStep } from '../services/workflowTemplateService';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
@@ -77,6 +78,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     },
     include: { steps: { orderBy: { order: 'asc' } } }
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'WORKFLOW', entityId: workflow.id, details: { name: workflow.name } });
   res.json(workflow);
 }));
 
@@ -104,6 +106,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     });
   });
 
+  await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'WORKFLOW', entityId: id, details: { name } });
   res.json(updatedWorkflow);
 }));
 

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
+import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -71,6 +72,7 @@ router.post('/plans', asyncHandler(async (req: Request, res: Response) => {
     },
     include: VISIT_PLAN_INCLUDE,
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'VISIT_PLAN', entityId: plan.id, details: { weekOf } });
   res.status(201).json(plan);
 }));
 
@@ -89,6 +91,7 @@ router.put('/plans/:id', asyncHandler(async (req: Request, res: Response) => {
     },
     include: VISIT_PLAN_INCLUDE,
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'VISIT_PLAN', entityId: id });
   res.json(updated);
 }));
 
@@ -99,6 +102,7 @@ router.delete('/plans/:id', asyncHandler(async (req: Request, res: Response) => 
 
   await prisma.visit.deleteMany({ where: { visitPlanId: id } });
   await prisma.visitPlan.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'VISIT_PLAN', entityId: id });
   res.json({ message: 'Ziyaret planı silindi.' });
 }));
 

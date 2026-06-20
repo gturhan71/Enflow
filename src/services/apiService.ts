@@ -502,6 +502,17 @@ class ApiService {
   async ratifyAgentRun(id: string, data: { decision: 'RATIFY' | 'REJECT'; ratifiedById?: string; ratifyNote?: string }) {
     return apiClient.fetchWithAuth(`/plugins/runs/${id}/ratify`, { method: 'POST', body: JSON.stringify(data) });
   }
+
+  // ── Denetim İzi (ActivityLog) ──
+  async getActivityLogs(params?: { entityType?: string; entityId?: string; action?: string; limit?: number }) {
+    const q = new URLSearchParams();
+    if (params?.entityType) q.set('entityType', params.entityType);
+    if (params?.entityId) q.set('entityId', params.entityId);
+    if (params?.action) q.set('action', params.action);
+    if (params?.limit) q.set('limit', String(params.limit));
+    const qs = q.toString();
+    return apiClient.fetchWithAuth(`/activity-logs${qs ? `?${qs}` : ''}`);
+  }
 }
 
 export const apiService = new ApiService();

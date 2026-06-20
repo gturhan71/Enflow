@@ -869,3 +869,16 @@ export interface AgentRun {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ActivityLog {
+  id: string;
+  action: string;
+  entityType: string;
+  entityId: string;
+  details?: string | null;
+  userId: string;
+  actorType?: 'HUMAN' | 'AGENT' | null;
+  agentRunId?: string | null;
+  tenantId: string;
+  timestamp: string;
+}
