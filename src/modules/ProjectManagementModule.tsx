@@ -374,7 +374,7 @@ const CostForm: React.FC<CostFormProps> = ({ milestones, onSave, onClose }) => {
 
 // ── Proje Devir Paketi (Faz 2) — ContractWorkflowDoc pattern'inin klonu ───────
 // Tip burada lokal tanımlı (types.ts'e taşınmaz) — ContractWorkflowDoc/
-// ContractWorkflow'un ContractWorkflowTest.tsx'te lokal tanımlanma konvansiyonuna uyar.
+// ContractWorkflow'un ContractWorkflowModule.tsx'te lokal tanımlanma konvansiyonuna uyar.
 
 interface ProjectHandoverDoc {
   id: string;

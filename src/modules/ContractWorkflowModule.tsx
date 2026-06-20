@@ -130,7 +130,7 @@ function bestProposalPrice(opportunityId: string, proposals: Proposal[]): number
   return best?.price ?? null;
 }
 
-export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Props) {
+export function ContractWorkflowModule({ opportunities = [], proposals = [] }: Props) {
   const [mode, setMode] = useState<'contracts' | 'legal'>('contracts');
   const [tab, setTab] = useState<TabId>('context');
   const [workflows, setWorkflows] = useState<ContractWorkflow[]>([]);
@@ -1504,4 +1504,4 @@ function LegalCaseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   );
 }
 
-export default ContractWorkflowTest;
+export default ContractWorkflowModule;

@@ -49,7 +49,7 @@ import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import ArchiveModule from './modules/ArchiveModule';
 import SubscriptionModule from './modules/SubscriptionModule';
-import ContractWorkflowTest from './modules/ContractWorkflowTest';
+import ContractWorkflowModule from './modules/ContractWorkflowModule';
 import SecurityTestModule from './modules/SecurityTestModule';
 import LicenseGeneratorModule from './modules/LicenseGeneratorModule';
 import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
@@ -216,10 +216,10 @@ const TenantAppInner = ({
   const isDocsActive = activeTab === 'documents';
   const isContractsActive = activeTab === 'contracts';
   const isCostActive = activeTab === 'cost-analysis';
-  const isContractWorkflowTestActive = activeTab === 'contract-workflow-test';
+  const isContractWorkflowActive = activeTab === 'contract-workflow' || activeTab === 'contract-workflow-test';
 
   const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
-    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowTestActive
+    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowActive
   });
   const { data: customersData } = useCustomers(tenantId, {
     enabled: isCrmActive || isVisitPlanActive
@@ -243,7 +243,7 @@ const TenantAppInner = ({
     enabled: isDocsActive
   });
   const { data: proposalsData, isLoading: proposalsLoading } = useProposals(tenantId, {
-    enabled: isCrmActive || isTodoActive || isDashboardActive || isContractWorkflowTestActive
+    enabled: isCrmActive || isTodoActive || isDashboardActive || isContractWorkflowActive
   });
 
   // Sync React Query data to local state for compatibility
@@ -342,8 +342,8 @@ const TenantAppInner = ({
 
       // Sözleşme — yeni ContractWorkflow ana modül
       case 'contract-workflow':
-      case 'contract-workflow-test': // geriye dönük uyumluluk
-        return <ContractWorkflowTest opportunities={opportunities} proposals={proposals} />;
+      case 'contract-workflow-test': // geriye dönük uyumluluk (legacy alias)
+        return <ContractWorkflowModule opportunities={opportunities} proposals={proposals} />;
 
       // Eski sözleşme modülü — erişim kapanmadı, sadece menüden çıkarıldı
       case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
