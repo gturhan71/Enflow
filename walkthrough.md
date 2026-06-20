@@ -1339,7 +1339,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 > 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
 >
-> Ölçek (2026-06-19): **51 veri modeli · 29 ekran modülü · 28 API alanı · 11 servis · 7 katman.**
+> Ölçek (2026-06-20): **51 veri modeli · 29 ekran modülü · 29 API alanı · 11 servis · 8 sanal agent · 7 katman.** (Faz 0–9 tamam; birimler-arası geçiş zinciri otomatik.)
 
 ### 27.1 Enflow nedir? (tek paragraf)
 
