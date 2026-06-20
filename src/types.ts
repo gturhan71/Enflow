@@ -626,6 +626,7 @@ export interface Invoice {
   paidAt?: string | null;
   projectId?: string | null;
   contractId?: string | null;
+  purchaseRequestId?: string | null;
   milestoneId?: string | null;
   customerName?: string | null;
   vendorName?: string | null;

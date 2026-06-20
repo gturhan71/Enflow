@@ -158,21 +158,45 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     include: { items: true, quotes: true, deliveries: true },
   });
 
-  // PO kesilince projeye bağlıysa CostItem oluştur
-  if (next === 'PO_ISSUED' && pr.projectId) {
+  // PO kesilince maliyet kalemi oluştur
+  if (next === 'PO_ISSUED') {
     const selected = await prisma.purchaseQuote.findFirst({
       where: { purchaseRequestId: pr.id, isSelected: true },
     });
-    await prisma.costItem.create({
-      data: {
-        tenantId: req.tenantId,
-        description: `PO: ${pr.title} (${updated.poNumber})`,
-        category: 'OTHER',
-        amount: selected?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0,
+    const amount = selected?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0;
+    if (pr.projectId) {
+      // Proje → Satınalma: doğru model ProjectCostItem (idempotent: purchaseRequestId)
+      const data = {
+        category: 'PROCUREMENT',
+        description: `PO: ${pr.title} (${updated.poNumber ?? ''})`,
+        actualAmount: amount,
+        amountTRY: amount,
         currency: pr.currency,
-        opportunityId: pr.sourceBomId ?? pr.projectId,
-      },
-    }).catch(() => {});
+        purchaseRequestId: pr.id,
+      };
+      const existing = await prisma.projectCostItem.findFirst({
+        where: { projectId: pr.projectId, purchaseRequestId: pr.id },
+      });
+      if (existing) {
+        await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
+      } else {
+        await prisma.projectCostItem.create({
+          data: { projectId: pr.projectId, createdById: req.userId, ...data },
+        }).catch(() => {});
+      }
+    } else if (pr.sourceBomId) {
+      // BoM kaynaklı satınalma → opportunity CostItem (mevcut davranış korunur)
+      await prisma.costItem.create({
+        data: {
+          tenantId: req.tenantId,
+          description: `PO: ${pr.title} (${updated.poNumber ?? ''})`,
+          category: 'OTHER',
+          amount,
+          currency: pr.currency,
+          opportunityId: pr.sourceBomId,
+        },
+      }).catch(() => {});
+    }
   }
 
   // TodoTask oluştur
@@ -338,6 +362,36 @@ router.post('/:id/invoice', asyncHandler(async (req: Request, res: Response) => 
     },
     include: { items: true, quotes: true, deliveries: true },
   });
+
+  // Satınalma faturası → Finans Invoice (type=PURCHASE). Idempotent: purchaseRequestId ile upsert.
+  if (invoiceAmount || invoiceNo) {
+    const selectedQuote = updated.quotes.find(q => q.isSelected);
+    const amount = invoiceAmount ? Number(invoiceAmount) : 0;
+    const paid = !!invoicePaidAt;
+    const invData = {
+      type: 'PURCHASE',
+      invoiceNo: invoiceNo || null,
+      amount,
+      issueDate: invoiceDate ? new Date(invoiceDate) : null,
+      projectId: updated.projectId || null,
+      vendorName: selectedQuote?.vendorName || null,
+      status: paid ? 'PAID' : 'ISSUED',
+      paidAmount: paid ? amount : 0,
+      paidAt: paid ? new Date(invoicePaidAt) : null,
+      notes: `Satınalma talebinden: ${updated.title}`,
+    };
+    const existingInv = await prisma.invoice.findFirst({
+      where: { purchaseRequestId: updated.id, tenantId: req.tenantId },
+    });
+    if (existingInv) {
+      await prisma.invoice.update({ where: { id: existingInv.id }, data: invData });
+    } else {
+      await prisma.invoice.create({
+        data: { tenantId: req.tenantId, purchaseRequestId: updated.id, ...invData },
+      });
+    }
+  }
+
   res.json(updated);
 }));
 

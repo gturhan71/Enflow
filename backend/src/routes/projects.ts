@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
-import { nextProjectCode } from '../services/projectCodeService';
+import { createProjectWithMilestones } from '../services/projectFactory';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
@@ -74,71 +74,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
-  let {
-    name, type = 'HARDWARE', description,
-    customerId, customerName, opportunityId, contractId,
-    pmId, pmName, ownerId,
-    totalValue = 0, contractCurrency = 'TRY', budgetTotal = 0, avgMargin = 0,
-    startDate, plannedEndDate, deadline,
-    status = 'PLANNING',
-    milestoneTemplate,
-    procurementNotes,
-  } = req.body;
-
-  // Fırsat verisini otomatik çek
-  if (opportunityId) {
-    const opp = await prisma.opportunity.findFirst({
-      where: { id: opportunityId, tenantId: req.tenantId },
-      include: { customer: true },
-    });
-    if (opp) {
-      if (!name) name = opp.title;
-      if (!customerId) customerId = opp.customerId;
-      if (!customerName && opp.customer) customerName = opp.customer.name;
-      if (!totalValue) totalValue = opp.value;
-      if (!budgetTotal) budgetTotal = opp.value;
-    }
-  }
-
-  const code = await nextProjectCode(req.tenantId, type);
-
-  const project = await prisma.project.create({
-    data: {
-      tenantId: req.tenantId,
-      code,
-      name,
-      type,
-      description: description || null,
-      customerId: customerId || null,
-      customerName: customerName || null,
-      opportunityId: opportunityId || null,
-      contractId: contractId || null,
-      pmId: pmId || req.userId,
-      pmName: pmName || null,
-      ownerId: ownerId || req.userId,
-      totalValue: Number(totalValue),
-      contractCurrency,
-      budgetTotal: Number(budgetTotal),
-      avgMargin: Number(avgMargin),
-      startDate: startDate ? new Date(startDate) : new Date(),
-      plannedEndDate: plannedEndDate ? new Date(plannedEndDate) : null,
-      deadline: deadline ? new Date(deadline) : (plannedEndDate ? new Date(plannedEndDate) : new Date()),
-      status,
-      phase: 'Planlama',
-      procurementNotes: procurementNotes || null,
-    },
-  });
-
-  // Milestone şablonu uygula
-  const tmplKey = milestoneTemplate || type;
-  const templates = getMilestoneTemplate(tmplKey);
-  for (const [idx, tmpl] of templates.entries()) {
-    await prisma.projectMilestone.create({
-      data: { projectId: project.id, ...tmpl, order: idx },
-    });
-  }
-
-  const full = await prisma.project.findFirst({ where: { id: project.id }, include: PROJECT_INCLUDE });
+  const full = await createProjectWithMilestones(req.tenantId, req.body, req.userId);
   res.status(201).json(full);
 }));
 
@@ -488,51 +424,5 @@ router.post(
   })
 );
 
-// ── Milestone şablonları ──────────────────────────────────────────────────────
-type MilestoneTmpl = { title: string; milestoneType: string; requiresApproval: boolean; isParallel: boolean };
-
-function getMilestoneTemplate(type: string): MilestoneTmpl[] {
-  const T: Record<string, MilestoneTmpl[]> = {
-    HARDWARE: [
-      { title: 'Planlama',              milestoneType: 'PLANNING',     requiresApproval: false, isParallel: false },
-      { title: 'Satınalma',             milestoneType: 'PROCUREMENT',  requiresApproval: false, isParallel: false },
-      { title: 'Sevkiyat',              milestoneType: 'SHIPMENT',     requiresApproval: false, isParallel: false },
-      { title: 'Kurulum',               milestoneType: 'INSTALLATION', requiresApproval: false, isParallel: false },
-      { title: 'Test & Kabul',          milestoneType: 'ACCEPTANCE',   requiresApproval: true,  isParallel: false },
-      { title: 'Garanti Süreci',        milestoneType: 'WARRANTY',     requiresApproval: false, isParallel: false },
-      { title: 'Faturalandırma',        milestoneType: 'INVOICING',    requiresApproval: false, isParallel: false },
-      { title: 'Tahsilat',              milestoneType: 'COLLECTION',   requiresApproval: false, isParallel: false },
-    ],
-    SOFTWARE: [
-      { title: 'Planlama & Analiz',     milestoneType: 'PLANNING',     requiresApproval: false, isParallel: false },
-      { title: 'Geliştirme',            milestoneType: 'DEVELOPMENT',  requiresApproval: false, isParallel: true  },
-      { title: 'Test',                  milestoneType: 'TESTING',      requiresApproval: false, isParallel: true  },
-      { title: 'Kabul & Geçiş',         milestoneType: 'ACCEPTANCE',   requiresApproval: true,  isParallel: false },
-      { title: 'Garanti Süreci',        milestoneType: 'WARRANTY',     requiresApproval: false, isParallel: false },
-      { title: 'Faturalandırma',        milestoneType: 'INVOICING',    requiresApproval: false, isParallel: false },
-      { title: 'Tahsilat',              milestoneType: 'COLLECTION',   requiresApproval: false, isParallel: false },
-    ],
-    SERVICE: [
-      { title: 'Planlama',              milestoneType: 'PLANNING',     requiresApproval: false, isParallel: false },
-      { title: 'Hizmet Sözleşmesi',     milestoneType: 'CUSTOM',       requiresApproval: false, isParallel: false },
-      { title: 'Hizmet Teslimi',        milestoneType: 'INSTALLATION', requiresApproval: false, isParallel: false },
-      { title: 'Kabul',                 milestoneType: 'ACCEPTANCE',   requiresApproval: true,  isParallel: false },
-      { title: 'Garanti Süreci',        milestoneType: 'WARRANTY',     requiresApproval: false, isParallel: false },
-      { title: 'Faturalandırma',        milestoneType: 'INVOICING',    requiresApproval: false, isParallel: false },
-      { title: 'Tahsilat',              milestoneType: 'COLLECTION',   requiresApproval: false, isParallel: false },
-    ],
-    MIXED: [
-      { title: 'Planlama',              milestoneType: 'PLANNING',     requiresApproval: false, isParallel: false },
-      { title: 'Satınalma',             milestoneType: 'PROCUREMENT',  requiresApproval: false, isParallel: true  },
-      { title: 'Geliştirme',            milestoneType: 'DEVELOPMENT',  requiresApproval: false, isParallel: true  },
-      { title: 'Kurulum & Entegrasyon', milestoneType: 'INSTALLATION', requiresApproval: false, isParallel: false },
-      { title: 'Test & Kabul',          milestoneType: 'ACCEPTANCE',   requiresApproval: true,  isParallel: false },
-      { title: 'Garanti Süreci',        milestoneType: 'WARRANTY',     requiresApproval: false, isParallel: false },
-      { title: 'Faturalandırma',        milestoneType: 'INVOICING',    requiresApproval: false, isParallel: false },
-      { title: 'Tahsilat',              milestoneType: 'COLLECTION',   requiresApproval: false, isParallel: false },
-    ],
-  };
-  return T[type] ?? T.HARDWARE;
-}
 
 export default router;

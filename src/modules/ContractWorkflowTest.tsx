@@ -44,6 +44,7 @@ interface ContractWorkflow {
   signedDate?: string | null;
   deadline?: string | null;
   notes?: string | null;
+  projectId?: string | null;
   documents: ContractWorkflowDoc[];
   createdAt: string;
 }
@@ -137,6 +138,7 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
   const [loading, setLoading] = useState(false);
   const [analysing, setAnalysing] = useState(false);
   const [transferring, setTransferring] = useState(false);
+  const [transferProject, setTransferProject] = useState<{ code?: string; name?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
@@ -406,7 +408,8 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
       const finalWf = await apiFetch(`${BASE}/${selected.id}`);
       selectWorkflow(finalWf);
       setWorkflows(prev => prev.map(w => w.id === finalWf.id ? finalWf : w));
-      notify(`Sözleşme onaylandı — ${result.tasksCreated} görev Proje Yönetimine aktarıldı.`);
+      if (result.project) setTransferProject({ code: result.project.code, name: result.project.name });
+      notify(`Sözleşme onaylandı — ${result.project?.code ? `Proje ${result.project.code} oluşturuldu, ` : ''}${result.tasksCreated} görev Proje Yönetimine aktarıldı.`);
       setTab('transfer');
     } catch (e) { notify((e as Error).message, true); }
     finally { setTransferring(false); }
@@ -441,7 +444,8 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
       const wf = await apiFetch(`${BASE}/${selected.id}`);
       selectWorkflow(wf);
       setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
-      notify(`${result.tasksCreated} görev Proje Yönetimi modülüne aktarıldı.`);
+      if (result.project) setTransferProject({ code: result.project.code, name: result.project.name });
+      notify(`${result.project?.code ? `Proje ${result.project.code} oluşturuldu — ` : ''}${result.tasksCreated} görev Proje Yönetimi modülüne aktarıldı.`);
     } catch (e) { notify((e as Error).message, true); }
     finally { setTransferring(false); }
   };
@@ -1255,6 +1259,11 @@ export function ContractWorkflowTest({ opportunities = [], proposals = [] }: Pro
                             Görevler Proje Yönetimi modülünde görünür.
                             {selected.signedDate && ` · İmzalandı: ${new Date(selected.signedDate).toLocaleDateString('tr-TR')}`}
                           </p>
+                          {selected.projectId && (
+                            <p className="text-xs text-emerald-300 font-bold mt-2">
+                              ✓ Proje kaydı oluşturuldu{transferProject?.code ? `: ${transferProject.code}${transferProject.name ? ` — ${transferProject.name}` : ''}` : ''} (Proje Yönetimi modülünde)
+                            </p>
+                          )}
                         </div>
                       ) : (
                         <div className={`p-4 rounded-xl border ${

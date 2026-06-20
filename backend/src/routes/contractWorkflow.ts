@@ -8,6 +8,7 @@ import http from 'http';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
+import { createProjectWithMilestones } from '../services/projectFactory';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -480,12 +481,32 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     )
   );
 
+  // Sözleşme → Proje: imzalı sözleşmeden Project kaydı oluştur (idempotent — projectId doluysa atla)
+  let project = null;
+  if (!wf.projectId) {
+    project = await createProjectWithMilestones(
+      req.tenantId,
+      {
+        name: wf.projectName || wf.title,
+        opportunityId: wf.opportunityId || undefined,
+        contractId: wf.contractId || undefined,
+        totalValue: wf.contractValue,
+        budgetTotal: wf.contractValue,
+        deadline: wf.deadline || undefined,
+        type: 'HARDWARE',
+      },
+      req.userId,
+    );
+  } else {
+    project = await prisma.project.findFirst({ where: { id: wf.projectId, tenantId: req.tenantId } });
+  }
+
   await prisma.contractWorkflow.update({
     where: { id },
-    data: { status: 'TRANSFERRED', updatedAt: new Date() },
+    data: { status: 'TRANSFERRED', projectId: project?.id ?? wf.projectId ?? null, updatedAt: new Date() },
   });
 
-  res.json({ success: true, tasksCreated: createdTasks.length, tasks: createdTasks });
+  res.json({ success: true, project, tasksCreated: createdTasks.length, tasks: createdTasks });
 }));
 
 export default router;

@@ -468,6 +468,7 @@ model ContractWorkflow {
   signedDate      DateTime?
   deadline        DateTime?
   notes           String?
+  projectId       String?               // /transfer ile oluşturulan Project (idempotency + bağ)
   tenantId        String
   tenant          Tenant                @relation(fields: [tenantId], references: [id])
   documents       ContractWorkflowDoc[]
@@ -837,6 +838,7 @@ model Invoice {
   tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   projectId     String?
   contractId    String?
+  purchaseRequestId String? // Satınalma faturasından türeyen finans faturası (idempotency + bağ)
   type          String    @default("SALES") // SALES | PURCHASE
   invoiceNo     String?
   amount        Float     @default(0)

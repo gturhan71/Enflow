@@ -94,7 +94,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     name, ikn, authority, method, status, submissionDeadline, estimatedValue, currency,
     opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes,
   } = req.body;
-  const item = await prisma.tender.update({
+  let item = await prisma.tender.update({
     where: { id },
     data: {
       name, ikn, authority, method, status,
@@ -103,6 +103,24 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
       currency, opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes,
     },
   });
+
+  // İhale WON → otomatik ContractWorkflow oluştur + bağla (idempotent: contractWorkflowId boşsa)
+  if (record.status !== 'WON' && status === 'WON' && !item.contractWorkflowId) {
+    const composedTitle = item.ikn ? `${item.name} — İKN: ${item.ikn}` : item.name;
+    const wf = await prisma.contractWorkflow.create({
+      data: {
+        title: composedTitle,
+        tenderName: item.name,
+        tenderNo: item.ikn || null,
+        contractValue: item.estimatedValue || 0,
+        opportunityId: item.opportunityId || null,
+        status: 'DRAFT',
+        tenantId: req.tenantId,
+      },
+    });
+    item = await prisma.tender.update({ where: { id }, data: { contractWorkflowId: wf.id } });
+  }
+
   res.json(item);
 }));
 
