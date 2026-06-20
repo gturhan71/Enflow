@@ -1038,6 +1038,7 @@ model AgentRun {
   outputJson    String?   // yapısal çıktı (eksik kalemler, risk vb.)
   triggeredById String?   // çalıştıran (manuel) veya null (otomatik)
   handoffTaskId String?   // oluşturulan devir TodoTask id'si
+  actionTaken   String?   // otonom modda yürütülen eylemin özeti (null=eylem yok)
   ratifiedById  String?
   ratifiedAt    DateTime?
   ratifyNote    String?

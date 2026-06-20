@@ -863,6 +863,7 @@ export interface AgentRun {
   outputJson?: string | null;
   triggeredById?: string | null;
   handoffTaskId?: string | null;
+  actionTaken?: string | null;
   ratifiedById?: string | null;
   ratifiedAt?: string | null;
   ratifyNote?: string | null;

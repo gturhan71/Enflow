@@ -481,6 +481,13 @@ const RunCard: React.FC<{ run: AgentRun; onRatify: (id: string, d: 'RATIFY' | 'R
         </div>
       )}
 
+      {run.actionTaken && (
+        <div className="flex gap-2 text-xs text-emerald-700 bg-emerald-50 rounded-xl p-3 mb-2 font-semibold">
+          <CheckCircle2 size={14} className="text-emerald-600 shrink-0 mt-0.5" />
+          <span className="leading-relaxed">Otonom eylem: {run.actionTaken}</span>
+        </div>
+      )}
+
       {!!Object.keys(output).length && (
         <details className="mb-2">
           <summary className="text-[11px] text-slate-400 cursor-pointer font-bold">Yapısal çıktı</summary>

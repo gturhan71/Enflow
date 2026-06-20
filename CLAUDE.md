@@ -304,6 +304,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 8.5 | Hukuk agent (AGENT_LEGAL, ADVISORY-only) | — |
 | 8.6 | CRM + İGPD agent (AGENT_IGPD yeni) → **8 agent tamam** | — |
 | 9 | Birimler-arası geçiş otomasyonu: **T3** İhale→Sözleşme · **T4** Sözleşme→Proje · **T5** Proje→Satınalma · **T6** Satınalma→Finans | faz9_flow_links |
+| 9 (agent otonomi) | Generic `autonomousAction` altyapısı — otonom mod artık önerdiğini **uygular** (recommend→act); ilk eylem Procurement en-ucuz-teklif-seç | faz9_autonomous_action |
 | Bakım | as-any temizliği (no-any) · Vite 8/Rolldown + TS 6 + @types/react · mobil drawer/safe-area · stray express kaldırma | — |
 
 Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
@@ -316,7 +317,9 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 - [ ] **Enflow-Wiki** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. Kaynağı hazır: `walkthrough.md §27` (Bileşen Envanteri & Uçtan Uca Akış). *Planlı bir sonraki iş.* (memory: [[enflow-wiki-plan]])
 - [x] **ActivityLog kapsamı — TAM** (2026-06-20) — merkezi `logActivity` helper (`backend/src/services/activityLog.ts`, non-throwing, actorType HUMAN|AGENT) + `GET /api/activity-logs?entityType=&entityId=&action=&limit=` (`activityLogs.ts`); **19 router**a denetim-izi (CREATE/UPDATE/DELETE + statü geçişleri): tüm süreç zinciri + admin (users/units) + approvalChains + corporateGovernance/visits/workflows. **Denetim İzi UI** (`ActivityLogModule.tsx`, GM-only Test Ortamı, `activity-log` sekmesi) — filtreli liste, agent köken etiketi (`agentProvenance`).
 - [x] **ContractWorkflow tam modüle terfi** (2026-06-20) — `ContractWorkflowTest`→`ContractWorkflowModule` rename; backend rol kapısı GM-only'den 7 yönetici role genişledi (GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL+FINANCE+İGPD; PRESALES/SALES_REP RBAC gereği deny); latent bug fix (gerçek `contract-workflow` sekmesinde opportunities/proposals yüklenmiyordu).
-- [ ] **Agent otonomi genişlemesi** — CRM/İGPD/Tender otonom senaryoları + orphan-stage otonom dal kullanımı (para/hukuk hariç).
+- [x] **Agent otonomi genişlemesi — Faz 9 (recommend→act)** (2026-06-20) — Bugüne dek AUTONOMOUS mod yalnız auto-ratify ediyordu (etki-alanı mutasyonu yapmıyordu); artık döngü kapalı. Generic `autonomousAction` altyapısı: `AgentOutput` opsiyonel `{ kind, summary, reversible, execute }` döner; `runAgent` (`backend/src/services/virtualAgentService.ts`) bunu **yalnız** mod AUTONOMOUS + eklenti AUTONOMOUS'a izinli (`plugin.allowedModes`) + eylem `reversible` ise çalıştırır. İlk somut eylem **Procurement → en ucuz teklifi otomatik seç** (`SELECT_CHEAPEST_QUOTE`; deselect-all→select, idempotent/geri-alınabilir; sadece valid+öneri-var+seçilmemişse). Eylem `AgentRun.actionTaken`'a (migration `faz9_autonomous_action`) + ayrı `AGENT_ACTION` ActivityLog'a (actorType=AGENT, agentRunId) yazılır; handoff görevi "✅ … yapıldı, incele" olur. **Güvenlik:** ADVISORY modda eylem ASLA çalışmaz; `AGENT_FINANCE`/`AGENT_LEGAL` `allowedModes:['ADVISORY']` → AUTONOMOUS'a hiç geçemez (ikinci kemer `allowedAuto` guard). Frontend: `AgentRun.actionTaken` tipi + RunCard emerald rozeti + AgentTag drill-down satırı. Diğer handler'lar (tender/project/presales/igpd/crm) `autonomousAction` tanımlamaz → davranışları değişmez. `autoSkipOrphanStages` orphan-stage otonom dalı ayrı path, dokunulmadı.
+  - **Doğrulama:** curl — ADVISORY→actionTaken null/seçim yok; AUTONOMOUS→Beta seçildi+RATIFIED+AGENT_ACTION log; rerun(alreadySelected)→eylem yok; AGENT_FINANCE→AUTONOMOUS=400; yanlış tenant=404. Playwright (GM) RunCard "Otonom eylem" rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
+- [ ] **Agent otonomi — kalan eylemler** — CRM/İGPD/Tender/Project/Presales için güvenli otonom mutasyonlar (altyapı hazır; her biri ayrı reversibility değerlendirmesi).
 - [ ] **Gerçek EKAP entegrasyonu** (şu an manuel İKN iskeleti).
 - [ ] **Entegrasyon katmanı doğrulaması** — Nextcloud DMS / Exchange e-posta / WhatsApp (denetimlerde kapsanmadı).
 
@@ -328,14 +331,25 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
+backend/src/services/unitReportingService.ts ← prismaClient
+backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
+backend/src/services/agentProvenance.ts ← pluginCatalog
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
+src/components/AgentTag.tsx ← services/apiService, lib/agentProvenance, types
+src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
+src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
+src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
 src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
-src/modules/ContractWorkflowTest.tsx ← services/apiClient, services/apiService, types
+src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
 src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, constants, types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
@@ -343,42 +357,29 @@ src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAna
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProposalEditor.tsx ← lib/utils, types
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
-src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
-backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/activityLog.ts ← prismaClient
-backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
 backend/src/services/projectFactory.ts ← prismaClient, projectCodeService
-backend/src/services/unitReportingService.ts ← prismaClient
-backend/src/services/workflowTemplateService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
 ## changes (last 10 commits — 1 second ago)
 ```
+src/components/ErrorBoundary.tsx              ~ErrorBoundary
 src/modules/ActivityLogModule.tsx             +actionTone  +ActivityLogModule
-src/modules/ContractWorkflowTest.tsx          +LegalView  +LegalCaseForm  ~bestProposalPrice  ~ContractWorkflowTest
-src/modules/ManagementReportingModule.tsx     +fmtValue  +prevRange  +printReportWindow  +printUnitReport
-src/modules/SalesSupport.tsx                  +TenderList  +TenderCalendar  +ChecklistTab  +GuaranteesTab
+src/modules/ContractWorkflowModule.tsx        +apiFetch  +bestProposalPrice  +ContractWorkflowModule  +LegalView
+src/modules/ManagementReportingModule.tsx     +prevRange  +printReportWindow  +printUnitReport  +printOverview
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
-backend/src/services/approvalChainService.ts  +autoSkipOrphanStages  ~completeApprovalChain  ~resetApprovalChain
-backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 backend/src/services/activityLog.ts           +logActivity
-backend/src/services/entitlementService.ts    +signaturePart  +generateLicenseKey  +isPluginEntitled  +listEntitlementsWithCatalog
-backend/src/services/pluginCatalog.ts         +getPlugin  +getAgentPluginForRole
 backend/src/services/projectFactory.ts        +getMilestoneTemplate  +createProjectWithMilestones
-backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
-backend/src/services/workflowTemplateService.ts +ensureDefaultWorkflow  +resolveNextStep
-backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
-.github/copilot-instructions.md               +agentActorId  +isAgentActor  +parseAgentActor  +actorType
+backend/src/services/virtualAgentService.ts   ~hasHandler
+.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
 ```
 
 ## .github
@@ -400,12 +401,12 @@ h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
 h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
 h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
+h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/agentProvenance.ts
 h3 backend/src/services/activityLog.ts
-h3 backend/src/services/approvalChainService.ts
 h3 backend/src/services/entitlementService.ts
-h3 backend/src/services/projectFactory.ts
 h3 backend/src/services/pluginCatalog.ts
+h3 backend/src/services/projectFactory.ts
 h3 backend/src/services/unitReportingService.ts
 h3 backend/src/services/workflowTemplateService.ts
 h3 backend/src/services/virtualAgentService.ts
@@ -414,32 +415,33 @@ h2 src
 
 ## backend
 
-### backend/pnpm-lock.yaml
+### backend/src/services/unitReportingService.ts
 ```
-keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
-```
-TABLE new_Workflow
-TABLE new_WorkflowStep
-```
-
-### backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
-```
-TABLE Invoice
-TABLE Payment
-TABLE GuaranteeLetter
-TABLE new_ProjectCostItem
-INDEX Invoice_tenantId_status_idx ON Invoice
-INDEX Payment_tenantId_idx ON Payment
-INDEX GuaranteeLetter_tenantId_status_idx ON GuaranteeLetter
-```
-
-### backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
-```
-TABLE LegalCase
-INDEX LegalCase_tenantId_status_idx ON LegalCase
+export interface UnitDefinition  :6-10
+key: string  :7-7
+label: string  :8-8
+role: string  :9-9
+export interface Period  :27-30
+start: Date  :28-28
+end: Date  :29-29
+export interface Metric  :41-47
+label: string  :42-42
+value: number | string  :43-43
+unit?: string  :44-44
+hint?: string  :45-45
+tone?: 'default' | 'positive' | 'warning'  :46-46
+export interface ChartSeries  :49-53
+title: string  :50-50
+type: 'bar' | 'pie' | 'line'  :51-51
+data: { name: string  :52-52
+export interface UnitMetricsResult  :55-62
+unitKey: string  :56-56
+label: string  :57-57
+role: string  :58-58
+period: { start: string  :59-59
+metrics: Metric[]  :60-60
+charts: ChartSeries[]  :61-61
+export interface WorkflowBottleneck  :404-408
 ```
 
 ### backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
@@ -447,14 +449,6 @@ INDEX LegalCase_tenantId_status_idx ON LegalCase
 TABLE UnitReport
 INDEX UnitReport_tenantId_unitKey_idx ON UnitReport
 INDEX UnitReport_tenantId_status_idx ON UnitReport
-```
-
-### backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
-```
-TABLE Tender
-TABLE TenderChecklistItem
-INDEX Tender_tenantId_status_idx ON Tender
-INDEX TenderChecklistItem_tenderId_idx ON TenderChecklistItem
 ```
 
 ### backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
@@ -467,12 +461,13 @@ INDEX AgentRun_tenantId_status_idx ON AgentRun
 INDEX AgentRun_tenantId_pluginKey_idx ON AgentRun
 ```
 
-### backend/src/services/approvalChainService.ts
+### backend/src/services/entitlementService.ts
 ```
-export async function ensureApprovalChain  :21-44
-export async function completeApprovalChain  :52-74
-export async function autoSkipOrphanStages  :84-194
-export async function resetApprovalChain  :197-210
+export function generateLicenseKey  :26-26
+export async function isPluginEntitled  :43-51
+export async function listEntitlementsWithCatalog  :54-70
+export async function activatePluginLicense  :78-82
+export async function updateEntitlement  :118-122
 ```
 
 ### backend/src/services/agentProvenance.ts
@@ -482,6 +477,24 @@ export function isAgentActor  :22-25
 export function parseAgentActor  :28-28
 export function actorType  :40-42
 export function agentDisplayLabel  :45-52
+```
+
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain  :21-44
+export async function completeApprovalChain  :52-74
+export async function autoSkipOrphanStages  :84-194
+export async function resetApprovalChain  :197-210
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/pnpm-lock.yaml
+```
+keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
 ### backend/src/services/activityLog.ts
@@ -496,15 +509,6 @@ details?: Record<string, unknown> | null  :14-14
 actorType?: 'HUMAN' | 'AGENT'  :15-15
 agentRunId?: string | null  :16-16
 export async function logActivity  :19-36
-```
-
-### backend/src/services/entitlementService.ts
-```
-export function generateLicenseKey  :26-26
-export async function isPluginEntitled  :43-51
-export async function listEntitlementsWithCatalog  :54-70
-export async function activatePluginLicense  :78-82
-export async function updateEntitlement  :118-122
 ```
 
 ### backend/src/services/pluginCatalog.ts
@@ -539,41 +543,6 @@ export function getMilestoneTemplate  :14-56
 export async function createProjectWithMilestones  :81-150
 ```
 
-### backend/src/services/unitReportingService.ts
-```
-export interface UnitDefinition  :6-10
-key: string  :7-7
-label: string  :8-8
-role: string  :9-9
-export interface Period  :27-30
-start: Date  :28-28
-end: Date  :29-29
-export interface Metric  :41-47
-label: string  :42-42
-value: number | string  :43-43
-unit?: string  :44-44
-hint?: string  :45-45
-tone?: 'default' | 'positive' | 'warning'  :46-46
-export interface ChartSeries  :49-53
-title: string  :50-50
-type: 'bar' | 'pie' | 'line'  :51-51
-data: { name: string  :52-52
-export interface UnitMetricsResult  :55-62
-unitKey: string  :56-56
-label: string  :57-57
-role: string  :58-58
-period: { start: string  :59-59
-metrics: Metric[]  :60-60
-charts: ChartSeries[]  :61-61
-export interface WorkflowBottleneck  :404-408
-```
-
-### backend/src/services/workflowTemplateService.ts
-```
-export async function ensureDefaultWorkflow  :92-150
-export function resolveNextStep  :160-164
-```
-
 ### backend/src/services/virtualAgentService.ts
 ```
 export interface AgentOutput  :13-18
@@ -586,6 +555,109 @@ export async function ratifyAgentRun  :496-502
 ```
 
 ## src
+
+### src/lib/agentProvenance.ts
+```
+export function isAgentActor  :19-22
+export function parseAgentActor  :24-24
+export function agentDisplayLabel  :34-41
+```
+
+### src/components/AgentTag.tsx
+```
+component AgentTag
+props AgentTagProps
+hook useState
+handler onClick
+```
+
+### src/modules/VirtualAgentsTestModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VirtualAgentsTestModule
+handler onChange
+handler onClick
+handler onSetMode
+handler onDisable
+handler onRatify
+```
+
+### src/App.tsx
+```
+hook useState
+hook useRef
+hook useEffect
+hook useAuth
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useContracts
+hook useTasks
+hook useUnits
+hook useUsers
+hook useDocuments
+hook useProposals
+export App
+handler onApproveProposal
+handler onLogout
+handler onLogin
+```
+
+### src/components/ErrorBoundary.tsx
+```
+props Props
+```
+
+### src/components/settings/SubscriptionSettings.tsx
+```
+props SubscriptionSettingsProps
+export SubscriptionSettings
+handler onChange
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+export UserManagement
+handler onSubmit
+```
+
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :8-15
+id?: string  :9-9
+pn: string  :10-10
+desc: string  :11-11
+qty: number  :12-12
+cost: number  :13-13
+margin: number  :14-14
+export const useBoM  :17-100
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+export Sidebar
+handler onClick
+```
 
 ### src/modules/ActivityLogModule.tsx
 ```
@@ -626,16 +698,16 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/ContractWorkflowTest.tsx
+### src/modules/ContractWorkflowModule.tsx
 ```
-component ContractWorkflowTest
+component ContractWorkflowModule
 component LegalView
 component LegalCaseForm
 props Props
 hook useState
 hook useCallback
 hook useEffect
-export ContractWorkflowTest
+export ContractWorkflowModule
 handler onChange
 handler onClick
 handler onBlur
@@ -671,21 +743,6 @@ hook useMemo
 export DocumentsModule
 handler onChange
 handler onSubmit
-```
-
-### src/modules/FinanceModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onDecide
-handler onClick
-handler onClose
-handler onChange
 ```
 
 ### src/modules/LicenseTypesModule.tsx
@@ -793,31 +850,6 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/SalesSupport.tsx
-```
-component TenderList
-component TenderCalendar
-component ChecklistTab
-component GuaranteesTab
-component EkapTab
-component TenderSelectorEmpty
-component Modal
-component TenderForm
-props SalesSupportProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-export SalesSupport
-handler onSelect
-handler onChanged
-handler onSelectTender
-handler onClick
-handler onChange
-handler onClose
-```
-
 ### src/modules/SecurityTestModule.tsx
 ```
 props ReportProps
@@ -852,20 +884,6 @@ hook useEffect
 export TodoModule
 handler onClick
 handler onChange
-```
-
-### src/modules/VirtualAgentsTestModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VirtualAgentsTestModule
-handler onChange
-handler onClick
-handler onSetMode
-handler onDisable
-handler onRatify
 ```
 
 ### src/modules/WorkflowBuilder.tsx

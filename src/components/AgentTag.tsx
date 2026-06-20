@@ -125,6 +125,12 @@ export default function AgentTag({
                   <p className="text-xs text-slate-600 leading-relaxed">{run.rationale}</p>
                 )}
 
+                {run.actionTaken && (
+                  <div className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                    ✅ Otonom eylem: {run.actionTaken}
+                  </div>
+                )}
+
                 {parsedOutput && (
                   <div className="bg-slate-50 rounded-xl p-3 space-y-1 border border-slate-100">
                     {Object.entries(parsedOutput).map(([k, v]) => (

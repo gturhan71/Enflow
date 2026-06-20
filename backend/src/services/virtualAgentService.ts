@@ -15,6 +15,13 @@ export interface AgentOutput {
   output: Record<string, unknown>; // yapısal çıktı
   // devir görevi başlığı/özeti
   taskTitle: string;
+  // opsiyonel otonom eylem — yalnız AUTONOMOUS modda + reversible ise çalıştırılır
+  autonomousAction?: {
+    kind: string;               // makine-okunur eylem türü ('SELECT_CHEAPEST_QUOTE')
+    summary: string;            // insan-okunur sonuç
+    reversible: boolean;        // güvenlik kapısı — yalnız true olanlar otomatik çalışır
+    execute: () => Promise<void>;
+  } | null;
 }
 
 type AgentHandler = (tenantId: string, entityId: string) => Promise<AgentOutput | null>;
@@ -185,11 +192,12 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
 
   // Tedarikçi önerisi — en düşük toplam (TRY varsa onu, yoksa nominal)
   let recommendation: { vendorName: string; amount: number; currency: string; deliveryDays: number | null } | null = null;
+  let best: (typeof pr.quotes)[number] | null = null;
   if (pr.quotes.length > 0) {
     const sorted = [...pr.quotes].sort(
       (a, b) => (a.totalAmountTRY ?? a.totalAmount) - (b.totalAmountTRY ?? b.totalAmount),
     );
-    const best = sorted[0];
+    best = sorted[0];
     recommendation = {
       vendorName: best.vendorName,
       amount: best.totalAmountTRY ?? best.totalAmount,
@@ -234,6 +242,29 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
     taskTitle: valid
       ? `Satınalma önerisi hazır: ${pr.title} (onay bekliyor)`
       : `Satınalma eksik: ${pr.title} (${issues.length} sorun)`,
+    // Otonom eylem: en ucuz teklifi seç — yalnız eksiksiz, öneri var ve henüz seçilmemişse
+    autonomousAction:
+      valid && recommendation && best && !alreadySelected
+        ? {
+            kind: 'SELECT_CHEAPEST_QUOTE',
+            summary: `En ucuz teklif seçildi: ${recommendation.vendorName} (${recommendation.amount.toLocaleString('tr-TR')} ${recommendation.currency})`,
+            reversible: true, // deselect-all → select; idempotent ve geri-alınabilir
+            execute: async () => {
+              await prisma.purchaseQuote.updateMany({
+                where: { purchaseRequestId: entityId },
+                data: { isSelected: false },
+              });
+              await prisma.purchaseQuote.update({
+                where: { id: best!.id },
+                data: { isSelected: true },
+              });
+              await prisma.purchaseRequest.update({
+                where: { id: entityId },
+                data: { selectedVendorId: best!.vendorId, selectedVendorName: best!.vendorName },
+              });
+            },
+          }
+        : null,
   };
 };
 
@@ -453,14 +484,40 @@ export async function runAgent(params: {
     },
   });
 
+  // Otonom eylem — yalnız AUTONOMOUS mod + eklenti AUTONOMOUS'a izinli + geri-alınabilir eylem.
+  // ADVISORY modda eylem ASLA çalışmaz: öneri handoff görevinde kalır, insan uygular.
+  const allowedAuto = (plugin.allowedModes ?? ['ADVISORY', 'AUTONOMOUS']).includes('AUTONOMOUS');
+  let actionTaken: string | null = null;
+  if (autoRatify && allowedAuto && result.autonomousAction?.reversible) {
+    await result.autonomousAction.execute();
+    actionTaken = result.autonomousAction.summary;
+    await prisma.agentRun.update({ where: { id: run.id }, data: { actionTaken } });
+    run.actionTaken = actionTaken; // dönen nesneyi güncel tut
+    // Mutasyonu AGENT_RUN'dan ayrı bir denetim kaydı olarak göster
+    await prisma.activityLog.create({
+      data: {
+        action: 'AGENT_ACTION',
+        entityType: plugin.entityType ?? 'AGENT',
+        entityId,
+        details: JSON.stringify({ pluginKey, kind: result.autonomousAction.kind, summary: actionTaken }),
+        userId: actorId,
+        actorType: 'AGENT',
+        agentRunId: run.id,
+        tenantId,
+      },
+    });
+  }
+
   // Devir görevi (gerçek kişiye) — unit çözümlemesi: ilk birim, yoksa task atla
   const unit = await prisma.unit.findFirst({ where: { tenantId } });
   let handoffTaskId: string | null = null;
   if (unit) {
     const task = await prisma.todoTask.create({
       data: {
-        title: result.taskTitle,
-        description: `🤖 ${plugin.name} tarafından hazırlandı.\n\n${result.rationale}`,
+        title: actionTaken ? `✅ ${actionTaken} — yapıldı, incele` : result.taskTitle,
+        description: actionTaken
+          ? `🤖 ${plugin.name} otonom modda uyguladı: ${actionTaken}\n\n${result.rationale}`
+          : `🤖 ${plugin.name} tarafından hazırlandı.\n\n${result.rationale}`,
         unitId: unit.id,
         assignedBy: actorId,
         priority: 'HIGH',
