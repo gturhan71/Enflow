@@ -85,7 +85,7 @@ export const PLUGIN_CATALOG: PluginDefinition[] = [
     allowedModes: ['ADVISORY'], // hukuki sorumluluk — asla otonom değil
     entityType: 'LEGAL_CASE',
     priceNote: 'Aylık eklenti',
-    status: 'COMING_SOON',
+    status: 'AVAILABLE',
   },
   {
     key: 'AGENT_CRM',

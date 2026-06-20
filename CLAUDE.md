@@ -601,6 +601,20 @@ Birimler-arası geçiş denetiminin (önceki tur) bulduğu 4 eksikten **2 akış
 
 > ⚠️ **Not:** Migration sonrası `npx prisma generate` zorunlu; nodemon eski client'la çökerse (`TS2339 projectId`) backend yeniden başlatılmalı.
 
+## UnitReport Çıktı + Hukuk Agent (Faz 7.4 + 8.5, 2026-06-20)
+
+İki planlı iyileştirme; **şema değişikliği yok**.
+
+### Faz 7.4 — UnitReport çıktı + dönem karşılaştırma (frontend-only)
+- `ManagementReportingModule.tsx`: `printReportWindow` (window.open+print, ProjectManagement deseni) + `printUnitReport(report)` (metricsSnapshot tablosu + 5 narrative + reviewNote) + `printOverview(overview)` (tüm birim başlık metrikleri + darboğaz tablosu). **Yazdır** butonları: Raporlarım kartı, IncomingReportCard (GM), Birim Detayı; **Konsolide Yazdır**: Genel Bakış.
+- **Dönem karşılaştırma:** `loadUnit` cari + **önceki dönem** (`prevRange` — aynı uzunlukta, hemen öncesi) metriklerini çeker (frontend double-fetch, backend değişmez); `MetricCard` sayısal metrikte ▲/▼ % delta gösterir.
+
+### Faz 8.5 — Hukuk agent handler (backend-only)
+- `pluginCatalog.ts` `AGENT_LEGAL`: COMING_SOON → **AVAILABLE** (`allowedModes:['ADVISORY']` korunur — hukuk asla otonom).
+- `virtualAgentService.ts` `legalHandler` (entityType LEGAL_CASE): deterministik denetim — opinion eksik / dueDate geçmiş / HIGH öncelik → `recommendation: DRAFT_OPINION|ESCALATE|REVIEW|NO_ACTION` + handoff TodoTask (`AGENT:AGENT_LEGAL` köken). `HANDLERS`'a kayıt.
+
+**Doğrulama:** Legal curl (lisans→LegalCase→run PENDING_RATIFICATION+ESCALATE+handoff `AGENT:AGENT_LEGAL`, **entitlement AUTONOMOUS→400** "izin verilmeyen mod", ratify) + Playwright (Konsolide Yazdır popup "Konsolide Yönetim Raporu", Birim Detayı Yazdır, ▲/▼ delta, 0 hata) + **RBAC 69/69**. Test verisi temizlendi (AgentRun/entitlement prisma ile). **Kalan:** AGENT_CRM (COMING_SOON), İGPD danışman.
+
 ## Sonraki Adımlar (Planlanan)
 
 Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal süreç boşluk analizi planı).
@@ -620,12 +634,13 @@ Detaylı yol haritası: `~/.claude/plans/flickering-toasting-leaf.md` (kurumsal 
 - [x] İhale/İSAB — SalesSupport'un backend destekli Tender modülüne evriltilmesi (Faz 6c)
 - [x] Yönetim Raporlama — birim metrik servisi + konsolide dashboard + iş akışı darboğazı (Faz 7.1 + 7.2)
 - [x] Yönetim Raporlama — UnitReport yönetici-yazımı/gönderim/inceleme akışı (Faz 7.3)
-- [ ] Yönetim Raporlama — UnitReport + konsolide PDF/yazdırma çıktısı + dönem karşılaştırma (Faz 7.4)
+- [x] Yönetim Raporlama — UnitReport + konsolide yazdırma çıktısı + dönem karşılaştırma (Faz 7.4, 2026-06-20)
 - [x] Sanal Agent eklenti/lisans altyapısı (PluginEntitlement/AgentRun) + GM-only test modülü + ApprovalChain orphan-stage agent dalı (Faz 8.0 + 8.2 — ticari sürüm dışı upsell, ADVISORY varsayılan)
 - [x] Sanal Agent lisans anahtarı üretimi (imzalı, GM-only `/generate-key`) + aktivasyon UI'si (Faz 8.1)
 - [x] Sanal Agent köken etiketi (provenance) — `AGENT:<pluginKey>` kanonik etiket + AgentRun/ActivityLog/ApprovalStage/TodoTask bağı + AgentTag rozeti/drill-down (Faz 8.3)
 - [x] Sanal Agent — Presales/Procurement/Finance handler'ları (önceki agent kural setiyle aynı; Finans ADVISORY-only) (Faz 8.4)
-- [ ] Sanal Agent — kalan handler'lar (CRM/Hukuk) + İGPD danışman çıktıları (Faz 8.x)
+- [x] Sanal Agent — **Hukuk handler** (AGENT_LEGAL AVAILABLE, ADVISORY-only, Faz 8.5, 2026-06-20)
+- [ ] Sanal Agent — kalan handler (CRM) + İGPD danışman çıktıları (Faz 8.x)
 - [ ] ContractWorkflow'u test modülünden çıkarıp tam modül haline getirme
 - [x] **Sözleşme → Proje otomatik bağlantısı** (Project kaydı oluşturma) — Faz 9 / T4 (2026-06-20)
 - [x] **Satınalma faturası → Finans Invoice** (type=PURCHASE, idempotent) — Faz 9 / T6 (2026-06-20)
@@ -660,11 +675,11 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
 backend/src/services/agentProvenance.ts ← pluginCatalog
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
-backend/src/services/projectCodeService.ts ← prismaClient
+backend/src/services/projectFactory.ts ← prismaClient, projectCodeService
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/workflowTemplateService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
@@ -678,16 +693,15 @@ src/modules/SalesSupport.tsx                  +TenderList  +TenderCalendar  +Che
 src/modules/VisitPlanModule.tsx               +mondayOf
 src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
-backend/src/services/approvalChainService.ts  +autoSkipOrphanStages  ~completeApprovalChain  ~resetApprovalChain
 backend/src/services/agentProvenance.ts       +agentActorId  +isAgentActor  +parseAgentActor  +actorType
+backend/src/services/approvalChainService.ts  +autoSkipOrphanStages  ~completeApprovalChain  ~resetApprovalChain
 backend/src/services/documentNumberService.ts +nextDocumentNumber  +previewDocumentNumber
 backend/src/services/entitlementService.ts    +signaturePart  +generateLicenseKey  +isPluginEntitled  +listEntitlementsWithCatalog
-backend/src/services/projectCodeService.ts    +nextProjectCode
+backend/src/services/projectFactory.ts        +getMilestoneTemplate  +createProjectWithMilestones
 backend/src/services/pluginCatalog.ts         +getPlugin  +getAgentPluginForRole
 backend/src/services/unitReportingService.ts  +getUnitDefinition  +resolvePeriod  +crmMetrics  +presalesMetrics
 backend/src/services/workflowTemplateService.ts +ensureDefaultWorkflow  +resolveNextStep
 backend/src/services/virtualAgentService.ts   +hasHandler  +runAgent  +ratifyAgentRun
-backend/src/utils/businessDays.ts             +addBusinessDays  +computeSlaDueDate
 backend/src/utils/fileUpload.ts               +slugify  +getUploadDir  +uploadToNextcloud
 .github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
 ```
@@ -705,21 +719,21 @@ h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
 h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
-h3 backend/prisma/migrations/20260616183730_add_approval_chain/migration.sql
-h3 backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
 h3 backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
+h3 backend/prisma/migrations/20260616200836_faz2_visit_plan_daily_report_project_handover/migration.sql
 h3 backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
 h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
-h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
+h3 backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
 h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
+h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
 h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
 h3 backend/src/services/approvalChainService.ts
+h3 backend/src/services/agentProvenance.ts
 h3 backend/src/services/documentNumberService.ts
 h3 backend/src/services/entitlementService.ts
-h3 backend/src/services/agentProvenance.ts
 h3 backend/src/services/projectCodeService.ts
 h3 backend/src/services/pluginCatalog.ts
+h3 backend/src/services/unitReportingService.ts
 h3 backend/src/services/workflowTemplateService.ts
 ```
 
@@ -755,12 +769,6 @@ INDEX Payment_tenantId_idx ON Payment
 INDEX GuaranteeLetter_tenantId_status_idx ON GuaranteeLetter
 ```
 
-### backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
-```
-TABLE LegalCase
-INDEX LegalCase_tenantId_status_idx ON LegalCase
-```
-
 ### backend/prisma/migrations/20260617142420_faz3_doc_coding_corporate_governance/migration.sql
 ```
 TABLE DocumentCodingProfile
@@ -776,12 +784,10 @@ INDEX DocumentSequence_tenantId_categoryCode_year_key ON DocumentSequence
 INDEX CorporateMetric_tenantId_name_period_key ON CorporateMetric
 ```
 
-### backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
+### backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
 ```
-TABLE Tender
-TABLE TenderChecklistItem
-INDEX Tender_tenantId_status_idx ON Tender
-INDEX TenderChecklistItem_tenderId_idx ON TenderChecklistItem
+TABLE LegalCase
+INDEX LegalCase_tenantId_status_idx ON LegalCase
 ```
 
 ### backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
@@ -789,6 +795,14 @@ INDEX TenderChecklistItem_tenderId_idx ON TenderChecklistItem
 TABLE UnitReport
 INDEX UnitReport_tenantId_unitKey_idx ON UnitReport
 INDEX UnitReport_tenantId_status_idx ON UnitReport
+```
+
+### backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
+```
+TABLE Tender
+TABLE TenderChecklistItem
+INDEX Tender_tenantId_status_idx ON Tender
+INDEX TenderChecklistItem_tenderId_idx ON TenderChecklistItem
 ```
 
 ### backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
@@ -801,14 +815,6 @@ INDEX AgentRun_tenantId_status_idx ON AgentRun
 INDEX AgentRun_tenantId_pluginKey_idx ON AgentRun
 ```
 
-### backend/src/services/approvalChainService.ts
-```
-export async function ensureApprovalChain  :21-44
-export async function completeApprovalChain  :52-74
-export async function autoSkipOrphanStages  :84-194
-export async function resetApprovalChain  :197-210
-```
-
 ### backend/src/services/agentProvenance.ts
 ```
 export function agentActorId  :17-19
@@ -816,6 +822,14 @@ export function isAgentActor  :22-25
 export function parseAgentActor  :28-28
 export function actorType  :40-42
 export function agentDisplayLabel  :45-52
+```
+
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain  :21-44
+export async function completeApprovalChain  :52-74
+export async function autoSkipOrphanStages  :84-194
+export async function resetApprovalChain  :197-210
 ```
 
 ### backend/src/services/documentNumberService.ts
@@ -833,9 +847,19 @@ export async function activatePluginLicense  :78-82
 export async function updateEntitlement  :118-122
 ```
 
-### backend/src/services/projectCodeService.ts
+### backend/src/services/projectFactory.ts
 ```
-export async function nextProjectCode  :16-28
+export interface ProjectFactoryInput  :58-79
+name?: string  :59-59
+type?: string  :60-60
+description?: string  :61-61
+customerId?: string  :62-62
+customerName?: string  :63-63
+opportunityId?: string  :64-64
+contractId?: string  :65-65
+pmId?: string  :66-66
+export function getMilestoneTemplate  :14-56
+export async function createProjectWithMilestones  :81-150
 ```
 
 ### backend/src/services/pluginCatalog.ts
@@ -899,11 +923,6 @@ taskTitle: string  :17-17
 export function hasHandler  :284-286
 export async function runAgent  :292-297
 export async function ratifyAgentRun  :379-385
-```
-
-### backend/src/utils/businessDays.ts
-```
-export function addBusinessDays  :5-22
 ```
 
 ### backend/src/utils/fileUpload.ts

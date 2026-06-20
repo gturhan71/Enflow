@@ -5,7 +5,7 @@ import {
 } from 'recharts';
 import {
   BarChart3, AlertTriangle, RefreshCw, TrendingUp, Clock, LayoutGrid, Building2,
-  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X,
+  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -39,12 +39,81 @@ function fmtValue(m: ReportMetric): string {
   return String(m.value);
 }
 
+// ── Dönem karşılaştırma: önceki dönem (aynı uzunlukta, hemen öncesi) ──────────
+function prevRange(start: string, end: string): { start: string; end: string } {
+  const s = new Date(start), e = new Date(end);
+  const lenMs = Math.max(0, e.getTime() - s.getTime());
+  const prevEnd = new Date(s.getTime() - 86400000);
+  const prevStart = new Date(prevEnd.getTime() - lenMs);
+  const iso = (d: Date) => d.toISOString().slice(0, 10);
+  return { start: iso(prevStart), end: iso(prevEnd) };
+}
+
+// ── Yazdırma / çıktı (window.print HTML — ProjectManagementModule deseni) ──────
+function printReportWindow(title: string, body: string) {
+  const w = window.open('', '_blank');
+  if (!w) return;
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+  <style>body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#1e293b;max-width:900px;margin:0 auto}
+  h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin:22px 0 6px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
+  table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}td,th{padding:6px 8px;border:1px solid #e2e8f0;text-align:left}
+  th{background:#f8fafc;font-weight:600}.muted{color:#64748b;font-size:13px}.narr{white-space:pre-wrap;font-size:13px;line-height:1.5}</style>
+  </head><body>${body}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => { try { w.print(); } catch { /* */ } }, 350);
+}
+
+const esc = (s: string) => s.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string));
+
+function printUnitReport(r: UnitReport) {
+  let snap: UnitMetrics | null = null;
+  try { snap = r.metricsSnapshot ? JSON.parse(r.metricsSnapshot) : null; } catch { snap = null; }
+  const metricRows = snap ? snap.metrics.map(m => `<tr><td>${esc(m.label)}</td><td>${fmtValue(m)}</td><td>${esc(m.hint ?? '')}</td></tr>`).join('') : '';
+  const narr = (label: string, v?: string | null) => v ? `<h2>${label}</h2><p class="narr">${esc(v)}</p>` : '';
+  const body = `
+  <h1>Birim Raporu — ${esc(r.unitLabel)}</h1>
+  <p class="muted">${r.periodStart.slice(0, 10)} — ${r.periodEnd.slice(0, 10)} · Durum: ${STATUS_BADGE[r.status]?.label ?? r.status}${r.docNumber ? ` · ${esc(r.docNumber)}` : ''}${r.authorName ? ` · ${esc(r.authorName)}` : ''}</p>
+  ${metricRows ? `<h2>Otomatik Metrikler (gönderim anı)</h2><table><tr><th>Metrik</th><th>Değer</th><th>Not</th></tr>${metricRows}</table>` : ''}
+  ${narr('Öne Çıkanlar', r.highlights)}
+  ${narr('Sorunlar', r.issues)}
+  ${narr('Planlanan Aksiyonlar', r.plannedActions)}
+  ${narr('Riskler', r.risks)}
+  ${narr('Özet', r.summary)}
+  ${r.reviewNote ? `<h2>İnceleme Notu</h2><p class="narr">${esc(r.reviewNote)}</p>` : ''}`;
+  printReportWindow(`Birim Raporu — ${r.unitLabel}`, body);
+}
+
+function printOverview(overview: ReportOverview, start: string, end: string) {
+  const unitTables = overview.units.map(u => {
+    const rows = u.headline.map(m => `<tr><td>${esc(m.label)}</td><td>${fmtValue(m)}</td></tr>`).join('');
+    return `<h2>${esc(u.label)}</h2><table><tr><th>Metrik</th><th>Değer</th></tr>${rows}</table>`;
+  }).join('');
+  const bn = (overview.bottlenecks || []).map(b => `<tr><td>${ROLE_LABELS[b.role] || b.role}</td><td>${b.pendingCount}</td><td>${b.oldestWaitingDays} gün</td></tr>`).join('');
+  const body = `<h1>Konsolide Yönetim Raporu</h1><p class="muted">${start} — ${end}</p>
+  ${bn ? `<h2>İş Akışı Darboğazı</h2><table><tr><th>Birim/Rol</th><th>Bekleyen</th><th>En Eski Bekleyiş</th></tr>${bn}</table>` : ''}
+  ${unitTables}`;
+  printReportWindow('Konsolide Yönetim Raporu', body);
+}
+
 // ── Ortak parçalar ───────────────────────────────────────────────────────────
-function MetricCard({ m }: { m: ReportMetric }) {
+function MetricCard({ m, prev }: { m: ReportMetric; prev?: number }) {
+  let delta: { up: boolean; pct: number } | null = null;
+  if (typeof m.value === 'number' && typeof prev === 'number' && prev !== 0 && m.value !== prev) {
+    const d = m.value - prev;
+    delta = { up: d > 0, pct: Math.abs((d / Math.abs(prev)) * 100) };
+  }
   return (
     <div className="glass-card p-4 rounded-2xl">
       <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-1">{m.label}</p>
-      <p className={`text-2xl font-black tracking-tighter ${TONE_CLASSES[m.tone || 'default']}`}>{fmtValue(m)}</p>
+      <div className="flex items-baseline gap-2">
+        <p className={`text-2xl font-black tracking-tighter ${TONE_CLASSES[m.tone || 'default']}`}>{fmtValue(m)}</p>
+        {delta && (
+          <span className="text-[11px] font-bold text-slate-500" title="Önceki döneme göre">
+            {delta.up ? '▲' : '▼'} {delta.pct.toFixed(0)}%
+          </span>
+        )}
+      </div>
       {m.hint && <p className="text-[10px] text-slate-400 mt-1">{m.hint}</p>}
     </div>
   );
@@ -296,6 +365,9 @@ function IncomingReportCard({ report, onReviewed }: { report: UnitReport; onRevi
           <div className="border-t border-slate-100 pt-3 space-y-2">
             <input value={note} onChange={e => setNote(e.target.value)} placeholder="İnceleme notu (opsiyonel)" className="input-glass w-full px-3 py-2 rounded-xl text-sm" />
             <div className="flex gap-2 justify-end">
+              <button onClick={() => printUnitReport(report)} className="btn-secondary px-4 py-2 rounded-xl text-sm flex items-center gap-1">
+                <Printer size={14} /> Yazdır
+              </button>
               <button onClick={() => review('RETURN')} disabled={busy} className="btn-secondary px-4 py-2 rounded-xl text-sm flex items-center gap-1 disabled:opacity-60">
                 <Undo2 size={14} /> İade Et
               </button>
@@ -325,6 +397,7 @@ export default function ManagementReportingModule() {
   const [units, setUnits] = useState<UnitDefinition[]>([]);
   const [selectedUnit, setSelectedUnit] = useState<string>('CRM');
   const [unitData, setUnitData] = useState<UnitMetrics | null>(null);
+  const [prevMetrics, setPrevMetrics] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [myReports, setMyReports] = useState<UnitReport[]>([]);
   const [incoming, setIncoming] = useState<UnitReport[]>([]);
@@ -346,6 +419,12 @@ export default function ManagementReportingModule() {
     try {
       const data = await apiService.getUnitMetrics(selectedUnit, { start, end });
       setUnitData(data);
+      // Dönem karşılaştırma: önceki dönem metriklerini de çek (delta için)
+      const pr = prevRange(start, end);
+      const prevData = await apiService.getUnitMetrics(selectedUnit, { start: pr.start, end: pr.end }).catch(() => null);
+      const map: Record<string, number> = {};
+      if (prevData) for (const m of prevData.metrics) if (typeof m.value === 'number') map[m.label] = m.value;
+      setPrevMetrics(map);
     } finally {
       setLoading(false);
     }
@@ -427,6 +506,11 @@ export default function ManagementReportingModule() {
       {/* Genel Bakış */}
       {tab === 'overview' && overview && (
         <div className="space-y-6">
+          <div className="flex justify-end">
+            <button onClick={() => printOverview(overview, start, end)} className="btn-secondary px-3 py-1.5 rounded-lg text-xs flex items-center gap-1">
+              <Printer size={13} /> Konsolide Yazdır
+            </button>
+          </div>
           <BottleneckPanel overview={overview} />
           {overview.units.map(u => (
             <div key={u.unitKey} className="space-y-3">
@@ -455,8 +539,14 @@ export default function ManagementReportingModule() {
           </div>
           {unitData && (
             <>
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] text-slate-400 font-bold">Δ önceki döneme göre</p>
+                <button onClick={() => unitData && printReportWindow(`Birim Metrikleri — ${unitData.label}`, `<h1>${esc(unitData.label)} — Metrikler</h1><p class="muted">${start} — ${end}</p><table><tr><th>Metrik</th><th>Değer</th><th>Not</th></tr>${unitData.metrics.map(m => `<tr><td>${esc(m.label)}</td><td>${fmtValue(m)}</td><td>${esc(m.hint ?? '')}</td></tr>`).join('')}</table>`)} className="btn-secondary px-3 py-1.5 rounded-lg text-xs flex items-center gap-1">
+                  <Printer size={13} /> Yazdır
+                </button>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                {unitData.metrics.map((m, i) => <MetricCard key={i} m={m} />)}
+                {unitData.metrics.map((m, i) => <MetricCard key={i} m={m} prev={prevMetrics[m.label]} />)}
               </div>
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {unitData.charts.map((c, i) => <ChartBlock key={i} c={c} />)}
@@ -502,6 +592,7 @@ export default function ManagementReportingModule() {
                           <button onClick={() => submitReport(r.id)} title="Yönetime Sun" className="btn-primary px-3 py-1.5 rounded-lg text-xs flex items-center gap-1"><Send size={13} /> Sun</button>
                         </>
                       )}
+                      <button onClick={() => printUnitReport(r)} title="Yazdır" className="p-2 text-slate-400 hover:text-primary"><Printer size={16} /></button>
                       <button onClick={() => deleteReport(r.id)} title="Sil" className="p-2 text-slate-400 hover:text-red-500"><Trash2 size={16} /></button>
                     </div>
                   </div>

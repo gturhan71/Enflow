@@ -273,12 +273,53 @@ const financeHandler: AgentHandler = async (tenantId, entityId) => {
   };
 };
 
+const legalHandler: AgentHandler = async (tenantId, entityId) => {
+  const c = await prisma.legalCase.findFirst({ where: { id: entityId, tenantId } });
+  if (!c) return null;
+
+  const isOpen = c.status !== 'CLOSED';
+  const overdue = !!c.dueDate && isOpen && new Date(c.dueDate) < new Date();
+  const hasOpinion = !!(c.opinion && c.opinion.trim());
+  const issues: string[] = [];
+  if (isOpen && !hasOpinion) issues.push('Hukuki görüş (opinion) henüz girilmemiş.');
+  if (overdue) issues.push(`Termin geçti (${new Date(c.dueDate!).toLocaleDateString('tr-TR')}).`);
+  if (c.priority === 'HIGH' && isOpen) issues.push('Yüksek öncelikli açık vaka.');
+
+  const recommendation = !isOpen
+    ? 'NO_ACTION'
+    : overdue
+      ? 'ESCALATE'
+      : !hasOpinion
+        ? 'DRAFT_OPINION'
+        : 'REVIEW';
+
+  const recLabel = recommendation === 'ESCALATE' ? 'üst makama taşıma (ESCALATED) öneriliyor'
+    : recommendation === 'DRAFT_OPINION' ? 'hukuki görüş taslağı hazırlanması öneriliyor'
+    : recommendation === 'REVIEW' ? 'inceleme öneriliyor'
+    : 'işlem gerekmiyor';
+
+  return {
+    rationale: `Hukuki vaka denetimi: "${c.title}" (${c.type}, öncelik ${c.priority}, durum ${c.status}). ${issues.length ? issues.join(' ') : 'Belirgin eksik yok.'} → ${recLabel}. (Danışman modu — kararı insan hukukçu ratifiye eder.)`,
+    output: {
+      type: c.type,
+      status: c.status,
+      priority: c.priority,
+      overdue,
+      hasOpinion,
+      issues,
+      recommendation,
+    },
+    taskTitle: `Hukuk önerisi: ${c.title} (${recommendation === 'ESCALATE' ? 'escalate' : recommendation === 'DRAFT_OPINION' ? 'görüş taslağı' : recommendation === 'REVIEW' ? 'inceleme' : 'işlem yok'})`,
+  };
+};
+
 const HANDLERS: Record<string, AgentHandler> = {
   AGENT_TENDER: tenderHandler,
   AGENT_PROJECT: projectHandler,
   AGENT_PRESALES: presalesHandler,
   AGENT_PROCUREMENT: procurementHandler,
   AGENT_FINANCE: financeHandler,
+  AGENT_LEGAL: legalHandler,
 };
 
 export function hasHandler(pluginKey: string): boolean {
