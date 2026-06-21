@@ -12,7 +12,6 @@ export default defineConfig({
   timeout: 30_000,
   fullyParallel: false, // Sıralı — auth setup önce bitmeli
   retries: 0,
-  globalSetup: "./global-setup.ts",     // swimlane/yönetici test kullanıcılarını seed eder
   globalTeardown: "./global-teardown.ts",
   reporter: [
     ["list"],

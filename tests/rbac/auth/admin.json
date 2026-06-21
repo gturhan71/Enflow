@@ -1,0 +1,26 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "enflow_current_user_tenant-1",
+          "value": "{\"id\":\"cmqo85krn0000hlw39mkm1p7y\",\"name\":\"Sistem Yöneticisi\",\"email\":\"admin@enflow.com\",\"role\":\"ADMIN\",\"permissions\":[\"DASHBOARD_VIEW\",\"SETTINGS_VIEW\",\"SETTINGS_COMPANY\",\"SETTINGS_UNITS\",\"SETTINGS_USERS\",\"SETTINGS_PERMISSIONS\",\"SETTINGS_INTEGRATIONS\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp9zqgg50003bqw3sjauc5st\",\"createdAt\":\"2026-06-21T20:13:56.195Z\",\"updatedAt\":\"2026-06-21T20:13:56.195Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+        },
+        {
+          "name": "enflow_auth_token",
+          "value": "Y21xbzg1a3JuMDAwMGhsdzM5bWttMXA3eQ=="
+        },
+        {
+          "name": "enflow_active_tenant_id",
+          "value": "tenant-1"
+        },
+        {
+          "name": "enflow_theme",
+          "value": "light"
+        }
+      ]
+    }
+  ]
+}

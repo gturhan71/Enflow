@@ -81,7 +81,8 @@ function extractRbacTestRoles(labels: Set<string>): string[] {
     const roles = new Set<string>();
     for (const f of fs.readdirSync(dir).filter((x) => x.endsWith('.ts'))) {
       const src = fs.readFileSync(path.join(dir, f), 'utf8');
-      for (const m of src.matchAll(/\b([a-z]+_[a-z_]+)\b/g)) {
+      // tek kelime (admin) veya snake_case (sales_mgr) — labels'a uyanları al
+      for (const m of src.matchAll(/\b([a-z][a-z_]{2,})\b/g)) {
         const up = m[1].toUpperCase();
         if (labels.has(up)) roles.add(up);
       }

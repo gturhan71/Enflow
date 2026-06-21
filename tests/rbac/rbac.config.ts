@@ -40,14 +40,22 @@ export type RoleName =
   // Gerçek DB kullanıcılı (seed YOK):
   | "sales_mgr"
   | "sales_support"
-  // Swimlane/yönetici rolleri — global-setup'ta seed edilir (rbac-test-* email):
+  // Swimlane/yönetici rolleri (gerçek DB kullanıcıları — 2026-06-21 eklendi):
   | "finance_mgr"
   | "igpd_mgr"
   | "ksu_mgr"
   | "project_mgr"
   | "legal_mgr"
   | "procurement_mgr"
-  | "isab_mgr";
+  | "isab_mgr"
+  // Akış-dışı / destek / rezerve roller (gerçek DB kullanıcıları):
+  | "admin"
+  | "presales_mgr"
+  | "technical_spec"
+  | "operations_mgr"
+  | "hr_mgr"
+  | "auditor"
+  | "kgd_mgr";
 
 export const ROLE_NAMES: RoleName[] = [
   "general_manager",
@@ -62,21 +70,17 @@ export const ROLE_NAMES: RoleName[] = [
   "legal_mgr",
   "procurement_mgr",
   "isab_mgr",
+  "admin",
+  "presales_mgr",
+  "technical_spec",
+  "operations_mgr",
+  "hr_mgr",
+  "auditor",
+  "kgd_mgr",
 ];
 
-// Seed edilen swimlane rolleri → DB rol anahtarı + seed izinleri (matris modülleri).
-// global-setup.ts bunları rbac-test-<key>@enflow.test email'iyle oluşturur;
-// global-teardown (cleanup: email contains 'rbac-test') otomatik siler.
-export const SEED_ROLES: Record<string, { dbRole: string; permissions: string[] }> = {
-  finance_mgr:     { dbRole: "FINANCE_MGR",     permissions: ["DASHBOARD_VIEW", "FINANCE_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-  igpd_mgr:        { dbRole: "IGPD_MGR",        permissions: ["DASHBOARD_VIEW", "CRM_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-  ksu_mgr:         { dbRole: "KSU_MGR",         permissions: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "MANAGEMENT_REPORTS_VIEW", "DOCUMENTS_VIEW", "ARCHIVE_VIEW", "TODO_VIEW"] },
-  project_mgr:     { dbRole: "PROJECT_MGR",     permissions: ["DASHBOARD_VIEW", "PROJECT_MGMT_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-  legal_mgr:       { dbRole: "LEGAL_MGR",       permissions: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-  procurement_mgr: { dbRole: "PROCUREMENT_MGR", permissions: ["DASHBOARD_VIEW", "PROCUREMENT_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-  isab_mgr:        { dbRole: "ISAB_MGR",        permissions: ["DASHBOARD_VIEW", "SALES_SUPPORT_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
-};
-
+// 19 rolün tamamı gerçek DB kullanıcısı (2026-06-21: eksik roller için kalıcı
+// kullanıcılar oluşturuldu → seed mekanizmasına gerek kalmadı).
 export const roles: Record<RoleName, { email: string; tenantId: string }> = {
   general_manager: {
     email:    process.env.GM_EMAIL      ?? "gokhan@t-ecosystem.com",
@@ -90,17 +94,22 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
     email:    process.env.SALES_EMAIL     ?? "mehmetkoc@enflow.com",
     tenantId: process.env.SALES_TENANT_ID ?? "tenant-1",
   },
-  // Gerçek DB kullanıcıları (seed yok):
-  sales_mgr:     { email: process.env.SALES_MGR_EMAIL     ?? "nur.becerikli@enflow.coom", tenantId: "tenant-1" },
-  sales_support: { email: process.env.SALES_SUPPORT_EMAIL ?? "nesrin.kayik@enflow.com",   tenantId: "tenant-1" },
-  // Seed edilen swimlane rolleri (rbac-test-* → teardown siler):
-  finance_mgr:     { email: "rbac-test-finance_mgr@enflow.test",     tenantId: "tenant-1" },
-  igpd_mgr:        { email: "rbac-test-igpd_mgr@enflow.test",        tenantId: "tenant-1" },
-  ksu_mgr:         { email: "rbac-test-ksu_mgr@enflow.test",         tenantId: "tenant-1" },
-  project_mgr:     { email: "rbac-test-project_mgr@enflow.test",     tenantId: "tenant-1" },
-  legal_mgr:       { email: "rbac-test-legal_mgr@enflow.test",       tenantId: "tenant-1" },
-  procurement_mgr: { email: "rbac-test-procurement_mgr@enflow.test", tenantId: "tenant-1" },
-  isab_mgr:        { email: "rbac-test-isab_mgr@enflow.test",        tenantId: "tenant-1" },
+  sales_mgr:       { email: "nur.becerikli@enflow.coom",      tenantId: "tenant-1" },
+  sales_support:   { email: "nesrin.kayik@enflow.com",        tenantId: "tenant-1" },
+  finance_mgr:     { email: "finans.muduru@enflow.com",       tenantId: "tenant-1" },
+  igpd_mgr:        { email: "igpd.muduru@enflow.com",         tenantId: "tenant-1" },
+  ksu_mgr:         { email: "sozlesme.uzmani@enflow.com",     tenantId: "tenant-1" },
+  project_mgr:     { email: "proje.yoneticisi@enflow.com",    tenantId: "tenant-1" },
+  legal_mgr:       { email: "hukuk.muduru@enflow.com",        tenantId: "tenant-1" },
+  procurement_mgr: { email: "satinalma.muduru@enflow.com",    tenantId: "tenant-1" },
+  isab_mgr:        { email: "isab.muduru@enflow.com",         tenantId: "tenant-1" },
+  admin:           { email: "admin@enflow.com",               tenantId: "tenant-1" },
+  presales_mgr:    { email: "presales.mgr@enflow.com",        tenantId: "tenant-1" },
+  technical_spec:  { email: "teknik.uzman@enflow.com",        tenantId: "tenant-1" },
+  operations_mgr:  { email: "operasyon.muduru@enflow.com",    tenantId: "tenant-1" },
+  hr_mgr:          { email: "ik.muduru@enflow.com",           tenantId: "tenant-1" },
+  auditor:         { email: "denetci@enflow.com",             tenantId: "tenant-1" },
+  kgd_mgr:         { email: "kalite.muduru@enflow.com",       tenantId: "tenant-1" },
 };
 
 // Başka tenant'tan kullanıcı — izolasyon testleri için
@@ -132,10 +141,12 @@ type Perm = "allow" | "deny";
 
 // Yeni 9 rol için tekrar eden expect blokları (route guard'larından deterministik türetildi).
 // Çoğu endpoint GM/özel-rol kapılı → yeni rollerin tümü deny; gate'siz GET'ler → tümü allow.
-const ND = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny" } as const; // gate'li (GM/özel) → yeni roller deny
-const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "allow", isab_mgr: "allow" } as const; // gate'siz (tenantMiddleware) → tümü allow
+// Akış-dışı 7 rol (admin/presales_mgr/technical_spec/operations_mgr/hr_mgr/auditor/kgd_mgr)
+// hiçbir requireRole gate'inde yok → ND/NCW=deny, NA(gate'siz GET)=allow.
+const ND = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny" } as const; // gate'li (GM/özel) → bu roller deny
+const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "allow", isab_mgr: "allow", admin: "allow", presales_mgr: "allow", technical_spec: "allow", operations_mgr: "allow", hr_mgr: "allow", auditor: "allow", kgd_mgr: "allow" } as const; // gate'siz (tenantMiddleware) → tümü allow
 // contract-workflows 7-rol gate: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL_MGR+FINANCE_MGR+IGPD_MGR
-const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny" } as const;
+const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny" } as const;
 
 export interface ApiCase {
   name: string;
@@ -306,11 +317,11 @@ export interface UiCase {
 }
 
 // UI görünürlük — yeni roller (seed izinleri = matris modülleri; sales_mgr/support gerçek DB izinleri).
-const UH = { sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden" } as const;
-// Presales üst menü: PRESALES_VIEW veya COST_ANALYSIS_VIEW → yalnız sales_mgr (gerçek izinleri içeriyor)
-const UPRES = { ...UH, sales_mgr: "visible" } as const;
-// CRM üst menü: CRM_VIEW → sales_mgr (gerçek) + igpd_mgr (seed CRM_VIEW)
-const UCRM = { ...UH, sales_mgr: "visible", igpd_mgr: "visible" } as const;
+const UH = { sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden" } as const;
+// Presales üst menü: PRESALES_VIEW veya COST_ANALYSIS_VIEW → sales_mgr + presales_mgr + technical_spec
+const UPRES = { ...UH, sales_mgr: "visible", presales_mgr: "visible", technical_spec: "visible" } as const;
+// CRM üst menü: CRM_VIEW → sales_mgr + igpd_mgr + presales_mgr
+const UCRM = { ...UH, sales_mgr: "visible", igpd_mgr: "visible", presales_mgr: "visible" } as const;
 
 export const uiMatrix: UiCase[] = [
   {
@@ -321,7 +332,7 @@ export const uiMatrix: UiCase[] = [
   {
     name: "Ayarlar menüsü",
     sidebarText: "Ayarlar",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH, admin: "visible" },
   },
   {
     // "Presales & Dizayn" üst menüsü, alt öğelerinden HERHANGİ BİRİ erişilebilir
