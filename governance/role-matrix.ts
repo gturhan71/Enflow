@@ -40,12 +40,14 @@ export interface RoleSpec {
   notes?: string;
 }
 
-// ── İskelet ───────────────────────────────────────────────────────────────────
-// staffing/kind/agentSubstitute ilk tahmindir; Faz 1'de teyit edilir/düzeltilir.
-// modules/endpointDomains/decisionRights/tasks BOŞ — Faz 1'de doldurulacak.
+// ── Matris ──────────────────────────────────────────────────────────────────
+// Faz 1'de tüm roller dolduruldu (reviewed DONE/ACCEPTED).
+// 2026-06-21: 14 eksik rol için gerçek kullanıcılar oluşturuldu → staffing=HUMAN
+// (önceki UNSTAFFED/AGENT_ONLY). agentSubstitute artık YEDEK (boş koltuk değil).
+// Notlardaki "DB personeli yok" ifadeleri bu tarihten önceki durumu yansıtır.
 export const ROLE_MATRIX: RoleSpec[] = [
   {
-    role: 'ADMIN', unit: 'Sistem', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'ADMIN', unit: 'Sistem', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['SETTINGS_VIEW', 'SETTINGS_COMPANY', 'SETTINGS_UNITS', 'SETTINGS_USERS', 'SETTINGS_PERMISSIONS', 'SETTINGS_INTEGRATIONS'],
     endpointDomains: [], decisionRights: [], tasks: [], approvalIn: [],
     reviewed: 'ACCEPTED',
@@ -109,7 +111,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Satış destek — İhale/İSAB modülü operasyonu; backend rol kapısı yok (frontend SALES_SUPPORT_VIEW).',
   },
   {
-    role: 'PRESALES_MGR', unit: 'Presales', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'PRESALES_MGR', unit: 'Presales', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'COST_ANALYSIS_VIEW', 'CRM_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [
@@ -136,7 +138,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Presales mühendisi — BoM/maliyet/teknik şartname sahibi. units.ts GET (read-only) erişimi var.',
   },
   {
-    role: 'TECHNICAL_SPEC', unit: 'Presales', kind: 'STAFF', staffing: 'UNSTAFFED',
+    role: 'TECHNICAL_SPEC', unit: 'Presales', kind: 'STAFF', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'COST_ANALYSIS_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [],
@@ -149,7 +151,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Teknik uzman — Presales mühendisine danışmanlık. DB personeli yok (tanımlı, atanmamış).',
   },
   {
-    role: 'PROJECT_MGR', unit: 'Proje', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'PROJECT_MGR', unit: 'Proje', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['contractWorkflow'],
     decisionRights: [
@@ -163,14 +165,14 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Proje birim yöneticisi — milestone/devir/maliyet. requiresApproval milestone geçişleri GM onayına gider. DB personeli yok; Project agent doldurur (devir/milestone).',
   },
   {
-    role: 'OPERATIONS_MGR', unit: 'Operasyon', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'OPERATIONS_MGR', unit: 'Operasyon', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'PROCUREMENT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [], decisionRights: [], tasks: [], approvalIn: [],
     reviewed: 'ACCEPTED',
     notes: 'Operasyon yöneticisi — tanımlı rol ama sisteme özgü somut karar mekanizması (onay/endpoint kapısı) YOK. DB personeli/agent yok. İleride operasyon akışı tanımlanırsa doldurulacak (ACCEPTED).',
   },
   {
-    role: 'PROCUREMENT_MGR', unit: 'Satın Alma', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'PROCUREMENT_MGR', unit: 'Satın Alma', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PROCUREMENT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [
@@ -183,7 +185,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Satın Alma birim yöneticisi — PR satınalma aşaması onayı + tedarikçi seçimi/PO. DB personeli yok; Procurement agent doldurur (en-ucuz-teklif otonom).',
   },
   {
-    role: 'FINANCE_MGR', unit: 'Finans', kind: 'MANAGER', staffing: 'AGENT_ONLY',
+    role: 'FINANCE_MGR', unit: 'Finans', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'FINANCE_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['contractWorkflow'],
     decisionRights: [
@@ -198,14 +200,14 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Finans birim yöneticisi — swimlane finansal onay + maliyet/fatura. DB personeli yok; Finance agent yalnız ADVISORY (para, asla otonom).',
   },
   {
-    role: 'HR_MGR', unit: 'İnsan Kaynakları', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'HR_MGR', unit: 'İnsan Kaynakları', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [], decisionRights: [], tasks: [], approvalIn: [],
     reviewed: 'ACCEPTED',
     notes: 'İK yöneticisi — tanımlı rol ama sistemde İK modülü/akışı YOK. DB personeli/agent yok. İK modülü eklenirse doldurulacak (ACCEPTED).',
   },
   {
-    role: 'AUDITOR', unit: 'Denetim', kind: 'STAFF', staffing: 'UNSTAFFED',
+    role: 'AUDITOR', unit: 'Denetim', kind: 'STAFF', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW'],
     endpointDomains: [],
     decisionRights: [],
@@ -217,7 +219,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Denetçi — salt-okunur denetim izi (ActivityLog). DB personeli yok; ActivityLog UI şu an GM-only. Ayrı AUDITOR erişimi ileride değerlendirilebilir (ACCEPTED).',
   },
   {
-    role: 'IGPD_MGR', unit: 'İGPD', kind: 'MANAGER', staffing: 'AGENT_ONLY',
+    role: 'IGPD_MGR', unit: 'İGPD', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['contractWorkflow'],
     decisionRights: [
@@ -231,7 +233,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'İş Geliştirme & Pazarlama yöneticisi — swimlane İGPD onayı + BD triyajı (deterministik agent annotation). DB personeli yok; İGPD agent doldurur.',
   },
   {
-    role: 'KGD_MGR', unit: 'Kalite Güvence', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'KGD_MGR', unit: 'Kalite Güvence', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CORPORATE_GOV_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [
@@ -242,7 +244,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Kalite Güvence yöneticisi — proje devri/kalite. Onay zincirinde değil; workflow adımı. DB personeli + agent YOK → workflow adımı manuel/atanmamış.',
   },
   {
-    role: 'KSU_MGR', unit: 'Sözleşme', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'KSU_MGR', unit: 'Sözleşme', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'CONTRACTS_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'DOCUMENTS_VIEW', 'ARCHIVE_VIEW', 'TODO_VIEW'],
     endpointDomains: ['contractWorkflow'],
     decisionRights: [
@@ -253,10 +255,10 @@ export const ROLE_MATRIX: RoleSpec[] = [
     ],
     tasks: [], approvalIn: ['OPPORTUNITY', 'PROPOSAL', 'CONTRACT_WORKFLOW_SIGNING'],
     reviewed: 'DONE',
-    notes: '⚠️ Kritik: Kontrat & Sözleşme yöneticisi — 3 onay zincirinde (sözleşme imzanın 1. aşaması). DB personeli + agent ikamesi YOK → bu aşamalar autoSkipOrphanStages ile SKIPPED oluyor. İleride personel atanmalı veya agent değerlendirilmeli.',
+    notes: 'Kontrat & Sözleşme yöneticisi — 3 onay zincirinde (sözleşme imzanın 1. aşaması). ✅ Artık gerçek personel atandı (sozlesme.uzmani@enflow.com) → imza/onay aşamaları auto-skip OLMUYOR (eski risk çözüldü).',
   },
   {
-    role: 'ISAB_MGR', unit: 'İhale Satın Alma', kind: 'MANAGER', staffing: 'UNSTAFFED',
+    role: 'ISAB_MGR', unit: 'İhale Satın Alma', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'SALES_SUPPORT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [], // tenders route'u rol kapısı yok (frontend SALES_SUPPORT_VIEW)
     decisionRights: [
@@ -269,7 +271,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'İhale Satın Alma birim yöneticisi — Tender/checklist/teminat + WON→Sözleşme (T3). DB personeli yok; Tender agent doldurur (checklist/deadline).',
   },
   {
-    role: 'LEGAL_MGR', unit: 'Hukuk', kind: 'MANAGER', staffing: 'AGENT_ONLY',
+    role: 'LEGAL_MGR', unit: 'Hukuk', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['contractWorkflow'],
     decisionRights: [

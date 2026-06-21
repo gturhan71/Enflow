@@ -118,3 +118,22 @@ adlarını ROLE_LABELS kanonik anahtarlarına hizala), RBAC 69/69 korunarak.
 - Seed izinleri = governance matris `modules` (UI görünürlüğü buradan türedi).
 - **Sonuç: RBAC 69 → 258 passed** (12 rol + cross-tenant izolasyonu). Seed kullanıcılar temizlendi. Bu, denetimdeki **C7 kapsam boşluğunu kapattı** → `audit:roles` artık **0 ERROR · 0 WARN · 1 INFO** (tek kalan: NAV GENERAL_MANAGER-as-perm, ACCEPTED).
 - Yeni dosyalar: `tests/rbac/global-setup.ts` + `playwright.config.ts` globalSetup; `rbac.config.ts` RoleName/ROLE_NAMES/roles/SEED_ROLES + matris expect'leri.
+
+## Faz 3 — Eksik roller için kalıcı kullanıcı oluşturma (2026-06-21)
+**Talep:** eksik roller için birer kullanıcı oluştur ve sisteme ekle.
+- **14 kalıcı kullanıcı** oluşturuldu (tenant-1, @enflow.com, izinler = governance matris modülleri, birim eşlemeli): ADMIN, PRESALES_MGR, TECHNICAL_SPEC, PROJECT_MGR, OPERATIONS_MGR, PROCUREMENT_MGR, FINANCE_MGR, HR_MGR, AUDITOR, IGPD_MGR, KGD_MGR, KSU_MGR, ISAB_MGR, LEGAL_MGR. Login (200) doğrulandı. Artık **19 rolün tamamının gerçek kullanıcısı var** (21 kullanıcı).
+- Matris `staffing`: 14 rol UNSTAFFED/AGENT_ONLY → **HUMAN**; `agentSubstitute` artık yedek. **KSU_MGR auto-skip riski ÇÖZÜLDÜ** (gerçek personel atandı).
+- Denetim (ara): 0 ERROR · 0 WARN · 8 INFO (7 yeni C7 kapsam boşluğu).
+
+## Faz 4 — RBAC tüm 19 role + seed kaldırma (2026-06-21)
+**Talep:** kalan 7 rolü de RBAC'a ekle.
+- Artık 19 rolün de gerçek kullanıcısı olduğundan **seed mekanizması kaldırıldı**: `global-setup.ts` silindi, `playwright.config` globalSetup çıkarıldı, `rbac.config` SEED_ROLES kaldırıldı; swimlane 7 rol `rbac-test-*` → gerçek `@enflow.com` email'lerine geçirildi.
+- 7 yeni rol RBAC'a eklendi (admin, presales_mgr, technical_spec, operations_mgr, hr_mgr, auditor, kgd_mgr) — gerçek kullanıcılar. apiMatrix/uiMatrix expect'leri spread sabitlerine (ND/NA/NCW/UH/UPRES/UCRM) eklenerek deterministik türetildi (hiçbiri gate'te değil → deny/allow; UI: admin→Ayarlar, presales_mgr/technical_spec→Presales, presales_mgr→CRM görünür).
+- **RBAC 258 → 405 passed** (19 rol + cross-tenant izolasyonu korundu). Seed yok → teardown yalnız test-mutasyonlarını siler.
+- Audit C7 extractor düzeltildi (tek-kelime rol adlarını da yakalar: admin/auditor).
+- **Nihai denetim: 0 ERROR · 0 WARN · 1 INFO** (tek kalan: NAV GENERAL_MANAGER-as-perm, ACCEPTED).
+
+## DURUM — Birim & Rol Yönetişimi TAMAM
+- 19 rol: kanonik matris (karar mekanizmaları + görevler) + gerçek kullanıcı + RBAC kapsamı + 0 ERROR denetim.
+- `pnpm audit:roles` deterministik bekçi; RBAC **405/405** (12→19 rol, cross-tenant dahil).
+- Açık (kod değil): NAV GENERAL_MANAGER-as-perm; satış izin-JSON drift'i (veri).
