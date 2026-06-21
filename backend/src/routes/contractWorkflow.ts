@@ -13,7 +13,7 @@ import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
-router.use(requireRole(['GENERAL_MANAGER', 'KSU_MGR', 'SALES_MANAGER', 'PROJECT_MANAGER', 'LEGAL_MGR', 'FINANCE_MGR', 'IGPD_MGR']));
+router.use(requireRole(['GENERAL_MANAGER', 'KSU_MGR', 'SALES_MGR', 'PROJECT_MGR', 'LEGAL_MGR', 'FINANCE_MGR', 'IGPD_MGR']));
 
 // ── Upload helpers ─────────────────────────────────────────────────────────────
 

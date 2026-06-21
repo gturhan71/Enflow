@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon --ext ts --ignore 'prisma/*.db' --ignore 'prisma/*.db-shm' --ignore 'prisma/*.db-wal' --ignore 'uploads/' --exec ts-node src/index.ts",
     "start": "ts-node src/index.ts",
+    "audit:roles": "ts-node --transpile-only src/scripts/auditRoles.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

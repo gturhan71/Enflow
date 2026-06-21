@@ -1,0 +1,5 @@
+{
+  "name": "enflow-governance",
+  "private": true,
+  "description": "Birim & rol sorumluluk matrisi (kanonik kaynak) — CommonJS scope (backend ts-node import edebilsin)"
+}

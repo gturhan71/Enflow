@@ -183,8 +183,8 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
   const [invoiceForm, setInvoiceForm] = useState({ invoiceNo: pr.invoiceNo ?? '', invoiceAmount: pr.invoiceAmount?.toString() ?? '', invoiceDate: pr.invoiceDate?.split('T')[0] ?? '', invoicePaidAt: pr.invoicePaidAt?.split('T')[0] ?? '' });
 
   const canApprove = () => {
-    if (pr.status === 'PENDING_UNIT' && (currentUserRole === 'SALES_MANAGER' || currentUserRole === 'GENERAL_MANAGER')) return true;
-    if (pr.status === 'PENDING_PROCUREMENT' && (currentUserRole === 'PROCUREMENT' || currentUserRole === 'GENERAL_MANAGER')) return true;
+    if (pr.status === 'PENDING_UNIT' && (currentUserRole === 'SALES_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
+    if (pr.status === 'PENDING_PROCUREMENT' && (currentUserRole === 'PROCUREMENT_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
     if (pr.status === 'PENDING_GM' && currentUserRole === 'GENERAL_MANAGER') return true;
     return false;
   };

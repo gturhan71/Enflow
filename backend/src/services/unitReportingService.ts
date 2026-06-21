@@ -10,13 +10,13 @@ export interface UnitDefinition {
 }
 
 export const UNIT_DEFINITIONS: UnitDefinition[] = [
-  { key: 'CRM', label: 'CRM / Satış', role: 'SALES_MANAGER' },
-  { key: 'PRESALES', label: 'Presales / Teknik', role: 'PRESALES' },
-  { key: 'PROCUREMENT', label: 'Satınalma', role: 'PROCUREMENT' },
+  { key: 'CRM', label: 'CRM / Satış', role: 'SALES_MGR' },
+  { key: 'PRESALES', label: 'Presales / Teknik', role: 'PRESALES_MGR' },
+  { key: 'PROCUREMENT', label: 'Satınalma', role: 'PROCUREMENT_MGR' },
   { key: 'FINANCE', label: 'Finans', role: 'FINANCE_MGR' },
   { key: 'LEGAL', label: 'Hukuk', role: 'LEGAL_MGR' },
   { key: 'TENDER', label: 'İhale / İSAB', role: 'ISAB_MGR' },
-  { key: 'PROJECT', label: 'Proje Yönetimi', role: 'PROJECT_MANAGER' },
+  { key: 'PROJECT', label: 'Proje Yönetimi', role: 'PROJECT_MGR' },
 ];
 
 export function getUnitDefinition(unitKey: string): UnitDefinition | undefined {
