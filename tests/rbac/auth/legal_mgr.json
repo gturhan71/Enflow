@@ -1,0 +1,26 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "enflow_current_user_tenant-1",
+          "value": "{\"id\":\"cmqo7qm2p00084rw3lk7z0jhg\",\"name\":\"RBAC LEGAL_MGR\",\"email\":\"rbac-test-legal_mgr@enflow.test\",\"role\":\"LEGAL_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"CONTRACTS_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":null,\"createdAt\":\"2026-06-21T20:02:18.049Z\",\"updatedAt\":\"2026-06-21T20:02:18.049Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+        },
+        {
+          "name": "enflow_auth_token",
+          "value": "Y21xbzdxbTJwMDAwODRydzNsazd6MGpoZw=="
+        },
+        {
+          "name": "enflow_active_tenant_id",
+          "value": "tenant-1"
+        },
+        {
+          "name": "enflow_theme",
+          "value": "light"
+        }
+      ]
+    }
+  ]
+}

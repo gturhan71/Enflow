@@ -1,0 +1,26 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:3000",
+      "localStorage": [
+        {
+          "name": "enflow_current_user_tenant-1",
+          "value": "{\"id\":\"cmqo7qm2x000c4rw3rabjz74d\",\"name\":\"RBAC ISAB_MGR\",\"email\":\"rbac-test-isab_mgr@enflow.test\",\"role\":\"ISAB_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"SALES_SUPPORT_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":null,\"createdAt\":\"2026-06-21T20:02:18.057Z\",\"updatedAt\":\"2026-06-21T20:02:18.057Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+        },
+        {
+          "name": "enflow_auth_token",
+          "value": "Y21xbzdxbTJ4MDAwYzRydzNyYWJqejc0ZA=="
+        },
+        {
+          "name": "enflow_active_tenant_id",
+          "value": "tenant-1"
+        },
+        {
+          "name": "enflow_theme",
+          "value": "light"
+        }
+      ]
+    }
+  ]
+}

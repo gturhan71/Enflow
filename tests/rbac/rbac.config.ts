@@ -36,22 +36,46 @@ export const apiBaseURL = process.env.ENFLOW_API_URL      ?? "http://localhost:3
 export type RoleName =
   | "general_manager"
   | "presales_eng"
-  | "sales_rep";
-  // Yeni roller buraya eklenir:
-  // | "sales_manager"
-  // | "procurement"
-  // | "legal"
-  // | "project_manager"
+  | "sales_rep"
+  // Gerçek DB kullanıcılı (seed YOK):
+  | "sales_mgr"
+  | "sales_support"
+  // Swimlane/yönetici rolleri — global-setup'ta seed edilir (rbac-test-* email):
+  | "finance_mgr"
+  | "igpd_mgr"
+  | "ksu_mgr"
+  | "project_mgr"
+  | "legal_mgr"
+  | "procurement_mgr"
+  | "isab_mgr";
 
 export const ROLE_NAMES: RoleName[] = [
   "general_manager",
   "presales_eng",
   "sales_rep",
-  // "sales_manager",
-  // "procurement",
-  // "legal",
-  // "project_manager",
+  "sales_mgr",
+  "sales_support",
+  "finance_mgr",
+  "igpd_mgr",
+  "ksu_mgr",
+  "project_mgr",
+  "legal_mgr",
+  "procurement_mgr",
+  "isab_mgr",
 ];
+
+// Seed edilen swimlane rolleri → DB rol anahtarı + seed izinleri (matris modülleri).
+// global-setup.ts bunları rbac-test-<key>@enflow.test email'iyle oluşturur;
+// global-teardown (cleanup: email contains 'rbac-test') otomatik siler.
+export const SEED_ROLES: Record<string, { dbRole: string; permissions: string[] }> = {
+  finance_mgr:     { dbRole: "FINANCE_MGR",     permissions: ["DASHBOARD_VIEW", "FINANCE_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+  igpd_mgr:        { dbRole: "IGPD_MGR",        permissions: ["DASHBOARD_VIEW", "CRM_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+  ksu_mgr:         { dbRole: "KSU_MGR",         permissions: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "MANAGEMENT_REPORTS_VIEW", "DOCUMENTS_VIEW", "ARCHIVE_VIEW", "TODO_VIEW"] },
+  project_mgr:     { dbRole: "PROJECT_MGR",     permissions: ["DASHBOARD_VIEW", "PROJECT_MGMT_VIEW", "MANAGEMENT_REPORTS_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+  legal_mgr:       { dbRole: "LEGAL_MGR",       permissions: ["DASHBOARD_VIEW", "CONTRACTS_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+  procurement_mgr: { dbRole: "PROCUREMENT_MGR", permissions: ["DASHBOARD_VIEW", "PROCUREMENT_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+  isab_mgr:        { dbRole: "ISAB_MGR",        permissions: ["DASHBOARD_VIEW", "SALES_SUPPORT_VIEW", "DOCUMENTS_VIEW", "TODO_VIEW"] },
+};
 
 export const roles: Record<RoleName, { email: string; tenantId: string }> = {
   general_manager: {
@@ -66,11 +90,17 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
     email:    process.env.SALES_EMAIL     ?? "mehmetkoc@enflow.com",
     tenantId: process.env.SALES_TENANT_ID ?? "tenant-1",
   },
-  // Yeni rol örneği (aktif edince üstteki RoleName ve ROLE_NAMES'e de ekle):
-  // sales_manager: {
-  //   email:    process.env.SALES_MANAGER_EMAIL     ?? "",
-  //   tenantId: process.env.SALES_MANAGER_TENANT_ID ?? "tenant-1",
-  // },
+  // Gerçek DB kullanıcıları (seed yok):
+  sales_mgr:     { email: process.env.SALES_MGR_EMAIL     ?? "nur.becerikli@enflow.coom", tenantId: "tenant-1" },
+  sales_support: { email: process.env.SALES_SUPPORT_EMAIL ?? "nesrin.kayik@enflow.com",   tenantId: "tenant-1" },
+  // Seed edilen swimlane rolleri (rbac-test-* → teardown siler):
+  finance_mgr:     { email: "rbac-test-finance_mgr@enflow.test",     tenantId: "tenant-1" },
+  igpd_mgr:        { email: "rbac-test-igpd_mgr@enflow.test",        tenantId: "tenant-1" },
+  ksu_mgr:         { email: "rbac-test-ksu_mgr@enflow.test",         tenantId: "tenant-1" },
+  project_mgr:     { email: "rbac-test-project_mgr@enflow.test",     tenantId: "tenant-1" },
+  legal_mgr:       { email: "rbac-test-legal_mgr@enflow.test",       tenantId: "tenant-1" },
+  procurement_mgr: { email: "rbac-test-procurement_mgr@enflow.test", tenantId: "tenant-1" },
+  isab_mgr:        { email: "rbac-test-isab_mgr@enflow.test",        tenantId: "tenant-1" },
 };
 
 // Başka tenant'tan kullanıcı — izolasyon testleri için
@@ -100,6 +130,13 @@ export const T1_IDS = {
 // Örnek: expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", sales_manager: "allow" }
 type Perm = "allow" | "deny";
 
+// Yeni 9 rol için tekrar eden expect blokları (route guard'larından deterministik türetildi).
+// Çoğu endpoint GM/özel-rol kapılı → yeni rollerin tümü deny; gate'siz GET'ler → tümü allow.
+const ND = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny" } as const; // gate'li (GM/özel) → yeni roller deny
+const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "allow", isab_mgr: "allow" } as const; // gate'siz (tenantMiddleware) → tümü allow
+// contract-workflows 7-rol gate: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL_MGR+FINANCE_MGR+IGPD_MGR
+const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny" } as const;
+
 export interface ApiCase {
   name: string;
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -114,20 +151,20 @@ export const apiMatrix: ApiCase[] = [
     name: "Kullanıcı listesi",
     method: "GET",
     path: "/api/users",
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
   {
     name: "Yeni kullanıcı oluştur",
     method: "POST",
     path: "/api/users",
     body: { name: "RBAC Test", email: "rbac-test@example.com", role: "SALES_REP", permissions: [] },
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
   {
     name: "Kullanıcı sil",
     method: "DELETE",
     path: `/api/users/${T1_IDS.dummyUserId}`,
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
 
   // --- Müşteri Yönetimi ---
@@ -135,13 +172,13 @@ export const apiMatrix: ApiCase[] = [
     name: "Müşteri listesi",
     method: "GET",
     path: "/api/customers",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow" },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
   {
     name: "Müşteri sil",
     method: "DELETE",
     path: `/api/customers/${T1_IDS.dummyUserId}`,
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
 
   // --- Fırsatlar ---
@@ -149,14 +186,14 @@ export const apiMatrix: ApiCase[] = [
     name: "Fırsat listesi",
     method: "GET",
     path: "/api/opportunities",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow" },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
   {
     name: "Yeni fırsat oluştur",
     method: "POST",
     path: "/api/opportunities",
     body: { title: "RBAC Test Fırsat", value: 0, status: "LEAD", probability: 10, customerId: "x", assignedToId: "x" },
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND },
   },
 
   // --- Teklifler ---
@@ -164,7 +201,7 @@ export const apiMatrix: ApiCase[] = [
     name: "Teklif listesi",
     method: "GET",
     path: "/api/proposals",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow" },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
 
   // --- Birimler ---
@@ -172,14 +209,14 @@ export const apiMatrix: ApiCase[] = [
     name: "Birim listesi",
     method: "GET",
     path: "/api/units",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "deny", ...ND },
   },
   {
     name: "Birim oluştur",
     method: "POST",
     path: "/api/units",
     body: { name: "RBAC Test Birim" },
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
 
   // --- Görevler ---
@@ -187,7 +224,7 @@ export const apiMatrix: ApiCase[] = [
     name: "Görev listesi",
     method: "GET",
     path: "/api/tasks",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow" },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
 
   // --- Sözleşme Süreci (yüksek hassasiyet) ---
@@ -195,14 +232,14 @@ export const apiMatrix: ApiCase[] = [
     name: "Sözleşme süreçleri listesi",
     method: "GET",
     path: "/api/contract-workflows",
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NCW },
   },
   {
     name: "Sözleşme süreci oluştur",
     method: "POST",
     path: "/api/contract-workflows",
     body: { title: "RBAC Test Sözleşme" },
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NCW },
   },
 
   // --- Arşiv ---
@@ -210,7 +247,7 @@ export const apiMatrix: ApiCase[] = [
     name: "Arşiv listesi",
     method: "GET",
     path: "/api/archive",
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
 ];
 
@@ -268,16 +305,23 @@ export interface UiCase {
   expect: Record<RoleName, "visible" | "hidden">;
 }
 
+// UI görünürlük — yeni roller (seed izinleri = matris modülleri; sales_mgr/support gerçek DB izinleri).
+const UH = { sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden" } as const;
+// Presales üst menü: PRESALES_VIEW veya COST_ANALYSIS_VIEW → yalnız sales_mgr (gerçek izinleri içeriyor)
+const UPRES = { ...UH, sales_mgr: "visible" } as const;
+// CRM üst menü: CRM_VIEW → sales_mgr (gerçek) + igpd_mgr (seed CRM_VIEW)
+const UCRM = { ...UH, sales_mgr: "visible", igpd_mgr: "visible" } as const;
+
 export const uiMatrix: UiCase[] = [
   {
     name: "Test Ortamı bölümü (sadece GM)",
     sidebarText: "Güvenlik Testi",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden" },
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
   },
   {
     name: "Ayarlar menüsü",
     sidebarText: "Ayarlar",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden" },
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
   },
   {
     // "Presales & Dizayn" üst menüsü, alt öğelerinden HERHANGİ BİRİ erişilebilir
@@ -288,11 +332,11 @@ export const uiMatrix: UiCase[] = [
     // ayrıca gizli kalır.
     name: "Presales menüsü",
     sidebarText: "Presales",
-    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible" },
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", ...UPRES },
   },
   {
     name: "CRM menüsü",
     sidebarText: "CRM",
-    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible" },
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", ...UCRM },
   },
 ];
