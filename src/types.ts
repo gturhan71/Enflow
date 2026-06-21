@@ -65,6 +65,10 @@ export interface Opportunity {
   status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
   description?: string;
   lostReason?: string;
+  agentTriage?: {
+    crm?: { recommendation: string; issues?: string[]; at: string };
+    igpd?: { recommendation: string; expectedValue: number; valueTier: string; at: string };
+  } | null;
   technicalStatus?: string;
   bomStatus?: string;
   tenantId?: string;

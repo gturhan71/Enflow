@@ -346,6 +346,22 @@ const legalHandler: AgentHandler = async (tenantId, entityId) => {
 
 const DAY_MS = 86400000;
 
+// Deterministik triyajı fırsata annotation olarak yaz — kritik alanlara (değer/olasılık/statü)
+// DOKUNMAZ; yalnız agentTriage JSON'unda ilgili agent bölümünü günceller (idempotent, geri-alınabilir).
+async function mergeTriage(
+  oppId: string,
+  section: 'crm' | 'igpd',
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const opp = await prisma.opportunity.findUnique({ where: { id: oppId }, select: { agentTriage: true } });
+  let prev: Record<string, unknown> = {};
+  if (opp?.agentTriage) {
+    try { prev = JSON.parse(opp.agentTriage); } catch { prev = {}; }
+  }
+  const next = { ...prev, [section]: payload };
+  await prisma.opportunity.update({ where: { id: oppId }, data: { agentTriage: JSON.stringify(next) } });
+}
+
 const crmHandler: AgentHandler = async (tenantId, entityId) => {
   const opp = await prisma.opportunity.findFirst({
     where: { id: entityId, tenantId },
@@ -386,6 +402,18 @@ const crmHandler: AgentHandler = async (tenantId, entityId) => {
     rationale: `CRM fırsat triyajı: "${opp.title}" (durum ${opp.status}, %${opp.probability}, ${opp.value.toLocaleString('tr-TR')} ₺, ${proposalCount} teklif). ${issues.length ? issues.join(' ') : 'Belirgin eksik yok.'} → ${recLabel}. (Danışman modu — insan ratifiye eder.)`,
     output: { status: opp.status, probability: opp.probability, value: opp.value, ageDays, proposalCount, issues, recommendation },
     taskTitle: `CRM önerisi: ${opp.title} (${recommendation === 'AT_RISK' ? 'risk' : recommendation === 'PROPOSAL_NEEDED' ? 'teklif' : recommendation === 'UPDATE_FIELDS' ? 'alan güncelle' : recommendation === 'FOLLOW_UP' ? 'takip' : 'işlem yok'})`,
+    // Otonom eylem: deterministik triyajı fırsata annotation yaz (açık fırsat + işlem gerekli ise)
+    autonomousAction:
+      isOpen && recommendation !== 'NO_ACTION'
+        ? {
+            kind: 'WRITE_CRM_TRIAGE',
+            summary: `CRM triyajı yazıldı: ${recommendation} (${issues.length} bulgu)`,
+            reversible: true,
+            execute: async () => {
+              await mergeTriage(entityId, 'crm', { recommendation, issues, at: new Date().toISOString() });
+            },
+          }
+        : null,
   };
 };
 
@@ -415,6 +443,18 @@ const igpdHandler: AgentHandler = async (tenantId, entityId) => {
     rationale: `İş Geliştirme değerlendirmesi: "${opp.title}" — değer ${opp.value.toLocaleString('tr-TR')} ₺ (${valueTier} kademe), olasılık %${opp.probability}, beklenen değer ≈ ${expectedValue.toLocaleString('tr-TR')} ₺, yaş ${ageDays} gün. → ${recLabel}. (Danışman modu — insan ratifiye eder.)`,
     output: { value: opp.value, probability: opp.probability, expectedValue, valueTier, ageDays, recommendation },
     taskTitle: `İş Geliştirme önerisi: ${opp.title} (${recommendation === 'PRIORITIZE' ? 'önceliklendir' : recommendation === 'NURTURE' ? 'besle' : recommendation === 'REVIEW' ? 'gözden geçir' : 'işlem yok'})`,
+    // Otonom eylem: beklenen değer + değer kademesi triyajını fırsata annotation yaz (açık + işlem gerekli ise)
+    autonomousAction:
+      isOpen && recommendation !== 'NO_ACTION'
+        ? {
+            kind: 'WRITE_IGPD_TRIAGE',
+            summary: `İGPD triyajı yazıldı: beklenen değer ${expectedValue.toLocaleString('tr-TR')} ₺ (${recommendation})`,
+            reversible: true,
+            execute: async () => {
+              await mergeTriage(entityId, 'igpd', { recommendation, expectedValue, valueTier, at: new Date().toISOString() });
+            },
+          }
+        : null,
   };
 };
 

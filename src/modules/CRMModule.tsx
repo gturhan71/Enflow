@@ -520,6 +520,21 @@ const CRMModule = ({
                       </div>
                     )}
 
+                    {(opp.agentTriage?.igpd || opp.agentTriage?.crm) && (
+                      <div className="flex flex-col gap-1">
+                        {opp.agentTriage.igpd && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5 self-start">
+                            🤖 BD: {opp.agentTriage.igpd.expectedValue.toLocaleString('tr-TR')} ₺ · {opp.agentTriage.igpd.recommendation}
+                          </span>
+                        )}
+                        {opp.agentTriage.crm && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-full px-2 py-0.5 self-start">
+                            🤖 CRM: {opp.agentTriage.crm.recommendation}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
                       {nextStage && opp.status !== 'WON' && opp.status !== 'LOST' && (
                         <button

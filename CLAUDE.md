@@ -305,6 +305,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 8.6 | CRM + İGPD agent (AGENT_IGPD yeni) → **8 agent tamam** | — |
 | 9 | Birimler-arası geçiş otomasyonu: **T3** İhale→Sözleşme · **T4** Sözleşme→Proje · **T5** Proje→Satınalma · **T6** Satınalma→Finans | faz9_flow_links |
 | 9 (agent otonomi) | Generic `autonomousAction` altyapısı — otonom mod artık önerdiğini **uygular** (recommend→act); ilk eylem Procurement en-ucuz-teklif-seç | faz9_autonomous_action |
+| 9 (agent otonomi 2) | CRM + İGPD **deterministik triyaj** otonom (annotation): `Opportunity.agentTriage` JSON'a yazar (kritik alanlara dokunmaz); Tender/Project/Presales **tasarım gereği danışman** | faz9_agent_triage |
 | Bakım | as-any temizliği (no-any) · Vite 8/Rolldown + TS 6 + @types/react · mobil drawer/safe-area · stray express kaldırma | — |
 
 Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
@@ -319,7 +320,8 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 - [x] **ContractWorkflow tam modüle terfi** (2026-06-20) — `ContractWorkflowTest`→`ContractWorkflowModule` rename; backend rol kapısı GM-only'den 7 yönetici role genişledi (GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL+FINANCE+İGPD; PRESALES/SALES_REP RBAC gereği deny); latent bug fix (gerçek `contract-workflow` sekmesinde opportunities/proposals yüklenmiyordu).
 - [x] **Agent otonomi genişlemesi — Faz 9 (recommend→act)** (2026-06-20) — Bugüne dek AUTONOMOUS mod yalnız auto-ratify ediyordu (etki-alanı mutasyonu yapmıyordu); artık döngü kapalı. Generic `autonomousAction` altyapısı: `AgentOutput` opsiyonel `{ kind, summary, reversible, execute }` döner; `runAgent` (`backend/src/services/virtualAgentService.ts`) bunu **yalnız** mod AUTONOMOUS + eklenti AUTONOMOUS'a izinli (`plugin.allowedModes`) + eylem `reversible` ise çalıştırır. İlk somut eylem **Procurement → en ucuz teklifi otomatik seç** (`SELECT_CHEAPEST_QUOTE`; deselect-all→select, idempotent/geri-alınabilir; sadece valid+öneri-var+seçilmemişse). Eylem `AgentRun.actionTaken`'a (migration `faz9_autonomous_action`) + ayrı `AGENT_ACTION` ActivityLog'a (actorType=AGENT, agentRunId) yazılır; handoff görevi "✅ … yapıldı, incele" olur. **Güvenlik:** ADVISORY modda eylem ASLA çalışmaz; `AGENT_FINANCE`/`AGENT_LEGAL` `allowedModes:['ADVISORY']` → AUTONOMOUS'a hiç geçemez (ikinci kemer `allowedAuto` guard). Frontend: `AgentRun.actionTaken` tipi + RunCard emerald rozeti + AgentTag drill-down satırı. Diğer handler'lar (tender/project/presales/igpd/crm) `autonomousAction` tanımlamaz → davranışları değişmez. `autoSkipOrphanStages` orphan-stage otonom dalı ayrı path, dokunulmadı.
   - **Doğrulama:** curl — ADVISORY→actionTaken null/seçim yok; AUTONOMOUS→Beta seçildi+RATIFIED+AGENT_ACTION log; rerun(alreadySelected)→eylem yok; AGENT_FINANCE→AUTONOMOUS=400; yanlış tenant=404. Playwright (GM) RunCard "Otonom eylem" rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
-- [ ] **Agent otonomi — kalan eylemler** — CRM/İGPD/Tender/Project/Presales için güvenli otonom mutasyonlar (altyapı hazır; her biri ayrı reversibility değerlendirmesi).
+- [x] **Agent otonomi 2 — CRM + İGPD deterministik triyaj** (2026-06-21, migration `faz9_agent_triage`) — İlke: yalnız **insan eli değmeden deterministik üretilebilen** çıktı otonom olur. CRM (kural-bazlı `recommendation` + issues) ve İGPD (`expectedValue = round(probability/100 × value)` + `valueTier` + `recommendation`) otonom modda triyajlarını yeni nullable `Opportunity.agentTriage` JSON alanına **annotation** olarak yazar — `value/probability/status/lostReason` gibi kritik alanlara **asla dokunmaz**, geri-alınabilir + idempotent (`mergeTriage` her agentın kendi bölümünü günceller, diğerini korur). `runAgent` **değişmedi** (Faz 9.1 altyapısı kullanıldı); `actionTaken` + `AGENT_ACTION` log + handoff görevi. Frontend: `Opportunity.agentTriage` tipi + CRM fırsat kartında 🤖 triyaj rozeti; `opportunities` GET parse. **Tender/Project/Presales tasarım gereği danışman** — deterministik-güvenli mutasyonları yok (checklist/devir evrakı kanıt ister; BoM/milestone insan kararı). Para/Hukuk `allowedModes:['ADVISORY']` kapsam dışı.
+  - **Doğrulama:** curl — ADVISORY→agentTriage null; AUTONOMOUS İGPD→`igpd.expectedValue=360000` (0.6×600k), value/prob/status değişmedi; CRM→`crm` yazıldı + `igpd` korundu (merge); rerun idempotent; WON fırsatta NO_ACTION→eylem yok; yanlış tenant=404. AGENT_ACTION logları actorType=AGENT. Playwright (GM) CRM kartında 🤖 BD/CRM rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
 - [ ] **Gerçek EKAP entegrasyonu** (şu an manuel İKN iskeleti).
 - [ ] **Entegrasyon katmanı doğrulaması** — Nextcloud DMS / Exchange e-posta / WhatsApp (denetimlerde kapsanmadı).
 
@@ -335,31 +337,31 @@ backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
-src/components/AgentTag.tsx ← services/apiService, lib/agentProvenance, types
-src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
-src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
-src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
+src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
+src/modules/ProposalEditor.tsx ← lib/utils, types
 src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
+src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
+src/modules/SecurityTestModule.tsx ← services/apiClient
+src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
+src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
+src/components/AgentTag.tsx ← services/apiService, lib/agentProvenance, types
+src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
-src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, types
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
-src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, constants, types
-src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
-src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ProposalEditor.tsx ← lib/utils, types
-src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
+src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 src/services/workflowService.ts ← apiService, whatsappService, exchangeService, types, utils/logger
@@ -368,9 +370,8 @@ backend/src/services/projectFactory.ts ← prismaClient, projectCodeService
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
-## changes (last 10 commits — 1 second ago)
+## changes (last 10 commits — 0 seconds ago)
 ```
-src/components/ErrorBoundary.tsx              ~ErrorBoundary
 src/modules/ActivityLogModule.tsx             +actionTone  +ActivityLogModule
 src/modules/ContractWorkflowModule.tsx        +apiFetch  +bestProposalPrice  +ContractWorkflowModule  +LegalView
 src/modules/ManagementReportingModule.tsx     +prevRange  +printReportWindow  +printUnitReport  +printOverview
@@ -378,8 +379,8 @@ src/services/apiService.ts                    ~ApiService
 src/services/workflowService.ts               ~WorkflowService
 backend/src/services/activityLog.ts           +logActivity
 backend/src/services/projectFactory.ts        +getMilestoneTemplate  +createProjectWithMilestones
-backend/src/services/virtualAgentService.ts   ~hasHandler
-.github/copilot-instructions.md               +ensureApprovalChain  +completeApprovalChain  +autoSkipOrphanStages  +resetApprovalChain
+backend/src/services/virtualAgentService.ts   ~runAgent  ~hasHandler
+.github/copilot-instructions.md               +logActivity  +getPlugin  +getAgentPluginForRole  +getMilestoneTemplate
 ```
 
 ## .github
@@ -394,23 +395,23 @@ h2 changes (last 10 commits — 1 second ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
-h3 backend/pnpm-lock.yaml
-h3 backend/prisma/migrations/20260617182226_add_workflow_default_and_skip_logic/migration.sql
-h3 backend/prisma/migrations/20260617203010_faz6a_finance/migration.sql
-h3 backend/prisma/migrations/20260617204307_faz6b_legal/migration.sql
+h3 backend/src/services/unitReportingService.ts
 h3 backend/prisma/migrations/20260618080234_faz7_unit_report/migration.sql
-h3 backend/prisma/migrations/20260617210532_faz6c_tender/migration.sql
 h3 backend/prisma/migrations/20260618095753_faz8_plugin_entitlement_agent_run/migration.sql
-h3 backend/src/services/approvalChainService.ts
-h3 backend/src/services/agentProvenance.ts
-h3 backend/src/services/activityLog.ts
 h3 backend/src/services/entitlementService.ts
+h3 backend/src/services/agentProvenance.ts
+h3 backend/src/services/approvalChainService.ts
+h3 backend/prisma/migrations/migration_lock.toml
+h3 backend/pnpm-lock.yaml
+h3 backend/src/services/activityLog.ts
 h3 backend/src/services/pluginCatalog.ts
 h3 backend/src/services/projectFactory.ts
-h3 backend/src/services/unitReportingService.ts
-h3 backend/src/services/workflowTemplateService.ts
 h3 backend/src/services/virtualAgentService.ts
 h2 src
+h3 src/lib/agentProvenance.ts
+h3 src/components/AgentTag.tsx
+h3 src/modules/VirtualAgentsTestModule.tsx
+h3 src/App.tsx
 ```
 
 ## backend
@@ -487,14 +488,14 @@ export async function autoSkipOrphanStages  :84-194
 export async function resetApprovalChain  :197-210
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
 ```
 
 ### backend/src/services/activityLog.ts
@@ -509,6 +510,21 @@ details?: Record<string, unknown> | null  :14-14
 actorType?: 'HUMAN' | 'AGENT'  :15-15
 agentRunId?: string | null  :16-16
 export async function logActivity  :19-36
+```
+
+### backend/src/services/projectFactory.ts
+```
+export interface ProjectFactoryInput  :58-79
+name?: string  :59-59
+type?: string  :60-60
+description?: string  :61-61
+customerId?: string  :62-62
+customerName?: string  :63-63
+opportunityId?: string  :64-64
+contractId?: string  :65-65
+pmId?: string  :66-66
+export function getMilestoneTemplate  :14-56
+export async function createProjectWithMilestones  :81-150
 ```
 
 ### backend/src/services/pluginCatalog.ts
@@ -528,30 +544,19 @@ export function getPlugin  :144-146
 export function getAgentPluginForRole  :150-154
 ```
 
-### backend/src/services/projectFactory.ts
-```
-export interface ProjectFactoryInput  :58-79
-name?: string  :59-59
-type?: string  :60-60
-description?: string  :61-61
-customerId?: string  :62-62
-customerName?: string  :63-63
-opportunityId?: string  :64-64
-contractId?: string  :65-65
-pmId?: string  :66-66
-export function getMilestoneTemplate  :14-56
-export async function createProjectWithMilestones  :81-150
-```
-
 ### backend/src/services/virtualAgentService.ts
 ```
-export interface AgentOutput  :13-18
+export interface AgentOutput  :13-25
 rationale: string  :14-14
 output: Record<string, unknown>  :15-15
 taskTitle: string  :17-17
-export function hasHandler  :401-403
-export async function runAgent  :409-414
-export async function ratifyAgentRun  :496-502
+autonomousAction?: { kind: string  :19-20
+summary: string  :21-21
+reversible: boolean  :22-22
+execute:  :23-23
+export function hasHandler  :432-434
+export async function runAgent  :440-445
+export async function ratifyAgentRun  :553-559
 ```
 
 ## src
@@ -563,26 +568,133 @@ export function parseAgentActor  :24-24
 export function agentDisplayLabel  :34-41
 ```
 
-### src/components/AgentTag.tsx
+### src/components/settings/UserManagement.tsx
 ```
-component AgentTag
-props AgentTagProps
+props UserManagementProps
 hook useState
+export UserManagement
+handler onSubmit
+```
+
+### src/modules/ContractModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export ContractModule
+handler onChange
 handler onClick
 ```
 
-### src/modules/VirtualAgentsTestModule.tsx
+### src/modules/DocumentsModule.tsx
+```
+props DocumentsModuleProps
+hook useState
+hook useMemo
+export DocumentsModule
+handler onChange
+handler onSubmit
+```
+
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
+handler onClick
+handler onChange
+```
+
+### src/components/ErrorBoundary.tsx
+```
+props Props
+```
+
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :8-15
+id?: string  :9-9
+pn: string  :10-10
+desc: string  :11-11
+qty: number  :12-12
+cost: number  :13-13
+margin: number  :14-14
+export const useBoM  :17-100
+```
+
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useBoM
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+```
+
+### src/modules/TodoModule.tsx
 ```
 hook useAuth
 hook useState
 hook useCallback
 hook useEffect
-export VirtualAgentsTestModule
+export TodoModule
+handler onClick
+handler onChange
+```
+
+### src/modules/SecurityTestModule.tsx
+```
+props ReportProps
+props Props
+hook useState
+hook useEffect
+hook useCallback
+export SecurityTestModule
+handler onSec
+handler onClick
+handler onDone
+```
+
+### src/modules/NegotiationModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+hook useRef
+export NegotiationModule
+handler onDeal
 handler onChange
 handler onClick
-handler onSetMode
-handler onDisable
-handler onRatify
+handler onSubmit
+```
+
+### src/modules/CostAnalysisModule.tsx
+```
+hook useState
+hook useMemo
+hook useEffect
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
 ```
 
 ### src/App.tsx
@@ -606,9 +718,12 @@ handler onLogout
 handler onLogin
 ```
 
-### src/components/ErrorBoundary.tsx
+### src/components/AgentTag.tsx
 ```
-props Props
+component AgentTag
+props AgentTagProps
+hook useState
+handler onClick
 ```
 
 ### src/components/settings/SubscriptionSettings.tsx
@@ -616,38 +731,6 @@ props Props
 props SubscriptionSettingsProps
 export SubscriptionSettings
 handler onChange
-```
-
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-export UserManagement
-handler onSubmit
-```
-
-### src/hooks/useBoM.ts
-```
-export interface AbbreviatedBoMItem  :8-15
-id?: string  :9-9
-pn: string  :10-10
-desc: string  :11-11
-qty: number  :12-12
-cost: number  :13-13
-margin: number  :14-14
-export const useBoM  :17-100
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
 ```
 
 ### src/layout/Sidebar.tsx
@@ -688,16 +771,6 @@ handler onConfirm
 handler onSubmit
 ```
 
-### src/modules/ContractModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export ContractModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/ContractWorkflowModule.tsx
 ```
 component ContractWorkflowModule
@@ -713,16 +786,6 @@ handler onClick
 handler onBlur
 ```
 
-### src/modules/CostAnalysisModule.tsx
-```
-hook useState
-hook useMemo
-hook useEffect
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/Dashboard.tsx
 ```
 hook useAuth
@@ -733,16 +796,6 @@ export Dashboard
 handler onOpps
 handler onValue
 handler onCount
-```
-
-### src/modules/DocumentsModule.tsx
-```
-props DocumentsModuleProps
-hook useState
-hook useMemo
-export DocumentsModule
-handler onChange
-handler onSubmit
 ```
 
 ### src/modules/LicenseTypesModule.tsx
@@ -770,33 +823,6 @@ hook useCallback
 handler onClick
 handler onChange
 handler onReviewed
-```
-
-### src/modules/NegotiationModule.tsx
-```
-hook useAuth
-hook useState
-hook useMemo
-hook useEffect
-hook useRef
-export NegotiationModule
-handler onDeal
-handler onChange
-handler onClick
-handler onSubmit
-```
-
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useBoM
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
 ```
 
 ### src/modules/ProcurementModule.tsx
@@ -839,30 +865,6 @@ handler onPrintReport
 handler onSelect
 ```
 
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
-### src/modules/SecurityTestModule.tsx
-```
-props ReportProps
-props Props
-hook useState
-hook useEffect
-hook useCallback
-export SecurityTestModule
-handler onSec
-handler onClick
-handler onDone
-```
-
 ### src/modules/SettingsModule.tsx
 ```
 props SettingsModuleProps
@@ -875,15 +877,18 @@ export SettingsModule
 handler onData
 ```
 
-### src/modules/TodoModule.tsx
+### src/modules/VirtualAgentsTestModule.tsx
 ```
 hook useAuth
 hook useState
 hook useCallback
 hook useEffect
-export TodoModule
-handler onClick
+export VirtualAgentsTestModule
 handler onChange
+handler onClick
+handler onSetMode
+handler onDisable
+handler onRatify
 ```
 
 ### src/modules/WorkflowBuilder.tsx

@@ -17,6 +17,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
   const parsed = opps.map((o: any) => ({
     ...o,
     costConfig: o.costConfig ? (() => { try { return JSON.parse(o.costConfig); } catch { return undefined; } })() : undefined,
+    agentTriage: o.agentTriage ? (() => { try { return JSON.parse(o.agentTriage); } catch { return null; } })() : null,
   }));
   res.json(parsed);
 }));

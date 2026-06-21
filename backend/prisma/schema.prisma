@@ -154,6 +154,7 @@ model Opportunity {
   status            String
   description       String?
   lostReason        String?       // status='LOST' olduğunda kapanış nedeni
+  agentTriage       String?       // JSON: { crm?:{recommendation,issues,at}, igpd?:{recommendation,expectedValue,valueTier,at} } — deterministik agent triyajı (annotation)
   technicalStatus   String        @default("PENDING")
   bomStatus         String        @default("DRAFT")
   costConfig        String?       // JSON: { baseCurrency, rates, marginMode, globalMargin }
