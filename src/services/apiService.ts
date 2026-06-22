@@ -272,6 +272,15 @@ class ApiService {
   async deleteDailyReport(id: string) {
     return apiClient.fetchWithAuth(`/visits/daily-reports/${id}`, { method: 'DELETE' });
   }
+  async shareReportPeriod(data: { userId: string; start: string; end: string }) {
+    return apiClient.fetchWithAuth('/visits/daily-reports/share-period', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async getReportSettings() {
+    return apiClient.fetchWithAuth('/visits/report-settings');
+  }
+  async updateReportSettings(shareIntervalDays: number) {
+    return apiClient.fetchWithAuth('/visits/report-settings', { method: 'PUT', body: JSON.stringify({ shareIntervalDays }) });
+  }
 
   // --- PROJE DEVİR PAKETİ (Faz 2) ---
   async getProjectHandoverDocs(projectId: string) {

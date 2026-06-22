@@ -672,7 +672,14 @@ model DailyReport {
   userName          String?
   date              DateTime
   content           String   // serbest metin günlük rapor
-  sharedWithManager Boolean  @default(false) // haftalık olarak yöneticiyle paylaşıldı mı
+  // İş bağlantısı matrisi (2 eksen): hangi iş üzerine raporlandı
+  meetingKind       String   @default("OTHER")       // INTRO(tanışma)|PLANNED|FOLLOWUP|OTHER
+  linkType          String   @default("NEW_CONTACT") // NEW_CONTACT|VISIT|OPPORTUNITY|PROJECT
+  linkId            String?                          // bağlı varlık id (soft-link); NEW_CONTACT'ta null
+  linkLabel         String?                          // anlık etiket (müşteri/fırsat/proje adı veya yeni iletişim)
+  isKnownToSystem   Boolean  @default(false)         // linkType != NEW_CONTACT (backend türetir)
+  sharedWithManager Boolean  @default(false) // dönem-toplu yöneticiyle paylaşıldı mı
+  sharedAt          DateTime?                        // toplu paylaşım anı
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }

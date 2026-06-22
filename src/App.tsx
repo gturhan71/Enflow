@@ -219,13 +219,13 @@ const TenantAppInner = ({
   const isContractWorkflowActive = activeTab === 'contract-workflow' || activeTab === 'contract-workflow-test';
 
   const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
-    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowActive
+    enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowActive || isVisitPlanActive
   });
   const { data: customersData } = useCustomers(tenantId, {
     enabled: isCrmActive || isVisitPlanActive
   });
   const { data: projectsData, isLoading: projectsLoading } = useProjects(tenantId, {
-    enabled: isDashboardActive || isProjectActive || isContractsActive || isTodoActive
+    enabled: isDashboardActive || isProjectActive || isContractsActive || isTodoActive || isVisitPlanActive
   });
   const { data: contractsData, isLoading: contractsLoading } = useContracts(tenantId, {
     enabled: isDashboardActive || isContractsActive || isTodoActive
@@ -350,7 +350,7 @@ const TenantAppInner = ({
 
       case 'procurement': return <ProcurementModule projects={projects} units={units} />;
       case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} />;
-      case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} />;
+      case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} opportunities={opportunities.map(o => ({ id: o.id, title: o.title }))} projects={projects.map(p => ({ id: p.id, name: p.name }))} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} proposals={proposals} setProposals={setProposals} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
