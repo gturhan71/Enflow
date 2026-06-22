@@ -518,6 +518,8 @@ export interface ConsolidationResult {
   newContacts: number;
   people: ConsolidationPerson[];
   matrix: Record<string, Record<string, number>>; // meetingKind × linkType
+  reportEntries: { date: string; userName: string; meetingKind: string; linkType: string; linkLabel: string | null; content: string }[];
+  visits: { date: string; customerName: string | null; type: string; status: string; note: string | null }[];
   visitReconciliation: {
     applicable: boolean;
     planned: number;
@@ -574,6 +576,18 @@ export async function computeConsolidation(
     ...(per.get(u.id) as { reportCount: number; knownCount: number; newCount: number; sharedCount: number }),
   }));
 
+  // Girilen içerikler — her günlük raporun metni (tarihe göre)
+  const reportEntries = [...reports]
+    .sort((a, b) => a.date.getTime() - b.date.getTime())
+    .map((r) => ({
+      date: r.date.toISOString(),
+      userName: r.userName ?? (userMap.get(r.userId)?.name ?? userMap.get(r.userId)?.email ?? ''),
+      meetingKind: r.meetingKind,
+      linkType: r.linkType,
+      linkLabel: r.linkLabel,
+      content: r.content,
+    }));
+
   // Ziyaret plan-gerçekleşen — ziyaret planı olan birim (Satış/CRM)
   const plans = await prisma.visitPlan.findMany({ where: { tenantId, weekOf: { gte: start, lte: end } }, include: { visits: true } });
   const applicable = unitKey === 'CRM' || plans.length > 0;
@@ -587,12 +601,22 @@ export async function computeConsolidation(
     pending: planned - completed - cancelled,
     coveragePct: planned ? Math.round((completed / planned) * 100) : 0,
   };
+  // Ziyaret detayları (girilen içerik: müşteri, tür, not)
+  const visits = [...allVisits]
+    .sort((a, b) => new Date(a.plannedDate).getTime() - new Date(b.plannedDate).getTime())
+    .map((v) => ({
+      date: (v.actualDate ?? v.plannedDate).toISOString(),
+      customerName: v.customerName,
+      type: v.type,
+      status: v.status,
+      note: v.needsCaptured,
+    }));
 
   return {
     unitKey, unitId, managerName: manager?.name ?? null, staffCount: users.length,
     period: { start: start.toISOString(), end: end.toISOString() },
     totalReports: reports.length, knownToSystem: known, newContacts: neu,
-    people, matrix, visitReconciliation,
+    people, matrix, reportEntries, visits, visitReconciliation,
   };
 }
 

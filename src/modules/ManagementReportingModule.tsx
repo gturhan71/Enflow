@@ -83,10 +83,17 @@ function consolidationHtml(c: ConsolidationResult): string {
   const vrHtml = vr.applicable
     ? `<h2>Ziyaret Plan-Gerçekleşen</h2><table><tr><th>Planlanan</th><th>Gerçekleşen</th><th>İptal</th><th>Bekleyen</th><th>Kapsama</th></tr>
        <tr><td>${vr.planned}</td><td>${vr.completed}</td><td>${vr.cancelled}</td><td>${vr.pending}</td><td><b>%${vr.coveragePct}</b></td></tr></table>` : '';
+  const dt = (s: string) => s.slice(0, 10);
+  const entryRows = (c.reportEntries || [])
+    .map(e => `<tr><td>${dt(e.date)}</td><td>${esc(e.userName)}</td><td>${MK_LABEL_PR[e.meetingKind] || e.meetingKind}</td><td>${LT_LABEL_PR[e.linkType] || e.linkType}${e.linkLabel ? ': ' + esc(e.linkLabel) : ''}</td><td>${esc(e.content)}</td></tr>`).join('');
+  const visitRows = (c.visits || [])
+    .map(v => `<tr><td>${dt(v.date)}</td><td>${esc(v.customerName || '')}</td><td>${esc(v.type)}</td><td>${esc(v.status)}</td><td>${esc(v.note || '')}</td></tr>`).join('');
   return `<h2>Konsolidasyon — Personel Günlük Raporları</h2>
   <p class="muted">${c.staffCount} personel · ${c.totalReports} rapor · Sistemde ${c.knownToSystem} · Yeni İletişim ${c.newContacts}</p>
   ${peopleRows ? `<table><tr><th>Personel</th><th>Rapor</th><th>Sistemde</th><th>Yeni</th><th>Paylaşılan</th></tr>${peopleRows}</table>` : '<p class="muted">Dönemde personel günlük raporu yok.</p>'}
+  ${entryRows ? `<h2>Günlük Rapor İçerikleri</h2><table><tr><th>Tarih</th><th>Personel</th><th>Toplantı</th><th>İş / Kaynak</th><th>Not / İçerik</th></tr>${entryRows}</table>` : ''}
   ${vrHtml}
+  ${visitRows ? `<h2>Ziyaretler (girilen detay)</h2><table><tr><th>Tarih</th><th>Müşteri</th><th>Tür</th><th>Durum</th><th>Görüşme Notu</th></tr>${visitRows}</table>` : ''}
   <h2>İş Bağlantısı Matrisi (Toplantı Türü × Kaynak)</h2>
   <table><tr><th>Toplantı \\ Kaynak</th>${lt.map(l => `<th>${LT_LABEL_PR[l]}</th>`).join('')}<th>Toplam</th></tr>${matrixRows}</table>`;
 }
@@ -221,10 +228,14 @@ function BottleneckPanel({ overview }: { overview: ReportOverview }) {
 
 // ── Konsolidasyon (personel günlük rapor + ziyaret plan-gerçekleşen) ─────────
 interface ConsolidationPerson { userId: string; name: string; role: string; isManager: boolean; reportCount: number; knownCount: number; newCount: number; sharedCount: number; }
+interface ConsolidationEntry { date: string; userName: string; meetingKind: string; linkType: string; linkLabel: string | null; content: string }
+interface ConsolidationVisit { date: string; customerName: string | null; type: string; status: string; note: string | null }
 interface ConsolidationResult {
   unitKey: string; staffCount: number; totalReports: number; knownToSystem: number; newContacts: number;
   managerName: string | null; people: ConsolidationPerson[];
   matrix?: Record<string, Record<string, number>>;
+  reportEntries?: ConsolidationEntry[];
+  visits?: ConsolidationVisit[];
   visitReconciliation: { applicable: boolean; planned: number; completed: number; cancelled: number; pending: number; coveragePct: number };
 }
 
@@ -260,6 +271,41 @@ function ConsolidationView({ c }: { c: ConsolidationResult }) {
             <span className={`px-2 py-0.5 rounded-full ${vr.coveragePct >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>Kapsama %{vr.coveragePct}</span>
           </div>
         </div>
+      )}
+      {/* Girilen içerikler — günlük rapor notları + ziyaret detayları */}
+      {!!(c.reportEntries && c.reportEntries.length) && (
+        <details className="mt-2 pt-2 border-t border-indigo-100">
+          <summary className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 cursor-pointer">Günlük Rapor İçerikleri ({c.reportEntries.length})</summary>
+          <div className="space-y-1.5 mt-2">
+            {c.reportEntries.map((e, i) => (
+              <div key={i} className="bg-white rounded-lg px-2.5 py-1.5 border border-slate-100">
+                <div className="flex items-center gap-2 flex-wrap text-[10px] text-slate-400 font-bold mb-0.5">
+                  <span>{e.date.slice(0, 10)}</span>
+                  <span className="text-indigo-500">{e.userName}</span>
+                  <span className="bg-indigo-50 text-indigo-600 px-1.5 rounded">{MK_LABEL_PR[e.meetingKind] || e.meetingKind}</span>
+                  <span className={`px-1.5 rounded ${e.linkType === 'NEW_CONTACT' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'}`}>{LT_LABEL_PR[e.linkType] || e.linkType}{e.linkLabel ? `: ${e.linkLabel}` : ''}</span>
+                </div>
+                <p className="text-[11px] text-slate-600">{e.content}</p>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+      {!!(c.visits && c.visits.length) && (
+        <details className="mt-2 pt-2 border-t border-indigo-100">
+          <summary className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 cursor-pointer">Ziyaretler ({c.visits.length})</summary>
+          <div className="space-y-1.5 mt-2">
+            {c.visits.map((v, i) => (
+              <div key={i} className="flex items-start justify-between gap-2 bg-white rounded-lg px-2.5 py-1.5 border border-slate-100 text-[11px]">
+                <div className="min-w-0">
+                  <span className="font-bold text-slate-700">{v.customerName || '—'}</span>
+                  {v.note && <span className="text-slate-500"> — {v.note}</span>}
+                </div>
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">{v.date.slice(0, 10)} · {v.status}</span>
+              </div>
+            ))}
+          </div>
+        </details>
       )}
     </div>
   );
