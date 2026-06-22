@@ -254,30 +254,47 @@ router.delete('/daily-reports/:id', asyncHandler(async (req: Request, res: Respo
 // GET: tüm tenant kullanıcıları okuyabilir (satışçı aralığı görmeli).
 // PUT: yalnız Satış Müdürü + GM (kadansı belirler). moduleSettings MERGE edilir.
 const DEFAULT_SHARE_INTERVAL = 7;
+const DEFAULT_TARGET_RATE = 80;
 
 router.get('/report-settings', asyncHandler(async (req: Request, res: Response) => {
   const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
   let ms: Record<string, unknown> = {};
   try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
   const dr = (ms.dailyReport as { shareIntervalDays?: number }) || {};
-  res.json({ shareIntervalDays: dr.shareIntervalDays ?? DEFAULT_SHARE_INTERVAL });
+  const vk = (ms.visitKpi as { targetRate?: number }) || {};
+  res.json({
+    shareIntervalDays: dr.shareIntervalDays ?? DEFAULT_SHARE_INTERVAL,
+    visitTargetRate: vk.targetRate ?? DEFAULT_TARGET_RATE,
+  });
 }));
 
 router.put('/report-settings', requireRole(['GENERAL_MANAGER', 'SALES_MGR']), asyncHandler(async (req: Request, res: Response) => {
-  const days = Number(req.body?.shareIntervalDays);
-  if (!Number.isFinite(days) || days < 1 || days > 365) {
-    return res.status(400).json({ error: 'shareIntervalDays 1–365 arası olmalı.' });
-  }
+  const hasDays = req.body?.shareIntervalDays !== undefined;
+  const hasTarget = req.body?.visitTargetRate !== undefined;
+  if (!hasDays && !hasTarget) return res.status(400).json({ error: 'shareIntervalDays veya visitTargetRate gerekli.' });
+
   const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
   let ms: Record<string, unknown> = {};
   try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
-  ms.dailyReport = { ...(ms.dailyReport as object || {}), shareIntervalDays: Math.round(days) };
+
+  if (hasDays) {
+    const days = Number(req.body.shareIntervalDays);
+    if (!Number.isFinite(days) || days < 1 || days > 365) return res.status(400).json({ error: 'shareIntervalDays 1–365 arası olmalı.' });
+    ms.dailyReport = { ...(ms.dailyReport as object || {}), shareIntervalDays: Math.round(days) };
+  }
+  if (hasTarget) {
+    const rate = Number(req.body.visitTargetRate);
+    if (!Number.isFinite(rate) || rate < 1 || rate > 100) return res.status(400).json({ error: 'visitTargetRate 1–100 arası olmalı.' });
+    ms.visitKpi = { ...(ms.visitKpi as object || {}), targetRate: Math.round(rate) };
+  }
   await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
   await logActivity({
     tenantId: req.tenantId, userId: req.userId, action: 'UPDATE',
-    entityType: 'REPORT_SETTINGS', entityId: req.tenantId, details: { shareIntervalDays: Math.round(days) },
+    entityType: 'REPORT_SETTINGS', entityId: req.tenantId, details: { ...(hasDays ? { shareIntervalDays: ms.dailyReport } : {}), ...(hasTarget ? { visitKpi: ms.visitKpi } : {}) },
   });
-  res.json({ shareIntervalDays: Math.round(days) });
+  const drr = (ms.dailyReport as { shareIntervalDays?: number }) || {};
+  const vkr = (ms.visitKpi as { targetRate?: number }) || {};
+  res.json({ shareIntervalDays: drr.shareIntervalDays ?? DEFAULT_SHARE_INTERVAL, visitTargetRate: vkr.targetRate ?? DEFAULT_TARGET_RATE });
 }));
 
 export default router;

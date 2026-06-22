@@ -506,6 +506,11 @@ export interface ConsolidationPerson {
   knownCount: number;
   newCount: number;
   sharedCount: number;
+  // Ziyaret-eşleşme KPI (planlanan ↔ yapılan+raporlanan)
+  plannedVisits: number;
+  completedVisits: number;
+  matchedVisits: number;   // tamamlanan VE o gün raporlanan
+  matchRate: number;       // matched/planned × 100 (skor)
 }
 export interface ConsolidationResult {
   unitKey: string;
@@ -520,6 +525,7 @@ export interface ConsolidationResult {
   matrix: Record<string, Record<string, number>>; // meetingKind × linkType
   reportEntries: { date: string; userName: string; meetingKind: string; linkType: string; linkLabel: string | null; content: string }[];
   visits: { date: string; customerName: string | null; type: string; status: string; note: string | null }[];
+  targetRate: number; // birim geneli ziyaret-eşleşme hedefi (%)
   visitReconciliation: {
     applicable: boolean;
     planned: number;
@@ -571,10 +577,46 @@ export async function computeConsolidation(
     const p = per.get(r.userId);
     if (p) { p.reportCount++; if (r.isKnownToSystem) p.knownCount++; else p.newCount++; if (r.sharedWithManager) p.sharedCount++; }
   }
-  const people: ConsolidationPerson[] = users.map((u) => ({
-    userId: u.id, name: u.name ?? u.email, role: u.role, isManager: u.id === manager?.id,
-    ...(per.get(u.id) as { reportCount: number; knownCount: number; newCount: number; sharedCount: number }),
-  }));
+
+  // Ziyaret planları (dönem) — per-personel KPI + genel mutabakat için tek seferde
+  const plans = await prisma.visitPlan.findMany({ where: { tenantId, weekOf: { gte: start, lte: end } }, include: { visits: true } });
+  // Birim geneli ziyaret-eşleşme hedefi (moduleSettings.visitKpi.targetRate)
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  let targetRate = 80;
+  try { const ms = JSON.parse(tenant?.moduleSettings || '{}'); if (ms?.visitKpi?.targetRate) targetRate = Number(ms.visitKpi.targetRate); } catch { /* default */ }
+
+  // Personelin rapor girdiği günler (YYYY-MM-DD) — eşleşme için
+  const dayKey = (d: Date) => d.toISOString().slice(0, 10);
+  const reportDaysByUser = new Map<string, Set<string>>();
+  for (const r of reports) {
+    if (!reportDaysByUser.has(r.userId)) reportDaysByUser.set(r.userId, new Set());
+    reportDaysByUser.get(r.userId)!.add(dayKey(r.date));
+  }
+  // Personelin ziyaret KPI'ı — plan sahibi (preparedById) = personel
+  const visitKpiByUser = new Map<string, { plannedVisits: number; completedVisits: number; matchedVisits: number }>();
+  for (const u of users) visitKpiByUser.set(u.id, { plannedVisits: 0, completedVisits: 0, matchedVisits: 0 });
+  for (const pl of plans) {
+    const k = visitKpiByUser.get(pl.preparedById);
+    if (!k) continue; // birim dışı plan sahibi
+    const days = reportDaysByUser.get(pl.preparedById) ?? new Set<string>();
+    for (const v of pl.visits) {
+      k.plannedVisits++;
+      if (v.status === 'COMPLETED') {
+        k.completedVisits++;
+        if (days.has(dayKey(v.actualDate ?? v.plannedDate))) k.matchedVisits++;
+      }
+    }
+  }
+
+  const people: ConsolidationPerson[] = users.map((u) => {
+    const base = per.get(u.id) as { reportCount: number; knownCount: number; newCount: number; sharedCount: number };
+    const vk = visitKpiByUser.get(u.id) as { plannedVisits: number; completedVisits: number; matchedVisits: number };
+    return {
+      userId: u.id, name: u.name ?? u.email, role: u.role, isManager: u.id === manager?.id,
+      ...base, ...vk,
+      matchRate: vk.plannedVisits ? Math.round((vk.matchedVisits / vk.plannedVisits) * 100) : 0,
+    };
+  });
 
   // Girilen içerikler — her günlük raporun metni (tarihe göre)
   const reportEntries = [...reports]
@@ -588,8 +630,7 @@ export async function computeConsolidation(
       content: r.content,
     }));
 
-  // Ziyaret plan-gerçekleşen — ziyaret planı olan birim (Satış/CRM)
-  const plans = await prisma.visitPlan.findMany({ where: { tenantId, weekOf: { gte: start, lte: end } }, include: { visits: true } });
+  // Ziyaret plan-gerçekleşen — ziyaret planı olan birim (Satış/CRM); plans yukarıda çekildi
   const applicable = unitKey === 'CRM' || plans.length > 0;
   const allVisits = plans.flatMap((p) => p.visits);
   const planned = allVisits.length;
@@ -616,7 +657,7 @@ export async function computeConsolidation(
     unitKey, unitId, managerName: manager?.name ?? null, staffCount: users.length,
     period: { start: start.toISOString(), end: end.toISOString() },
     totalReports: reports.length, knownToSystem: known, newContacts: neu,
-    people, matrix, reportEntries, visits, visitReconciliation,
+    people, matrix, reportEntries, visits, targetRate, visitReconciliation,
   };
 }
 

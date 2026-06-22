@@ -123,7 +123,10 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
     meetingKind: 'INTRO', linkType: 'NEW_CONTACT', linkId: '', linkLabel: '',
   });
   const [shareInterval, setShareInterval] = useState(7);
+  const [targetRate, setTargetRate] = useState(80);
   const [sharing, setSharing] = useState(false);
+  // Personel skor tablosu (yalnız yönetici) — bu haftanın konsolidasyonu
+  const [scoreboard, setScoreboard] = useState<{ userId: string; name: string; isManager: boolean; plannedVisits: number; completedVisits: number; matchedVisits: number; matchRate: number }[]>([]);
 
   const currentWeek = mondayOf(new Date());
 
@@ -133,11 +136,19 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
       const [planList, reportList, settings] = await Promise.all([
         apiService.getVisitPlans() as Promise<VisitPlan[]>,
         apiService.getDailyReports({ userId: currentUser?.id || '' }) as Promise<DailyReport[]>,
-        apiService.getReportSettings().catch(() => ({ shareIntervalDays: 7 })) as Promise<{ shareIntervalDays: number }>,
+        apiService.getReportSettings().catch(() => ({ shareIntervalDays: 7, visitTargetRate: 80 })) as Promise<{ shareIntervalDays: number; visitTargetRate: number }>,
       ]);
       setPlans(planList);
       setReports(reportList);
       setShareInterval(settings?.shareIntervalDays ?? 7);
+      setTargetRate(settings?.visitTargetRate ?? 80);
+      // Yönetici: bu hafta için personel ziyaret-eşleşme skorları
+      if (canSetInterval) {
+        const wEnd = new Date(currentWeek); wEnd.setDate(wEnd.getDate() + 6);
+        apiService.getReportConsolidation('CRM', { start: currentWeek, end: wEnd.toISOString().slice(0, 10) })
+          .then((c: { people?: typeof scoreboard }) => setScoreboard(c?.people ?? []))
+          .catch(() => setScoreboard([]));
+      }
     } catch {
       // sessizce geç
     } finally {
@@ -285,8 +296,14 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
 
   const handleUpdateInterval = async (days: number) => {
     setShareInterval(days);
-    try { await apiService.updateReportSettings(days); }
+    try { await apiService.updateReportSettings({ shareIntervalDays: days }); }
     catch { alert('Aralık güncellenemedi (yetki?).'); }
+  };
+
+  const handleUpdateTarget = async (rate: number) => {
+    setTargetRate(rate);
+    try { await apiService.updateReportSettings({ visitTargetRate: rate }); }
+    catch { alert('Hedef güncellenemedi (yetki?).'); }
   };
 
   // ── İş-bağlantısı matrisi (Toplantı Türü × Kaynak adet) — son `shareInterval` gün ──
@@ -490,6 +507,62 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
           </div>
         )}
       </div>
+
+      {/* ── Personel Hedefleri & Skor (yalnız yönetici) ─────────────────── */}
+      {canSetInterval && (
+        <div className="glass-panel rounded-[32px] p-8 bg-white border border-slate-100">
+          <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 className="text-emerald-500" size={20} />
+              <h4 className="text-base font-black text-slate-800 uppercase tracking-widest">Personel Hedefleri & Skor</h4>
+              <span className="text-[10px] text-slate-400 font-bold normal-case tracking-normal">— planlanan ↔ yapılan+raporlanan ziyaret eşleşmesi</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Birim hedefi:</span>
+              <input
+                type="number" min={1} max={100} value={targetRate}
+                onChange={e => handleUpdateTarget(Math.max(1, Math.min(100, Number(e.target.value) || 1)))}
+                title="Birim geneli ziyaret-eşleşme hedefi (%)"
+                className="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-center outline-none"
+              />
+              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">%</span>
+            </div>
+          </div>
+          {scoreboard.filter(p => p.plannedVisits > 0).length === 0 ? (
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-6">Bu hafta planlanan ziyaret yok.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-slate-400 text-left">
+                  <th className="font-black uppercase tracking-widest py-2">Personel</th>
+                  <th className="font-black uppercase tracking-widest text-center">Planlanan</th>
+                  <th className="font-black uppercase tracking-widest text-center">Tamamlanan</th>
+                  <th className="font-black uppercase tracking-widest text-center">Eşleşen</th>
+                  <th className="font-black uppercase tracking-widest text-center">Skor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {scoreboard.filter(p => p.plannedVisits > 0).map(p => {
+                  const met = p.matchRate >= targetRate;
+                  return (
+                    <tr key={p.userId} className="border-t border-slate-100">
+                      <td className="font-bold text-slate-700 py-2">{p.name}{p.isManager ? ' (yönetici)' : ''}</td>
+                      <td className="text-center text-slate-600 font-bold">{p.plannedVisits}</td>
+                      <td className="text-center text-slate-600 font-bold">{p.completedVisits}</td>
+                      <td className="text-center text-slate-600 font-bold">{p.matchedVisits}</td>
+                      <td className="text-center">
+                        <span className={cn('inline-block px-2.5 py-0.5 rounded-full text-[11px] font-black', met ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700')}>
+                          %{p.matchRate}{met ? ' ✓' : ` / %${targetRate}`}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
 
       {/* ── Günlük Rapor ───────────────────────────────────────────────── */}
       <div className="glass-panel rounded-[32px] p-8 bg-white border border-slate-100">

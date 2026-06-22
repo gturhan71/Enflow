@@ -281,8 +281,8 @@ class ApiService {
   async getReportSettings() {
     return apiClient.fetchWithAuth('/visits/report-settings');
   }
-  async updateReportSettings(shareIntervalDays: number) {
-    return apiClient.fetchWithAuth('/visits/report-settings', { method: 'PUT', body: JSON.stringify({ shareIntervalDays }) });
+  async updateReportSettings(opts: { shareIntervalDays?: number; visitTargetRate?: number }) {
+    return apiClient.fetchWithAuth('/visits/report-settings', { method: 'PUT', body: JSON.stringify(opts) });
   }
 
   // --- PROJE DEVİR PAKETİ (Faz 2) ---

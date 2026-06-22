@@ -70,8 +70,12 @@ const MK_LABEL_PR: Record<string, string> = { INTRO: 'Tanışma', PLANNED: 'Plan
 const LT_LABEL_PR: Record<string, string> = { NEW_CONTACT: 'Yeni İletişim', VISIT: 'Planlı Ziyaret', OPPORTUNITY: 'Fırsat', PROJECT: 'Proje' };
 
 function consolidationHtml(c: ConsolidationResult): string {
-  const peopleRows = c.people.filter(p => p.reportCount > 0)
-    .map(p => `<tr><td>${esc(p.name)}${p.isManager ? ' <b>(yönetici)</b>' : ''}</td><td>${p.reportCount}</td><td>${p.knownCount}</td><td>${p.newCount}</td><td>${p.sharedCount}</td></tr>`).join('');
+  const tgt = c.targetRate ?? 80;
+  const peopleRows = c.people.filter(p => p.reportCount > 0 || (p.plannedVisits ?? 0) > 0)
+    .map(p => {
+      const score = (p.plannedVisits ?? 0) > 0 ? `%${p.matchRate} (${p.matchedVisits}/${p.plannedVisits}, hedef %${tgt})` : '—';
+      return `<tr><td>${esc(p.name)}${p.isManager ? ' <b>(yönetici)</b>' : ''}</td><td>${p.reportCount}</td><td>${p.knownCount}</td><td>${p.newCount}</td><td>${p.sharedCount}</td><td>${score}</td></tr>`;
+    }).join('');
   const mk = ['INTRO', 'PLANNED', 'FOLLOWUP', 'OTHER']; const lt = ['NEW_CONTACT', 'VISIT', 'OPPORTUNITY', 'PROJECT'];
   const m = (c.matrix || {}) as Record<string, Record<string, number>>;
   const matrixRows = mk.map(k => {
@@ -90,7 +94,7 @@ function consolidationHtml(c: ConsolidationResult): string {
     .map(v => `<tr><td>${dt(v.date)}</td><td>${esc(v.customerName || '')}</td><td>${esc(v.type)}</td><td>${esc(v.status)}</td><td>${esc(v.note || '')}</td></tr>`).join('');
   return `<h2>Konsolidasyon — Personel Günlük Raporları</h2>
   <p class="muted">${c.staffCount} personel · ${c.totalReports} rapor · Sistemde ${c.knownToSystem} · Yeni İletişim ${c.newContacts}</p>
-  ${peopleRows ? `<table><tr><th>Personel</th><th>Rapor</th><th>Sistemde</th><th>Yeni</th><th>Paylaşılan</th></tr>${peopleRows}</table>` : '<p class="muted">Dönemde personel günlük raporu yok.</p>'}
+  ${peopleRows ? `<table><tr><th>Personel</th><th>Rapor</th><th>Sistemde</th><th>Yeni</th><th>Paylaşılan</th><th>Ziyaret Skoru</th></tr>${peopleRows}</table>` : '<p class="muted">Dönemde personel günlük raporu yok.</p>'}
   ${entryRows ? `<h2>Günlük Rapor İçerikleri</h2><table><tr><th>Tarih</th><th>Personel</th><th>Toplantı</th><th>İş / Kaynak</th><th>Not / İçerik</th></tr>${entryRows}</table>` : ''}
   ${vrHtml}
   ${visitRows ? `<h2>Ziyaretler (girilen detay)</h2><table><tr><th>Tarih</th><th>Müşteri</th><th>Tür</th><th>Durum</th><th>Görüşme Notu</th></tr>${visitRows}</table>` : ''}
@@ -227,7 +231,7 @@ function BottleneckPanel({ overview }: { overview: ReportOverview }) {
 }
 
 // ── Konsolidasyon (personel günlük rapor + ziyaret plan-gerçekleşen) ─────────
-interface ConsolidationPerson { userId: string; name: string; role: string; isManager: boolean; reportCount: number; knownCount: number; newCount: number; sharedCount: number; }
+interface ConsolidationPerson { userId: string; name: string; role: string; isManager: boolean; reportCount: number; knownCount: number; newCount: number; sharedCount: number; plannedVisits?: number; completedVisits?: number; matchedVisits?: number; matchRate?: number; }
 interface ConsolidationEntry { date: string; userName: string; meetingKind: string; linkType: string; linkLabel: string | null; content: string }
 interface ConsolidationVisit { date: string; customerName: string | null; type: string; status: string; note: string | null }
 interface ConsolidationResult {
@@ -236,6 +240,7 @@ interface ConsolidationResult {
   matrix?: Record<string, Record<string, number>>;
   reportEntries?: ConsolidationEntry[];
   visits?: ConsolidationVisit[];
+  targetRate?: number;
   visitReconciliation: { applicable: boolean; planned: number; completed: number; cancelled: number; pending: number; coveragePct: number };
 }
 
@@ -250,14 +255,26 @@ function ConsolidationView({ c }: { c: ConsolidationResult }) {
         <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700">Sistemde {c.knownToSystem}</span>
         <span className="bg-amber-50 px-2 py-0.5 rounded-full text-amber-700">Yeni İletişim {c.newContacts}</span>
       </div>
-      {c.people.some(p => p.reportCount > 0) && (
+      {c.people.some(p => p.reportCount > 0 || (p.plannedVisits ?? 0) > 0) && (
         <div className="space-y-1 mb-2">
-          {c.people.filter(p => p.reportCount > 0).map(p => (
-            <div key={p.userId} className="flex items-center justify-between text-[11px]">
-              <span className="font-bold text-slate-700">{p.name}{p.isManager ? ' (yönetici)' : ''}</span>
-              <span className="text-slate-500">{p.reportCount} rapor · sistemde {p.knownCount} · yeni {p.newCount}</span>
-            </div>
-          ))}
+          {c.people.filter(p => p.reportCount > 0 || (p.plannedVisits ?? 0) > 0).map(p => {
+            const tgt = c.targetRate ?? 80;
+            const hasVisits = (p.plannedVisits ?? 0) > 0;
+            const met = (p.matchRate ?? 0) >= tgt;
+            return (
+              <div key={p.userId} className="flex items-center justify-between text-[11px] gap-2">
+                <span className="font-bold text-slate-700">{p.name}{p.isManager ? ' (yönetici)' : ''}</span>
+                <span className="text-slate-500 flex items-center gap-2">
+                  <span>{p.reportCount} rapor · sistemde {p.knownCount} · yeni {p.newCount}</span>
+                  {hasVisits && (
+                    <span className={`px-1.5 py-0.5 rounded-full font-black ${met ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                      Skor %{p.matchRate} ({p.matchedVisits}/{p.plannedVisits}, hedef %{tgt})
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
       {vr.applicable && (
