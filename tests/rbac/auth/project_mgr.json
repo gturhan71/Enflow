@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmqo85ktf0003hlw32y4zj1el\",\"name\":\"Proje Yöneticisi\",\"email\":\"proje.yoneticisi@enflow.com\",\"role\":\"PROJECT_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"PROJECT_MGMT_VIEW\",\"MANAGEMENT_REPORTS_VIEW\",\"CONTRACTS_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmqe5vlc9000l2jw36qeyzgcs\",\"createdAt\":\"2026-06-21T20:13:56.259Z\",\"updatedAt\":\"2026-06-21T20:13:56.259Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+          "value": "{\"id\":\"cmqo85ktf0003hlw32y4zj1el\",\"name\":\"Proje Yöneticisi\",\"email\":\"proje.yoneticisi@enflow.com\",\"role\":\"PROJECT_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"PROJECT_MGMT_VIEW\",\"MANAGEMENT_REPORTS_VIEW\",\"CONTRACTS_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmqe5vlc9000l2jw36qeyzgcs\",\"createdAt\":\"2026-06-21T20:13:56.259Z\",\"updatedAt\":\"2026-06-21T20:13:56.259Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{\\\"dailyReport\\\":{\\\"shareIntervalDays\\\":7},\\\"visitKpi\\\":{\\\"targetRate\\\":80}}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-06-22T17:14:01.184Z\"}}"
         },
         {
           "name": "enflow_auth_token",

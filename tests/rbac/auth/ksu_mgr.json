@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmqo85kza000bhlw314wcuj3b\",\"name\":\"Kontrat & Sözleşme Uzmanı\",\"email\":\"sozlesme.uzmani@enflow.com\",\"role\":\"KSU_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"CONTRACTS_VIEW\",\"MANAGEMENT_REPORTS_VIEW\",\"DOCUMENTS_VIEW\",\"ARCHIVE_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmqgzh6u00001bji72otc111x\",\"createdAt\":\"2026-06-21T20:13:56.470Z\",\"updatedAt\":\"2026-06-21T20:13:56.470Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+          "value": "{\"id\":\"cmqo85kza000bhlw314wcuj3b\",\"name\":\"Kontrat & Sözleşme Uzmanı\",\"email\":\"sozlesme.uzmani@enflow.com\",\"role\":\"KSU_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"CONTRACTS_VIEW\",\"MANAGEMENT_REPORTS_VIEW\",\"DOCUMENTS_VIEW\",\"ARCHIVE_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmqgzh6u00001bji72otc111x\",\"createdAt\":\"2026-06-21T20:13:56.470Z\",\"updatedAt\":\"2026-06-21T20:13:56.470Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{\\\"dailyReport\\\":{\\\"shareIntervalDays\\\":7},\\\"visitKpi\\\":{\\\"targetRate\\\":80}}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-06-22T17:14:01.184Z\"}}"
         },
         {
           "name": "enflow_auth_token",

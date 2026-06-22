@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmqo85kvn0007hlw3tuyp2v0i\",\"name\":\"İnsan Kaynakları Müdürü\",\"email\":\"ik.muduru@enflow.com\",\"role\":\"HR_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp9ztbua000abqw32cjerazo\",\"createdAt\":\"2026-06-21T20:13:56.339Z\",\"updatedAt\":\"2026-06-21T20:13:56.339Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+          "value": "{\"id\":\"cmqo85kvn0007hlw3tuyp2v0i\",\"name\":\"İnsan Kaynakları Müdürü\",\"email\":\"ik.muduru@enflow.com\",\"role\":\"HR_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp9ztbua000abqw32cjerazo\",\"createdAt\":\"2026-06-21T20:13:56.339Z\",\"updatedAt\":\"2026-06-21T20:13:56.339Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{\\\"dailyReport\\\":{\\\"shareIntervalDays\\\":7},\\\"visitKpi\\\":{\\\"targetRate\\\":80}}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-06-22T17:14:01.184Z\"}}"
         },
         {
           "name": "enflow_auth_token",

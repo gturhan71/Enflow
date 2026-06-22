@@ -6,7 +6,7 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmp5lhehc000259w33zxhyy0p\",\"name\":\"Gökhan Turhan\",\"email\":\"gokhan@t-ecosystem.com\",\"role\":\"GENERAL_MANAGER\",\"permissions\":[\"ARCHIVE_VIEW\",\"CONTRACTS_VIEW\",\"COST_ANALYSIS_VIEW\",\"CRM_VIEW\",\"DASHBOARD_VIEW\",\"DOCUMENTS_VIEW\",\"PRESALES_VIEW\",\"PROJECT_MGMT_VIEW\",\"SALES_SUPPORT_VIEW\",\"SETTINGS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp5lheha000059w3rs1buoba\",\"createdAt\":\"2026-05-14T14:39:43.248Z\",\"updatedAt\":\"2026-05-17T17:30:50.190Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-05-14T14:39:43.241Z\"}}"
+          "value": "{\"id\":\"cmp5lhehc000259w33zxhyy0p\",\"name\":\"Gökhan Turhan\",\"email\":\"gokhan@t-ecosystem.com\",\"role\":\"GENERAL_MANAGER\",\"permissions\":[\"ARCHIVE_VIEW\",\"CONTRACTS_VIEW\",\"COST_ANALYSIS_VIEW\",\"CRM_VIEW\",\"DASHBOARD_VIEW\",\"DOCUMENTS_VIEW\",\"PRESALES_VIEW\",\"PROJECT_MGMT_VIEW\",\"SALES_SUPPORT_VIEW\",\"SETTINGS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp5lheha000059w3rs1buoba\",\"createdAt\":\"2026-05-14T14:39:43.248Z\",\"updatedAt\":\"2026-05-17T17:30:50.190Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{\\\"dailyReport\\\":{\\\"shareIntervalDays\\\":7},\\\"visitKpi\\\":{\\\"targetRate\\\":80}}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-06-22T17:14:01.184Z\"}}"
         },
         {
           "name": "enflow_auth_token",
