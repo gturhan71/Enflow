@@ -190,6 +190,51 @@ function BottleneckPanel({ overview }: { overview: ReportOverview }) {
   );
 }
 
+// ── Konsolidasyon (personel günlük rapor + ziyaret plan-gerçekleşen) ─────────
+interface ConsolidationPerson { userId: string; name: string; role: string; isManager: boolean; reportCount: number; knownCount: number; newCount: number; sharedCount: number; }
+interface ConsolidationResult {
+  unitKey: string; staffCount: number; totalReports: number; knownToSystem: number; newContacts: number;
+  managerName: string | null; people: ConsolidationPerson[];
+  visitReconciliation: { applicable: boolean; planned: number; completed: number; cancelled: number; pending: number; coveragePct: number };
+}
+
+function ConsolidationView({ c }: { c: ConsolidationResult }) {
+  const vr = c.visitReconciliation;
+  return (
+    <div className="bg-indigo-50/60 rounded-xl p-3 border border-indigo-100">
+      <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-2">Konsolidasyon — Personel Günlük Raporları</p>
+      <div className="flex items-center gap-2 flex-wrap mb-2 text-[11px] font-black">
+        <span className="bg-white px-2 py-0.5 rounded-full border border-slate-100 text-slate-600">{c.staffCount} personel</span>
+        <span className="bg-white px-2 py-0.5 rounded-full border border-slate-100 text-slate-600">{c.totalReports} rapor</span>
+        <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700">Sistemde {c.knownToSystem}</span>
+        <span className="bg-amber-50 px-2 py-0.5 rounded-full text-amber-700">Yeni İletişim {c.newContacts}</span>
+      </div>
+      {c.people.some(p => p.reportCount > 0) && (
+        <div className="space-y-1 mb-2">
+          {c.people.filter(p => p.reportCount > 0).map(p => (
+            <div key={p.userId} className="flex items-center justify-between text-[11px]">
+              <span className="font-bold text-slate-700">{p.name}{p.isManager ? ' (yönetici)' : ''}</span>
+              <span className="text-slate-500">{p.reportCount} rapor · sistemde {p.knownCount} · yeni {p.newCount}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {vr.applicable && (
+        <div className="mt-2 pt-2 border-t border-indigo-100">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-indigo-400 mb-1">Ziyaret Plan-Gerçekleşen</p>
+          <div className="flex items-center gap-2 flex-wrap text-[11px] font-black">
+            <span className="bg-white px-2 py-0.5 rounded-full border border-slate-100 text-slate-600">Planlanan {vr.planned}</span>
+            <span className="bg-emerald-50 px-2 py-0.5 rounded-full text-emerald-700">Gerçekleşen {vr.completed}</span>
+            <span className="bg-red-50 px-2 py-0.5 rounded-full text-red-600">İptal {vr.cancelled}</span>
+            <span className="bg-slate-100 px-2 py-0.5 rounded-full text-slate-600">Bekleyen {vr.pending}</span>
+            <span className={`px-2 py-0.5 rounded-full ${vr.coveragePct >= 70 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>Kapsama %{vr.coveragePct}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Rapor formu (yönetici-yazımı, ön-dolu metriklerle) ───────────────────────
 function ReportForm({ report, units, onClose, onSaved }: {
   report: UnitReport | null;
@@ -211,14 +256,18 @@ function ReportForm({ report, units, onClose, onSaved }: {
   const [risks, setRisks] = useState(report?.risks || '');
   const [summary, setSummary] = useState(report?.summary || '');
   const [preview, setPreview] = useState<UnitMetrics | null>(null);
+  const [consolidation, setConsolidation] = useState<ConsolidationResult | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Ön-dolu metrik önizlemesi (salt-okunur) — seçili birim+döneme göre
+  // Ön-dolu metrik + konsolidasyon önizlemesi (salt-okunur) — seçili birim+döneme göre
   useEffect(() => {
     let active = true;
     apiService.getUnitMetrics(unitKey, { start: periodStart, end: periodEnd })
       .then((m: UnitMetrics) => { if (active) setPreview(m); })
       .catch(() => { if (active) setPreview(null); });
+    apiService.getReportConsolidation(unitKey, { start: periodStart, end: periodEnd })
+      .then((c: ConsolidationResult) => { if (active) setConsolidation(c); })
+      .catch(() => { if (active) setConsolidation(null); });
     return () => { active = false; };
   }, [unitKey, periodStart, periodEnd]);
 
@@ -283,6 +332,10 @@ function ReportForm({ report, units, onClose, onSaved }: {
           ) : <p className="text-xs text-slate-400">Metrikler yükleniyor…</p>}
         </div>
 
+        {consolidation && (consolidation.totalReports > 0 || consolidation.visitReconciliation.applicable) && (
+          <ConsolidationView c={consolidation} />
+        )}
+
         {([
           ['Öne Çıkanlar', highlights, setHighlights],
           ['Sorunlar', issues, setIssues],
@@ -316,6 +369,8 @@ function IncomingReportCard({ report, onReviewed }: { report: UnitReport; onRevi
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const snapshot: UnitMetrics | null = report.metricsSnapshot ? JSON.parse(report.metricsSnapshot) : null;
+  let consolidation: ConsolidationResult | null = null;
+  try { consolidation = report.consolidationSnapshot ? JSON.parse(report.consolidationSnapshot) : null; } catch { consolidation = null; }
 
   const review = async (decision: 'APPROVE' | 'RETURN') => {
     setBusy(true);
@@ -353,6 +408,10 @@ function IncomingReportCard({ report, onReviewed }: { report: UnitReport; onRevi
                 </div>
               ))}
             </div>
+          )}
+          {consolidation && <ConsolidationView c={consolidation} />}
+          {report.escalatedToName && (
+            <p className="text-[11px] text-slate-500"><span className="font-bold">Üst birim yöneticisi:</span> {report.escalatedToName}</p>
           )}
           {([['Öne Çıkanlar', report.highlights], ['Sorunlar', report.issues], ['Planlanan Aksiyonlar', report.plannedActions], ['Riskler', report.risks], ['Genel Değerlendirme', report.summary]] as [string, string | null | undefined][])
             .filter(([, v]) => v)
@@ -436,9 +495,12 @@ export default function ManagementReportingModule() {
   }, []);
 
   const loadIncoming = useCallback(async () => {
-    const data = await apiService.getUnitReports({ status: 'SUBMITTED' });
+    // GM tümünü görür; diğer yöneticiler yalnız kendilerine yönlenen (escalate) raporları
+    const data = isGM
+      ? await apiService.getUnitReports({ status: 'SUBMITTED' })
+      : await apiService.getUnitReports({ pendingForReviewer: currentUser.id });
     setIncoming(Array.isArray(data) ? data : []);
-  }, []);
+  }, [isGM, currentUser.id]);
 
   useEffect(() => {
     apiService.getReportUnits().then((u: UnitDefinition[]) => setUnits(u)).catch(() => setUnits([]));

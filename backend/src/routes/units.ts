@@ -16,11 +16,28 @@ router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Reque
 }));
 
 router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
-  const { name, description, managerId } = req.body;
+  const { name, description, managerId, parentId } = req.body;
   const unit = await prisma.unit.create({
-    data: { name, description, managerId, tenantId: req.tenantId }
+    data: { name, description, managerId: managerId || null, parentId: parentId || null, tenantId: req.tenantId }
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'UNIT', entityId: unit.id, details: { name: unit.name } });
+  res.json(unit);
+}));
+
+router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const existing = await prisma.unit.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!existing) return res.status(404).json({ error: 'Birim bulunamadı.' });
+  const { name, description, managerId, parentId } = req.body;
+  // kendine parent olamaz
+  const safeParent = parentId && parentId !== id ? parentId : (parentId === null || parentId === '' ? null : existing.parentId);
+  const data: Record<string, unknown> = {};
+  if (name !== undefined) data.name = name;
+  if (description !== undefined) data.description = description;
+  if (managerId !== undefined) data.managerId = managerId || null;
+  if (parentId !== undefined) data.parentId = safeParent;
+  const unit = await prisma.unit.update({ where: { id }, data });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'UNIT', entityId: id, details: { name: unit.name, parentId: unit.parentId } });
   res.json(unit);
 }));
 

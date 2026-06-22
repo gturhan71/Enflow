@@ -111,8 +111,37 @@ const Dashboard = ({
   const [activeTab, setActiveTab] = useState<'overview' | 'performance'>('overview');
   const [logs, setLogs] = useState<any[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
+  const [incomingReports, setIncomingReports] = useState<any[]>([]);
+  const [allUnitReports, setAllUnitReports] = useState<any[]>([]);
 
-  const isManager = currentUser?.role === 'GENERAL_MANAGER';
+  const isGM = currentUser?.role === 'GENERAL_MANAGER';
+  const isManager = isGM || /_MGR$/.test(currentUser?.role || '');
+
+  // Yönetici: kendisine yönlenen (escalate) bekleyen raporlar + birim KPI için tüm raporlar
+  useEffect(() => {
+    if (!isManager) return;
+    const pendingP = isGM
+      ? apiService.getUnitReports({ status: 'SUBMITTED' })
+      : apiService.getUnitReports({ pendingForReviewer: currentUser?.id || '' });
+    Promise.all([pendingP, apiService.getUnitReports()])
+      .then(([pend, all]) => {
+        setIncomingReports(Array.isArray(pend) ? pend : []);
+        setAllUnitReports(Array.isArray(all) ? all : []);
+      })
+      .catch(() => { /* sessiz */ });
+  }, [isManager, isGM, currentUser?.id]);
+
+  // Birim KPI: birim başına rapor durumları (SUBMITTED/REVIEWED)
+  const reportKpiByUnit = useMemo(() => {
+    const map: Record<string, { unit: string; sunulan: number; onaylanan: number }> = {};
+    for (const r of allUnitReports) {
+      const k = r.unitLabel || r.unitKey;
+      if (!map[k]) map[k] = { unit: k, sunulan: 0, onaylanan: 0 };
+      if (r.status === 'SUBMITTED') map[k].sunulan++;
+      if (r.status === 'REVIEWED') map[k].onaylanan++;
+    }
+    return Object.values(map);
+  }, [allUnitReports]);
 
   useEffect(() => {
     if (activeTab === 'performance' && isManager) {
@@ -465,6 +494,56 @@ const Dashboard = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi, i) => <KPICard key={kpi.label} kpi={kpi} index={i} />)}
       </div>
+
+      {/* Yönetici: Gelen Birim Raporları + birim rapor KPI grafiği */}
+      {isManager && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="glass-panel rounded-3xl p-6 bg-white border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Gelen Raporlar</h4>
+              <span className={`text-[11px] font-black px-3 py-1 rounded-full ${incomingReports.length ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+                {incomingReports.length} bekliyor
+              </span>
+            </div>
+            {incomingReports.length === 0 ? (
+              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-8">İnceleme bekleyen rapor yok.</p>
+            ) : (
+              <div className="space-y-2">
+                {incomingReports.slice(0, 6).map((r) => (
+                  <div key={r.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 truncate">{r.unitLabel || r.unitKey}</p>
+                      <p className="text-[10px] text-slate-400">{(r.periodStart || '').slice(0, 10)} — {(r.periodEnd || '').slice(0, 10)} · {r.authorName || '—'}</p>
+                    </div>
+                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 shrink-0">SUNULDU</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {isGM && (
+            <div className="glass-panel rounded-3xl p-6 bg-white border border-slate-100 lg:col-span-2">
+              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Birim Rapor KPI</h4>
+              {reportKpiByUnit.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-8">Henüz birim raporu yok.</p>
+              ) : (
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={reportKpiByUnit}>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                      <XAxis dataKey="unit" tick={{ fontSize: 10 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                      <Tooltip />
+                      <Bar dataKey="sunulan" name="Sunulan" fill="#38bdf8" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="onaylanan" name="Onaylanan" fill="#34d399" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Approval Queue Section */}
       {approvalQueue.length > 0 && (

@@ -118,6 +118,9 @@ class ApiService {
   // --- UNITS ---
   async getUnits() { return settingsService.getUnits(); }
   async createUnit(data: Omit<Unit, 'id'>) { return settingsService.createUnit(data); }
+  async updateUnit(id: string, data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
   async deleteUnit(id: string, transferId?: string) { return settingsService.deleteUnit(id, transferId); }
 
   // --- USERS ---
@@ -462,9 +465,13 @@ class ApiService {
     return apiClient.fetchWithAuth(`/reports/unit-metrics?${qs}`);
   }
   async getWorkflowBottlenecks() { return apiClient.fetchWithAuth('/reports/bottlenecks'); }
-  async getUnitReports(params?: { unitKey?: string; status?: string }) {
+  async getUnitReports(params?: { unitKey?: string; status?: string; pendingForReviewer?: string; start?: string; end?: string }) {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiClient.fetchWithAuth(`/reports/unit-reports${qs}`);
+  }
+  async getReportConsolidation(unitKey: string, params?: { start?: string; end?: string }) {
+    const qs = new URLSearchParams({ unitKey, ...(params || {}) } as Record<string, string>).toString();
+    return apiClient.fetchWithAuth(`/reports/report-consolidation?${qs}`);
   }
   async getUnitReport(id: string) { return apiClient.fetchWithAuth(`/reports/unit-reports/${id}`); }
   async createUnitReport(data: Record<string, unknown>) {

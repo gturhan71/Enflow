@@ -8,6 +8,8 @@ import {
   computeUnitMetrics,
   computeOverview,
   computeWorkflowBottlenecks,
+  computeConsolidation,
+  resolveEscalationTarget,
 } from '../services/unitReportingService';
 
 const router: Router = Router();
@@ -61,8 +63,30 @@ router.get('/unit-reports', tenantMiddleware, asyncHandler(async (req: Request, 
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (req.query.unitKey) where.unitKey = String(req.query.unitKey);
   if (req.query.status) where.status = String(req.query.status);
+  // Bir üst yöneticiye yönlenmiş (escalate) bekleyen raporlar
+  if (req.query.pendingForReviewer) {
+    where.escalatedToId = String(req.query.pendingForReviewer);
+    where.status = 'SUBMITTED';
+  }
+  // Geriye dönük dönem filtresi (periyot başlangıcına göre)
+  if (req.query.start && req.query.end) {
+    where.periodStart = { gte: new Date(String(req.query.start)) };
+    where.periodEnd = { lte: new Date(String(req.query.end)) };
+  }
   const reports = await prisma.unitReport.findMany({ where, orderBy: { createdAt: 'desc' } });
   res.json(reports);
+}));
+
+// Konsolidasyon önizleme (submit öncesi canlı) — ?unitKey=&start=&end=
+router.get('/report-consolidation', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const unitKey = String(req.query.unitKey || '');
+  if (!getUnitDefinition(unitKey)) return res.status(400).json({ error: 'Geçersiz unitKey' });
+  const data = await computeConsolidation(
+    req.tenantId, unitKey,
+    req.query.start ? String(req.query.start) : undefined,
+    req.query.end ? String(req.query.end) : undefined,
+  );
+  res.json(data);
 }));
 
 // Tek rapor
@@ -169,18 +193,20 @@ router.post('/unit-reports/:id/submit', tenantMiddleware, asyncHandler(async (re
     res.status(409).json({ error: 'Yalnızca taslak veya iade edilmiş raporlar sunulabilir' });
     return;
   }
-  const metrics = await computeUnitMetrics(
-    req.tenantId,
-    existing.unitKey,
-    existing.periodStart.toISOString(),
-    existing.periodEnd.toISOString(),
-  );
+  const [metrics, consolidation, escalation] = await Promise.all([
+    computeUnitMetrics(req.tenantId, existing.unitKey, existing.periodStart.toISOString(), existing.periodEnd.toISOString()),
+    computeConsolidation(req.tenantId, existing.unitKey, existing.periodStart.toISOString(), existing.periodEnd.toISOString()),
+    resolveEscalationTarget(req.tenantId, existing.unitKey),
+  ]);
   const report = await prisma.unitReport.update({
     where: { id: existing.id },
     data: {
       status: 'SUBMITTED',
       submittedAt: new Date(),
       metricsSnapshot: metrics ? JSON.stringify(metrics) : null,
+      consolidationSnapshot: consolidation ? JSON.stringify(consolidation) : null,
+      escalatedToId: escalation.id,
+      escalatedToName: escalation.name,
     },
   });
   res.json(report);

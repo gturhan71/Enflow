@@ -120,6 +120,8 @@ export interface Unit {
   id: string;
   name: string;
   description?: string;
+  managerId?: string | null;
+  parentId?: string | null;
 }
 
 export interface CostRequirement {
@@ -802,6 +804,9 @@ export interface UnitReport {
   authorId?: string | null;
   authorName?: string | null;
   metricsSnapshot?: string | null;
+  consolidationSnapshot?: string | null;
+  escalatedToId?: string | null;
+  escalatedToName?: string | null;
   highlights?: string | null;
   issues?: string | null;
   plannedActions?: string | null;

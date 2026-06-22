@@ -30,29 +30,29 @@ export const UnitManagement = ({
     const formData = new FormData(e.target as HTMLFormElement);
     const name = formData.get('name') as string;
     const description = formData.get('description') as string;
-    
+    const parentId = (formData.get('parentId') as string) || null;
+
     if (!name) return;
 
     const unitData = {
       name,
       description,
+      parentId,
       tenantId: activeTenantId
     };
 
     setLoading(true);
     try {
       if (editingUnit) {
-        // Edit unit endpoint or similar, if not supported fallback to create
-        // The original code only implemented createUnit: apiService.createUnit(unitData)
-        const savedUnit = await apiService.createUnit(unitData);
-        setUnits([...units, savedUnit]);
+        const savedUnit = await apiService.updateUnit(editingUnit.id, unitData) as Unit;
+        setUnits(units.map(u => u.id === editingUnit.id ? savedUnit : u));
       } else {
         const savedUnit = await apiService.createUnit(unitData);
         setUnits([...units, savedUnit]);
       }
       setShowUnitModal(false);
       setEditingUnit(null);
-      alert('Birim başarıyla oluşturuldu.');
+      alert('Birim kaydedildi.');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Birim kaydedilemedi.');
     } finally {
@@ -152,12 +152,25 @@ export const UnitManagement = ({
                   required 
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500" 
                 />
-                <textarea 
-                  name="description" 
-                  placeholder="Birim Açıklaması" 
+                <textarea
+                  name="description"
+                  placeholder="Birim Açıklaması"
                   defaultValue={editingUnit?.description || ''}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none" 
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none"
                 />
+                <div>
+                  <label className="text-[10px] font-bold uppercase text-slate-400 ml-1">Üst Birim (rapor hiyerarşisi)</label>
+                  <select
+                    name="parentId"
+                    defaultValue={editingUnit?.parentId || ''}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                  >
+                    <option value="">— Üst birim yok —</option>
+                    {units.filter(u => u.id !== editingUnit?.id).map(u => (
+                      <option key={u.id} value={u.id}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div className="flex justify-end gap-3 pt-4">
                   <button 
                     type="button" 

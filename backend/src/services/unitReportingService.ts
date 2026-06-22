@@ -482,3 +482,122 @@ export async function computeOverview(
     bottlenecks,
   };
 }
+
+// ── Konsolidasyon (Faz: çok-seviyeli rapor) ──────────────────────────────────
+// Birim yöneticisinin raporu: dönemdeki personel günlük raporları +
+// ziyaret plan-gerçekleşen mutabakatı. Birim personeli def.role → yönetici
+// kullanıcı → unitId → o birimdeki tüm kullanıcılar üzerinden çözülür.
+export interface ConsolidationPerson {
+  userId: string;
+  name: string;
+  role: string;
+  isManager: boolean;
+  reportCount: number;
+  knownCount: number;
+  newCount: number;
+  sharedCount: number;
+}
+export interface ConsolidationResult {
+  unitKey: string;
+  unitId: string | null;
+  managerName: string | null;
+  staffCount: number;
+  period: { start: string; end: string };
+  totalReports: number;
+  knownToSystem: number;
+  newContacts: number;
+  people: ConsolidationPerson[];
+  matrix: Record<string, Record<string, number>>; // meetingKind × linkType
+  visitReconciliation: {
+    applicable: boolean;
+    planned: number;
+    completed: number;
+    cancelled: number;
+    pending: number;
+    coveragePct: number;
+  };
+}
+
+const MK = ['INTRO', 'PLANNED', 'FOLLOWUP', 'OTHER'];
+const LT = ['NEW_CONTACT', 'VISIT', 'OPPORTUNITY', 'PROJECT'];
+
+export async function computeConsolidation(
+  tenantId: string,
+  unitKey: string,
+  startStr?: string,
+  endStr?: string,
+): Promise<ConsolidationResult | null> {
+  const def = getUnitDefinition(unitKey);
+  if (!def) return null;
+  const { start, end } = resolvePeriod(startStr, endStr);
+
+  const manager = await prisma.user.findFirst({ where: { tenantId, role: def.role } });
+  const unitId = manager?.unitId ?? null;
+  const staff = unitId
+    ? await prisma.user.findMany({ where: { tenantId, unitId } })
+    : (manager ? [manager] : []);
+  const userMap = new Map<string, typeof staff[number]>();
+  for (const u of staff) userMap.set(u.id, u);
+  if (manager) userMap.set(manager.id, manager);
+  const users = [...userMap.values()];
+  const userIds = users.map((u) => u.id);
+
+  const reports = userIds.length
+    ? await prisma.dailyReport.findMany({ where: { tenantId, userId: { in: userIds }, date: { gte: start, lte: end } } })
+    : [];
+
+  const matrix: Record<string, Record<string, number>> = {};
+  for (const mk of MK) { matrix[mk] = {}; for (const lt of LT) matrix[mk][lt] = 0; }
+  let known = 0, neu = 0;
+  const per = new Map<string, { reportCount: number; knownCount: number; newCount: number; sharedCount: number }>();
+  for (const u of users) per.set(u.id, { reportCount: 0, knownCount: 0, newCount: 0, sharedCount: 0 });
+  for (const r of reports) {
+    const mk = MK.includes(r.meetingKind) ? r.meetingKind : 'OTHER';
+    const lt = LT.includes(r.linkType) ? r.linkType : 'NEW_CONTACT';
+    matrix[mk][lt]++;
+    if (r.isKnownToSystem) known++; else neu++;
+    const p = per.get(r.userId);
+    if (p) { p.reportCount++; if (r.isKnownToSystem) p.knownCount++; else p.newCount++; if (r.sharedWithManager) p.sharedCount++; }
+  }
+  const people: ConsolidationPerson[] = users.map((u) => ({
+    userId: u.id, name: u.name ?? u.email, role: u.role, isManager: u.id === manager?.id,
+    ...(per.get(u.id) as { reportCount: number; knownCount: number; newCount: number; sharedCount: number }),
+  }));
+
+  // Ziyaret plan-gerçekleşen — ziyaret planı olan birim (Satış/CRM)
+  const plans = await prisma.visitPlan.findMany({ where: { tenantId, weekOf: { gte: start, lte: end } }, include: { visits: true } });
+  const applicable = unitKey === 'CRM' || plans.length > 0;
+  const allVisits = plans.flatMap((p) => p.visits);
+  const planned = allVisits.length;
+  const completed = allVisits.filter((v) => v.status === 'COMPLETED').length;
+  const cancelled = allVisits.filter((v) => v.status === 'CANCELLED').length;
+  const visitReconciliation = {
+    applicable,
+    planned, completed, cancelled,
+    pending: planned - completed - cancelled,
+    coveragePct: planned ? Math.round((completed / planned) * 100) : 0,
+  };
+
+  return {
+    unitKey, unitId, managerName: manager?.name ?? null, staffCount: users.length,
+    period: { start: start.toISOString(), end: end.toISOString() },
+    totalReports: reports.length, knownToSystem: known, newContacts: neu,
+    people, matrix, visitReconciliation,
+  };
+}
+
+// Raporun yönlendiği üst birim yöneticisi: unit → parentId → parent.manager
+export async function resolveEscalationTarget(
+  tenantId: string,
+  unitKey: string,
+): Promise<{ id: string | null; name: string | null }> {
+  const def = getUnitDefinition(unitKey);
+  if (!def) return { id: null, name: null };
+  const manager = await prisma.user.findFirst({ where: { tenantId, role: def.role } });
+  if (!manager?.unitId) return { id: null, name: null };
+  const unit = await prisma.unit.findUnique({ where: { id: manager.unitId } });
+  if (!unit?.parentId) return { id: null, name: null };
+  const parent = await prisma.unit.findUnique({ where: { id: unit.parentId }, include: { manager: true } });
+  if (!parent?.manager) return { id: null, name: null };
+  return { id: parent.manager.id, name: parent.manager.name ?? parent.manager.email };
+}

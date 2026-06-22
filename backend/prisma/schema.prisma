@@ -88,9 +88,12 @@ model Unit {
   description String?
   tenantId    String
   managerId   String?
+  parentId    String?  // üst birim (hiyerarşi — rapor escalation hedefi)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   manager     User?    @relation("UnitManager", fields: [managerId], references: [id])
+  parent      Unit?    @relation("UnitHierarchy", fields: [parentId], references: [id])
+  children    Unit[]   @relation("UnitHierarchy")
   tenant      Tenant   @relation(fields: [tenantId], references: [id])
   users       User[]
   steps       WorkflowStep[]
@@ -989,6 +992,9 @@ model UnitReport {
   authorId        String?
   authorName      String?
   metricsSnapshot String?   // gönderim anında computeUnitMetrics JSON snapshot'ı
+  consolidationSnapshot String? // gönderim anı konsolidasyon JSON (personel günlük rapor + ziyaret plan-gerçekleşen)
+  escalatedToId   String?   // raporun yönlendiği üst birim yöneticisi (snapshot)
+  escalatedToName String?
   highlights      String?   // öne çıkanlar
   issues          String?   // sorunlar
   plannedActions  String?   // planlanan aksiyonlar
