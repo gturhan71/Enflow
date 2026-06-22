@@ -66,14 +66,43 @@ function printReportWindow(title: string, body: string) {
 
 const esc = (s: string) => s.replace(/[<>&]/g, c => ({ '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c] as string));
 
+const MK_LABEL_PR: Record<string, string> = { INTRO: 'Tanışma', PLANNED: 'Planlı', FOLLOWUP: 'Takip', OTHER: 'Diğer' };
+const LT_LABEL_PR: Record<string, string> = { NEW_CONTACT: 'Yeni İletişim', VISIT: 'Planlı Ziyaret', OPPORTUNITY: 'Fırsat', PROJECT: 'Proje' };
+
+function consolidationHtml(c: ConsolidationResult): string {
+  const peopleRows = c.people.filter(p => p.reportCount > 0)
+    .map(p => `<tr><td>${esc(p.name)}${p.isManager ? ' <b>(yönetici)</b>' : ''}</td><td>${p.reportCount}</td><td>${p.knownCount}</td><td>${p.newCount}</td><td>${p.sharedCount}</td></tr>`).join('');
+  const mk = ['INTRO', 'PLANNED', 'FOLLOWUP', 'OTHER']; const lt = ['NEW_CONTACT', 'VISIT', 'OPPORTUNITY', 'PROJECT'];
+  const m = (c.matrix || {}) as Record<string, Record<string, number>>;
+  const matrixRows = mk.map(k => {
+    const cells = lt.map(l => `<td>${(m[k] && m[k][l]) || 0}</td>`).join('');
+    const tot = lt.reduce((s, l) => s + ((m[k] && m[k][l]) || 0), 0);
+    return `<tr><td>${MK_LABEL_PR[k]}</td>${cells}<td><b>${tot}</b></td></tr>`;
+  }).join('');
+  const vr = c.visitReconciliation;
+  const vrHtml = vr.applicable
+    ? `<h2>Ziyaret Plan-Gerçekleşen</h2><table><tr><th>Planlanan</th><th>Gerçekleşen</th><th>İptal</th><th>Bekleyen</th><th>Kapsama</th></tr>
+       <tr><td>${vr.planned}</td><td>${vr.completed}</td><td>${vr.cancelled}</td><td>${vr.pending}</td><td><b>%${vr.coveragePct}</b></td></tr></table>` : '';
+  return `<h2>Konsolidasyon — Personel Günlük Raporları</h2>
+  <p class="muted">${c.staffCount} personel · ${c.totalReports} rapor · Sistemde ${c.knownToSystem} · Yeni İletişim ${c.newContacts}</p>
+  ${peopleRows ? `<table><tr><th>Personel</th><th>Rapor</th><th>Sistemde</th><th>Yeni</th><th>Paylaşılan</th></tr>${peopleRows}</table>` : '<p class="muted">Dönemde personel günlük raporu yok.</p>'}
+  ${vrHtml}
+  <h2>İş Bağlantısı Matrisi (Toplantı Türü × Kaynak)</h2>
+  <table><tr><th>Toplantı \\ Kaynak</th>${lt.map(l => `<th>${LT_LABEL_PR[l]}</th>`).join('')}<th>Toplam</th></tr>${matrixRows}</table>`;
+}
+
 function printUnitReport(r: UnitReport) {
   let snap: UnitMetrics | null = null;
   try { snap = r.metricsSnapshot ? JSON.parse(r.metricsSnapshot) : null; } catch { snap = null; }
+  let cons: ConsolidationResult | null = null;
+  try { cons = r.consolidationSnapshot ? JSON.parse(r.consolidationSnapshot) : null; } catch { cons = null; }
   const metricRows = snap ? snap.metrics.map(m => `<tr><td>${esc(m.label)}</td><td>${fmtValue(m)}</td><td>${esc(m.hint ?? '')}</td></tr>`).join('') : '';
   const narr = (label: string, v?: string | null) => v ? `<h2>${label}</h2><p class="narr">${esc(v)}</p>` : '';
   const body = `
   <h1>Birim Raporu — ${esc(r.unitLabel)}</h1>
-  <p class="muted">${r.periodStart.slice(0, 10)} — ${r.periodEnd.slice(0, 10)} · Durum: ${STATUS_BADGE[r.status]?.label ?? r.status}${r.docNumber ? ` · ${esc(r.docNumber)}` : ''}${r.authorName ? ` · ${esc(r.authorName)}` : ''}</p>
+  <p class="muted">${r.periodLabel ? esc(r.periodLabel) + ' · ' : ''}${r.periodStart.slice(0, 10)} — ${r.periodEnd.slice(0, 10)} · Durum: ${STATUS_BADGE[r.status]?.label ?? r.status}${r.docNumber ? ` · ${esc(r.docNumber)}` : ''}${r.authorName ? ` · ${esc(r.authorName)}` : ''}</p>
+  ${r.escalatedToName ? `<p class="muted">Üst birim yöneticisine sunuldu: <b>${esc(r.escalatedToName)}</b></p>` : ''}
+  ${cons ? consolidationHtml(cons) : ''}
   ${metricRows ? `<h2>Otomatik Metrikler (gönderim anı)</h2><table><tr><th>Metrik</th><th>Değer</th><th>Not</th></tr>${metricRows}</table>` : ''}
   ${narr('Öne Çıkanlar', r.highlights)}
   ${narr('Sorunlar', r.issues)}
@@ -195,6 +224,7 @@ interface ConsolidationPerson { userId: string; name: string; role: string; isMa
 interface ConsolidationResult {
   unitKey: string; staffCount: number; totalReports: number; knownToSystem: number; newContacts: number;
   managerName: string | null; people: ConsolidationPerson[];
+  matrix?: Record<string, Record<string, number>>;
   visitReconciliation: { applicable: boolean; planned: number; completed: number; cancelled: number; pending: number; coveragePct: number };
 }
 

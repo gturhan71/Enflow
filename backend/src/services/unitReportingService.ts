@@ -29,11 +29,21 @@ export interface Period {
   end: Date;
 }
 
-/** Verilmeyen tarihler için içinde bulunulan ayı varsayılan döner. */
+/** Verilmeyen tarihler için içinde bulunulan ayı varsayılan döner.
+ *  Dönem sonu tarih-only/gün-başı (00:00) verildiğinde o günün SONUNA (23:59:59.999)
+ *  çekilir → son günün verisi kapsam dışı kalmaz (kapsayıcı dönem-sonu). */
 export function resolvePeriod(startStr?: string, endStr?: string): Period {
   const now = new Date();
   const start = startStr ? new Date(startStr) : new Date(now.getFullYear(), now.getMonth(), 1);
-  const end = endStr ? new Date(endStr) : new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  let end: Date;
+  if (endStr) {
+    end = new Date(endStr);
+    if (end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0 && end.getUTCMilliseconds() === 0) {
+      end.setUTCHours(23, 59, 59, 999); // gün-başı → gün-sonu (kapsayıcı)
+    }
+  } else {
+    end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+  }
   return { start, end };
 }
 
