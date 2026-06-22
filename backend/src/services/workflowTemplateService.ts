@@ -11,63 +11,94 @@ import { prisma } from '../prismaClient';
 interface CanonicalStep {
   /** Birim adında aranan anahtar kelimeler (küçük harf, biri eşleşmeli). */
   match: string[];
+  /** Birim adında bulunursa bu adımı ELEYEN kelimeler (çakışma önler, örn.
+   *  'Yönetim' ≠ 'Proje Yönetimi'). Opsiyonel. */
+  exclude?: string[];
   description: string;
   type: 'AUTO' | 'MANUAL';
   requiresCompletion: boolean;
   completionNote?: string;
 }
 
+// Sıra = Enflow uçtan-uca akışı + governance onay swimlane'i (governance/role-matrix.ts):
+//   Satış → Presales → [Finans → İGPD → Üst Yönetim onayı] → Hukuk(danışman)
+//   → İSAB/İhale(WON→Sözleşme T3) → KSU/Sözleşme imza(SIGNED→Proje T4)
+//   → Proje(→Satınalma T5) → KGD/Devir → Satın Alma(→Finans T6)
+// exclude: birim adı çakışmalarını çözer (Satış≠Satış Destek, Yönetim≠Proje
+// Yönetimi, Presales≠Teknik Hizmetler, Satın Alma≠İSAB).
 export const DEFAULT_WORKFLOW_STEPS: CanonicalStep[] = [
   {
-    match: ['satış', 'pazarlama', 'crm'],
-    description: 'Fırsat yönetimi ve ilk değerlendirme',
+    match: ['satış', 'crm'],
+    exclude: ['destek'],
+    description: 'Fırsat yönetimi ve ilk değerlendirme (Satış — SALES_REP/SALES_MGR)',
     type: 'AUTO',
     requiresCompletion: false,
   },
   {
-    match: ['teknik', 'presales', 'çözüm'],
-    description: 'Teknik analiz, BoM ve maliyet hazırlığı',
+    match: ['presales', 'çözüm'],
+    description: 'Teknik analiz, BoM ve maliyet hazırlığı (Presales — PRESALES_ENG/MGR)',
     type: 'AUTO',
     requiresCompletion: true,
     completionNote: 'BoM ve maliyet analizi tamamlanmış olmalı',
   },
   {
     match: ['finans'],
-    description: 'Finansal değerlendirme ve onay',
+    description: 'Finansal değerlendirme ve onay — swimlane 1 (Finans — FINANCE_MGR)',
     type: 'MANUAL',
     requiresCompletion: true,
     completionNote: 'Maliyet/marj onayı verilmiş olmalı',
   },
   {
     match: ['igpd', 'iş geliştirme'],
-    description: 'İş geliştirme ve pazarlama onayı',
+    description: 'İş geliştirme ve pazarlama onayı — swimlane 2 (İGPD — IGPD_MGR)',
     type: 'MANUAL',
     requiresCompletion: true,
     completionNote: 'İGPD değerlendirmesi tamamlanmış olmalı',
   },
   {
-    match: ['üst yönetim', 'gmü', 'genel müdür'],
-    description: 'Üst yönetim onayı',
+    match: ['yönetim', 'genel müdür', 'üst yönetim', 'gmü'],
+    exclude: ['proje'],
+    description: 'Üst yönetim (Genel Müdür) onayı — swimlane 3 (GENERAL_MANAGER)',
     type: 'MANUAL',
     requiresCompletion: true,
     completionNote: 'Üst yönetim onayı alınmış olmalı',
   },
   {
+    match: ['hukuk'],
+    description: 'Hukuki inceleme (Hukuk — LEGAL_MGR, danışman/ADVISORY)',
+    type: 'AUTO',
+    requiresCompletion: false,
+  },
+  {
+    match: ['isab', 'i̇sab', 'ihale'],
+    description: 'İhale uygunluk, teklif ve teminat (İSAB — ISAB_MGR) → WON→Sözleşme (T3)',
+    type: 'MANUAL',
+    requiresCompletion: true,
+    completionNote: 'İhale uygunluk checklist ve teminat tamamlanmış olmalı',
+  },
+  {
     match: ['ksu', 'sözleşme', 'kontrat'],
-    description: 'Sözleşme ve evrak kontrolü',
+    description: 'Sözleşme imza ve evrak kontrolü — swimlane 4 (KSU — KSU_MGR) → SIGNED→Proje (T4)',
     type: 'MANUAL',
     requiresCompletion: true,
     completionNote: 'Zorunlu sözleşme evrakları kontrol edilmiş olmalı',
   },
   {
-    match: ['kgd', 'kalite'],
-    description: 'Kalite güvence ve proje devri',
+    match: ['proje'],
+    description: 'Proje yürütme: milestone, maliyet, karlılık (Proje — PROJECT_MGR) → Satınalma (T5)',
     type: 'AUTO',
     requiresCompletion: false,
   },
   {
-    match: ['isab', 'i̇sab', 'ihale', 'satın alma'],
-    description: 'İhale ve satın alma takibi',
+    match: ['kgd', 'kalite'],
+    description: 'Kalite güvence ve proje devri (KGD — KGD_MGR)',
+    type: 'AUTO',
+    requiresCompletion: false,
+  },
+  {
+    match: ['satın alma', 'satınalma', 'satin alma'],
+    exclude: ['isab', 'i̇sab', 'ihale'],
+    description: 'Satınalma talebi, PO, teslimat ve fatura (Satın Alma — PROCUREMENT_MGR) → Finans (T6)',
     type: 'AUTO',
     requiresCompletion: false,
   },
@@ -103,7 +134,10 @@ export async function ensureDefaultWorkflow(tenantId: string) {
   const ordered: { unitId: string; step: CanonicalStep }[] = [];
   for (const step of DEFAULT_WORKFLOW_STEPS) {
     const unit = units.find(
-      (u) => !used.has(u.id) && step.match.some((kw) => normalize(u.name).includes(normalize(kw)))
+      (u) =>
+        !used.has(u.id) &&
+        step.match.some((kw) => normalize(u.name).includes(normalize(kw))) &&
+        !(step.exclude ?? []).some((kw) => normalize(u.name).includes(normalize(kw)))
     );
     if (unit) {
       used.add(unit.id);
