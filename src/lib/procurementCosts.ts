@@ -11,7 +11,7 @@ export const PROCUREMENT_METHODS: { key: ProcurementMethod; label: string; hint:
   { key: 'OPEN',       label: 'Açık İhale',                hint: 'Tam kamu masraf seti (teminat, damga, KİK, dosya)' },
   { key: 'RESTRICTED', label: 'Belli İstekliler Arası',    hint: 'Açık ihale ile aynı masraf seti' },
   { key: 'NEGOTIATED', label: 'Pazarlık Usulü İhale',      hint: 'İhale masrafları (dosya bedeli hariç)' },
-  { key: 'DIRECT',     label: 'Doğrudan Temin',            hint: 'Asgari masraf (yalnız damga vergisi)' },
+  { key: 'DIRECT',     label: 'Doğrudan Temin',            hint: 'Damga vergisi + karar pulu' },
   { key: 'PRIVATE',    label: 'Özel / Ticari Teklif',      hint: 'Kamu-ihale masrafı yok' },
 ];
 
@@ -48,8 +48,9 @@ const IHALE_COMMON: MethodCostLine[] = [
   { label: 'Geçici teminat mektubu komisyonu', kind: 'PERCENT', value: 0.6,   category: 'GUARANTEE' },
   { label: 'Kesin teminat mektubu komisyonu',  kind: 'PERCENT', value: 1.2,   category: 'GUARANTEE' },
   { label: 'Damga vergisi (sözleşme, binde 9.48)', kind: 'PERCENT', value: 0.948, category: 'TAX' },
+  { label: 'İhale kararı karar pulu (binde 5.69)', kind: 'PERCENT', value: 0.569, category: 'TAX' },
   { label: 'KİK payı (binde 0.5)',             kind: 'PERCENT', value: 0.05,  category: 'FEE' },
-  { label: 'Karar pulu / ilan bedeli',         kind: 'FIXED',   value: 1500,  category: 'FEE' },
+  { label: 'İlan bedeli',                      kind: 'FIXED',   value: 1500,  category: 'FEE' },
   { label: 'Noter / sözleşme masrafı',         kind: 'FIXED',   value: 2500,  category: 'NOTARY' },
 ];
 
@@ -66,6 +67,7 @@ export const METHOD_COST_TEMPLATES: Record<ProcurementMethod, MethodCostLine[]> 
   NEGOTIATED: [...IHALE_COMMON],
   DIRECT: [
     { label: 'Damga vergisi (sözleşme, binde 9.48)', kind: 'PERCENT', value: 0.948, category: 'TAX' },
+    { label: 'Karar pulu (sözleşme/onay kararı, binde 5.69)', kind: 'PERCENT', value: 0.569, category: 'TAX' },
   ],
   PRIVATE: [],
 };
