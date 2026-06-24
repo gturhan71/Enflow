@@ -155,18 +155,28 @@ export interface BoMItem {
 export interface CostItem {
   id: string;
   description: string;
-  category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' | 'OTHER';
+  category: string; // CostCategory (procurementCosts.ts) — DB'de String
   amount: number;
   currency?: string;
   opportunityId: string;
   tenantId?: string;
+  auto?: boolean;   // usule göre otomatik gelen masraf kalemi mi
 }
 
 export interface CostConfig {
   baseCurrency: string;
-  rates: Record<string, number>;
-  marginMode: 'PER_ITEM' | 'PROJECT_WIDE';
-  globalMargin: number;
+  // Yeni model
+  spotRates?: Record<string, number>;
+  forwardOverrides?: Record<string, number>;   // döviz başına forward override
+  annualDepreciation?: number;                  // yıllık değer-kaybı %
+  collectionDate?: string;                      // tahsilat tarihi (forward için)
+  targetMargin?: number;                        // satış-üzerinden hedef marj %
+  procurementMethod?: string;                   // ProcurementMethod
+  methodCostLines?: { label: string; kind: 'PERCENT' | 'FIXED'; value: number; category: string }[];
+  // Legacy (geriye uyum)
+  rates?: Record<string, number>;
+  marginMode?: 'PER_ITEM' | 'PROJECT_WIDE';
+  globalMargin?: number;
 }
 
 export type SubscriptionPlanType = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';

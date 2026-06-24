@@ -170,6 +170,7 @@ router.post('/:id/costs', tenantMiddleware, asyncHandler(async (req: Request, re
           description: item.description,
           category: item.category,
           amount: parseFloat(String(item.amount)) || 0,
+          auto: item.auto === true,
           ...(item.currency ? { currency: String(item.currency) } : {})
         }
       });

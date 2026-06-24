@@ -213,9 +213,10 @@ model BoMItem {
 model CostItem {
   id              String      @id @default(cuid())
   description     String
-  category        String      // LABOR, LOGISTICS, TRAVEL, OTHER
+  category        String      // CostCategory (procurementCosts.ts)
   amount          Float
   currency        String?
+  auto            Boolean     @default(false) // usule göre otomatik gelen masraf mı
   opportunityId   String
   tenantId        String
   createdAt       DateTime    @default(now())
