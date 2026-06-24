@@ -50,6 +50,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSearch, useForm } from '../hooks/useShared';
 import { CustomerImportWizard } from '../components/CustomerImportWizard';
 import { generateProposalPDF } from '../utils/generateProposalPDF';
+import { PROCUREMENT_METHODS } from '../lib/procurementCosts';
 
 const CRMModule = ({
   opportunities = [],
@@ -163,7 +164,8 @@ const CRMModule = ({
   });
 
   const opportunityForm = useForm<Partial<Opportunity>>({
-    title: '', value: 0, probability: 50, customerId: '', description: '', status: 'NEW'
+    title: '', value: 0, probability: 50, customerId: '', description: '', status: 'NEW',
+    procurementMethod: 'OPEN', targetBidDate: ''
   });
 
   const handleRevertApproval = async (oppId: string) => {
@@ -358,7 +360,9 @@ const CRMModule = ({
       probability: opp.probability,
       customerId: opp.customerId,
       description: opp.description || '',
-      status: opp.status
+      status: opp.status,
+      procurementMethod: opp.procurementMethod || 'OPEN',
+      targetBidDate: opp.targetBidDate ? opp.targetBidDate.slice(0, 10) : ''
     });
     setIsEditingOpp(true);
     setShowNewOpportunityModal(true);
@@ -1634,6 +1638,17 @@ const CRMModule = ({
                   <option value="">Müşteri Seçin...</option>
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
+                <input type="number" name="value" min={0} value={opportunityForm.values.value ?? 0} onChange={opportunityForm.handleChange} placeholder="Tahmini Bedel" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
+                <div>
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Teklife Dönüşüm — Satış Destek Tetikleyici</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <select name="procurementMethod" value={opportunityForm.values.procurementMethod ?? 'OPEN'} onChange={opportunityForm.handleChange} className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20">
+                      {PROCUREMENT_METHODS.map(m => <option key={m.key} value={m.key}>{m.label}</option>)}
+                    </select>
+                    <input type="date" name="targetBidDate" value={opportunityForm.values.targetBidDate ?? ''} onChange={opportunityForm.handleChange} title="Son teklif tarihi" className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20" />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-2">Fırsat kaydedilince seçilen usulle Satış Destek birimine ihale/dosya takibi uyarısı iletilir.</p>
+                </div>
                 <div className="flex justify-end gap-3 pt-4">
                   <button type="button" onClick={() => setShowNewOpportunityModal(false)} className="px-8 py-3 text-xs font-black text-slate-500 uppercase tracking-widest">İPTAL</button>
                   <button type="submit" className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg">KAYDET</button>

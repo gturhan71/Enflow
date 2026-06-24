@@ -22,8 +22,13 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
   res.json(parsed);
 }));
 
+const METHOD_LABELS: Record<string, string> = {
+  OPEN: 'Açık İhale', RESTRICTED: 'Belli İstekliler Arası', NEGOTIATED: 'Pazarlık Usulü İhale',
+  DIRECT: 'Doğrudan Temin', PRIVATE: 'Özel/Ticari Teklif',
+};
+
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, assignedToId, description, expectedCloseDate, status } = req.body;
+  const { title, value, probability, customerId, assignedToId, description, expectedCloseDate, status, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
 
   if (!title || !customerId) {
@@ -35,6 +40,7 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
 
   const finalAssignedId = assignedToId || firstUser.id;
   const finalCreatedById = req.body.createdById || firstUser.id;
+  const bidDate = targetBidDate ? new Date(targetBidDate) : null;
 
   const opp = await prisma.opportunity.create({
     data: {
@@ -46,16 +52,46 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
       createdById: finalCreatedById,
       description: description || '',
       expectedCloseDate: expectedCloseDate ? new Date(expectedCloseDate) : null,
+      procurementMethod: procurementMethod || null,
+      targetBidDate: bidDate,
       tenantId,
       status: status || 'NEW'
     },
     include: { customer: true, assignedTo: true, createdBy: true }
   });
+
+  // Satınalma usulü seçildiyse: Satış Destek için otomatik İhale/dosya takibi + uyarı (her usulde)
+  if (procurementMethod) {
+    const owner = await prisma.user.findFirst({ where: { id: finalAssignedId } });
+    const tender = await prisma.tender.create({
+      data: {
+        tenantId, name: title, method: procurementMethod, status: 'DRAFT',
+        submissionDeadline: bidDate, estimatedValue: parseFloat(value as string) || 0,
+        currency: 'TRY', opportunityId: opp.id, ownerId: finalAssignedId, ownerName: owner?.name || null,
+      },
+    }).catch(() => null);
+
+    const salesSupport = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_SUPPORT' } });
+    const label = METHOD_LABELS[procurementMethod] || procurementMethod;
+    const dateStr = bidDate ? bidDate.toLocaleDateString('tr-TR') : 'belirtilmedi';
+    await notify(tenantId, salesSupport?.id, 'Yeni fırsat takibi', `"${title}" — usul: ${label}, son teklif: ${dateStr}. İhale/dosya hazırlığını başlatın.`, 'INFO');
+    if (salesSupport?.unitId || tender) {
+      await prisma.todoTask.create({ data: {
+        title: `İhale dosyası: ${title}`,
+        description: `Fırsat ${label} usulüyle teklife dönüşecek (son teklif: ${dateStr}). Dosya hazırlığını teklifle paralel yürütün.`,
+        unitId: salesSupport?.unitId || 'unit_sales_support', assignedBy: finalCreatedById, tenantId,
+        relatedModule: 'OPPORTUNITY', relatedItemId: opp.id, priority: 'HIGH', status: 'PENDING',
+        ...(bidDate ? { dueDate: bidDate } : {}),
+      } }).catch(() => {});
+    }
+    await logActivity({ tenantId, userId: finalCreatedById, action: 'TENDER_TRIGGERED', entityType: 'OPPORTUNITY', entityId: opp.id, details: { method: procurementMethod, tenderId: tender?.id ?? null } });
+  }
+
   res.json(opp);
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig } = req.body;
+  const { title, value, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
 
@@ -73,12 +109,25 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (customerId !== undefined) updateData.customerId = customerId;
   if (technicalStatus !== undefined) updateData.technicalStatus = technicalStatus;
   if (costConfig !== undefined) updateData.costConfig = typeof costConfig === 'string' ? costConfig : JSON.stringify(costConfig);
+  if (procurementMethod !== undefined) updateData.procurementMethod = procurementMethod || null;
+  if (targetBidDate !== undefined) updateData.targetBidDate = targetBidDate ? new Date(targetBidDate as string) : null;
 
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },
     data: updateData,
     include: { customer: true, assignedTo: true, createdBy: true }
   });
+
+  // Usul/son-teklif tarihi değiştiyse bağlı Tender'ı senkronla (varsa)
+  if (procurementMethod !== undefined || targetBidDate !== undefined) {
+    const linked = await prisma.tender.findFirst({ where: { tenantId, opportunityId } });
+    if (linked) {
+      await prisma.tender.update({ where: { id: linked.id }, data: {
+        ...(procurementMethod !== undefined ? { method: procurementMethod || 'OPEN' } : {}),
+        ...(targetBidDate !== undefined ? { submissionDeadline: targetBidDate ? new Date(targetBidDate as string) : null } : {}),
+      } }).catch(() => {});
+    }
+  }
 
   await logActivity({
     tenantId, userId: updatedBy || updated.assignedToId,

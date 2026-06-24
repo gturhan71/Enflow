@@ -71,6 +71,8 @@ export interface Opportunity {
   } | null;
   technicalStatus?: string;
   bomStatus?: string;
+  procurementMethod?: string; // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — Satış Destek tetikleyici
+  targetBidDate?: string;     // son teklif/dönüşüm tarihi
   tenantId?: string;
   customerId: string;
   assignedToId: string;

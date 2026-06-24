@@ -24,6 +24,7 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
 
 const METHOD_LABELS: Record<string, string> = {
   OPEN: 'Açık İhale', RESTRICTED: 'Belli İstekliler', NEGOTIATED: 'Pazarlık', DIRECT: 'Doğrudan Temin',
+  PRIVATE: 'Özel/Ticari Teklif',
 };
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Taslak', PREPARING: 'Hazırlık', SUBMITTED: 'Teklif Verildi', EVALUATING: 'Değerlendirme',
