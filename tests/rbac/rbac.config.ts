@@ -335,15 +335,14 @@ export const uiMatrix: UiCase[] = [
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH, admin: "visible" },
   },
   {
-    // "Presales & Dizayn" üst menüsü, alt öğelerinden HERHANGİ BİRİ erişilebilir
-    // olduğunda görünür (bkz. Sidebar.tsx — parent OR child mantığı). Alt öğeler:
-    // "BoM & Tasarım" (PRESALES_VIEW) + "Maliyet Analizi" (COST_ANALYSIS_VIEW).
-    // sales_rep'te COST_ANALYSIS_VIEW olduğu için üst menü görünür — bu bir açık
-    // değil, Maliyet Analizi'ne erişimin doğru sonucu. PRESALES_VIEW (BoM) leaf'i
-    // ayrıca gizli kalır.
+    // "Presales & Dizayn" üst menüsü artık YALNIZ "BoM & Tasarım" (PRESALES_VIEW)
+    // alt öğesini içerir — "Maliyet Analizi" CRM (Satış) grubuna taşındı. Dolayısıyla
+    // bu menü yalnız PRESALES_VIEW olan rollere görünür. sales_rep'te PRESALES_VIEW
+    // yok (cost CRM'e taşındı) → sales_rep için artık GİZLİ. sales_mgr'da PRESALES_VIEW
+    // ayrıca bulunduğu için görünür kalır.
     name: "Presales menüsü",
     sidebarText: "Presales",
-    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", ...UPRES },
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "hidden", ...UPRES },
   },
   {
     name: "CRM menüsü",

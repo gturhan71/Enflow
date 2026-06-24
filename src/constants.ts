@@ -91,6 +91,7 @@ export const NAV_ITEMS = [
     subItems: [
       { id: 'crm-dashboard',    label: 'Genel Bakış',        requiredPermission: 'CRM_VIEW' },
       { id: 'crm-opportunities', label: 'Fırsatlar',        requiredPermission: 'CRM_OPPS_VIEW' },
+      { id: 'crm-cost',         label: 'Maliyet Analizi',    requiredPermission: 'COST_ANALYSIS_VIEW' },
       { id: 'crm-proposals',    label: 'Teklifler',          requiredPermission: 'CRM_PROPOSALS_VIEW' },
       { id: 'crm-customers',    label: 'Müşteriler',         requiredPermission: 'CRM_CUSTOMERS_VIEW' },
       { id: 'crm-negotiation',  label: 'Canlı Pazarlıklar',  requiredPermission: 'CRM_OPPS_VIEW' },
@@ -103,7 +104,6 @@ export const NAV_ITEMS = [
     requiredPermission: 'PRESALES_VIEW',
     subItems: [
       { id: 'presales-bom',  label: 'BoM & Tasarım',    requiredPermission: 'PRESALES_VIEW' },
-      { id: 'presales-cost', label: 'Maliyet Analizi',   requiredPermission: 'COST_ANALYSIS_VIEW' },
     ],
   },
   { id: 'sales-support',     label: 'Satış Destek',       icon: FileCheck,    requiredPermission: 'SALES_SUPPORT_VIEW' },

@@ -84,7 +84,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'SALES_REP', unit: 'Satış', kind: 'STAFF', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_CUSTOMERS_VIEW', 'CRM_PROPOSALS_VIEW', 'VISIT_PLAN_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_CUSTOMERS_VIEW', 'CRM_PROPOSALS_VIEW', 'COST_ANALYSIS_VIEW', 'VISIT_PLAN_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['customers', 'opportunities'],
     decisionRights: [],
     tasks: [
@@ -112,7 +112,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'PRESALES_MGR', unit: 'Presales', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'COST_ANALYSIS_VIEW', 'CRM_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'CRM_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [
       { decision: 'Teknik / BoM onayı (Presales birim onayı)', via: 'statusTransition:Opportunity.technicalStatus / bomStatus' },
@@ -124,7 +124,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'PRESALES_ENG', unit: 'Presales', kind: 'STAFF', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'COST_ANALYSIS_VIEW', 'CRM_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'CRM_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: ['units'], // yalnız GET (liste) — GM_OR_PRESALES; POST/DELETE GM-only
     decisionRights: [],
     tasks: [
@@ -139,7 +139,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'TECHNICAL_SPEC', unit: 'Presales', kind: 'STAFF', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'COST_ANALYSIS_VIEW', 'TODO_VIEW'],
+    modules: ['DASHBOARD_VIEW', 'PRESALES_VIEW', 'TODO_VIEW'],
     endpointDomains: [],
     decisionRights: [],
     tasks: [

@@ -215,7 +215,7 @@ const TenantAppInner = ({
   const isTodoActive = activeTab === 'todo';
   const isDocsActive = activeTab === 'documents';
   const isContractsActive = activeTab === 'contracts';
-  const isCostActive = activeTab === 'cost-analysis';
+  const isCostActive = activeTab === 'cost-analysis' || activeTab === 'crm-cost';
   const isContractWorkflowActive = activeTab === 'contract-workflow' || activeTab === 'contract-workflow-test';
 
   const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
@@ -334,7 +334,8 @@ const TenantAppInner = ({
       case 'presales':
       case 'presales-bom':
         return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} />;
-      case 'presales-cost':
+      case 'crm-cost':
+      case 'presales-cost': // geriye dönük uyumluluk (eski Presales konumu)
       case 'cost-analysis': // geriye dönük uyumluluk
         return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} />;
 

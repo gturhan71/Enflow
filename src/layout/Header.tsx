@@ -130,6 +130,8 @@ const Header = ({
       case 'crm-proposals': return 'Teklif Yönetimi';
       case 'presales': return 'AI Presales & Teknik Analiz';
       case 'sales-support': return 'Satış Destek Operasyonları';
+      case 'crm-cost':
+      case 'presales-cost':
       case 'cost-analysis': return 'Maliyetlendirme & Marj';
       case 'documents': return 'Kurumsal Belge Yönetimi';
       case 'contract': return 'Sözleşme Yönetim Modülü';

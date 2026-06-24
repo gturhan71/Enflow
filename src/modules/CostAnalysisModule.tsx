@@ -517,10 +517,20 @@ const CostAnalysisModule = ({
                     }
                     if (status === 'APPROVED') {
                       return (
-                        <div className="p-4 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 flex items-start gap-3">
-                          <TrendingUp size={16} className="text-emerald-600 mt-0.5 shrink-0" />
-                          <p className="text-[11px] text-emerald-700 leading-relaxed font-bold">Maliyet analizi onaylandı. Teklif hazırlanabilir.</p>
-                        </div>
+                        <>
+                          <div className="p-4 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 flex items-start gap-3">
+                            <TrendingUp size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-emerald-700 leading-relaxed font-bold">Maliyet analizi onaylandı. Teklif hazırlanabilir.</p>
+                          </div>
+                          <button onClick={handleSave} disabled={loading}
+                            className="w-full bg-white border border-slate-200 text-slate-700 py-3 rounded-2xl text-[11px] font-black shadow-sm hover:bg-slate-50 transition-all flex items-center justify-center gap-2 uppercase tracking-[0.15em] active:scale-95 disabled:opacity-60">
+                            {loading ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} Yeniden Analiz Et ve Onaya Gönder
+                          </button>
+                          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                            <AlertCircle size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                            <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Presales BoM'u revize ettiyse maliyeti güncelleyip <strong>yeni bir tur</strong> olarak Satış Müdürü onayına gönderebilirsiniz.</p>
+                          </div>
+                        </>
                       );
                     }
                     return (
