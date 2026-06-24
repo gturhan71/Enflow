@@ -39,6 +39,8 @@ class ApiService {
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }
   async revertOpportunityApproval(oppId: string) { return crmService.revertOpportunityApproval(oppId); }
+  async submitCostApproval(oppId: string) { return crmService.submitCostApproval(oppId); }
+  async approveCost(oppId: string, data: { decision: 'APPROVE' | 'REJECT'; note?: string }) { return crmService.approveCost(oppId, data); }
 
   // --- PROPOSALS ---
   async getProposals() { return crmService.getProposals(); }
@@ -141,7 +143,7 @@ class ApiService {
   async updateTenant(id: string, data: { name: string }) { return settingsService.updateTenant(id, data); }
 
   // --- NOTIFICATIONS ---
-  async getNotifications() { return settingsService.getNotifications(); }
+  async getNotifications(userId?: string) { return settingsService.getNotifications(userId); }
   async createNotification(data: Omit<Notification, 'id'>) { return settingsService.createNotification(data); }
   async updateNotification(id: string, data: Partial<Notification>) { return settingsService.updateNotification(id, data); }
   async deleteNotification(id: string) { return settingsService.deleteNotification(id); }

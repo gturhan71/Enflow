@@ -86,6 +86,19 @@ export const crmService = {
     });
   },
 
+  async submitCostApproval(opportunityId: string) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/submit-cost-approval`, {
+      method: 'POST'
+    });
+  },
+
+  async approveCost(opportunityId: string, data: { decision: 'APPROVE' | 'REJECT'; note?: string }) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/approve-cost`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
   // --- PROPOSALS ---
   async getProposals() {
     return apiClient.fetchWithAuth('/proposals');

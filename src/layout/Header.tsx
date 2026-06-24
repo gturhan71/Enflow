@@ -18,6 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { MOCK_NOTIFICATIONS } from '../constants';
 import { Notification } from '../types';
+import { apiService } from '../services/apiService';
 
 const Header = ({ 
   title, 
@@ -40,7 +41,26 @@ const Header = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState(MOCK_NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+
+  // Gerçek (backend) bildirimlerini kullanıcı bazında çek; varsa mock'un yerini alır
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    let active = true;
+    const load = async () => {
+      try {
+        const real = await apiService.getNotifications(currentUser.id);
+        if (active && Array.isArray(real) && real.length > 0) {
+          setNotifications(real as Notification[]);
+        }
+      } catch {
+        // sessizce mock'ta kal
+      }
+    };
+    load();
+    const t = window.setInterval(load, 30000);
+    return () => { active = false; window.clearInterval(t); };
+  }, [currentUser?.id]);
 
   // Filter out notifications that are scheduled for the future
   const visibleNotifications = notifications.filter(n => {
@@ -88,7 +108,10 @@ const Header = ({
   const handleNotificationClick = (notification: Notification) => {
     // Mark as read
     setNotifications(prev => prev.map(n => n.id === notification.id ? { ...n, isRead: true } : n));
-    
+    if (!notification.isRead) {
+      apiService.updateNotification(notification.id, { isRead: true }).catch(() => {});
+    }
+
     // Navigate if possible
     if (notification.relatedModule && setActiveTab) {
       setActiveTab(notification.relatedModule);

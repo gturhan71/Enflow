@@ -89,8 +89,8 @@ export const settingsService = {
   },
 
   // --- NOTIFICATIONS ---
-  async getNotifications() {
-    return apiClient.fetchWithAuth('/notifications');
+  async getNotifications(userId?: string) {
+    return apiClient.fetchWithAuth(`/notifications${userId ? `?userId=${encodeURIComponent(userId)}` : ''}`);
   },
 
   async createNotification(data: Omit<Notification, 'id'>) {

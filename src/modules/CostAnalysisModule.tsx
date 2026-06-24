@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem, CostConfig } from '../types';
 import { apiService } from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
 import {
   ProcurementMethod, PROCUREMENT_METHODS, METHOD_COST_TEMPLATES, MethodCostLine,
   CostCategory, COST_CATEGORY_LABEL, computeForwardRates, monthsUntil,
@@ -33,9 +34,14 @@ const CostAnalysisModule = ({
   setActiveTab?: (tab: string) => void;
   tenantId?: string;
 }) => {
+  const { currentUser } = useAuth();
+  const canApprove = currentUser?.role === 'SALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState('');
   const [loading, setLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
+  const [approveNote, setApproveNote] = useState('');
+  const [decisionLoading, setDecisionLoading] = useState(false);
 
   const [costItems, setCostItems] = useState<Partial<CostItem>[]>([]);
   const [localBomItems, setLocalBomItems] = useState<BoMItem[]>([]);
@@ -55,6 +61,7 @@ const CostAnalysisModule = ({
   const selectedOpp = useMemo(() => opportunities.find(o => o.id === selectedOppId), [opportunities, selectedOppId]);
 
   React.useEffect(() => {
+    setSubmitted(false);
     if (!selectedOpp) { setCostItems([]); setLocalBomItems([]); setMethodCosts([]); return; }
     setLocalBomItems(selectedOpp.bomItems || []);
     const cc = selectedOpp.costConfig;
@@ -156,15 +163,33 @@ const CostAnalysisModule = ({
       await Promise.allSettled([
         apiService.saveCostItems(selectedOppId, allCosts as CostItem[]),
         apiService.saveBoMItems(selectedOppId, bomWithPrices),
-        apiService.updateOpportunity(selectedOppId, { technicalStatus: 'APPROVED', costConfig }),
+        apiService.updateOpportunity(selectedOppId, { costConfig }),
       ]);
+      // Maliyet analizi → Satış Müdürü onayına gönder + satış temsilcisine bilgilendirme
+      await apiService.submitCostApproval(selectedOppId);
       setOpportunities(prev => prev.map(o => o.id === selectedOppId
-        ? { ...o, technicalStatus: 'APPROVED', costItems: allCosts as CostItem[], bomItems: bomWithPrices, costConfig } : o));
+        ? { ...o, technicalStatus: 'PENDING_APPROVAL', costItems: allCosts as CostItem[], bomItems: bomWithPrices, costConfig } : o));
+      setSubmitted(true);
       setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-      if (setActiveTab) setTimeout(() => setActiveTab('crm-proposals'), 0);
+      setTimeout(() => setSaveSuccess(false), 4000);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDecision = async (decision: 'APPROVE' | 'REJECT') => {
+    if (!selectedOppId) return;
+    setDecisionLoading(true);
+    try {
+      const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
+      await apiService.approveCost(selectedOppId, { decision, note: approveNote || undefined });
+      setOpportunities(prev => prev.map(o => o.id === selectedOppId
+        ? { ...o, technicalStatus: newStatus } : o));
+      setSubmitted(false);
+      setApproveNote('');
+      if (decision === 'APPROVE' && setActiveTab) setTimeout(() => setActiveTab('crm-proposals'), 600);
+    } finally {
+      setDecisionLoading(false);
     }
   };
 
@@ -176,7 +201,7 @@ const CostAnalysisModule = ({
         {saveSuccess && (
           <motion.div initial={{ opacity: 0, y: -16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -16 }}
             className="fixed top-6 right-6 z-50 bg-emerald-500 text-white px-6 py-3 rounded-2xl shadow-xl font-bold text-sm flex items-center gap-2">
-            <Save size={14} /> Analiz kaydedildi. Teklifler sayfasına yönlendiriliyorsunuz…
+            <Save size={14} /> Analiz kaydedildi ve Satış Müdürü onayına gönderildi.
           </motion.div>
         )}
       </AnimatePresence>
@@ -461,14 +486,62 @@ const CostAnalysisModule = ({
                   </div>
                 </div>
                 <div className="mt-6 space-y-4">
-                  <button onClick={handleSave} disabled={loading}
-                    className="w-full bg-primary text-white py-4 rounded-2xl text-xs font-black shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95 disabled:opacity-60">
-                    {loading ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Analizi Kaydet
-                  </button>
-                  <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
-                    <AlertCircle size={15} className="text-slate-400 mt-0.5 shrink-0" />
-                    <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Maliyetler tahsilat tarihindeki forward kurdan, {baseCurrency} cinsinden hesaplanır; usul masrafları otomatik eklenir. Kayıt teklif sürecini başlatır.</p>
-                  </div>
+                  {(() => {
+                    const status = submitted ? 'PENDING_APPROVAL' : selectedOpp?.technicalStatus;
+                    if (status === 'PENDING_APPROVAL') {
+                      return (
+                        <>
+                          <div className="p-4 rounded-2xl bg-amber-500/5 border-2 border-amber-500/20 flex items-start gap-3">
+                            <CalendarClock size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-amber-700 leading-relaxed font-bold">Maliyet analizi Satış Müdürü onayını bekliyor. Satış temsilcisi bilgilendirildi.</p>
+                          </div>
+                          {canApprove && (
+                            <div className="p-4 rounded-2xl bg-white border border-slate-200 space-y-3">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Satış Müdürü Kararı</span>
+                              <input value={approveNote} onChange={(e) => setApproveNote(e.target.value)} placeholder="Not (opsiyonel)"
+                                className="w-full bg-slate-50 border border-slate-200 px-3 py-2 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-primary/10" />
+                              <div className="flex gap-3">
+                                <button onClick={() => handleDecision('APPROVE')} disabled={decisionLoading}
+                                  className="flex-1 bg-emerald-600 text-white py-3 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-60 flex items-center justify-center gap-2">
+                                  {decisionLoading ? <Loader2 size={16} className="animate-spin" /> : null} Onayla
+                                </button>
+                                <button onClick={() => handleDecision('REJECT')} disabled={decisionLoading}
+                                  className="flex-1 bg-red-500/10 text-red-600 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-500/20 transition-all active:scale-95 disabled:opacity-60">
+                                  Reddet
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      );
+                    }
+                    if (status === 'APPROVED') {
+                      return (
+                        <div className="p-4 rounded-2xl bg-emerald-500/5 border-2 border-emerald-500/20 flex items-start gap-3">
+                          <TrendingUp size={16} className="text-emerald-600 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-emerald-700 leading-relaxed font-bold">Maliyet analizi onaylandı. Teklif hazırlanabilir.</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {status === 'REJECTED' && (
+                          <div className="p-4 rounded-2xl bg-red-500/5 border-2 border-red-500/20 flex items-start gap-3">
+                            <AlertCircle size={16} className="text-red-600 mt-0.5 shrink-0" />
+                            <p className="text-[11px] text-red-700 leading-relaxed font-bold">Önceki analiz reddedildi. Revize edip yeniden onaya gönderin.</p>
+                          </div>
+                        )}
+                        <button onClick={handleSave} disabled={loading}
+                          className="w-full bg-primary text-white py-4 rounded-2xl text-xs font-black shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all flex items-center justify-center gap-3 uppercase tracking-[0.2em] active:scale-95 disabled:opacity-60">
+                          {loading ? <Loader2 size={20} className="animate-spin" /> : <Save size={20} />} Kaydet ve Onaya Gönder
+                        </button>
+                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-start gap-3">
+                          <AlertCircle size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                          <p className="text-[10px] text-slate-500 leading-relaxed font-medium">Maliyetler tahsilat tarihindeki forward kurdan, {baseCurrency} cinsinden hesaplanır; usul masrafları otomatik eklenir. Kayıt Satış Müdürü onay akışını başlatır.</p>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
             </div>

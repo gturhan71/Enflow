@@ -5,8 +5,9 @@ import { asyncHandler, tenantMiddleware } from '../middleware';
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const userId = req.query.userId ? String(req.query.userId) : undefined;
   const notifications = await prisma.notification.findMany({
-    where: { tenantId: req.tenantId },
+    where: { tenantId: req.tenantId, ...(userId ? { userId } : {}) },
     orderBy: { timestamp: 'desc' }
   });
   res.json(notifications);
