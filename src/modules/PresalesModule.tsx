@@ -12,9 +12,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { CostAnalysisModule } from '../components/CostAnalysisModule';
 import {
-  BoMItem,
   Opportunity,
   Proposal,
   TodoTask,
@@ -40,7 +38,7 @@ interface PresalesModuleProps {
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>;
 }
 
-const PresalesModule = ({ opportunities, setOpportunities, units, users, proposals, setProposals, setTasks }: PresalesModuleProps) => {
+const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
@@ -59,7 +57,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
     setBomItems,
     addBoMItem,
     isSubmitting,
-    handleFinalApproval,
+    saveAndHandoff,
     totalCost
   } = useBoM(selectedOppId, setOpportunities);
 
@@ -114,71 +112,28 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
     const opp = opportunities.find(o => o.id === selectedOppId);
     if (!opp) return;
 
-    const success = await handleFinalApproval();
+    // BoM kaydet + Satış'a devret (maliyet analizi Satış'ın işi — burada teklif/onay yok)
+    const success = await saveAndHandoff();
     if (!success) return;
 
     setShowApprovalPreview(false);
 
-    // Versiyon: bu fırsat için kaç teklif var + 1
-    const version = (proposals?.filter(p => p.opportunityId === selectedOppId) ?? []).length + 1;
-
-    // Abbreviated bomItems → proper BoMItem
-    const properItems: BoMItem[] = bomItems.map((item, idx) => ({
-      id: item.id ?? item.pn ?? String(idx),
-      partNumber: item.pn,
-      description: item.desc,
-      quantity: item.qty,
-      purchaseCost: item.cost,
-      marginPercentage: item.margin,
-      unitSalePrice: item.cost * (1 + item.margin / 100),
-      totalSalePrice: item.cost * (1 + item.margin / 100) * item.qty,
-    }));
-
-    const totalPrice = properItems.reduce((s, i) => s + (i.totalSalePrice ?? 0), 0);
-
     try {
-      // 1. Proposal oluştur (PENDING_APPROVAL, yeni versiyon)
-      const newProposal = await apiService.createProposal({
-        opportunityId: selectedOppId,
-        customerId: opp.customerId,
-        createdById: currentUser?.id,
-        status: 'PENDING_APPROVAL',
-        version,
-        totalPrice,
-        items: properItems,
-        content: JSON.stringify({
-          items: properItems,
-          totalPrice,
-          description: `BoM bazlı maliyet teklifi — v${version}`,
-          isBomApproval: true,
-          // Maliyet analizinde ayarlanan döviz/kur/marj bilgisi varsa taşı
-          ...(opp.costConfig
-            ? {
-                baseCurrency: opp.costConfig.baseCurrency,
-                exchangeRates: opp.costConfig.rates,
-                marginMode: opp.costConfig.marginMode,
-              }
-            : {}),
-        }),
-      });
-      if (setProposals) setProposals(prev => [newProposal, ...prev]);
-
-      // 2. Yönetici onay görevi — relatedItemId = proposal.id
-      // SLA: Presales/onay birimine bu talep için en az 3 iş günü süre verilir (dueDate backend'de otomatik hesaplanır).
+      // Satış'a "maliyet analizi yap" görevi (relatedModule = OPPORTUNITY)
       const task = await apiService.createTask({
-        title: `BoM Onayı v${version}: ${opp.title}`,
-        description: `Presales tarafından hazırlanan v${version} BoM listesi onayınızı bekliyor. Toplam: ${totalPrice.toLocaleString('tr-TR')} ${opp.customer?.currency ?? ''}`,
-        unitId: 'unit_management',
+        title: `Maliyet Analizi: ${opp.title}`,
+        description: `Presales BoM listesini tamamladı (${bomItems.length} kalem). Satış birimi maliyet/karlılık analizini yapıp Satış Müdürü onayına sunabilir.`,
+        unitId: 'unit_sales',
         assignedBy: currentUser?.id || 'system',
         priority: 'HIGH',
         status: 'PENDING',
-        relatedModule: 'PROPOSAL',
-        relatedItemId: newProposal.id,
+        relatedModule: 'OPPORTUNITY',
+        relatedItemId: selectedOppId,
         slaBusinessDays: 3,
       });
       if (setTasks) setTasks(prev => [task, ...prev]);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Onay süreci başlatılamadı.');
+      alert(err instanceof Error ? err.message : 'Satışa devir görevi oluşturulamadı.');
     }
   };
 
@@ -229,7 +184,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
                 className="bg-primary text-white px-6 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-50 uppercase tracking-widest"
               >
                 {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                Yönetici Onayına Sun
+                BoM'u Kaydet & Satışa Devret
               </button>
               <button 
                 onClick={() => setShowHandOffModal(true)}
@@ -318,10 +273,6 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
                  </div>
                ))}
              </div>
-             
-             <div className="border-t border-slate-100">
-               <CostAnalysisModule />
-             </div>
           </div>
         </div>
       ) : (
@@ -388,8 +339,8 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
                     <CheckCircle2 size={24} />
                   </div>
                   <div>
-                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">BoM Onay Önizleme</h4>
-                    <p className="text-sm text-slate-500 font-medium">Lütfen listeyi son kez kontrol edin.</p>
+                    <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight">BoM Devir Önizleme</h4>
+                    <p className="text-sm text-slate-500 font-medium">BoM Satış birimine maliyet analizi için devredilecek.</p>
                   </div>
                 </div>
                 <button 
@@ -441,8 +392,8 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
                   <div>
                     <p className="text-sm font-bold text-amber-900">Önemli Not</p>
                     <p className="text-xs text-amber-700 leading-relaxed mt-1">
-                      Onay sürecine gönderilen BoM listesi üzerinde yönetici incelemesi tamamlanana kadar değişiklik yapılamaz. 
-                      Lütfen tüm kalemlerin ve maliyetlerin doğru olduğundan emin olun.
+                      Bu BoM Satış birimine maliyet/karlılık analizi için devredilecek. Maliyet analizi daha önce
+                      yapıldıysa devir yeni bir tur başlatır (maliyet durumu sıfırlanır). Lütfen kalemlerin doğruluğundan emin olun.
                     </p>
                   </div>
                 </div>
@@ -463,12 +414,12 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, proposa
                   {isSubmitting ? (
                     <>
                       <Loader2 size={18} className="animate-spin" />
-                      Gönderiliyor...
+                      Devrediliyor...
                     </>
                   ) : (
                     <>
                       <CheckCircle2 size={18} />
-                      Yönetici Onayına Gönder
+                      Kaydet ve Satışa Devret
                     </>
                   )}
                 </button>

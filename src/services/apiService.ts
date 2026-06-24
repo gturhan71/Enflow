@@ -34,7 +34,7 @@ class ApiService {
   async createOpportunity(data: Partial<Opportunity>) { return crmService.createOpportunity(data); }
   async updateOpportunity(id: string, data: Partial<Opportunity>) { return crmService.updateOpportunity(id, data); }
   async deleteOpportunity(id: string) { return crmService.deleteOpportunity(id); }
-  async saveBoMItems(oppId: string, items: BoMItem[]) { return crmService.saveBoMItems(oppId, items); }
+  async saveBoMItems(oppId: string, items: BoMItem[], opts?: { handoff?: boolean }) { return crmService.saveBoMItems(oppId, items, opts); }
   async saveCostItems(oppId: string, items: CostItem[]) { return crmService.saveCostItems(oppId, items); }
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }

@@ -114,7 +114,8 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
 
 router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
-  const { items } = req.body;
+  const tenantId = req.tenantId;
+  const { items, handoff } = req.body;
 
   if (!items || !Array.isArray(items)) {
     return res.status(400).json({ error: 'Geçersiz BoM listesi.' });
@@ -150,6 +151,17 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
     }
     return created;
   });
+
+  // Presales BoM'u Satış'a devrediyor (handoff). BoM zaten maliyet-analizinden geçmişse
+  // (APPROVED/PENDING_APPROVAL), revizyon yeni bir tur gerektirir → durumu sıfırla + sat. temsilcisini uyar.
+  if (handoff) {
+    const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+    if (opp && (opp.technicalStatus === 'APPROVED' || opp.technicalStatus === 'PENDING_APPROVAL')) {
+      await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'PENDING' } });
+      await notify(tenantId, opp.assignedToId, 'BoM revize edildi', `"${opp.title}" için BoM güncellendi. Maliyet analizini yenileyip yeniden onaya gönderin.`, 'WARNING');
+      await logActivity({ tenantId, userId: req.userId, action: 'BOM_REVISED_RESET', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, prevStatus: opp.technicalStatus } });
+    }
+  }
 
   res.json(result);
 }));

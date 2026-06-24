@@ -52,10 +52,10 @@ export const crmService = {
     });
   },
 
-  async saveBoMItems(opportunityId: string, items: BoMItem[]) {
+  async saveBoMItems(opportunityId: string, items: BoMItem[], opts?: { handoff?: boolean }) {
     return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/bom`, {
       method: 'POST',
-      body: JSON.stringify({ items })
+      body: JSON.stringify({ items, handoff: opts?.handoff === true })
     });
   },
 

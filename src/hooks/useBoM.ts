@@ -44,11 +44,13 @@ export const useBoM = (
     setHasUnsavedChanges(true);
   };
 
-  const handleFinalApproval = async () => {
-    if (!selectedOppId) return;
+  // Presales BoM'u hazırlayıp Satış'a devreder (maliyet analizi Satış'ın işi).
+  // Burada teklif oluşturulmaz / yönetici onayı istenmez / technicalStatus APPROVED yapılmaz —
+  // sadece BoM kaydedilir ve handoff sinyali gönderilir (revizyon ise backend cost durumunu sıfırlar).
+  const saveAndHandoff = async () => {
+    if (!selectedOppId) return false;
     setIsSubmitting(true);
     try {
-      // Abbreviated format → proper BoMItem for API and opportunity state
       const properItems: BoMItem[] = bomItems.map((item, idx) => ({
         id: item.id ?? item.pn ?? String(idx),
         partNumber: item.pn,
@@ -56,31 +58,21 @@ export const useBoM = (
         quantity: item.qty,
         purchaseCost: item.cost,
         marginPercentage: item.margin,
-        unitSalePrice: item.cost * (1 + item.margin / 100),
-        totalSalePrice: item.cost * (1 + item.margin / 100) * item.qty,
       }));
 
-      // 1. BoM kalemlerini veritabanına kaydet
-      await apiService.saveBoMItems(selectedOppId, properItems);
+      await apiService.saveBoMItems(selectedOppId, properItems, { handoff: true });
 
-      // 2. Onay sürecini başlat
-      await apiService.requestProposalApproval(selectedOppId, {
-        note: 'Teknik çalışma tamamlandı, fiyat teklifi onaya sunulmuştur.',
-        managerId: 'cmp5lhehc000259w33zxhyy0p'
-      });
-
-      alert('Teklif başarıyla yönetici onayına sunuldu.');
       setHasUnsavedChanges(false);
-
-      setOpportunities(prev => prev.map(o =>
-        o.id === selectedOppId
-          ? { ...o, technicalStatus: 'APPROVED', bomItems: properItems }
-          : o
-      ));
+      // Backend revizyonda (maliyet zaten yapılmışsa) technicalStatus'u PENDING'e sıfırlar — yereli de yansıt
+      setOpportunities(prev => prev.map(o => {
+        if (o.id !== selectedOppId) return o;
+        const wasCosted = o.technicalStatus === 'APPROVED' || o.technicalStatus === 'PENDING_APPROVAL';
+        return { ...o, bomItems: properItems, ...(wasCosted ? { technicalStatus: 'PENDING' as const } : {}) };
+      }));
 
       return true;
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Onay sürecinde hata oluştu.');
+      alert(err instanceof Error ? err.message : 'BoM kaydedilirken hata oluştu.');
       return false;
     } finally {
       setIsSubmitting(false);
@@ -94,7 +86,7 @@ export const useBoM = (
     setBomItems,
     addBoMItem,
     isSubmitting,
-    handleFinalApproval,
+    saveAndHandoff,
     totalCost
   };
 };
