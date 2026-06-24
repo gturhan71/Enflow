@@ -333,19 +333,9 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-backend/src/services/agentProvenance.ts ← pluginCatalog
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance
-src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
-src/modules/ContractModule.tsx ← constants, types, components/TaskProgressTracker, services/workflowService, contexts/AuthContext
-src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
-src/modules/ProposalEditor.tsx ← lib/utils, types
-src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
-src/modules/PresalesModule.tsx ← components/CostAnalysisModule, types, SpecAnalysis, services/workflowService, contexts/AuthContext
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/modules/SecurityTestModule.tsx ← services/apiClient
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
@@ -361,24 +351,31 @@ src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthCo
 src/components/AgentTag.tsx ← services/apiService, lib/agentProvenance, types
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
+backend/src/services/workflowTemplateService.ts ← prismaClient
 src/App.tsx ← utils/logger, constants, types, layout/Sidebar, layout/Header
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/hooks/useBoM.ts ← constants, services/apiService, contexts/UnsavedChangesContext, types
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/Dashboard.tsx ← types, lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, constants, types
-src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 backend/src/services/unitReportingService.ts ← prismaClient
-backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
+src/lib/procurementCosts.ts                   +monthsUntil  +forwardRate  +computeForwardRates
+src/modules/CostAnalysisModule.tsx            +Marj
 src/modules/ManagementReportingModule.tsx     +consolidationHtml  +ConsolidationView  ~printReportWindow  ~BottleneckPanel
-src/modules/VisitPlanModule.tsx               +g  ~mondayOf
+src/modules/VisitPlanModule.tsx               +g
 src/services/apiService.ts                    ~ApiService
-backend/src/services/unitReportingService.ts  +computeConsolidation  +resolveEscalationTarget  ~computeOverview  ~getUnitDefinition
-backend/src/services/workflowTemplateService.ts ~ensureDefaultWorkflow
+src/types.ts                                  +marj
+backend/src/services/unitReportingService.ts  +computeConsolidation  +resolveEscalationTarget  ~computeOverview  ~resolvePeriod
+.github/copilot-instructions.md               +agentActorId  +isAgentActor  +parseAgentActor  +actorType
 ```
 
 ## .github
@@ -393,43 +390,26 @@ h2 changes (last 10 commits — 1 second ago)
 h2 .github
 h3 .github/copilot-instructions.md
 h2 backend
-h3 backend/src/services/agentProvenance.ts
-h3 backend/src/services/approvalChainService.ts
 h3 backend/pnpm-lock.yaml
 h3 backend/src/services/projectFactory.ts
 h3 backend/src/services/activityLog.ts
+h3 backend/src/services/virtualAgentService.ts
+h3 backend/src/services/pluginCatalog.ts
+h3 backend/src/services/workflowTemplateService.ts
 h3 backend/prisma/migrations/migration_lock.toml
 h3 backend/prisma/migrations/20260622105919_faz_daily_report_worklink/migration.sql
 h3 backend/prisma/migrations/20260622112412_faz_unit_hierarchy_consolidation/migration.sql
-h3 backend/src/services/pluginCatalog.ts
-h3 backend/src/services/virtualAgentService.ts
+h3 backend/prisma/migrations/20260624135659_faz_costitem_auto/migration.sql
 h3 backend/src/services/unitReportingService.ts
-h3 backend/src/services/workflowTemplateService.ts
+h2 governance
+h3 governance/FINDINGS.md
+h3 governance/role-matrix.ts
 h2 src
-h3 src/lib/agentProvenance.ts
-h3 src/components/settings/UserManagement.tsx
-h3 src/modules/ContractModule.tsx
-h3 src/modules/DocumentsModule.tsx
+h3 src/hooks/useBoM.ts
+h3 src/modules/PresalesModule.tsx
 ```
 
 ## backend
-
-### backend/src/services/agentProvenance.ts
-```
-export function agentActorId  :17-19
-export function isAgentActor  :22-25
-export function parseAgentActor  :28-28
-export function actorType  :40-42
-export function agentDisplayLabel  :45-52
-```
-
-### backend/src/services/approvalChainService.ts
-```
-export async function ensureApprovalChain  :21-44
-export async function completeApprovalChain  :52-74
-export async function autoSkipOrphanStages  :84-194
-export async function resetApprovalChain  :197-210
-```
 
 ### backend/pnpm-lock.yaml
 ```
@@ -480,21 +460,6 @@ export async function runAgent  :480-485
 export async function ratifyAgentRun  :593-599
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
-### backend/prisma/migrations/20260622105919_faz_daily_report_worklink/migration.sql
-```
-TABLE new_DailyReport
-```
-
-### backend/prisma/migrations/20260622112412_faz_unit_hierarchy_consolidation/migration.sql
-```
-TABLE new_Unit
-```
-
 ### backend/src/services/pluginCatalog.ts
 ```
 export interface PluginDefinition  :13-27
@@ -510,6 +475,32 @@ export type PluginCategory  :10-10
 export type AgentMode  :11-11
 export function getPlugin  :144-146
 export function getAgentPluginForRole  :150-154
+```
+
+### backend/src/services/workflowTemplateService.ts
+```
+export async function ensureDefaultWorkflow  :123-184
+export function resolveNextStep  :194-198
+```
+
+### backend/prisma/migrations/20260622105919_faz_daily_report_worklink/migration.sql
+```
+TABLE new_DailyReport
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/prisma/migrations/20260622112412_faz_unit_hierarchy_consolidation/migration.sql
+```
+TABLE new_Unit
+```
+
+### backend/prisma/migrations/20260624135659_faz_costitem_auto/migration.sql
+```
+TABLE new_CostItem
 ```
 
 ### backend/src/services/unitReportingService.ts
@@ -541,89 +532,53 @@ charts: ChartSeries[]  :71-71
 export interface WorkflowBottleneck  :414-418
 ```
 
-### backend/src/services/workflowTemplateService.ts
+## governance
+
+### governance/FINDINGS.md
 ```
-export async function ensureDefaultWorkflow  :123-184
-export function resolveNextStep  :194-198
+h1 Enflow — Rol/Birim Uygunluk Denetimi: Bulgular & Karar Kütüğü
+h2 Faz 0 — İskele temel çizgisi (2026-06-21)
+h2 Faz 1 — Personel turları
+h3 Tur 1 — GM / Admin (Üst Yönetim · Sistem) — 2026-06-21
+h3 Tur 2 — Satış (SALES_MGR · SALES_REP · SALES_SUPPORT) — 2026-06-21
+h3 Tur 3 — Presales (PRESALES_MGR · PRESALES_ENG · TECHNICAL_SPEC) — 2026-06-21
+h3 Tur 4 — İSAB/İhale (ISAB_MGR) · Satın Alma (PROCUREMENT_MGR) — 2026-06-21
+h3 Tur 5 — Finans (FINANCE_MGR) · İGPD (IGPD_MGR) — 2026-06-21
+h3 Tur 6 — KSU/Sözleşme · KGD/Kalite · Proje (PROJECT_MGR) — 2026-06-21
+h3 Tur 7 — Hukuk (LEGAL_MGR) + kalan roller (ADMIN/OPERATIONS_MGR/HR_MGR/AUDITOR) — 2026-06-21
+h2 Faz 1 Kapanış — Kalan 3 INFO (ACCEPTED, kapsam dışı)
+h2 Faz 2 — RBAC süiti rol kapsamı genişletme (2026-06-21)
+h2 Faz 3 — Eksik roller için kalıcı kullanıcı oluşturma (2026-06-21)
+h2 Faz 4 — RBAC tüm 19 role + seed kaldırma (2026-06-21)
+h2 DURUM — Birim & Rol Yönetişimi TAMAM
+```
+
+### governance/role-matrix.ts
+```
+export interface DecisionRight  :16-20
+decision: string  :17-17
+via: string  :18-18
+threshold?: string  :19-19
+export interface RoleTask  :22-26
+task: string  :23-23
+raci: RACI  :24-24
+via: string  :25-25
+export interface RoleSpec  :28-41
+role: string  :29-29
+unit: string  :30-30
+kind: RoleKind  :31-31
+staffing: Staffing  :32-32
+modules: string[]  :33-33
+endpointDomains: string[]  :34-34
+decisionRights: DecisionRight[]  :35-35
+tasks: RoleTask[]  :36-36
+export type RoleKind  :11-11
+export type Staffing  :12-12
+export type RACI  :13-13
+export type AgentMode  :14-14
 ```
 
 ## src
-
-### src/lib/agentProvenance.ts
-```
-export function isAgentActor  :19-22
-export function parseAgentActor  :24-24
-export function agentDisplayLabel  :34-41
-```
-
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-export UserManagement
-handler onSubmit
-```
-
-### src/modules/ContractModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export ContractModule
-handler onChange
-handler onClick
-```
-
-### src/modules/DocumentsModule.tsx
-```
-props DocumentsModuleProps
-hook useState
-hook useMemo
-export DocumentsModule
-handler onChange
-handler onSubmit
-```
-
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
-### src/components/ErrorBoundary.tsx
-```
-props Props
-```
-
-### src/hooks/useBoM.ts
-```
-export interface AbbreviatedBoMItem  :8-15
-id?: string  :9-9
-pn: string  :10-10
-desc: string  :11-11
-qty: number  :12-12
-cost: number  :13-13
-margin: number  :14-14
-export const useBoM  :17-100
-```
-
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useBoM
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
-```
 
 ### src/modules/TodoModule.tsx
 ```
@@ -661,28 +616,6 @@ handler onDeal
 handler onChange
 handler onClick
 handler onSubmit
-```
-
-### src/modules/CostAnalysisModule.tsx
-```
-hook useState
-hook useMemo
-hook useEffect
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
 ```
 
 ### src/modules/SettingsModule.tsx
@@ -835,6 +768,24 @@ handler onConfirm
 handler onSubmit
 ```
 
+### src/modules/ProcurementModule.tsx
+```
+props VendorFormProps
+props PRDetailDrawerProps
+props PRFormProps
+props ProcurementModuleProps
+hook useState
+hook useAuth
+hook useCallback
+hook useEffect
+export ProcurementModule
+handler onClick
+handler onChange
+handler onKeyDown
+handler onRefresh
+handler onSave
+```
+
 ### src/App.tsx
 ```
 hook useState
@@ -863,6 +814,55 @@ hook useState
 export UnitManagement
 handler onSubmit
 handler onChange
+```
+
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :8-15
+id?: string  :9-9
+pn: string  :10-10
+desc: string  :11-11
+qty: number  :12-12
+cost: number  :13-13
+margin: number  :14-14
+export const useBoM  :17-92
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
+### src/lib/procurementCosts.ts
+```
+export interface MethodCostLine  :40-45
+label: string  :41-41
+kind: 'PERCENT' | 'FIXED'  :42-42
+value: number  :43-43
+category: CostCategory  :44-44
+export type ProcurementMethod  :8-8
+export type CostCategory  :19-19
+export function monthsUntil  :77-83
+export function forwardRate  :86-88
+export function computeForwardRates  :91-103
+```
+
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+export CostAnalysisModule
+handler onChange
+handler onClick
 ```
 
 ### src/modules/Dashboard.tsx
@@ -895,22 +895,17 @@ handler onChange
 handler onReviewed
 ```
 
-### src/modules/ProcurementModule.tsx
+### src/modules/PresalesModule.tsx
 ```
-props VendorFormProps
-props PRDetailDrawerProps
-props PRFormProps
-props ProcurementModuleProps
-hook useState
+props PresalesModuleProps
 hook useAuth
-hook useCallback
-hook useEffect
-export ProcurementModule
-handler onClick
+hook useRef
+hook useState
+hook useBoM
+export PresalesModule
 handler onChange
-handler onKeyDown
-handler onRefresh
-handler onSave
+handler onClick
+handler onTransferToBoM
 ```
 
 ### src/modules/VisitPlanModule.tsx
@@ -928,7 +923,7 @@ handler onBlur
 
 ### src/services/apiService.ts
 ```
-class ApiService  :13-87
+class ApiService  :13-85
 setAuth  :14-16
 async login  :18-20
 async forgotPassword  :22-24
