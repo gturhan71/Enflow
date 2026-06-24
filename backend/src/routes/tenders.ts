@@ -7,6 +7,7 @@ import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { analyzeSpec } from '../services/specAnalysis';
 
 const router: Router = Router();
 
@@ -158,7 +159,7 @@ router.post('/:id/checklist', tenantMiddleware, asyncHandler(async (req: Request
   const id = String(req.params.id);
   const tender = await prisma.tender.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!tender) return res.status(404).json({ error: 'İhale bulunamadı.' });
-  const { name, isRequired, sortOrder, notes } = req.body;
+  const { name, isRequired, sortOrder, notes, docType } = req.body;
   if (!name) return res.status(400).json({ error: 'Evrak adı zorunlu.' });
   const count = await prisma.tenderChecklistItem.count({ where: { tenderId: id } });
   const item = await prisma.tenderChecklistItem.create({
@@ -168,6 +169,8 @@ router.post('/:id/checklist', tenantMiddleware, asyncHandler(async (req: Request
       isRequired: isRequired !== false,
       sortOrder: typeof sortOrder === 'number' ? sortOrder : count,
       notes: notes || null,
+      docType: docType || null,
+      source: 'MANUAL',
     },
   });
   res.json(item);
@@ -197,6 +200,100 @@ router.delete('/:id/checklist/:itemId', tenantMiddleware, asyncHandler(async (re
   if (!record) return res.status(404).json({ error: 'Evrak bulunamadı.' });
   await prisma.tenderChecklistItem.delete({ where: { id: itemId } });
   res.json({ message: 'Silindi.' });
+}));
+
+// ── İhale dosyası analizi: şartname → verilecek dökümanlar listesi ─────────────
+function trLower(s: string): string { return (s || '').toLocaleLowerCase('tr-TR'); }
+function nameMatches(itemName: string, docName: string): boolean {
+  const a = trLower(itemName), b = trLower(docName);
+  if (!a || !b) return false;
+  if (a.includes(b) || b.includes(a)) return true;
+  const at = new Set(a.split(/\s+/).filter(w => w.length > 3));
+  const bt = b.split(/\s+/).filter(w => w.length > 3);
+  const overlap = bt.filter(w => at.has(w)).length;
+  return overlap >= 2; // en az 2 anlamlı ortak kelime
+}
+
+/** Şirket Evrakları envanterinden geçerli evrakları checklist'e otomatik eşle. Eşlenen sayısını döner. */
+async function autoMatchCorporateDocs(tenantId: string, tenderId: string, deadline: Date | null): Promise<number> {
+  const items = await prisma.tenderChecklistItem.findMany({ where: { tenderId, status: 'PENDING' } });
+  const corpDocs = await prisma.corporateDocument.findMany({ where: { tenantId } });
+  const validRef = deadline || new Date();
+  let matched = 0;
+  for (const item of items) {
+    const cand = corpDocs.find(d => nameMatches(item.name, d.name) && (!d.expiryDate || d.expiryDate > validRef));
+    if (cand) {
+      await prisma.tenderChecklistItem.update({
+        where: { id: item.id },
+        data: {
+          status: 'DONE', source: 'CORPORATE_DOC', corporateDocId: cand.id,
+          ...(cand.fileUrl ? { fileUrl: cand.fileUrl } : {}),
+          notes: `Şirket Evrakları envanterinden otomatik eklendi${cand.expiryDate ? ` (geçerli: ${cand.expiryDate.toLocaleDateString('tr-TR')})` : ''}`,
+        },
+      });
+      matched++;
+    }
+  }
+  return matched;
+}
+
+router.post('/:id/analyze', tenantMiddleware, tenderUpload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const tenantId = req.tenantId;
+  const tender = await prisma.tender.findFirst({ where: { id, tenantId } });
+  if (!tender) return res.status(404).json({ error: 'İhale bulunamadı.' });
+
+  // Girdi: yüklenen dosya (PDF/TXT) veya body.specText
+  let specText = String(req.body.specText || tender.specText || '');
+  if (req.file) {
+    const ext = path.extname(req.file.originalname).toLowerCase();
+    if (ext === '.pdf') {
+      try {
+        const pdfParse = require('pdf-parse') as (b: Buffer) => Promise<{ text: string }>;
+        const parsed = await pdfParse(req.file.buffer);
+        specText = parsed.text || specText;
+      } catch {
+        return res.status(422).json({ error: 'PDF metni çıkarılamadı (taranmış olabilir). Metni elle yapıştırın veya manuel liste oluşturun.' });
+      }
+    } else {
+      specText = req.file.buffer.toString('utf-8');
+    }
+  }
+  if (!specText.trim()) {
+    return res.status(400).json({ error: 'Analiz için şartname metni veya dosya gerekli.' });
+  }
+
+  const { analysis, usedAI } = await analyzeSpec(specText, { fallbackName: tender.name, fallbackNo: tender.ikn });
+
+  await prisma.tender.update({ where: { id }, data: { specText, aiAnalysis: JSON.stringify(analysis), status: tender.status === 'DRAFT' ? 'PREPARING' : tender.status } });
+
+  // Eski AI-üretilen kalemleri tazele, yenilerini ekle (manuel kalemler korunur)
+  await prisma.tenderChecklistItem.deleteMany({ where: { tenderId: id, isAiGenerated: true } });
+  const base = await prisma.tenderChecklistItem.count({ where: { tenderId: id } });
+  await prisma.tenderChecklistItem.createMany({
+    data: analysis.documents.map((d, i) => ({
+      tenderId: id, name: d.name, docType: d.docType || 'OTHER', isRequired: d.deadline_priority !== 'LOW',
+      isAiGenerated: true, source: 'AI', sortOrder: base + i,
+      deadline: tender.submissionDeadline, notes: d.notes || null,
+    })),
+  });
+
+  const matched = await autoMatchCorporateDocs(tenantId, id, tender.submissionDeadline);
+  await logActivity({ tenantId, userId: req.userId, action: 'TENDER_ANALYZE', entityType: 'TENDER', entityId: id, details: { usedAI, docs: analysis.documents.length, autoMatched: matched } });
+
+  const items = await prisma.tenderChecklistItem.findMany({ where: { tenderId: id }, orderBy: { sortOrder: 'asc' } });
+  res.json({ usedAI, autoMatched: matched, checklist: items });
+}));
+
+router.post('/:id/auto-match', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const tenantId = req.tenantId;
+  const tender = await prisma.tender.findFirst({ where: { id, tenantId } });
+  if (!tender) return res.status(404).json({ error: 'İhale bulunamadı.' });
+  const matched = await autoMatchCorporateDocs(tenantId, id, tender.submissionDeadline);
+  await logActivity({ tenantId, userId: req.userId, action: 'TENDER_AUTOMATCH', entityType: 'TENDER', entityId: id, details: { autoMatched: matched } });
+  const items = await prisma.tenderChecklistItem.findMany({ where: { tenderId: id }, orderBy: { sortOrder: 'asc' } });
+  res.json({ autoMatched: matched, checklist: items });
 }));
 
 router.post(

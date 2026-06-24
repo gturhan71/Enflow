@@ -2,6 +2,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Gavel, Plus, Calendar, ClipboardCheck, ShieldCheck, Landmark, Trash2,
   CheckCircle2, Clock, AlertTriangle, Upload, FileText, X, ExternalLink,
+  Sparkles, Building2, Loader2, FileSearch,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
@@ -201,6 +202,10 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
   const [items, setItems] = useState<TenderChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const [specText, setSpecText] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [manualName, setManualName] = useState('');
+  const [info, setInfo] = useState('');
 
   const load = useCallback(async () => {
     if (!tender) { setItems([]); return; }
@@ -214,6 +219,60 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
     if (!tender) return;
     await apiService.updateTenderChecklistItem(tender.id, item.id, { status });
     load();
+  };
+
+  // Analiz: şartname metniyle AI
+  const analyzeText = async () => {
+    if (!tender || !specText.trim()) return;
+    setAnalyzing(true); setInfo('');
+    try {
+      const r = await apiService.analyzeTender(tender.id, { specText }) as { usedAI: boolean; autoMatched: number };
+      setInfo(`${r.usedAI ? 'AI' : 'Standart liste'} ile döküman listesi oluşturuldu · ${r.autoMatched} evrak Şirket Evraklarından otomatik eklendi.`);
+      await load();
+    } catch (e) { setInfo('Analiz hatası: ' + (e instanceof Error ? e.message : '')); }
+    finally { setAnalyzing(false); }
+  };
+
+  // Analiz: dosya (PDF/TXT) yükle
+  const analyzeFile = async (file: File) => {
+    if (!tender) return;
+    setAnalyzing(true); setInfo('');
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
+      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+      const res = await fetch(`/api/tenders/${tender.id}/analyze`, {
+        method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
+      setInfo(`${data.usedAI ? 'AI' : 'Standart liste'} ile döküman listesi oluşturuldu · ${data.autoMatched} otomatik eklendi.`);
+      await load();
+    } catch (e) { setInfo('Dosya analizi hatası: ' + (e instanceof Error ? e.message : '')); }
+    finally { setAnalyzing(false); }
+  };
+
+  // Manuel kalem ekle (AI'sız)
+  const addManual = async () => {
+    if (!tender || !manualName.trim()) return;
+    await apiService.addTenderChecklistItem(tender.id, { name: manualName.trim() });
+    setManualName(''); load();
+  };
+
+  const deleteItem = async (item: TenderChecklistItem) => {
+    if (!tender) return;
+    await apiService.deleteTenderChecklistItem(tender.id, item.id);
+    load();
+  };
+
+  const autoMatch = async () => {
+    if (!tender) return;
+    setAnalyzing(true); setInfo('');
+    try {
+      const r = await apiService.autoMatchTender(tender.id) as { autoMatched: number };
+      setInfo(`${r.autoMatched} evrak Şirket Evrakları envanterinden otomatik eklendi.`);
+      await load();
+    } finally { setAnalyzing(false); }
   };
 
   const upload = async (item: TenderChecklistItem, file: File) => {
@@ -242,14 +301,46 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
   return (
     <div className="space-y-4">
       <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center justify-between mb-1">
           <h4 className="font-black text-slate-900">{tender.name}</h4>
           <span className="text-sm font-bold text-primary">{done.length}/{required.length} zorunlu ({pct}%)</span>
         </div>
+        <p className="text-[11px] text-slate-400 mb-2">{tender.ikn ? `İKN: ${tender.ikn} · ` : ''}Dosyalama: {tender.ikn || '—'} / {tender.name}</p>
         <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
           <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
         </div>
       </div>
+
+      {/* İhale Dosyası Analizi — 3 mod: AI-metin / AI-dosya / manuel */}
+      <div className="glass-card p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <FileSearch className="w-4 h-4 text-primary" />
+          <h5 className="font-black text-slate-900 text-sm">İhale Dosyası Analizi — Verilecek Dökümanlar</h5>
+        </div>
+        <p className="text-[11px] text-slate-500">İdari/teknik şartname + atıf yapılan hususları yapıştırın ya da dosya yükleyin; sistem verilecek döküman listesini çıkarır ve geçerli evrakları Şirket Evraklarından otomatik ekler.</p>
+        <textarea value={specText} onChange={e => setSpecText(e.target.value)} rows={3} placeholder="Şartname metnini buraya yapıştırın..."
+          className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary/20" />
+        <div className="flex flex-wrap items-center gap-2">
+          <button onClick={analyzeText} disabled={analyzing || !specText.trim()} className="btn-primary text-xs disabled:opacity-50">
+            {analyzing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />} AI ile Analiz Et
+          </button>
+          <label className="btn-secondary text-xs cursor-pointer">
+            <Upload className="w-3.5 h-3.5" /> PDF / TXT Yükle
+            <input type="file" accept=".pdf,.txt" className="hidden" disabled={analyzing}
+              onChange={e => { const f = e.target.files?.[0]; if (f) analyzeFile(f); e.target.value = ''; }} />
+          </label>
+          <button onClick={autoMatch} disabled={analyzing} className="btn-secondary text-xs disabled:opacity-50">
+            <Building2 className="w-3.5 h-3.5" /> Şirket Evrakları ile Eşle
+          </button>
+        </div>
+        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+          <input value={manualName} onChange={e => setManualName(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addManual(); }}
+            placeholder="Manuel evrak ekle (AI'sız)..." className="flex-1 text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 outline-none" />
+          <button onClick={addManual} disabled={!manualName.trim()} className="btn-secondary text-xs disabled:opacity-50"><Plus className="w-3.5 h-3.5" /> Ekle</button>
+        </div>
+        {info && <p className="text-[11px] font-semibold text-emerald-600">{info}</p>}
+      </div>
+
       {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
       <div className="space-y-2">
         {items.map(item => (
@@ -259,8 +350,12 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
                 : item.status === 'WAIVED' ? <CheckCircle2 className="w-5 h-5 text-slate-300 flex-shrink-0" />
                 : <Clock className="w-5 h-5 text-amber-500 flex-shrink-0" />}
               <div className="min-w-0">
-                <p className="font-semibold text-slate-900 truncate">{item.name}
-                  {item.isRequired && <span className="ml-2 text-[10px] font-bold text-red-500">ZORUNLU</span>}</p>
+                <p className="font-semibold text-slate-900 truncate flex items-center gap-1.5 flex-wrap">{item.name}
+                  {item.isRequired && <span className="text-[10px] font-bold text-red-500">ZORUNLU</span>}
+                  {item.isAiGenerated && <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded-full"><Sparkles className="w-2.5 h-2.5" />AI</span>}
+                  {item.source === 'CORPORATE_DOC' && <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full"><Building2 className="w-2.5 h-2.5" />Şirket Evrakı</span>}
+                </p>
+                {item.source === 'CORPORATE_DOC' && item.notes && <p className="text-[10px] text-emerald-600">{item.notes}</p>}
                 {item.fileUrl && (
                   <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-primary hover:underline flex items-center gap-1">
                     <FileText className="w-3 h-3" /> Yüklenen dosya <ExternalLink className="w-3 h-3" />
@@ -278,6 +373,7 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
                 ? <button onClick={() => setStatus(item, 'DONE')} className="text-xs text-emerald-600 hover:underline">Tamam</button>
                 : <button onClick={() => setStatus(item, 'PENDING')} className="text-xs text-slate-400 hover:underline">Geri Al</button>}
               {item.status !== 'WAIVED' && <button onClick={() => setStatus(item, 'WAIVED')} className="text-xs text-slate-400 hover:underline">Muaf</button>}
+              <button onClick={() => deleteItem(item)} title="Sil" className="text-slate-300 hover:text-red-500"><Trash2 className="w-3.5 h-3.5" /></button>
             </div>
           </div>
         ))}

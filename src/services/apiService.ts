@@ -455,6 +455,12 @@ class ApiService {
   async deleteTenderChecklistItem(id: string, itemId: string) {
     return apiClient.fetchWithAuth(`/tenders/${id}/checklist/${itemId}`, { method: 'DELETE' });
   }
+  async analyzeTender(id: string, data: { specText: string }) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/analyze`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async autoMatchTender(id: string) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/auto-match`, { method: 'POST' });
+  }
 
   // --- REPORTS: Yönetim Raporlama ---
   async getReportUnits() { return apiClient.fetchWithAuth('/reports/units'); }

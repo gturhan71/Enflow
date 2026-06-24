@@ -960,6 +960,8 @@ model Tender {
   ownerName           String?
   docNumber           String?
   notes               String?
+  specText            String?   // idari/teknik şartname + atıf yapılan hususlar metni (analiz girdisi)
+  aiAnalysis          String?   // JSON — şartname analizi çıktısı
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   checklist           TenderChecklistItem[]
@@ -976,6 +978,11 @@ model TenderChecklistItem {
   fileUrl     String?
   sortOrder   Int      @default(0)
   notes       String?
+  docType       String?  // TAX|BANK|LEGAL|FIRM_CERT|SPEC|ADMIN|OTHER
+  deadline      DateTime?
+  isAiGenerated Boolean  @default(false)
+  source        String?  // MANUAL|AI|CORPORATE_DOC — evrak kaynağı
+  corporateDocId String? // Şirket Evrakları envanterinden otomatik eşlenen belge bağı
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   @@index([tenderId])

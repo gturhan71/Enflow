@@ -729,6 +729,11 @@ export interface TenderChecklistItem {
   fileUrl?: string | null;
   sortOrder: number;
   notes?: string | null;
+  docType?: string | null;
+  deadline?: string | null;
+  isAiGenerated?: boolean;
+  source?: 'MANUAL' | 'AI' | 'CORPORATE_DOC' | null;
+  corporateDocId?: string | null;
 }
 
 export interface Tender {

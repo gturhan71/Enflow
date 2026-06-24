@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import Anthropic from '@anthropic-ai/sdk';
+import { analyzeSpec } from '../services/specAnalysis';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -192,102 +192,8 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
     return res.status(400).json({ error: 'Analiz için sözleşme metni veya idari şartname girilmeli.' });
   }
 
-  let analysis: object;
-
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
-    const client = new Anthropic({ apiKey });
-    const message = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 4096,
-      messages: [{
-        role: 'user',
-        content: `Aşağıdaki sözleşme metni ve/veya idari şartnameyi analiz et.
-Yanıtı YALNIZCA geçerli JSON olarak ver, açıklama veya markdown olmadan.
-
-Beklenen format:
-{
-  "documents": [
-    {
-      "name": "Belge adı",
-      "docType": "TAX|BANK|LEGAL|FIRM_CERT|SPEC|ADMIN|OTHER",
-      "description": "Ne için gerekli, nasıl temin edilir",
-      "deadline_priority": "HIGH|MEDIUM|LOW",
-      "estimated_days": 3,
-      "notes": "Varsa özel not"
-    }
-  ],
-  "tasks": [
-    {
-      "order": 1,
-      "title": "Yapılacak iş",
-      "description": "Detay",
-      "category": "TAX|LEGAL|ADMIN|TECHNICAL|OTHER",
-      "priority": "HIGH|MEDIUM|LOW",
-      "estimated_days": 2
-    }
-  ],
-  "key_clauses": [
-    {
-      "clause": "Madde başlığı",
-      "impact": "Proje/süreç üzerindeki etkisi",
-      "action_required": "Yapılması gereken"
-    }
-  ],
-  "contract_summary": {
-    "project_name": "İdari şartname veya sözleşmede geçen resmi proje/iş adı (tam olarak belgedeki gibi)",
-    "tender_no": "Varsa ihale kayıt numarası (İKN) — örn: 2024/123456 — bulunamazsa null",
-    "type": "Sözleşme türü (HIZMET/MAL ALIMI/YAPIM İŞİ/vb.)",
-    "tax_obligations": ["Damga vergisi %0.948", "KDV %20"],
-    "key_deadlines": ["Başlangıç: X gün", "Teslim: Y gün"],
-    "special_requirements": ["Özel şart 1", "Özel şart 2"],
-    "project_impacts": ["Proje yönetimini etkileyecek madde 1"]
-  }
-}
-
---- BELGE ---
-${inputText}`,
-      }],
-    });
-
-    const raw = (message.content[0] as { type: string; text: string }).text.trim();
-    const jsonStart = raw.indexOf('{');
-    const jsonEnd = raw.lastIndexOf('}');
-    analysis = JSON.parse(raw.slice(jsonStart, jsonEnd + 1));
-  } else {
-    analysis = {
-      documents: [
-        { name: 'Geçici Teminat Mektubu', docType: 'BANK', description: 'Sözleşme bedelinin %6\'sı oranında banka teminat mektubu', deadline_priority: 'HIGH', estimated_days: 3, notes: 'Bankadan alınacak, belirli süre geçerli olmalı' },
-        { name: 'Vergi Borcu Yoktur Yazısı', docType: 'TAX', description: 'Vergi dairesinden güncel tarihli belge', deadline_priority: 'HIGH', estimated_days: 2, notes: 'İnteraktif vergi dairesinden online alınabilir' },
-        { name: 'SGK Borcu Yoktur Yazısı', docType: 'FIRM_CERT', description: 'SGK\'dan güncel tarihli borcu yoktur belgesi', deadline_priority: 'HIGH', estimated_days: 2, notes: 'e-Devlet üzerinden alınabilir' },
-        { name: 'Ticaret Odası Faaliyet Belgesi', docType: 'LEGAL', description: 'Son 6 ay içinde alınmış güncel faaliyet belgesi', deadline_priority: 'MEDIUM', estimated_days: 1, notes: 'Bağlı olunan ticaret odasından temin edilir' },
-        { name: 'İmza Sirküleri', docType: 'LEGAL', description: 'Noterden onaylı güncel imza sirküleri', deadline_priority: 'MEDIUM', estimated_days: 1, notes: 'Mevcut sirküler güncel ise kullanılabilir' },
-        { name: 'Damga Vergisi Dekontu', docType: 'TAX', description: 'Sözleşme bedeli üzerinden %0.948 damga vergisi ödeme dekontu', deadline_priority: 'HIGH', estimated_days: 1, notes: 'Vergi dairesine ödeme yapılmalı' },
-        { name: 'İdari Şartname', docType: 'SPEC', description: 'Müşteri tarafından verilen idari şartname belgesi', deadline_priority: 'MEDIUM', estimated_days: 0, notes: 'Müşteriden temin edildi' },
-      ],
-      tasks: [
-        { order: 1, title: 'Teminat mektubunu bankaya hazırlat', description: 'Sözleşme bedeli belirlendikten sonra %6 oranında geçici teminat mektubu temin et', category: 'LEGAL', priority: 'HIGH', estimated_days: 3 },
-        { order: 2, title: 'Vergi ve SGK borcu yoktur belgelerini al', description: 'Güncel tarihli vergi ve SGK borcu yoktur yazılarını temin et', category: 'TAX', priority: 'HIGH', estimated_days: 2 },
-        { order: 3, title: 'Damga vergisini öde', description: 'Sözleşme bedelinin %0.948\'i oranında damga vergisini vergi dairesine yatır', category: 'TAX', priority: 'HIGH', estimated_days: 1 },
-        { order: 4, title: 'Taslak sözleşmeyi hukuk birimine incelet', description: 'Sözleşme maddelerinin yasal uygunluğu için hukuk birimi incelemesi yaptır', category: 'LEGAL', priority: 'MEDIUM', estimated_days: 2 },
-        { order: 5, title: 'Sözleşme imzalama randevusu al', description: 'Müşteri ile uygun tarihte imzalama toplantısı planla', category: 'ADMIN', priority: 'MEDIUM', estimated_days: 1 },
-      ],
-      key_clauses: [
-        { clause: 'Cezai Şart', impact: 'Gecikmeler için günlük ceza uygulanabilir', action_required: 'Proje takvimini dikkatli planla, tampon süre bırak' },
-        { clause: 'Ödeme Koşulları', impact: 'Hakediş/milestone bazlı ödeme yapısı belirlenmiş olabilir', action_required: 'Nakit akış planlaması yap' },
-        { clause: 'Garanti ve Teminat', impact: 'İş bitiminde kesin teminat mektubu gerekebilir', action_required: 'Teminat mektuplarının sürelerini takip et' },
-      ],
-      contract_summary: {
-        project_name: wf.tenderName || wf.title,
-        tender_no: wf.tenderNo || null,
-        type: 'HİZMET / MAL ALIMI',
-        tax_obligations: ['Damga Vergisi %0.948', 'KDV %20'],
-        key_deadlines: ['Sözleşme imzasından itibaren iş başı', 'Teslim süresi şartnamede belirtilmiş'],
-        special_requirements: ['Yerli malı belgesi gerekebilir', 'ISO sertifikaları gerekebilir'],
-        project_impacts: ['Teknik şartname gereksinimleri proje kapsamını belirler', 'Muayene ve kabul prosedürleri uygulanacak'],
-      },
-    };
-  }
+  // Ortak şartname analiz servisi (Claude + mock fallback) — DRY (tenders ile paylaşımlı)
+  const { analysis } = await analyzeSpec(inputText, { fallbackName: wf.tenderName || wf.title, fallbackNo: wf.tenderNo });
 
   // Extract project name and tender no from analysis, update workflow title
   const summary = (analysis as { contract_summary?: { project_name?: string; tender_no?: string } }).contract_summary;
