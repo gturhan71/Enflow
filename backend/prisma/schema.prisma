@@ -962,6 +962,8 @@ model Tender {
   notes               String?
   specText            String?   // idari/teknik şartname + atıf yapılan hususlar metni (analiz girdisi)
   aiAnalysis          String?   // JSON — şartname analizi çıktısı
+  remindersSent       String?   // JSON dizi — gönderilen zaman-eşiği hatırlatmaları ['72h','48h','12h','6h']
+  submittedAt         DateTime? // "Teklif İletildi" zamanı
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   checklist           TenderChecklistItem[]

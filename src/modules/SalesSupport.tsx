@@ -13,15 +13,31 @@ interface SalesSupportProps {
   opportunities?: Opportunity[];
 }
 
-type TabKey = 'list' | 'calendar' | 'checklist' | 'guarantees' | 'ekap';
+type TabKey = 'list' | 'calendar' | 'checklist' | 'guarantees' | 'submitted' | 'ekap';
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'list', label: 'İhale Listesi', icon: Gavel },
   { key: 'calendar', label: 'İhale Takvimi', icon: Calendar },
   { key: 'checklist', label: 'Uygunluk Denetimi', icon: ClipboardCheck },
   { key: 'guarantees', label: 'Teminat', icon: ShieldCheck },
+  { key: 'submitted', label: 'Girilen İhaleler', icon: FileText },
   { key: 'ekap', label: 'EKAP', icon: Landmark },
 ];
+
+const SUBMITTED_STATUSES = ['SUBMITTED', 'EVALUATING', 'WON', 'LOST'];
+
+// Son teklif tarihine kalan süreye göre eşik rozeti (3g/2g/12s/6s)
+function deadlineBadge(deadline?: string | null): { label: string; tone: string } | null {
+  if (!deadline) return null;
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return { label: 'Süre doldu', tone: 'bg-red-100 text-red-700' };
+  const h = ms / 3_600_000;
+  if (h <= 6) return { label: '6 saat kaldı', tone: 'bg-red-100 text-red-700' };
+  if (h <= 12) return { label: '12 saat kaldı', tone: 'bg-orange-100 text-orange-700' };
+  if (h <= 48) return { label: '2 gün kaldı', tone: 'bg-amber-100 text-amber-700' };
+  if (h <= 72) return { label: '3 gün kaldı', tone: 'bg-yellow-100 text-yellow-700' };
+  return null;
+}
 
 const METHOD_LABELS: Record<string, string> = {
   OPEN: 'Açık İhale', RESTRICTED: 'Belli İstekliler', NEGOTIATED: 'Pazarlık', DIRECT: 'Doğrudan Temin',
@@ -98,10 +114,11 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 
       {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
 
-      {tab === 'list' && <TenderList tenders={tenders} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} />}
-      {tab === 'calendar' && <TenderCalendar tenders={tenders} />}
-      {tab === 'checklist' && <ChecklistTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} />}
+      {tab === 'list' && <TenderList tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} />}
+      {tab === 'calendar' && <TenderCalendar tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} />}
+      {tab === 'checklist' && <ChecklistTab tender={selected} tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
+      {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => SUBMITTED_STATUSES.includes(t.status))} />}
       {tab === 'ekap' && <EkapTab prefix={ekapPrefix} setPrefix={setEkapPrefix} />}
 
       <AnimatePresence>
@@ -135,6 +152,7 @@ function TenderList({ tenders, selectedId, onSelect, onChanged }: {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES[t.status] || ''}`}>{STATUS_LABELS[t.status] || t.status}</span>
+                  {(() => { const b = deadlineBadge(t.submissionDeadline); return b ? <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.tone}`}>{b.label}</span> : null; })()}
                   {t.docNumber && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg">{t.docNumber}</span>}
                 </div>
                 <p className="text-xs text-slate-500">
@@ -196,8 +214,8 @@ function TenderCalendar({ tenders }: { tenders: Tender[] }) {
 }
 
 // ── Uygunluk Denetimi (Checklist) ────────────────────────────────────────────────
-function ChecklistTab({ tender, tenders, onSelectTender }: {
-  tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void;
+function ChecklistTab({ tender, tenders, onSelectTender, onChanged }: {
+  tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; onChanged?: () => void;
 }) {
   const [items, setItems] = useState<TenderChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -275,6 +293,18 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
     } finally { setAnalyzing(false); }
   };
 
+  // "Teklif İletildi" — dosyayı Girilen İhaleler'e taşı (eksik dökümanda onay ister)
+  const submitBid = async () => {
+    if (!tender) return;
+    const reqMissing = items.filter(i => i.isRequired && !['DONE', 'WAIVED'].includes(i.status));
+    if (reqMissing.length > 0 && !window.confirm(`${reqMissing.length} zorunlu döküman eksik:\n• ${reqMissing.map(m => m.name).join('\n• ')}\n\nYine de teklifi iletildi olarak işaretleyip Girilen İhaleler'e taşımak istiyor musunuz?`)) return;
+    if (!window.confirm('Teklif iletildi olarak işaretlenecek ve dosya "Girilen İhaleler" arşivine taşınacak. Onaylıyor musunuz?')) return;
+    try {
+      await apiService.submitTender(tender.id, { force: reqMissing.length > 0 });
+      onChanged?.();
+    } catch (e) { alert('İşlem hatası: ' + (e instanceof Error ? e.message : '')); }
+  };
+
   const upload = async (item: TenderChecklistItem, file: File) => {
     if (!tender) return;
     setUploadingId(item.id);
@@ -301,14 +331,20 @@ function ChecklistTab({ tender, tenders, onSelectTender }: {
   return (
     <div className="space-y-4">
       <div className="glass-card p-5">
-        <div className="flex items-center justify-between mb-1">
-          <h4 className="font-black text-slate-900">{tender.name}</h4>
-          <span className="text-sm font-bold text-primary">{done.length}/{required.length} zorunlu ({pct}%)</span>
+        <div className="flex items-center justify-between mb-1 gap-3">
+          <h4 className="font-black text-slate-900 truncate">{tender.name}</h4>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {(() => { const b = deadlineBadge(tender.submissionDeadline); return b ? <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${b.tone}`}>{b.label}</span> : null; })()}
+            <span className="text-sm font-bold text-primary">{done.length}/{required.length} zorunlu ({pct}%)</span>
+          </div>
         </div>
-        <p className="text-[11px] text-slate-400 mb-2">{tender.ikn ? `İKN: ${tender.ikn} · ` : ''}Dosyalama: {tender.ikn || '—'} / {tender.name}</p>
-        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+        <p className="text-[11px] text-slate-400 mb-2">Son teklif: {fmtDate(tender.submissionDeadline)} · Dosyalama: {tender.ikn || '—'} / {tender.name}</p>
+        <div className="h-2 bg-slate-100 rounded-full overflow-hidden mb-3">
           <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${pct}%` }} />
         </div>
+        <button onClick={submitBid} className="btn-primary text-xs w-full justify-center">
+          <CheckCircle2 className="w-4 h-4" /> Teklif İletildi — Girilen İhaleler'e Taşı
+        </button>
       </div>
 
       {/* İhale Dosyası Analizi — 3 mod: AI-metin / AI-dosya / manuel */}
@@ -473,6 +509,29 @@ function EkapTab({ prefix, setPrefix }: { prefix: string; setPrefix: (v: string)
 }
 
 // ── Yardımcılar ──────────────────────────────────────────────────────────────────
+// ── Girilen İhaleler (arşiv: teklif iletilmiş/sonuçlanmış dosyalar) ───────────────
+function SubmittedTenders({ tenders }: { tenders: Tender[] }) {
+  if (tenders.length === 0)
+    return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz teklif iletilen ihale yok. Uygunluk Denetimi'nde "Teklif İletildi" ile dosyayı buraya taşıyın.</div>;
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-slate-500 px-1">Teklifi iletilen dosyalar İKN + işin adı ile arşivlenir. İş <strong>kazanılırsa</strong> teklif detay raporu + açık BoM + maliyet analizi Satınalma ve Proje Yönetimi'ne devredilir.</p>
+      {tenders.map(t => (
+        <div key={t.id} className="glass-card p-5 flex items-start justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
+              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES[t.status] || ''}`}>{STATUS_LABELS[t.status] || t.status}</span>
+            </div>
+            <p className="text-xs text-slate-500">{t.ikn ? `İKN: ${t.ikn} · ` : ''}{METHOD_LABELS[t.method] || t.method} · {fmt(t.estimatedValue, t.currency)}</p>
+            <p className="text-[11px] text-slate-400">Teklif iletildi: {fmtDate(t.submittedAt)} · Dosyalama: {t.ikn || '—'} / {t.name}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function TenderSelectorEmpty({ tenders, onSelectTender, text }: { tenders: Tender[]; onSelectTender: (id: string) => void; text: string }) {
   return (
     <div className="glass-card p-12 text-center space-y-4">

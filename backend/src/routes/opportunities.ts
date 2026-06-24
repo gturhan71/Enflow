@@ -124,7 +124,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     if (linked) {
       await prisma.tender.update({ where: { id: linked.id }, data: {
         ...(procurementMethod !== undefined ? { method: procurementMethod || 'OPEN' } : {}),
-        ...(targetBidDate !== undefined ? { submissionDeadline: targetBidDate ? new Date(targetBidDate as string) : null } : {}),
+        ...(targetBidDate !== undefined ? { submissionDeadline: targetBidDate ? new Date(targetBidDate as string) : null, remindersSent: null } : {}),
       } }).catch(() => {});
     }
   }

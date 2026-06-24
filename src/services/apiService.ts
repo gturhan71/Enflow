@@ -461,6 +461,9 @@ class ApiService {
   async autoMatchTender(id: string) {
     return apiClient.fetchWithAuth(`/tenders/${id}/auto-match`, { method: 'POST' });
   }
+  async submitTender(id: string, data?: { force?: boolean }) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/submit`, { method: 'POST', body: JSON.stringify(data || {}) });
+  }
 
   // --- REPORTS: Yönetim Raporlama ---
   async getReportUnits() { return apiClient.fetchWithAuth('/reports/units'); }

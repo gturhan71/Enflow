@@ -742,9 +742,10 @@ export interface Tender {
   name: string;
   ikn?: string | null;
   authority?: string | null;
-  method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED' | 'DIRECT';
+  method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED' | 'DIRECT' | 'PRIVATE';
   status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED';
   submissionDeadline?: string | null;
+  submittedAt?: string | null;
   estimatedValue: number;
   currency: string;
   opportunityId?: string | null;

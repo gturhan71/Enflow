@@ -8,6 +8,7 @@ import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { analyzeSpec } from '../services/specAnalysis';
+import { sweepTenderReminders } from '../services/tenderReminders';
 
 const router: Router = Router();
 
@@ -36,6 +37,7 @@ async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<
 // ── İhaleler ────────────────────────────────────────────────────────────────────
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await sweepTenderReminders(req.tenantId); // zaman-eşiği hatırlatmaları (non-throwing)
   const { status, method } = req.query as { status?: string; method?: string };
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (status) where.status = status;
@@ -294,6 +296,29 @@ router.post('/:id/auto-match', tenantMiddleware, asyncHandler(async (req: Reques
   await logActivity({ tenantId, userId: req.userId, action: 'TENDER_AUTOMATCH', entityType: 'TENDER', entityId: id, details: { autoMatched: matched } });
   const items = await prisma.tenderChecklistItem.findMany({ where: { tenderId: id }, orderBy: { sortOrder: 'asc' } });
   res.json({ autoMatched: matched, checklist: items });
+}));
+
+// "Teklif İletildi" — dosyayı "Girilen İhaleler" arşivine taşı (status=SUBMITTED)
+router.post('/:id/submit', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const tenantId = req.tenantId;
+  const { force } = req.body as { force?: boolean };
+  const tender = await prisma.tender.findFirst({ where: { id, tenantId } });
+  if (!tender) return res.status(404).json({ error: 'İhale bulunamadı.' });
+  if (['SUBMITTED', 'EVALUATING', 'WON', 'LOST'].includes(tender.status)) {
+    return res.status(409).json({ error: 'İhale zaten teslim edilmiş/sonuçlanmış.' });
+  }
+
+  // Eksik zorunlu döküman kontrolü (force ile geçilebilir)
+  const items = await prisma.tenderChecklistItem.findMany({ where: { tenderId: id } });
+  const missing = items.filter(i => i.isRequired && !['DONE', 'WAIVED'].includes(i.status));
+  if (missing.length > 0 && !force) {
+    return res.status(422).json({ error: 'Eksik zorunlu döküman var.', missing: missing.map(m => m.name) });
+  }
+
+  const updated = await prisma.tender.update({ where: { id }, data: { status: 'SUBMITTED', submittedAt: new Date() } });
+  await logActivity({ tenantId, userId: req.userId, action: 'TENDER_SUBMITTED', entityType: 'TENDER', entityId: id, details: { name: tender.name, forced: !!force, missing: missing.length } });
+  res.json(updated);
 }));
 
 router.post(
