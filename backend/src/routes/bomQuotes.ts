@@ -1,10 +1,17 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
+import multer from 'multer';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
+
+const QUOTE_UPLOADS_ROOT = path.join(__dirname, '../../uploads/bom-quotes');
+const quoteUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
 
 // Bir fırsatın tüm BoM teklifleri (lineKey ile gruplanır)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
@@ -98,6 +105,43 @@ router.post('/:qid/select', asyncHandler(async (req: Request, res: Response) => 
 
   await logActivity({ tenantId, userId: req.userId, action: 'SELECT_BOM_QUOTE', entityType: 'BOM_QUOTE', entityId: qid, details: { opportunityId: quote.opportunityId, lineKey: quote.lineKey, vendorName: quote.vendorName, unitPrice: quote.unitPrice } });
   res.json(selected);
+}));
+
+// Orijinal teklif dosyası yükle (xls/xlsx/xml/doc/docx/pdf) — seçim kanıtı
+const ALLOWED_EXT = ['.pdf', '.xls', '.xlsx', '.xml', '.doc', '.docx', '.csv'];
+router.post('/:qid/upload', quoteUpload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+  const qid = String(req.params.qid);
+  const tenantId = req.tenantId;
+  if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
+  const quote = await prisma.boMLineQuote.findFirst({ where: { id: qid, tenantId } });
+  if (!quote) return res.status(404).json({ error: 'Teklif bulunamadı.' });
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!ALLOWED_EXT.includes(ext)) {
+    return res.status(415).json({ error: `Desteklenmeyen format. İzinli: ${ALLOWED_EXT.join(', ')}` });
+  }
+
+  const folder = slugify(`${quote.opportunityId}_${quote.lineKey}`);
+  const uploadDir = getUploadDir(QUOTE_UPLOADS_ROOT, folder);
+  const safeName = `${qid.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+  fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
+  const localUrl = `/uploads/bom-quotes/${folder}/${safeName}`;
+  let fileUrl = localUrl;
+  let ncUrl: string | null = null;
+
+  const NC_URL = process.env.NEXTCLOUD_URL, NC_USER = process.env.NEXTCLOUD_USER, NC_PASS = process.env.NEXTCLOUD_PASS;
+  if (NC_URL && NC_USER && NC_PASS) {
+    try {
+      ncUrl = await uploadToNextcloud(req.file.buffer, safeName, `/ENFLOW_DMS/BoM_Teklifleri/${folder}`, NC_URL, NC_USER, NC_PASS);
+      fileUrl = ncUrl;
+    } catch (e) {
+      console.warn('[Nextcloud] BoM quote upload failed, using local:', (e as Error).message);
+      fileUrl = localUrl;
+    }
+  }
+
+  const updated = await prisma.boMLineQuote.update({ where: { id: qid }, data: { fileUrl, fileName: req.file.originalname } });
+  await logActivity({ tenantId, userId: req.userId, action: 'UPLOAD_BOM_QUOTE_FILE', entityType: 'BOM_QUOTE', entityId: qid, details: { fileName: req.file.originalname } });
+  res.json({ quote: updated, localUrl, nextcloudUrl: ncUrl });
 }));
 
 export default router;

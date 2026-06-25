@@ -174,6 +174,8 @@ export interface BoMLineQuote {
   validUntil?: string | null;
   notes?: string | null;
   isSelected: boolean;
+  fileUrl?: string | null;
+  fileName?: string | null;
   createdAt?: string;
 }
 

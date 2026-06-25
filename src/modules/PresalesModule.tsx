@@ -524,6 +524,21 @@ const BoMQuotePanel: React.FC<{
 
   const removeQuote = async (q: BoMLineQuote) => { await apiService.deleteBomQuote(q.id); load(); };
 
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const uploadFile = async (q: BoMLineQuote, file: File) => {
+    setUploadingId(q.id);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
+      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+      const r = await fetch(`/api/bom-quotes/${q.id}/upload`, { method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
+      await load();
+    } catch (e) { alert('Yükleme hatası: ' + (e instanceof Error ? e.message : '')); }
+    finally { setUploadingId(null); }
+  };
+
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
       <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
@@ -556,6 +571,18 @@ const BoMQuotePanel: React.FC<{
                     </p>
                     {q.specSummary && <p className="text-[11px] text-slate-500 mt-0.5">{q.specSummary}</p>}
                     {q.deliveryDays != null && <p className="text-[10px] text-slate-400">{q.deliveryDays} gün teslimat</p>}
+                    <div className="flex items-center gap-2 mt-1">
+                      {q.fileUrl ? (
+                        <a href={q.fileUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
+                          <Upload size={10} /> {q.fileName || 'Teklif dosyası'}
+                        </a>
+                      ) : <span className="text-[10px] text-slate-400">Orijinal teklif dosyası yok</span>}
+                      <label className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 cursor-pointer border border-slate-200 rounded px-1.5 py-0.5">
+                        {uploadingId === q.id ? '...' : q.fileUrl ? 'Değiştir' : 'Dosya Yükle'}
+                        <input type="file" className="hidden" accept=".pdf,.xls,.xlsx,.xml,.doc,.docx,.csv" disabled={uploadingId === q.id}
+                          onChange={e => { const file = e.target.files?.[0]; if (file) uploadFile(q, file); e.target.value = ''; }} />
+                      </label>
+                    </div>
                   </div>
                   <div className="text-right shrink-0">
                     <p className="text-sm font-black text-slate-900">{q.unitPrice.toLocaleString('tr-TR')} {q.currency}</p>

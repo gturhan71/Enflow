@@ -231,6 +231,8 @@ model BoMLineQuote {
   validUntil         DateTime?
   notes              String?
   isSelected         Boolean  @default(false)
+  fileUrl            String?  // orijinal teklif dosyası (xls/xml/doc/pdf) — seçim kanıtı
+  fileName           String?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
   @@index([opportunityId, lineKey])
