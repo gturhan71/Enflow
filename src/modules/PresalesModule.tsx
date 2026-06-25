@@ -63,12 +63,15 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     totalCost
   } = useBoM(selectedOppId, setOpportunities, opportunities);
 
+  // BoM hangi dövizle hazırlanıyorsa o döviz maliyetlendirmeye değişmeden taşınır (kritik)
+  const [bomCurrency, setBomCurrency] = useState('TRY');
   const [newItem, setNewItem] = useState({
     pn: '',
     desc: '',
     qty: 1,
     cost: 0,
-    margin: 15
+    margin: 15,
+    currency: 'TRY'
   });
 
   const [showApprovalPreview, setShowApprovalPreview] = useState(false);
@@ -247,18 +250,30 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                 </div>
              </div>
              
+             {/* BoM Para Birimi — yeni kalemler bu dövizle hazırlanır (maliyetlendirmeye değişmeden taşınır) */}
+             <div className="px-4 pt-3 pb-1 bg-slate-50 flex items-center gap-2">
+               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">BoM Para Birimi</span>
+               <select value={bomCurrency} onChange={(e) => { setBomCurrency(e.target.value); setNewItem(n => ({ ...n, currency: e.target.value })); }}
+                 className="text-xs font-bold border border-slate-200 rounded-lg px-2 py-1 bg-white outline-none">
+                 <option value="TRY">₺ TRY</option><option value="USD">$ USD</option><option value="EUR">€ EUR</option>
+               </select>
+               <span className="text-[10px] text-amber-600 font-semibold">Her kalemin hazırlandığı döviz maliyetlendirmeye aynı kurla aktarılır.</span>
+             </div>
              {/* Manual BoM Item Form */}
              <div className="p-4 bg-slate-50 border-b border-slate-100 grid grid-cols-12 gap-2">
                 <input type="text" placeholder="P/N" className="col-span-3 p-2 text-xs border rounded-lg bg-white" value={newItem.pn} onChange={(e) => setNewItem({...newItem, pn: e.target.value})} />
-                <input type="text" placeholder="Açıklama" className="col-span-5 p-2 text-xs border rounded-lg bg-white" value={newItem.desc} onChange={(e) => setNewItem({...newItem, desc: e.target.value})} />
+                <input type="text" placeholder="Açıklama" className="col-span-4 p-2 text-xs border rounded-lg bg-white" value={newItem.desc} onChange={(e) => setNewItem({...newItem, desc: e.target.value})} />
                 <input type="number" placeholder="Adet" className="col-span-1 p-2 text-xs border rounded-lg bg-white" value={newItem.qty} onChange={(e) => setNewItem({...newItem, qty: parseInt(e.target.value) || 1})} />
                 <input type="number" placeholder="Maliyet" className="col-span-2 p-2 text-xs border rounded-lg bg-white" value={newItem.cost} onChange={(e) => setNewItem({...newItem, cost: parseFloat(e.target.value) || 0})} />
+                <select value={newItem.currency} onChange={(e) => setNewItem({...newItem, currency: e.target.value})} className="col-span-1 p-2 text-xs border rounded-lg bg-white" title="Para birimi">
+                  <option value="TRY">₺</option><option value="USD">$</option><option value="EUR">€</option>
+                </select>
                 <button
                   className="col-span-1 bg-primary text-white rounded-lg flex items-center justify-center hover:bg-primary/90 transition-all"
                   onClick={() => {
                     if (!newItem.pn && !newItem.desc) return;
                     addBoMItem(newItem);
-                    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15 });
+                    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15, currency: bomCurrency });
                   }}
                 >
                   <Plus size={16} />
@@ -270,7 +285,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                  <div key={item.lineKey || i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 font-sans">
                     <div className="flex justify-between items-center">
                       <span className="font-mono text-xs font-bold text-indigo-600">{item.pn}</span>
-                      <span className="text-sm font-bold text-slate-800">{item.cost.toLocaleString('tr-TR')} x {item.qty}</span>
+                      <span className="text-sm font-bold text-slate-800">{item.cost.toLocaleString('tr-TR')} {item.currency || 'TRY'} x {item.qty}</span>
                     </div>
                     <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
                     <div className="flex items-center justify-between mt-2">
@@ -286,7 +301,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           </div>
         </div>
       ) : (
-        <SpecAnalysis opportunityId={selectedOppId} onTransferToBoM={(prods) => { setBomItems([...prods.map(p => ({pn: p.pn, desc: p.description, qty: p.quantity, cost: 0, margin: 15})), ...bomItems]); setModuleView('BOM'); }} />
+        <SpecAnalysis opportunityId={selectedOppId} onTransferToBoM={(prods) => { setBomItems([...prods.map(p => ({pn: p.pn, desc: p.description, qty: p.quantity, cost: 0, margin: 15, currency: bomCurrency, lineKey: undefined})), ...bomItems]); setModuleView('BOM'); }} />
       )}
 
       {/* Hand-off Modal */}

@@ -13,6 +13,7 @@ export interface AbbreviatedBoMItem {
   cost: number;
   margin: number;
   vendor?: string;
+  currency?: string; // BoM kaleminin hazırlandığı döviz — maliyetlendirmeye değişmeden taşınmalı (kritik)
 }
 
 const newLineKey = () =>
@@ -40,6 +41,7 @@ export const useBoM = (
       cost: item.purchaseCost,
       margin: item.marginPercentage,
       vendor: item.vendor || undefined,
+      currency: item.currency || undefined,
     }));
     setBomItems(real);
   }, [selectedOppId, opportunities]);
@@ -65,6 +67,7 @@ export const useBoM = (
         purchaseCost: item.cost,
         marginPercentage: item.margin,
         vendor: item.vendor,
+        currency: item.currency,
       }));
 
       await apiService.saveBoMItems(selectedOppId, properItems, { handoff: true });

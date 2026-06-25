@@ -312,6 +312,12 @@ const CostAnalysisModule = ({
                   </div>
                   <span className="px-4 py-1.5 bg-indigo-500/10 text-indigo-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">{localBomItems.length} Kalem</span>
                 </div>
+                {localBomItems.some(it => !it.currency) && (
+                  <div className="px-6 py-3 bg-red-50 border-b border-red-200 flex items-center gap-2">
+                    <AlertCircle size={16} className="text-red-600 shrink-0" />
+                    <p className="text-xs font-bold text-red-700">Bazı kalemlerde para birimi belirtilmemiş! BoM hangi dövizle hazırlandıysa o döviz seçilmeli — yanlış kur hayati maliyet hatası yaratır.</p>
+                  </div>
+                )}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
@@ -338,10 +344,13 @@ const CostAnalysisModule = ({
                                 className="w-14 bg-white/60 border border-slate-200 rounded-lg py-1 px-2 text-center font-bold text-slate-900 outline-none focus:border-indigo-500" />
                             </td>
                             <td className="px-4 py-3">
-                              <select value={item.currency || baseCurrency} onChange={e => handleUpdateBomItem(i, 'currency', e.target.value)}
-                                className="w-full bg-white border border-slate-200 rounded-lg py-1 px-2 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500">
+                              <select value={item.currency || ''} onChange={e => handleUpdateBomItem(i, 'currency', e.target.value)}
+                                className={cn('w-full rounded-lg py-1 px-2 text-xs font-bold outline-none',
+                                  item.currency ? 'bg-white border border-slate-200 text-slate-700 focus:border-indigo-500' : 'bg-red-50 border-2 border-red-400 text-red-700')}>
+                                {!item.currency && <option value="" disabled>Döviz seç!</option>}
                                 {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
                               </select>
+                              {!item.currency && <span className="text-[9px] text-red-600 font-bold block mt-0.5">Para birimi yok</span>}
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex flex-col items-end gap-0.5">
