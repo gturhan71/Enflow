@@ -464,6 +464,9 @@ class ApiService {
   async submitTender(id: string, data?: { force?: boolean }) {
     return apiClient.fetchWithAuth(`/tenders/${id}/submit`, { method: 'POST', body: JSON.stringify(data || {}) });
   }
+  async withdrawTender(id: string, data: { reason: string }) {
+    return apiClient.fetchWithAuth(`/tenders/${id}/withdraw`, { method: 'POST', body: JSON.stringify(data) });
+  }
 
   // --- REPORTS: Yönetim Raporlama ---
   async getReportUnits() { return apiClient.fetchWithAuth('/reports/units'); }

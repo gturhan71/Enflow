@@ -62,7 +62,7 @@ export interface Opportunity {
   value: number;
   probability: number;
   expectedCloseDate?: string;
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST';
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST' | 'WITHDRAWN';
   description?: string;
   lostReason?: string;
   agentTriage?: {
@@ -743,9 +743,11 @@ export interface Tender {
   ikn?: string | null;
   authority?: string | null;
   method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED' | 'DIRECT' | 'PRIVATE';
-  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED';
+  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED' | 'WITHDRAWN';
   submissionDeadline?: string | null;
   submittedAt?: string | null;
+  withdrawnAt?: string | null;
+  withdrawReason?: string | null;
   estimatedValue: number;
   currency: string;
   opportunityId?: string | null;

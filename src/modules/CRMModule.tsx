@@ -420,7 +420,7 @@ const CRMModule = ({
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div>
             <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic">Satış Boru Hattı</h3>
-            <p className="text-slate-400 text-sm font-medium mt-1">{opportunitySearch.filteredItems.length} fırsat · {opportunitySearch.filteredItems.filter(o => o.status !== 'LOST' && o.status !== 'WON').length} aktif</p>
+            <p className="text-slate-400 text-sm font-medium mt-1">{opportunitySearch.filteredItems.length} fırsat · {opportunitySearch.filteredItems.filter(o => o.status !== 'LOST' && o.status !== 'WON' && o.status !== 'WITHDRAWN').length} aktif</p>
           </div>
           <div className="flex items-center gap-4">
             <SaveButton onClick={handleSaveAll} loading={loading} />
@@ -600,7 +600,7 @@ const CRMModule = ({
     const customerOpps = opportunities.filter(o => o.customerId === customerId);
     const wonOpps = customerOpps.filter(o => o.status === 'WON');
     const lostOpps = customerOpps.filter(o => o.status === 'LOST');
-    const activeOpps = customerOpps.filter(o => !['WON', 'LOST'].includes(o.status));
+    const activeOpps = customerOpps.filter(o => !['WON', 'LOST', 'WITHDRAWN'].includes(o.status));
 
     const getBestValue = (opp: Opportunity) => {
       const oppProposals = proposals.filter(p => p.opportunityId === opp.id && p.totalPrice);
@@ -615,12 +615,14 @@ const CRMModule = ({
   };
 
   const renderCRMDashboard = () => {
-    const activeOpps = opportunities.filter(o => o.status !== 'WON' && o.status !== 'LOST');
+    const activeOpps = opportunities.filter(o => o.status !== 'WON' && o.status !== 'LOST' && o.status !== 'WITHDRAWN');
     const wonOpps = opportunities.filter(o => o.status === 'WON');
+    // Win-rate paydası: yönetimsel "iştirak edilmedi" hariç (KPI nötr)
+    const kpiOpps = opportunities.filter(o => o.status !== 'WITHDRAWN');
     const pipelineValue = activeOpps.reduce((s, o) => s + (o.value ?? 0), 0);
     const wonValue = wonOpps.reduce((s, o) => s + (o.value ?? 0), 0);
-    const winRate = opportunities.length > 0
-      ? Math.round((wonOpps.length / opportunities.length) * 100)
+    const winRate = kpiOpps.length > 0
+      ? Math.round((wonOpps.length / kpiOpps.length) * 100)
       : 0;
     const pendingProposals = proposals.filter(p => p.status === 'PENDING_APPROVAL').length;
     const activeCustomers = customers.filter(c => c.status === 'ACTIVE').length;

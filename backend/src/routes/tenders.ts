@@ -3,7 +3,7 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
@@ -318,6 +318,51 @@ router.post('/:id/submit', tenantMiddleware, asyncHandler(async (req: Request, r
 
   const updated = await prisma.tender.update({ where: { id }, data: { status: 'SUBMITTED', submittedAt: new Date() } });
   await logActivity({ tenantId, userId: req.userId, action: 'TENDER_SUBMITTED', entityType: 'TENDER', entityId: id, details: { name: tender.name, forced: !!force, missing: missing.length } });
+  res.json(updated);
+}));
+
+// Yönetim "iştirak etme" kararı — akışı keser, KPI-nötr (yalnız GM, teklif verilmeden önce)
+router.post('/:id/withdraw', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const tenantId = req.tenantId;
+  const reason = String(req.body?.reason || '').trim();
+  if (!reason) return res.status(400).json({ error: 'Çekilme gerekçesi zorunludur.' });
+
+  const tender = await prisma.tender.findFirst({ where: { id, tenantId } });
+  if (!tender) return res.status(404).json({ error: 'İhale bulunamadı.' });
+  if (!['DRAFT', 'PREPARING'].includes(tender.status)) {
+    return res.status(409).json({ error: 'Yalnız teklif verilmeden önce (taslak/hazırlık) iştirak kararı alınabilir.' });
+  }
+
+  const updated = await prisma.tender.update({
+    where: { id },
+    data: { status: 'WITHDRAWN', withdrawnAt: new Date(), withdrawnById: req.userId || null, withdrawReason: reason },
+  });
+
+  // Bağlı fırsat: LOST değil → nötr WITHDRAWN (KPI cezası yok, kayıp arşivi tetiklenmez)
+  let opp: { assignedToId: string } | null = null;
+  if (tender.opportunityId) {
+    opp = await prisma.opportunity.update({
+      where: { id: tender.opportunityId },
+      data: { status: 'WITHDRAWN' },
+      select: { assignedToId: true },
+    }).catch(() => null);
+  }
+
+  // Emek-birimlerini bilgilendir: karar yönetimsel, KPI'yı etkilemez
+  const effortUsers = await prisma.user.findMany({ where: { tenantId, role: { in: ['SALES_SUPPORT', 'PRESALES_ENG', 'PRESALES_MGR'] } }, select: { id: true } });
+  const recipientIds = [...new Set([opp?.assignedToId, ...effortUsers.map(u => u.id)].filter(Boolean) as string[])];
+  for (const userId of recipientIds) {
+    await prisma.notification.create({
+      data: {
+        tenantId, userId, type: 'INFO',
+        title: 'Yönetim kararı: iştirak edilmedi',
+        message: `"${tender.name}" ihalesine yönetim kararıyla iştirak edilmeyecek. Gerekçe: ${reason}. Bu karar emeğinizi geçersiz kılmaz ve birim KPI'nıza olumsuz etki etmez.`,
+      },
+    }).catch(() => {});
+  }
+
+  await logActivity({ tenantId, userId: req.userId, action: 'TENDER_WITHDRAWN', entityType: 'TENDER', entityId: id, details: { name: tender.name, reason, opportunityId: tender.opportunityId } });
   res.json(updated);
 }));
 

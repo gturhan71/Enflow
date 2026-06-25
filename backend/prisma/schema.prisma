@@ -964,6 +964,9 @@ model Tender {
   aiAnalysis          String?   // JSON — şartname analizi çıktısı
   remindersSent       String?   // JSON dizi — gönderilen zaman-eşiği hatırlatmaları ['72h','48h','12h','6h']
   submittedAt         DateTime? // "Teklif İletildi" zamanı
+  withdrawnAt         DateTime? // yönetim "iştirak etme" kararı zamanı (status=WITHDRAWN)
+  withdrawnById       String?   // kararı veren GM
+  withdrawReason      String?   // çekilme gerekçesi (yönetimsel)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   checklist           TenderChecklistItem[]

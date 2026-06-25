@@ -173,7 +173,7 @@ const Dashboard = ({
     );
     const getOppValue = (o: Opportunity) => bestProposalByOppId[o.id] ?? o.value ?? 0;
 
-    const activeOpps = opportunities.filter(o => o.status !== 'LOST' && o.status !== 'WON');
+    const activeOpps = opportunities.filter(o => o.status !== 'LOST' && o.status !== 'WON' && o.status !== 'WITHDRAWN');
     const lostOpps = opportunities.filter(o => o.status === 'LOST');
     const wonOpps = opportunities.filter(o => o.status === 'WON');
 

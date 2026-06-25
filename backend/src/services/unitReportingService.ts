@@ -85,13 +85,17 @@ async function crmMetrics(tenantId: string, p: Period): Promise<{ metrics: Metri
     where: { tenantId, status: 'LOST', updatedAt: { gte: p.start, lte: p.end } },
   });
   const openPipeline = await prisma.opportunity.findMany({
-    where: { tenantId, status: { notIn: ['WON', 'LOST'] } },
+    where: { tenantId, status: { notIn: ['WON', 'LOST', 'WITHDRAWN'] } },
+  });
+  // Yönetimsel "iştirak edilmedi" — KPI-nötr (kayıp DEĞİL; kazanım oranı paydasına girmez)
+  const withdrawnInPeriod = await prisma.opportunity.count({
+    where: { tenantId, status: 'WITHDRAWN', updatedAt: { gte: p.start, lte: p.end } },
   });
 
   const pipelineValue = openPipeline.reduce((s, o) => s + (o.value || 0), 0);
   const wonValue = wonInPeriod.reduce((s, o) => s + (o.value || 0), 0);
   const lostValue = lostInPeriod.reduce((s, o) => s + (o.value || 0), 0);
-  const decided = wonInPeriod.length + lostInPeriod.length;
+  const decided = wonInPeriod.length + lostInPeriod.length; // WITHDRAWN dahil DEĞİL
   const winRate = decided > 0 ? (wonInPeriod.length / decided) * 100 : 0;
 
   // En sık kayıp nedenleri
@@ -106,6 +110,7 @@ async function crmMetrics(tenantId: string, p: Period): Promise<{ metrics: Metri
     { label: 'Kazanılan', value: wonInPeriod.length, unit: 'adet', tone: 'positive' },
     { label: 'Kaybedilen', value: lostInPeriod.length, unit: 'adet', tone: lostInPeriod.length > 0 ? 'warning' : 'default' },
     { label: 'Kazanım Oranı', value: fmt(winRate), unit: '%', tone: winRate >= 50 ? 'positive' : 'default' },
+    { label: 'İştirak Edilmeyen (yönetim)', value: withdrawnInPeriod, unit: 'adet', tone: 'default', hint: 'Yönetim kararı — kayıp sayılmaz, KPI nötr' },
     { label: 'Açık Pipeline Değeri', value: fmt(pipelineValue), unit: '₺' },
     { label: 'Kazanılan Değer', value: fmt(wonValue), unit: '₺', tone: 'positive' },
     { label: 'Kaybedilen Değer', value: fmt(lostValue), unit: '₺', tone: lostValue > 0 ? 'danger' : 'default' },
@@ -291,6 +296,7 @@ async function tenderMetrics(tenantId: string, p: Period): Promise<{ metrics: Me
 
   const won = created.filter(t => t.status === 'WON').length;
   const lost = created.filter(t => t.status === 'LOST').length;
+  const withdrawn = created.filter(t => t.status === 'WITHDRAWN').length; // yönetim kararı — nötr
   const active = await prisma.tender.findMany({
     where: { tenantId, status: { in: ['DRAFT', 'PREPARING', 'SUBMITTED', 'EVALUATING'] } },
     include: { checklist: true },
@@ -315,6 +321,7 @@ async function tenderMetrics(tenantId: string, p: Period): Promise<{ metrics: Me
     { label: 'Aktif İhale', value: active.length, unit: 'adet' },
     { label: 'Kazanılan', value: won, unit: 'adet', tone: 'positive' },
     { label: 'Kaybedilen', value: lost, unit: 'adet', tone: lost > 0 ? 'warning' : 'default' },
+    { label: 'İştirak Edilmeyen (yönetim)', value: withdrawn, unit: 'adet', tone: 'default', hint: 'Yönetim kararı — kayıp sayılmaz' },
     { label: 'Yaklaşan Deadline (7g)', value: upcoming, unit: 'adet', tone: upcoming > 0 ? 'warning' : 'default' },
     { label: 'Evrak Tamamlanma', value: fmt(checklistRate), unit: '%', tone: checklistRate >= 80 ? 'positive' : 'default' },
   ];

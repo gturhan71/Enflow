@@ -45,7 +45,7 @@ const METHOD_LABELS: Record<string, string> = {
 };
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Taslak', PREPARING: 'Hazırlık', SUBMITTED: 'Teklif Verildi', EVALUATING: 'Değerlendirme',
-  WON: 'Kazanıldı', LOST: 'Kaybedildi', CANCELLED: 'İptal',
+  WON: 'Kazanıldı', LOST: 'Kaybedildi', CANCELLED: 'İptal', WITHDRAWN: 'İştirak Edilmedi',
 };
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -55,7 +55,10 @@ const STATUS_STYLES: Record<string, string> = {
   WON: 'bg-emerald-100 text-emerald-700 border-emerald-200',
   LOST: 'bg-red-100 text-red-700 border-red-200',
   CANCELLED: 'bg-slate-100 text-slate-400 border-slate-200',
+  WITHDRAWN: 'bg-slate-100 text-slate-500 border-slate-300',
 };
+// Aktif sekmelerden çıkarılan terminal/arşiv durumları
+const ARCHIVED_STATUSES = ['SUBMITTED', 'EVALUATING', 'WON', 'LOST', 'WITHDRAWN'];
 
 const fmt = (n: number, c = 'TRY') =>
   new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
@@ -86,6 +89,21 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
   useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const selected = useMemo(() => tenders.find(t => t.id === selectedId) || null, [tenders, selectedId]);
+  const isGM = currentUser?.role === 'GENERAL_MANAGER';
+  const [withdrawTarget, setWithdrawTarget] = useState<Tender | null>(null);
+  const [withdrawReason, setWithdrawReason] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+
+  const confirmWithdraw = async () => {
+    if (!withdrawTarget || !withdrawReason.trim()) return;
+    setWithdrawing(true);
+    try {
+      await apiService.withdrawTender(withdrawTarget.id, { reason: withdrawReason.trim() });
+      setWithdrawTarget(null); setWithdrawReason('');
+      await load();
+    } catch (e) { alert('İşlem hatası: ' + (e instanceof Error ? e.message : '')); }
+    finally { setWithdrawing(false); }
+  };
 
   return (
     <div className="p-8 space-y-6">
@@ -114,12 +132,33 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 
       {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
 
-      {tab === 'list' && <TenderList tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} />}
-      {tab === 'calendar' && <TenderCalendar tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} />}
-      {tab === 'checklist' && <ChecklistTab tender={selected} tenders={tenders.filter(t => !SUBMITTED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} />}
+      {tab === 'list' && <TenderList tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
+      {tab === 'calendar' && <TenderCalendar tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} />}
+      {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
-      {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => SUBMITTED_STATUSES.includes(t.status))} />}
+      {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} />}
       {tab === 'ekap' && <EkapTab prefix={ekapPrefix} setPrefix={setEkapPrefix} />}
+
+      <AnimatePresence>
+        {withdrawTarget && (
+          <Modal title="Yönetim Kararı — İhaleye İştirak Etme" onClose={() => setWithdrawTarget(null)}>
+            <div className="space-y-4">
+              <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+                <strong>{withdrawTarget.name}</strong> ihalesine iştirak edilmeyecek olarak işaretlenecek. Akış kesilir; bu karar <strong>kayıp sayılmaz</strong> ve Satış/Satış Destek/Presales birimlerinin KPI'sını olumsuz etkilemez. İlgili birimler bilgilendirilir.
+              </div>
+              <textarea value={withdrawReason} onChange={e => setWithdrawReason(e.target.value)} rows={3} placeholder="Çekilme gerekçesi (zorunlu)..."
+                className="w-full text-sm bg-slate-50 border border-slate-200 rounded-xl p-3 outline-none focus:ring-2 focus:ring-primary/20" />
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setWithdrawTarget(null)} className="btn-secondary text-xs">Vazgeç</button>
+                <button onClick={confirmWithdraw} disabled={!withdrawReason.trim() || withdrawing}
+                  className="text-xs font-bold px-4 py-2 rounded-xl bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2">
+                  {withdrawing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <X className="w-3.5 h-3.5" />} İştirak Etme — Akışı Kes
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+      </AnimatePresence>
 
       <AnimatePresence>
         {showForm && (
@@ -135,8 +174,9 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 };
 
 // ── İhale Listesi ────────────────────────────────────────────────────────────────
-function TenderList({ tenders, selectedId, onSelect, onChanged }: {
+function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw }: {
   tenders: Tender[]; selectedId: string | null; onSelect: (id: string) => void; onChanged: () => void;
+  isGM?: boolean; onWithdraw?: (t: Tender) => void;
 }) {
   if (tenders.length === 0)
     return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz ihale yok. "Yeni İhale" ile başlayın.</div>;
@@ -170,6 +210,10 @@ function TenderList({ tenders, selectedId, onSelect, onChanged }: {
                     </span>
                   )}
                 </div>
+                {isGM && onWithdraw && (
+                  <button onClick={(e) => { e.stopPropagation(); onWithdraw(t); }} title="Yönetim: İhaleye iştirak etme (KPI-nötr)"
+                    className="text-[10px] font-bold text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-2 py-1 transition-colors">İştirak Etme</button>
+                )}
                 <button onClick={async (e) => { e.stopPropagation(); if (confirm('İhale silinsin mi?')) { await apiService.deleteTender(t.id); onChanged(); } }}
                   className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={16} /></button>
               </div>
@@ -214,8 +258,9 @@ function TenderCalendar({ tenders }: { tenders: Tender[] }) {
 }
 
 // ── Uygunluk Denetimi (Checklist) ────────────────────────────────────────────────
-function ChecklistTab({ tender, tenders, onSelectTender, onChanged }: {
+function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWithdraw }: {
   tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; onChanged?: () => void;
+  isGM?: boolean; onWithdraw?: (t: Tender) => void;
 }) {
   const [items, setItems] = useState<TenderChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -345,6 +390,11 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged }: {
         <button onClick={submitBid} className="btn-primary text-xs w-full justify-center">
           <CheckCircle2 className="w-4 h-4" /> Teklif İletildi — Girilen İhaleler'e Taşı
         </button>
+        {isGM && onWithdraw && (
+          <button onClick={() => onWithdraw(tender)} className="mt-2 text-xs font-bold w-full justify-center flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors">
+            <X className="w-3.5 h-3.5" /> Yönetim: İhaleye İştirak Etme (akışı kes, KPI-nötr)
+          </button>
+        )}
       </div>
 
       {/* İhale Dosyası Analizi — 3 mod: AI-metin / AI-dosya / manuel */}
@@ -515,7 +565,7 @@ function SubmittedTenders({ tenders }: { tenders: Tender[] }) {
     return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz teklif iletilen ihale yok. Uygunluk Denetimi'nde "Teklif İletildi" ile dosyayı buraya taşıyın.</div>;
   return (
     <div className="space-y-3">
-      <p className="text-xs text-slate-500 px-1">Teklifi iletilen dosyalar İKN + işin adı ile arşivlenir. İş <strong>kazanılırsa</strong> teklif detay raporu + açık BoM + maliyet analizi Satınalma ve Proje Yönetimi'ne devredilir.</p>
+      <p className="text-xs text-slate-500 px-1">Sonuçlanan/teslim dosyalar İKN + işin adı ile arşivlenir. İş <strong>kazanılırsa</strong> teklif detay raporu + açık BoM + maliyet analizi Satınalma ve Proje Yönetimi'ne devredilir. <strong>İştirak Edilmedi</strong> kayıtları yönetimsel karardır — kayıp sayılmaz, KPI'yı etkilemez.</p>
       {tenders.map(t => (
         <div key={t.id} className="glass-card p-5 flex items-start justify-between gap-4">
           <div className="space-y-1 min-w-0">
@@ -524,7 +574,9 @@ function SubmittedTenders({ tenders }: { tenders: Tender[] }) {
               <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES[t.status] || ''}`}>{STATUS_LABELS[t.status] || t.status}</span>
             </div>
             <p className="text-xs text-slate-500">{t.ikn ? `İKN: ${t.ikn} · ` : ''}{METHOD_LABELS[t.method] || t.method} · {fmt(t.estimatedValue, t.currency)}</p>
-            <p className="text-[11px] text-slate-400">Teklif iletildi: {fmtDate(t.submittedAt)} · Dosyalama: {t.ikn || '—'} / {t.name}</p>
+            {t.status === 'WITHDRAWN'
+              ? <p className="text-[11px] text-slate-500">İştirak edilmedi: {fmtDate(t.withdrawnAt)} · Gerekçe: {t.withdrawReason || '—'}</p>
+              : <p className="text-[11px] text-slate-400">Teklif iletildi: {fmtDate(t.submittedAt)} · Dosyalama: {t.ikn || '—'} / {t.name}</p>}
           </div>
         </div>
       ))}
