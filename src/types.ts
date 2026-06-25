@@ -158,6 +158,21 @@ export interface BoMItem {
 
 export type TechnicalCompliance = 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT';
 
+export interface BomHandoff {
+  id: string;
+  opportunityId: string;
+  oppTitle: string;
+  customerName?: string | null;
+  handedOffById?: string | null;
+  handedOffByName?: string | null;
+  handoffCount: number;
+  itemCount: number;
+  totalsByCurrency?: string | null; // JSON {TRY:x,USD:y}
+  snapshot?: string | null;          // JSON { items:[...], evaluation:{...}|null }
+  firstHandoffAt?: string;
+  lastHandoffAt?: string;
+}
+
 export interface BoMLineQuote {
   id: string;
   tenantId?: string;

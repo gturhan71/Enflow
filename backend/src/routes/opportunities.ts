@@ -205,7 +205,7 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
   // Presales BoM'u Satış'a devrediyor (handoff). BoM zaten maliyet-analizinden geçmişse
   // (APPROVED/PENDING_APPROVAL), revizyon yeni bir tur gerektirir → durumu sıfırla + sat. temsilcisini uyar.
   if (handoff) {
-    const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+    const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId }, include: { customer: true } });
     if (opp && (opp.technicalStatus === 'APPROVED' || opp.technicalStatus === 'PENDING_APPROVAL')) {
       await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'PENDING' } });
       await notify(tenantId, opp.assignedToId, 'BoM revize edildi', `"${opp.title}" için BoM güncellendi. Maliyet analizini yenileyip yeniden onaya gönderin.`, 'WARNING');
@@ -214,10 +214,11 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
 
     // Tedarikçi teklif değerlendirme snapshot'ı → teklif detayı/rapor + arşiv (değişmez kayıt)
     const quotes = await prisma.boMLineQuote.findMany({ where: { tenantId, opportunityId } });
+    let evalSnapshot: object | null = null;
     if (quotes.length > 0) {
       const byLine = new Map<string, typeof quotes>();
       for (const q of quotes) { const arr = byLine.get(q.lineKey) || []; arr.push(q); byLine.set(q.lineKey, arr); }
-      const snapshot = {
+      evalSnapshot = {
         evaluatedAt: new Date().toISOString(),
         totalQuotes: quotes.length,
         lines: [...byLine.entries()].map(([lineKey, qs]) => {
@@ -226,12 +227,12 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
             lineKey,
             componentName: qs[0].componentName || null,
             quoteCount: qs.length,
-            selected: sel ? { vendorName: sel.vendorName, unitPrice: sel.unitPrice, currency: sel.currency, technicalCompliance: sel.technicalCompliance, specSummary: sel.specSummary } : null,
+            selected: sel ? { vendorName: sel.vendorName, unitPrice: sel.unitPrice, currency: sel.currency, technicalCompliance: sel.technicalCompliance, specSummary: sel.specSummary, fileName: sel.fileName, fileUrl: sel.fileUrl } : null,
             alternatives: qs.filter(x => !x.isSelected).map(x => ({ vendorName: x.vendorName, unitPrice: x.unitPrice, currency: x.currency, technicalCompliance: x.technicalCompliance })),
           };
         }),
       };
-      await prisma.opportunity.update({ where: { id: opportunityId }, data: { bomEvaluation: JSON.stringify(snapshot) } }).catch(() => {});
+      await prisma.opportunity.update({ where: { id: opportunityId }, data: { bomEvaluation: JSON.stringify(evalSnapshot) } }).catch(() => {});
       await prisma.archiveItem.create({
         data: {
           tenantId, boxNo: 'DIGITAL', shelfNo: 'BOM-EVAL', category: 'BOM_EVALUATION',
@@ -242,6 +243,35 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
       }).catch(() => {});
       await logActivity({ tenantId, userId: req.userId, action: 'BOM_EVALUATION_ARCHIVED', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { quotes: quotes.length, lines: byLine.size } });
     }
+
+    // Devir kaydı (fırsat-bazlı upsert): KPI + Presales yönetici liste/detay
+    const totalsByCurrency: Record<string, number> = {};
+    for (const b of result) {
+      const cur = b.currency || 'TRY';
+      totalsByCurrency[cur] = (totalsByCurrency[cur] || 0) + (b.purchaseCost || 0) * (b.quantity || 0);
+    }
+    const handoffSnapshot = {
+      items: result.map(b => ({ partNumber: b.partNumber, description: b.description, quantity: b.quantity, purchaseCost: b.purchaseCost, currency: b.currency || 'TRY', vendor: b.vendor || null })),
+      evaluation: evalSnapshot,
+    };
+    const handoffUser = req.userId ? await prisma.user.findFirst({ where: { id: req.userId }, select: { name: true } }) : null;
+    const now = new Date();
+    await prisma.bomHandoff.upsert({
+      where: { tenantId_opportunityId: { tenantId, opportunityId } },
+      create: {
+        tenantId, opportunityId, oppTitle: opp?.title || opportunityId, customerName: opp?.customer?.name || null,
+        handedOffById: req.userId || null, handedOffByName: handoffUser?.name || null,
+        handoffCount: 1, itemCount: result.length, totalsByCurrency: JSON.stringify(totalsByCurrency),
+        snapshot: JSON.stringify(handoffSnapshot), lastHandoffAt: now,
+      },
+      update: {
+        oppTitle: opp?.title || opportunityId, customerName: opp?.customer?.name || null,
+        handedOffById: req.userId || null, handedOffByName: handoffUser?.name || null,
+        handoffCount: { increment: 1 }, itemCount: result.length, totalsByCurrency: JSON.stringify(totalsByCurrency),
+        snapshot: JSON.stringify(handoffSnapshot), lastHandoffAt: now,
+      },
+    }).catch(() => {});
+    await logActivity({ tenantId, userId: req.userId, action: 'BOM_HANDED_OFF', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { itemCount: result.length } });
   }
 
   res.json(result);

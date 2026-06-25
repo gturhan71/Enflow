@@ -1105,3 +1105,23 @@ model AgentRun {
   @@index([tenantId, status])
   @@index([tenantId, pluginKey])
 }
+
+// Presales → Satışa devredilen BoM kaydı (fırsat-bazlı upsert; KPI + liste/detay)
+model BomHandoff {
+  id               String   @id @default(cuid())
+  tenantId         String
+  opportunityId    String
+  oppTitle         String
+  customerName     String?
+  handedOffById    String?
+  handedOffByName  String?
+  handoffCount     Int      @default(1)
+  itemCount        Int      @default(0)
+  totalsByCurrency String?  // JSON {TRY:x,USD:y} — mixed-currency güvenliği (tek toplam yok)
+  snapshot         String?  // JSON: BoM kalemleri + vendor değerlendirme özeti (devir anının içeriği)
+  firstHandoffAt   DateTime @default(now())
+  lastHandoffAt    DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  @@unique([tenantId, opportunityId])
+  @@index([tenantId, lastHandoffAt])
+}

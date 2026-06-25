@@ -56,6 +56,16 @@ router.get('/overview', tenantMiddleware, asyncHandler(async (req: Request, res:
   res.json(result);
 }));
 
+// Presales → Satışa devredilen BoM'lar (yönetici liste/detay) — ?start=&end=
+router.get('/bom-handoffs', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const where: Record<string, unknown> = { tenantId: req.tenantId };
+  if (req.query.start && req.query.end) {
+    where.lastHandoffAt = { gte: new Date(String(req.query.start)), lte: new Date(String(req.query.end)) };
+  }
+  const handoffs = await prisma.bomHandoff.findMany({ where, orderBy: { lastHandoffAt: 'desc' } });
+  res.json(handoffs);
+}));
+
 // ── Birim Raporu (UnitReport): yönetici-yazımı + gönderim/inceleme ───────────
 
 // Liste — ?unitKey=&status=

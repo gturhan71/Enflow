@@ -19,7 +19,8 @@ import {
   TodoTask,
   Unit,
   User,
-  BoMLineQuote
+  BoMLineQuote,
+  BomHandoff
 } from '../types';
 import SpecAnalysis from './SpecAnalysis';
 import { workflowService } from '../services/workflowService';
@@ -43,7 +44,8 @@ interface PresalesModuleProps {
 const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS'>('BOM');
+  const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS' | 'HANDOFFS'>('BOM');
+  const isPresalesMgr = currentUser?.role === 'PRESALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState<string>('');
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [isHandingOff, setIsHandingOff] = useState(false);
@@ -205,6 +207,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           <div className="flex bg-slate-200/50 p-1 rounded-2xl">
             <button onClick={() => setModuleView('BOM')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'BOM' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><LayoutDashboard size={16} />BoM Oluşturma</button>
             <button onClick={() => setModuleView('ANALYSIS')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'ANALYSIS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><FileSearch size={16} />Şartname Analizi</button>
+            {isPresalesMgr && <button onClick={() => setModuleView('HANDOFFS')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'HANDOFFS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><LayoutDashboard size={16} />Devredilen BoM'lar</button>}
           </div>
         </div>
       </div>
@@ -300,6 +303,8 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
              </div>
           </div>
         </div>
+      ) : moduleView === 'HANDOFFS' ? (
+        <BomHandoffsView />
       ) : (
         <SpecAnalysis opportunityId={selectedOppId} onTransferToBoM={(prods) => { setBomItems([...prods.map(p => ({pn: p.pn, desc: p.description, qty: p.quantity, cost: 0, margin: 15, currency: bomCurrency, lineKey: undefined})), ...bomItems]); setModuleView('BOM'); }} />
       )}
@@ -465,6 +470,85 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           />
         )}
       </AnimatePresence>
+    </div>
+  );
+};
+
+// ── Devredilen BoM'lar (Presales yönetici liste/detay) ──────────────────────────
+const COMP_LABEL: Record<string, string> = { COMPLIANT: 'Uygun', PARTIAL: 'Kısmen Uygun', NON_COMPLIANT: 'Uygun Değil' };
+
+const BomHandoffsView: React.FC = () => {
+  const [handoffs, setHandoffs] = useState<BomHandoff[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selected, setSelected] = useState<BomHandoff | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    apiService.getBomHandoffs().then(d => { if (active) setHandoffs((d as BomHandoff[]) || []); }).finally(() => active && setLoading(false));
+    return () => { active = false; };
+  }, []);
+
+  const fmtTotals = (json?: string | null) => {
+    if (!json) return '—';
+    try { const t = JSON.parse(json) as Record<string, number>; return Object.entries(t).map(([c, v]) => `${v.toLocaleString('tr-TR')} ${c}`).join(' + ') || '—'; } catch { return '—'; }
+  };
+  const snap = selected?.snapshot ? (() => { try { return JSON.parse(selected.snapshot as string) as { items: { partNumber: string; description: string; quantity: number; purchaseCost: number; currency: string; vendor?: string | null }[]; evaluation?: { lines?: { componentName?: string; quoteCount: number; selected?: { vendorName: string; technicalCompliance: string; fileName?: string; fileUrl?: string } | null; alternatives?: unknown[] }[] } | null }; } catch { return null; } })() : null;
+
+  return (
+    <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 gap-6 overflow-hidden">
+      {/* Liste */}
+      <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
+        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+          <h4 className="font-black text-slate-900">Satışa Devredilen BoM'lar</h4>
+          <span className="text-xs font-bold text-indigo-600">{handoffs.length} fırsat</span>
+        </div>
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {loading && <p className="text-sm text-slate-400 italic px-2">Yükleniyor...</p>}
+          {!loading && handoffs.length === 0 && <p className="text-sm text-slate-400 italic px-2">Henüz Satışa devredilen BoM yok.</p>}
+          {handoffs.map(h => (
+            <button key={h.id} onClick={() => setSelected(h)}
+              className={cn("w-full text-left p-3 rounded-2xl border transition-all", selected?.id === h.id ? "border-indigo-400 bg-indigo-50/40" : "border-slate-100 bg-slate-50 hover:bg-white")}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-bold text-slate-900 truncate">{h.oppTitle}</span>
+                {h.handoffCount > 1 && <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-1.5 py-0.5 rounded-full shrink-0">{h.handoffCount}. revizyon</span>}
+              </div>
+              <p className="text-[11px] text-slate-500">{h.customerName || '—'} · {h.itemCount} kalem · {fmtTotals(h.totalsByCurrency)}</p>
+              <p className="text-[10px] text-slate-400">Son devir: {h.lastHandoffAt ? new Date(h.lastHandoffAt).toLocaleDateString('tr-TR') : '—'}{h.handedOffByName ? ` · ${h.handedOffByName}` : ''}</p>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Detay */}
+      <div className="glass-panel rounded-3xl flex flex-col overflow-hidden bg-white border border-slate-100 shadow-sm">
+        <div className="p-5 border-b border-slate-100">
+          <h4 className="font-black text-slate-900">{selected ? selected.oppTitle : 'Detay'}</h4>
+          <p className="text-xs text-slate-400">{selected ? 'BoM içeriği + tedarikçi değerlendirme' : 'İncelemek için soldan bir BoM seçin'}</p>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {snap?.items?.map((it, i) => {
+            const evalLine = snap.evaluation?.lines?.find(l => l.componentName === it.partNumber || l.componentName === it.description);
+            return (
+              <div key={i} className="p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-mono text-xs font-bold text-indigo-600">{it.partNumber}</span>
+                  <span className="text-sm font-bold text-slate-800">{it.purchaseCost.toLocaleString('tr-TR')} {it.currency} × {it.quantity}</span>
+                </div>
+                <p className="text-xs text-slate-600">{it.description}</p>
+                <div className="flex items-center justify-between mt-1">
+                  {it.vendor ? <span className="text-[11px] text-emerald-600 font-semibold">✓ {it.vendor}</span> : <span className="text-[11px] text-slate-400">Tedarikçi —</span>}
+                  {evalLine?.selected && <span className="text-[10px] text-slate-500">{COMP_LABEL[evalLine.selected.technicalCompliance] || ''}{(evalLine.alternatives?.length ?? 0) > 0 ? ` · +${evalLine.alternatives!.length} alternatif` : ''}</span>}
+                </div>
+                {evalLine?.selected?.fileUrl && (
+                  <a href={evalLine.selected.fileUrl} target="_blank" rel="noreferrer" className="text-[10px] font-bold text-indigo-600 hover:underline">📎 {evalLine.selected.fileName || 'Teklif dosyası'}</a>
+                )}
+              </div>
+            );
+          })}
+          {selected && (!snap || !snap.items?.length) && <p className="text-sm text-slate-400 italic">Snapshot içeriği yok.</p>}
+        </div>
+      </div>
     </div>
   );
 };

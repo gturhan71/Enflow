@@ -44,6 +44,10 @@ class ApiService {
   async updateBomQuote(qid: string, data: Record<string, unknown>) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'PUT', body: JSON.stringify(data) }); }
   async deleteBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'DELETE' }); }
   async selectBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}/select`, { method: 'POST' }); }
+  async getBomHandoffs(params?: { start?: string; end?: string }) {
+    const qs = params?.start && params?.end ? `?start=${params.start}&end=${params.end}` : '';
+    return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);
+  }
   async submitCostApproval(oppId: string) { return crmService.submitCostApproval(oppId); }
   async approveCost(oppId: string, data: { decision: 'APPROVE' | 'REJECT'; note?: string }) { return crmService.approveCost(oppId, data); }
 
