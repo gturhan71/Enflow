@@ -153,12 +153,18 @@ async function presalesMetrics(tenantId: string, p: Period): Promise<{ metrics: 
     ? bomItems.reduce((s, b) => s + (b.marginPercentage || 0), 0) / bomItems.length
     : 0;
 
+  // Tedarikçi teklif değerlendirmesi (dönemde değerlendirilen teklifler)
+  const evaluatedQuotes = await prisma.boMLineQuote.count({
+    where: { tenantId, createdAt: { gte: p.start, lte: p.end } },
+  });
+
   const metrics: Metric[] = [
     { label: 'Teklif (dönem)', value: proposals.length, unit: 'adet' },
     { label: 'Taslak', value: byStatus['DRAFT'] || 0, unit: 'adet' },
     { label: 'Gönderilen', value: byStatus['SENT'] || 0, unit: 'adet' },
     { label: 'Kabul Edilen', value: byStatus['ACCEPTED'] || 0, unit: 'adet', tone: 'positive' },
     { label: 'BoM Kalemi', value: bomItems.length, unit: 'adet' },
+    { label: 'Değerlendirilen Teklif', value: evaluatedQuotes, unit: 'adet', hint: 'Vendor teklif değerlendirme (fiyat+uygunluk)' },
     { label: 'Ortalama Marj', value: fmt(avgMargin), unit: '%', tone: avgMargin >= 20 ? 'positive' : 'default' },
   ];
   const charts: ChartSeries[] = [{

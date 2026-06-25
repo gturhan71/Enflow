@@ -626,6 +626,36 @@ const ProposalEditor = ({
               </div>
             </div>
 
+            {/* Tedarikçi Değerlendirme & Uygunluk (Presales teklif değerlendirme snapshot'ı) */}
+            {(() => {
+              if (!opportunity.bomEvaluation) return null;
+              let snap: { lines?: { componentName?: string | null; quoteCount: number; selected?: { vendorName: string; unitPrice: number; currency: string; technicalCompliance: string } | null }[]; totalQuotes?: number } | null = null;
+              try { snap = JSON.parse(opportunity.bomEvaluation); } catch { return null; }
+              if (!snap?.lines?.length) return null;
+              const compLabel: Record<string, string> = { COMPLIANT: 'Uygun', PARTIAL: 'Kısmen Uygun', NON_COMPLIANT: 'Uygun Değil' };
+              return (
+                <div className="glass-panel p-6 rounded-[32px] bg-white shadow-sm border border-slate-100">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 mb-3 block">Tedarikçi Değerlendirme & Teknik Uygunluk ({snap.totalQuotes ?? 0} teklif)</label>
+                  <div className="space-y-2">
+                    {snap.lines.map((ln, i) => (
+                      <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-2xl bg-slate-50 border border-slate-100">
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold text-slate-800 truncate">{ln.componentName || 'Kalem'}</p>
+                          <p className="text-[11px] text-slate-400">{ln.quoteCount} teklif değerlendirildi</p>
+                        </div>
+                        {ln.selected ? (
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold text-slate-900">{ln.selected.vendorName}</p>
+                            <p className="text-[11px] text-slate-500">{ln.selected.unitPrice.toLocaleString('tr-TR')} {ln.selected.currency} · <span className="text-emerald-600 font-semibold">{compLabel[ln.selected.technicalCompliance] || ln.selected.technicalCompliance}</span></p>
+                          </div>
+                        ) : <span className="text-[11px] text-amber-600 font-semibold">Seçim yapılmadı</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Terms & Description */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               <div className="glass-panel p-6 rounded-[32px] bg-white shadow-sm border border-slate-100">

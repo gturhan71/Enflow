@@ -211,6 +211,37 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
       await notify(tenantId, opp.assignedToId, 'BoM revize edildi', `"${opp.title}" için BoM güncellendi. Maliyet analizini yenileyip yeniden onaya gönderin.`, 'WARNING');
       await logActivity({ tenantId, userId: req.userId, action: 'BOM_REVISED_RESET', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, prevStatus: opp.technicalStatus } });
     }
+
+    // Tedarikçi teklif değerlendirme snapshot'ı → teklif detayı/rapor + arşiv (değişmez kayıt)
+    const quotes = await prisma.boMLineQuote.findMany({ where: { tenantId, opportunityId } });
+    if (quotes.length > 0) {
+      const byLine = new Map<string, typeof quotes>();
+      for (const q of quotes) { const arr = byLine.get(q.lineKey) || []; arr.push(q); byLine.set(q.lineKey, arr); }
+      const snapshot = {
+        evaluatedAt: new Date().toISOString(),
+        totalQuotes: quotes.length,
+        lines: [...byLine.entries()].map(([lineKey, qs]) => {
+          const sel = qs.find(x => x.isSelected) || null;
+          return {
+            lineKey,
+            componentName: qs[0].componentName || null,
+            quoteCount: qs.length,
+            selected: sel ? { vendorName: sel.vendorName, unitPrice: sel.unitPrice, currency: sel.currency, technicalCompliance: sel.technicalCompliance, specSummary: sel.specSummary } : null,
+            alternatives: qs.filter(x => !x.isSelected).map(x => ({ vendorName: x.vendorName, unitPrice: x.unitPrice, currency: x.currency, technicalCompliance: x.technicalCompliance })),
+          };
+        }),
+      };
+      await prisma.opportunity.update({ where: { id: opportunityId }, data: { bomEvaluation: JSON.stringify(snapshot) } }).catch(() => {});
+      await prisma.archiveItem.create({
+        data: {
+          tenantId, boxNo: 'DIGITAL', shelfNo: 'BOM-EVAL', category: 'BOM_EVALUATION',
+          description: `BoM tedarikçi teklif değerlendirmesi — ${opp?.title ?? opportunityId} (${quotes.length} teklif, ${byLine.size} kalem)`,
+          owner: req.userId || 'system', status: 'IN_ARCHIVE',
+          tags: JSON.stringify(['bom-evaluation', opportunityId]),
+        },
+      }).catch(() => {});
+      await logActivity({ tenantId, userId: req.userId, action: 'BOM_EVALUATION_ARCHIVED', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { quotes: quotes.length, lines: byLine.size } });
+    }
   }
 
   res.json(result);
