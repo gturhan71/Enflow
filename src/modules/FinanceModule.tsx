@@ -7,7 +7,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
-import { Invoice, Payment, GuaranteeLetter, FinanceSummary } from '../types';
+import { Invoice, Payment, GuaranteeLetter, FinanceSummary, Opportunity, BoMItem, CostItem } from '../types';
+
+interface FinancingByCurrency { cost: number; benefit: number; net: number }
+interface FinancingResult { closingDate: string; interestRates: Record<string, number>; byCurrency: Record<string, FinancingByCurrency>; cashFlowGap: { currency: string; maxDeficit: number }[] }
+interface Installment { id: string; dueDate: string; amount: number; currency: string; note?: string | null }
 
 const GUARANTEE_STATUS_TR: Record<string, string> = { REQUESTED: 'Talep Edildi', ACTIVE: 'Aktif', RELEASED: 'İade', EXPIRED: 'Süresi Doldu', CALLED: 'Nakde Çevrildi' };
 const GTYPE_TR: Record<string, string> = { BID_BOND: 'Geçici Teminat', PERFORMANCE: 'Kesin Teminat', ADVANCE: 'Avans Teminatı', WARRANTY: 'Garanti Teminatı' };
@@ -18,13 +22,14 @@ interface CostApproval {
   project?: { id: string; name: string; code?: string | null } | null;
 }
 
-type TabKey = 'invoices' | 'collection' | 'guarantees' | 'cost-approval' | 'summary';
+type TabKey = 'invoices' | 'collection' | 'guarantees' | 'cost-approval' | 'financing' | 'summary';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'invoices', label: 'Faturalar', icon: <FileText size={16} /> },
   { key: 'collection', label: 'Tahsilat', icon: <Wallet size={16} /> },
   { key: 'guarantees', label: 'Teminat Mektupları', icon: <ShieldCheck size={16} /> },
   { key: 'cost-approval', label: 'Maliyet Onayı', icon: <ClipboardCheck size={16} /> },
+  { key: 'financing', label: 'Vade & Finansman', icon: <CalendarClock size={16} /> },
   { key: 'summary', label: 'Özet', icon: <BarChart3 size={16} /> },
 ];
 
@@ -116,6 +121,7 @@ const FinanceModule = () => {
         <GuaranteesTab items={guarantees} onChanged={load}
           onDelete={async (id) => { await apiService.deleteGuarantee(id); load(); }} />
       )}
+      {tab === 'financing' && <FinancingTab />}
       {tab === 'cost-approval' && (
         <CostApprovalTab items={costApprovals}
           onDecide={async (id, decision) => {
@@ -344,6 +350,141 @@ const FulfillGuaranteeForm = ({ g, onClose, onSaved }: { g: GuaranteeLetter; onC
           <button onClick={submit} disabled={!f.bankName || saving} className="btn-primary text-sm disabled:opacity-50">Düzenlendi — Aktif Yap</button>
         </div>
       </div>
+    </div>
+  );
+};
+
+// ── Vade & Finansman Etkisi (taksitli tahsilat) ──────────────────────────────────
+const FinancingTab = () => {
+  const [opps, setOpps] = useState<Opportunity[]>([]);
+  const [oppId, setOppId] = useState('');
+  const [refStart, setRefStart] = useState(new Date().toISOString().slice(0, 10));
+  const [rates, setRates] = useState<Record<string, number>>({ TRY: 50, USD: 10, EUR: 8 });
+  const [installments, setInstallments] = useState<Installment[]>([]);
+  const [effect, setEffect] = useState<FinancingResult | null>(null);
+  const [newInst, setNewInst] = useState({ dueDate: '', amount: '', currency: 'TRY' });
+  const [applied, setApplied] = useState('');
+
+  useEffect(() => { apiService.getOpportunities().then(d => setOpps((d as Opportunity[]) || [])); apiService.getFinanceSettings().then(s => setRates((s as { interestRates: Record<string, number> }).interestRates)); }, []);
+
+  const selectedOpp = opps.find(o => o.id === oppId);
+  const loadEffect = useCallback(async () => {
+    if (!oppId) { setEffect(null); setInstallments([]); return; }
+    const [eff, inst] = await Promise.all([apiService.getFinancingEffect(oppId, refStart), apiService.getCollectionInstallments(oppId)]);
+    setEffect(eff as FinancingResult); setInstallments((inst as Installment[]) || []);
+  }, [oppId, refStart]);
+  useEffect(() => { loadEffect(); }, [loadEffect]);
+
+  const saveRates = async () => { await apiService.updateFinanceSettings({ interestRates: rates }); loadEffect(); };
+  const addInst = async () => {
+    if (!oppId || !newInst.dueDate || !newInst.amount) return;
+    await apiService.addCollectionInstallment({ opportunityId: oppId, dueDate: newInst.dueDate, amount: Number(newInst.amount), currency: newInst.currency });
+    setNewInst({ dueDate: '', amount: '', currency: 'TRY' }); loadEffect();
+  };
+  const delInst = async (id: string) => { await apiService.deleteCollectionInstallment(id); loadEffect(); };
+  const setTerm = async (kind: string, itemId: string, days: string) => {
+    await apiService.updatePaymentTerm({ kind, itemId, paymentTermDays: days === '' ? null : Number(days) });
+    loadEffect(); setOpps(prev => prev.map(o => o.id !== oppId ? o : { ...o })); // trigger
+    apiService.getOpportunities().then(d => setOpps((d as Opportunity[]) || []));
+  };
+  const apply = async () => {
+    if (!oppId) return;
+    const r = await apiService.applyFinancingEffect({ opportunityId: oppId, referenceStart: refStart }) as { created: { currency: string; amount: number }[] };
+    setApplied(r.created.length ? `Eklendi: ${r.created.map(c => `${c.amount.toLocaleString('tr-TR')} ${c.currency}`).join(', ')}` : 'Net maliyet yok — kalem eklenmedi.');
+    setTimeout(() => setApplied(''), 5000);
+  };
+
+  const paymentItems = selectedOpp
+    ? [
+        ...(selectedOpp.bomItems || []).map(b => ({ kind: 'BOM', id: b.id, name: b.partNumber, amount: (b.purchaseCost || 0) * (b.quantity || 0), currency: b.currency || 'TRY', term: (b as BoMItem & { paymentTermDays?: number }).paymentTermDays })),
+        ...(selectedOpp.costItems || []).filter(c => c.category !== 'FINANCE').map(c => ({ kind: 'COST', id: c.id, name: c.description, amount: c.amount, currency: c.currency || 'TRY', term: (c as CostItem & { paymentTermDays?: number }).paymentTermDays })),
+      ]
+    : [];
+
+  return (
+    <div className="space-y-4">
+      <div className="glass-card p-4 flex flex-wrap items-center gap-3">
+        <select value={oppId} onChange={e => setOppId(e.target.value)} className="input-glass text-sm min-w-[240px]">
+          <option value="">Fırsat seçin…</option>
+          {opps.map(o => <option key={o.id} value={o.id}>{o.title}</option>)}
+        </select>
+        <label className="text-xs text-slate-500">Ödeme referans tarihi</label>
+        <input type="date" value={refStart} onChange={e => setRefStart(e.target.value)} className="input-glass text-sm" />
+        <div className="flex items-center gap-1 ml-auto">
+          <span className="text-[10px] font-bold text-slate-400 uppercase">Yıllık Faiz %</span>
+          {(['TRY', 'USD', 'EUR'] as const).map(c => (
+            <span key={c} className="flex items-center gap-1 text-xs">{c}<input type="number" value={rates[c] ?? 0} onChange={e => setRates({ ...rates, [c]: Number(e.target.value) })} className="w-14 input-glass text-xs py-1" /></span>
+          ))}
+          <button onClick={saveRates} className="btn-secondary text-xs">Kaydet</button>
+        </div>
+      </div>
+
+      {!oppId ? <EmptyState text="Vade & finansman etkisi için bir fırsat seçin." /> : (
+        <>
+          {/* Tahsilat Planı (taksitli) */}
+          <div className="glass-card p-4">
+            <h4 className="font-black text-slate-900 text-sm mb-2">Tahsilat Planı (taksitli)</h4>
+            <div className="space-y-1">
+              {installments.map(i => (
+                <div key={i.id} className="flex items-center justify-between text-sm bg-slate-50 rounded-lg px-3 py-1.5">
+                  <span>{new Date(i.dueDate).toLocaleDateString('tr-TR')} · <b>{fmt(i.amount, i.currency)}</b></span>
+                  <button onClick={() => delInst(i.id)} className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
+                </div>
+              ))}
+              {installments.length === 0 && <p className="text-xs text-slate-400 italic">Taksit eklenmedi (tek/çok taksitli tahsilat girin).</p>}
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <input type="date" value={newInst.dueDate} onChange={e => setNewInst({ ...newInst, dueDate: e.target.value })} className="input-glass text-xs" />
+              <input type="number" placeholder="Tutar" value={newInst.amount} onChange={e => setNewInst({ ...newInst, amount: e.target.value })} className="input-glass text-xs w-28" />
+              <select value={newInst.currency} onChange={e => setNewInst({ ...newInst, currency: e.target.value })} className="input-glass text-xs"><option>TRY</option><option>USD</option><option>EUR</option></select>
+              <button onClick={addInst} className="btn-secondary text-xs"><Plus size={13} /> Taksit Ekle</button>
+            </div>
+          </div>
+
+          {/* Ödeme kalemleri (BoM + diğer) — vade düzenlenebilir */}
+          <div className="glass-card p-4">
+            <h4 className="font-black text-slate-900 text-sm mb-2">Ödeme Kalemleri (alış + diğer maliyet)</h4>
+            <div className="space-y-1">
+              {paymentItems.map(it => (
+                <div key={it.id} className="grid grid-cols-12 items-center gap-2 text-sm bg-slate-50 rounded-lg px-3 py-1.5">
+                  <span className="col-span-5 truncate">{it.name} <span className="text-[10px] text-slate-400">({it.kind === 'BOM' ? 'BoM' : 'Maliyet'})</span></span>
+                  <span className="col-span-3 font-bold">{fmt(it.amount, it.currency)}</span>
+                  <span className="col-span-4 flex items-center gap-1 justify-end text-xs text-slate-500">Ödeme vadesi
+                    <input type="number" defaultValue={it.term ?? ''} onBlur={e => setTerm(it.kind, it.id, e.target.value)} className="w-16 input-glass text-xs py-1" /> gün</span>
+                </div>
+              ))}
+              {paymentItems.length === 0 && <p className="text-xs text-slate-400 italic">Bu fırsatta ödeme kalemi (BoM/maliyet) yok.</p>}
+            </div>
+          </div>
+
+          {/* Etki */}
+          {effect && (
+            <div className="glass-card p-4">
+              <h4 className="font-black text-slate-900 text-sm mb-2">Finansman Etkisi (döviz-bazlı · kapanış {new Date(effect.closingDate).toLocaleDateString('tr-TR')})</h4>
+              <div className="grid gap-2">
+                {Object.entries(effect.byCurrency).map(([cur, v]) => (
+                  <div key={cur} className={`flex items-center justify-between p-3 rounded-xl border ${v.net < 0 ? 'bg-red-50 border-red-200' : 'bg-emerald-50 border-emerald-200'}`}>
+                    <span className="text-sm font-bold">{cur}</span>
+                    <span className="text-xs text-slate-500">Maliyet {fmt(v.cost, cur)} · Getiri {fmt(v.benefit, cur)}</span>
+                    <span className={`text-sm font-black ${v.net < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                      {v.net < 0 ? `Finansman Maliyeti ${fmt(-v.net, cur)}` : `Getiri ${fmt(v.net, cur)} (yönetim kararı)`}
+                    </span>
+                  </div>
+                ))}
+                {Object.keys(effect.byCurrency).length === 0 && <p className="text-xs text-slate-400 italic">Hesaplanacak vade verisi yok.</p>}
+              </div>
+              {effect.cashFlowGap.some(g => g.maxDeficit < 0) && (
+                <p className="text-[11px] text-amber-600 font-semibold mt-2">Nakit-akış boşluğu: {effect.cashFlowGap.filter(g => g.maxDeficit < 0).map(g => `${fmt(-g.maxDeficit, g.currency)}`).join(' · ')} finansman ihtiyacı.</p>
+              )}
+              <div className="flex items-center gap-3 mt-3">
+                <button onClick={apply} className="btn-primary text-sm">Net Maliyeti Maliyet Analizine Ekle</button>
+                {applied && <span className="text-xs font-semibold text-emerald-600">{applied}</span>}
+                <span className="text-[11px] text-slate-400">Pozitif (getiri) otomatik kâr olarak eklenmez — yönetim kararıdır.</span>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };

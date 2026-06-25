@@ -3,10 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import multer from 'multer';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
+import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
+
+const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
 const router: Router = Router();
 
@@ -364,6 +367,137 @@ router.get('/summary', tenantMiddleware, asyncHandler(async (req: Request, res: 
     expiringGuarantees: expiringGuarantees.length,
     pendingCostApprovals,
   });
+}));
+
+// ── Vade & Finansman Etkisi (Faz B) ──────────────────────────────────────────
+
+// Banka faiz oranları (tenant ayarı — moduleSettings.finance.interestRates)
+router.get('/settings', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findFirst({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const fin = (ms.finance as { interestRates?: Record<string, number> }) || {};
+  res.json({ interestRates: { ...DEFAULT_RATES, ...(fin.interestRates || {}) } });
+}));
+
+router.put('/settings', tenantMiddleware, requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']), asyncHandler(async (req: Request, res: Response) => {
+  const { interestRates } = req.body as { interestRates?: Record<string, number> };
+  const tenant = await prisma.tenant.findFirst({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const fin = (ms.finance as Record<string, unknown>) || {};
+  ms.finance = { ...fin, interestRates: { ...DEFAULT_RATES, ...(interestRates || {}) } };
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'FINANCE_RATES_UPDATED', entityType: 'TENANT', entityId: req.tenantId, details: { interestRates } });
+  res.json({ interestRates: (ms.finance as { interestRates: Record<string, number> }).interestRates });
+}));
+
+// Taksitli tahsilat planı
+router.get('/collection-installments', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.query.opportunityId ? String(req.query.opportunityId) : undefined;
+  if (!opportunityId) return res.status(400).json({ error: 'opportunityId zorunlu.' });
+  const items = await prisma.collectionInstallment.findMany({ where: { tenantId: req.tenantId, opportunityId }, orderBy: [{ sortOrder: 'asc' }, { dueDate: 'asc' }] });
+  res.json(items);
+}));
+
+router.post('/collection-installments', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { opportunityId, dueDate, amount, currency, note, sortOrder } = req.body;
+  if (!opportunityId || !dueDate) return res.status(400).json({ error: 'opportunityId ve dueDate zorunlu.' });
+  const item = await prisma.collectionInstallment.create({
+    data: { tenantId: req.tenantId, opportunityId: String(opportunityId), dueDate: new Date(dueDate), amount: parseFloat(String(amount)) || 0, currency: currency || 'TRY', note: note || null, sortOrder: typeof sortOrder === 'number' ? sortOrder : 0 },
+  });
+  res.json(item);
+}));
+
+router.put('/collection-installments/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const rec = await prisma.collectionInstallment.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Taksit bulunamadı.' });
+  const { dueDate, amount, currency, note } = req.body;
+  const item = await prisma.collectionInstallment.update({ where: { id }, data: {
+    ...(dueDate !== undefined && { dueDate: new Date(dueDate) }),
+    ...(amount !== undefined && { amount: parseFloat(String(amount)) || 0 }),
+    ...(currency !== undefined && { currency }),
+    ...(note !== undefined && { note: note || null }),
+  } });
+  res.json(item);
+}));
+
+router.delete('/collection-installments/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const rec = await prisma.collectionInstallment.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Taksit bulunamadı.' });
+  await prisma.collectionInstallment.delete({ where: { id } });
+  res.json({ ok: true });
+}));
+
+// Finansman etkisi hesabı (ödeme kalemleri + taksitli tahsilat)
+async function buildFinancing(tenantId: string, opportunityId: string, referenceStart?: string) {
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const rates = { ...DEFAULT_RATES, ...(((ms.finance as { interestRates?: Record<string, number> })?.interestRates) || {}) };
+
+  const [boms, costs, installments] = await Promise.all([
+    prisma.boMItem.findMany({ where: { opportunityId } }),
+    prisma.costItem.findMany({ where: { opportunityId, tenantId } }),
+    prisma.collectionInstallment.findMany({ where: { tenantId, opportunityId } }),
+  ]);
+
+  const events: CashEvent[] = [];
+  for (const b of boms) events.push({ kind: 'PAYMENT', label: `BoM: ${b.partNumber}`, date: paymentDate(referenceStart, b.paymentTermDays), amount: (b.purchaseCost || 0) * (b.quantity || 0), currency: b.currency || 'TRY' });
+  for (const c of costs) {
+    if (c.category === 'FINANCE') continue; // önceki finansman kalemini hesaba katma (döngü önleme)
+    events.push({ kind: 'PAYMENT', label: c.description, date: paymentDate(referenceStart, c.paymentTermDays), amount: c.amount || 0, currency: c.currency || 'TRY' });
+  }
+  for (const i of installments) events.push({ kind: 'COLLECTION', label: i.note || 'Tahsilat taksiti', date: i.dueDate.toISOString(), amount: i.amount || 0, currency: i.currency || 'TRY' });
+
+  const result = computeFinancingEffect(events, rates, referenceStart);
+  return { rates, result };
+}
+
+// Kalem ödeme vadesi (gün) güncelle — BoM veya CostItem
+router.put('/payment-term', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { kind, itemId, paymentTermDays } = req.body as { kind?: string; itemId?: string; paymentTermDays?: number };
+  if (!itemId || !kind) return res.status(400).json({ error: 'kind ve itemId zorunlu.' });
+  const days = paymentTermDays == null || paymentTermDays === undefined ? null : parseInt(String(paymentTermDays));
+  if (kind === 'BOM') {
+    const b = await prisma.boMItem.findFirst({ where: { id: itemId } });
+    if (!b) return res.status(404).json({ error: 'Kalem bulunamadı.' });
+    await prisma.boMItem.update({ where: { id: itemId }, data: { paymentTermDays: days } });
+  } else if (kind === 'COST') {
+    const c = await prisma.costItem.findFirst({ where: { id: itemId, tenantId: req.tenantId } });
+    if (!c) return res.status(404).json({ error: 'Kalem bulunamadı.' });
+    await prisma.costItem.update({ where: { id: itemId }, data: { paymentTermDays: days } });
+  } else return res.status(400).json({ error: 'Geçersiz kind.' });
+  res.json({ ok: true });
+}));
+
+router.get('/financing-effect', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.query.opportunityId ? String(req.query.opportunityId) : undefined;
+  if (!opportunityId) return res.status(400).json({ error: 'opportunityId zorunlu.' });
+  const referenceStart = req.query.referenceStart ? String(req.query.referenceStart) : undefined;
+  const { rates, result } = await buildFinancing(req.tenantId, opportunityId, referenceStart);
+  res.json({ interestRates: rates, ...result });
+}));
+
+// Net negatif (maliyet) etkiyi maliyet analizine CostItem olarak iter (yönetim onayı; döviz-bazlı)
+router.post('/financing-effect/apply', tenantMiddleware, requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']), asyncHandler(async (req: Request, res: Response) => {
+  const { opportunityId, referenceStart } = req.body as { opportunityId?: string; referenceStart?: string };
+  if (!opportunityId) return res.status(400).json({ error: 'opportunityId zorunlu.' });
+  const { result } = await buildFinancing(req.tenantId, opportunityId, referenceStart);
+  // Önceki otomatik finansman kalemlerini temizle (idempotent)
+  await prisma.costItem.deleteMany({ where: { opportunityId, tenantId: req.tenantId, category: 'FINANCE' } });
+  const created: { currency: string; amount: number }[] = [];
+  for (const [cur, v] of Object.entries(result.byCurrency)) {
+    if (v.net < 0) { // net negatif = finansman MALİYETİ
+      const amount = Math.round(-v.net * 100) / 100;
+      await prisma.costItem.create({ data: { tenantId: req.tenantId, opportunityId, description: `Finansman Maliyeti (vade etkisi)`, category: 'FINANCE', amount, currency: cur, auto: true } });
+      created.push({ currency: cur, amount });
+    }
+  }
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'FINANCING_COST_APPLIED', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { created } });
+  res.json({ ok: true, created, byCurrency: result.byCurrency });
 }));
 
 export default router;

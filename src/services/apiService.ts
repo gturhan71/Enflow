@@ -48,6 +48,15 @@ class ApiService {
     const qs = params?.start && params?.end ? `?start=${params.start}&end=${params.end}` : '';
     return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);
   }
+  // Finans — Vade & Finansman Etkisi
+  async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
+  async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }
+  async getCollectionInstallments(oppId: string) { return apiClient.fetchWithAuth(`/finance/collection-installments?opportunityId=${encodeURIComponent(oppId)}`); }
+  async addCollectionInstallment(data: Record<string, unknown>) { return apiClient.fetchWithAuth('/finance/collection-installments', { method: 'POST', body: JSON.stringify(data) }); }
+  async deleteCollectionInstallment(id: string) { return apiClient.fetchWithAuth(`/finance/collection-installments/${id}`, { method: 'DELETE' }); }
+  async updatePaymentTerm(data: { kind: string; itemId: string; paymentTermDays: number | null }) { return apiClient.fetchWithAuth('/finance/payment-term', { method: 'PUT', body: JSON.stringify(data) }); }
+  async getFinancingEffect(oppId: string, referenceStart?: string) { return apiClient.fetchWithAuth(`/finance/financing-effect?opportunityId=${encodeURIComponent(oppId)}${referenceStart ? `&referenceStart=${referenceStart}` : ''}`); }
+  async applyFinancingEffect(data: { opportunityId: string; referenceStart?: string }) { return apiClient.fetchWithAuth('/finance/financing-effect/apply', { method: 'POST', body: JSON.stringify(data) }); }
   async submitCostApproval(oppId: string) { return crmService.submitCostApproval(oppId); }
   async approveCost(oppId: string, data: { decision: 'APPROVE' | 'REJECT'; note?: string }) { return crmService.approveCost(oppId, data); }
 
