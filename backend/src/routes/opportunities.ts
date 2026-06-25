@@ -184,6 +184,7 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
       const newItem = await tx.boMItem.create({
         data: {
           opportunityId,
+          lineKey: item.lineKey ? String(item.lineKey) : undefined,
           partNumber: String(item.pn || item.partNumber || 'N/A'),
           description: String(item.desc || item.description || ''),
           quantity: qty,

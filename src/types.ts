@@ -73,6 +73,7 @@ export interface Opportunity {
   bomStatus?: string;
   procurementMethod?: string; // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — Satış Destek tetikleyici
   targetBidDate?: string;     // son teklif/dönüşüm tarihi
+  bomEvaluation?: string;     // JSON — BoM tedarikçi teklif değerlendirme snapshot'ı
   tenantId?: string;
   customerId: string;
   assignedToId: string;
@@ -139,6 +140,7 @@ export interface CostRequirement {
 
 export interface BoMItem {
   id: string;
+  lineKey?: string;
   opportunityId?: string;
   projectId?: string;
   partNumber: string;
@@ -150,8 +152,29 @@ export interface BoMItem {
   totalSalePrice?: number;
   vendor?: string;
   currency?: string;
-  source?: 'API' | 'EXCEL' | 'MANUAL';
+  source?: string;
   status?: 'PENDING_MATCH' | 'MATCHED';
+}
+
+export type TechnicalCompliance = 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT';
+
+export interface BoMLineQuote {
+  id: string;
+  tenantId?: string;
+  opportunityId: string;
+  lineKey: string;
+  componentName?: string | null;
+  vendorId?: string | null;
+  vendorName: string;
+  unitPrice: number;
+  currency: string;
+  technicalCompliance: TechnicalCompliance;
+  specSummary?: string | null;
+  deliveryDays?: number | null;
+  validUntil?: string | null;
+  notes?: string | null;
+  isSelected: boolean;
+  createdAt?: string;
 }
 
 export interface CostItem {

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   LayoutDashboard,
   FileSearch,
@@ -8,7 +8,8 @@ import {
   AlertCircle,
   X,
   Loader2,
-  Upload
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -17,7 +18,8 @@ import {
   Proposal,
   TodoTask,
   Unit,
-  User
+  User,
+  BoMLineQuote
 } from '../types';
 import SpecAnalysis from './SpecAnalysis';
 import { workflowService } from '../services/workflowService';
@@ -59,7 +61,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     isSubmitting,
     saveAndHandoff,
     totalCost
-  } = useBoM(selectedOppId, setOpportunities);
+  } = useBoM(selectedOppId, setOpportunities, opportunities);
 
   const [newItem, setNewItem] = useState({
     pn: '',
@@ -70,6 +72,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   });
 
   const [showApprovalPreview, setShowApprovalPreview] = useState(false);
+  const [quoteLine, setQuoteLine] = useState<{ lineKey: string; name: string } | null>(null);
 
   const handleHandOff = async () => {
     if (!selectedOppId || !targetUnitId || !targetUserId) return;
@@ -264,12 +267,19 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
 
              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
                {bomItems.map((item, i) => (
-                 <div key={i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 font-sans">
+                 <div key={item.lineKey || i} className="p-4 bg-slate-50 rounded-2xl border border-slate-100 font-sans">
                     <div className="flex justify-between items-center">
                       <span className="font-mono text-xs font-bold text-indigo-600">{item.pn}</span>
-                      <span className="text-sm font-bold text-slate-800">${item.cost} x {item.qty}</span>
+                      <span className="text-sm font-bold text-slate-800">{item.cost.toLocaleString('tr-TR')} x {item.qty}</span>
                     </div>
                     <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
+                    <div className="flex items-center justify-between mt-2">
+                      {item.vendor ? <span className="text-[11px] text-emerald-600 font-semibold">✓ {item.vendor}</span> : <span className="text-[11px] text-slate-400">Tedarikçi seçilmedi</span>}
+                      <button onClick={() => setQuoteLine({ lineKey: item.lineKey || '', name: item.pn || item.desc })}
+                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 border border-indigo-200 rounded-lg px-2 py-1">
+                        Teklif Değerlendir
+                      </button>
+                    </div>
                  </div>
                ))}
              </div>
@@ -428,6 +438,142 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           </div>
         )}
       </AnimatePresence>
+
+      <AnimatePresence>
+        {quoteLine && selectedOppId && (
+          <BoMQuotePanel
+            opportunityId={selectedOppId}
+            lineKey={quoteLine.lineKey}
+            componentName={quoteLine.name}
+            onClose={() => setQuoteLine(null)}
+            onSelected={(cost, vendor) => setBomItems(prev => prev.map(b => b.lineKey === quoteLine.lineKey ? { ...b, cost, vendor } : b))}
+          />
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// ── BoM Tedarikçi Teklif Değerlendirme Paneli ────────────────────────────────────
+const COMPLIANCE: Record<string, { label: string; cls: string }> = {
+  COMPLIANT: { label: 'Uygun', cls: 'bg-emerald-100 text-emerald-700' },
+  PARTIAL: { label: 'Kısmen Uygun', cls: 'bg-amber-100 text-amber-700' },
+  NON_COMPLIANT: { label: 'Uygun Değil', cls: 'bg-red-100 text-red-700' },
+};
+
+const BoMQuotePanel: React.FC<{
+  opportunityId: string; lineKey: string; componentName: string;
+  onClose: () => void; onSelected: (cost: number, vendor: string) => void;
+}> = ({ opportunityId, lineKey, componentName, onClose, onSelected }) => {
+  const [quotes, setQuotes] = useState<BoMLineQuote[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [suggestId, setSuggestId] = useState<string | null>(null);
+  const [f, setF] = useState({ vendorName: '', unitPrice: '', currency: 'TRY', technicalCompliance: 'COMPLIANT', specSummary: '', deliveryDays: '' });
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const all = (await apiService.getBomQuotes(opportunityId)) as BoMLineQuote[];
+      setQuotes((all || []).filter(q => q.lineKey === lineKey));
+    } finally { setLoading(false); }
+  }, [opportunityId, lineKey]);
+  useEffect(() => { load(); }, [load]);
+
+  const addQuote = async () => {
+    if (!f.vendorName.trim() || !f.unitPrice) return;
+    await apiService.addBomQuote({
+      opportunityId, lineKey, componentName,
+      vendorName: f.vendorName.trim(), unitPrice: Number(f.unitPrice), currency: f.currency,
+      technicalCompliance: f.technicalCompliance, specSummary: f.specSummary || undefined,
+      deliveryDays: f.deliveryDays ? Number(f.deliveryDays) : undefined,
+    });
+    setF({ vendorName: '', unitPrice: '', currency: 'TRY', technicalCompliance: 'COMPLIANT', specSummary: '', deliveryDays: '' });
+    load();
+  };
+
+  const suggest = () => {
+    const compliant = quotes.filter(q => q.technicalCompliance !== 'NON_COMPLIANT');
+    if (compliant.length === 0) { setSuggestId(null); return; }
+    const cheapest = compliant.reduce((a, b) => (a.unitPrice <= b.unitPrice ? a : b));
+    setSuggestId(cheapest.id);
+  };
+
+  const selectQuote = async (q: BoMLineQuote) => {
+    if (q.technicalCompliance === 'NON_COMPLIANT') return;
+    try {
+      await apiService.selectBomQuote(q.id);
+      onSelected(q.unitPrice, q.vendorName);
+      load();
+    } catch (e) { alert('Seçim hatası: ' + (e instanceof Error ? e.message : '')); }
+  };
+
+  const removeQuote = async (q: BoMLineQuote) => { await apiService.deleteBomQuote(q.id); load(); };
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+      <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }}
+        className="glass-panel w-full max-w-2xl rounded-3xl shadow-2xl bg-white max-h-[90vh] flex flex-col">
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h4 className="text-lg font-black text-slate-900">Tedarikçi Teklif Değerlendirme</h4>
+            <p className="text-xs text-slate-500">{componentName} — fiyat + teknik uygunluk; yalnız uygun teklif BoM'a işlenir.</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-xl"><X size={18} /></button>
+        </div>
+
+        <div className="p-6 overflow-y-auto flex-1 space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Alınan Teklifler ({quotes.length})</span>
+            <button onClick={suggest} disabled={quotes.length === 0} className="text-[11px] font-bold text-indigo-600 border border-indigo-200 rounded-lg px-2 py-1 disabled:opacity-40">En uygun öner</button>
+          </div>
+          {loading && <p className="text-sm text-slate-400 italic">Yükleniyor...</p>}
+          {!loading && quotes.length === 0 && <p className="text-sm text-slate-400 italic">Henüz teklif eklenmedi.</p>}
+          {quotes.map(q => {
+            const c = COMPLIANCE[q.technicalCompliance] || COMPLIANCE.COMPLIANT;
+            return (
+              <div key={q.id} className={`rounded-2xl p-3 border ${q.isSelected ? 'border-emerald-500/50 bg-emerald-50' : suggestId === q.id ? 'border-indigo-400 bg-indigo-50/40' : 'border-slate-200 bg-white'}`}>
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-slate-900 flex items-center gap-2">{q.vendorName}
+                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${c.cls}`}>{c.label}</span>
+                      {q.isSelected && <span className="text-[10px] font-bold text-emerald-600">✓ SEÇİLİ</span>}
+                      {suggestId === q.id && !q.isSelected && <span className="text-[10px] font-bold text-indigo-600">★ Önerilen</span>}
+                    </p>
+                    {q.specSummary && <p className="text-[11px] text-slate-500 mt-0.5">{q.specSummary}</p>}
+                    {q.deliveryDays != null && <p className="text-[10px] text-slate-400">{q.deliveryDays} gün teslimat</p>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-sm font-black text-slate-900">{q.unitPrice.toLocaleString('tr-TR')} {q.currency}</p>
+                    <div className="flex items-center gap-2 justify-end mt-1">
+                      <button onClick={() => selectQuote(q)} disabled={q.technicalCompliance === 'NON_COMPLIANT' || q.isSelected}
+                        title={q.technicalCompliance === 'NON_COMPLIANT' ? 'Teknik uygun olmayan seçilemez' : 'BoM\'a seç'}
+                        className="text-[11px] font-bold text-emerald-600 disabled:text-slate-300 disabled:cursor-not-allowed">Seç</button>
+                      <button onClick={() => removeQuote(q)} className="text-slate-300 hover:text-red-500"><Trash2 size={13} /></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div className="p-6 border-t border-slate-100 bg-slate-50/50 space-y-2">
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Yeni Teklif Ekle</p>
+          <div className="grid grid-cols-12 gap-2">
+            <input value={f.vendorName} onChange={e => setF({ ...f, vendorName: e.target.value })} placeholder="Tedarikçi (üretici/dist.)" className="col-span-5 px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none" />
+            <input type="number" value={f.unitPrice} onChange={e => setF({ ...f, unitPrice: e.target.value })} placeholder="Birim fiyat" className="col-span-3 px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none" />
+            <select value={f.currency} onChange={e => setF({ ...f, currency: e.target.value })} className="col-span-2 px-2 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none">
+              <option>TRY</option><option>USD</option><option>EUR</option>
+            </select>
+            <input type="number" value={f.deliveryDays} onChange={e => setF({ ...f, deliveryDays: e.target.value })} placeholder="Gün" className="col-span-2 px-2 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none" />
+            <select value={f.technicalCompliance} onChange={e => setF({ ...f, technicalCompliance: e.target.value })} className="col-span-5 px-2 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none">
+              <option value="COMPLIANT">Uygun</option><option value="PARTIAL">Kısmen Uygun</option><option value="NON_COMPLIANT">Uygun Değil</option>
+            </select>
+            <input value={f.specSummary} onChange={e => setF({ ...f, specSummary: e.target.value })} placeholder="Teknik not / uygunluk" className="col-span-5 px-3 py-2 text-xs bg-white border border-slate-200 rounded-lg outline-none" />
+            <button onClick={addQuote} disabled={!f.vendorName.trim() || !f.unitPrice} className="col-span-2 bg-primary text-white rounded-lg text-xs font-bold flex items-center justify-center gap-1 disabled:opacity-40"><Plus size={14} />Ekle</button>
+          </div>
+        </div>
+      </motion.div>
     </div>
   );
 };

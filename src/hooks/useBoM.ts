@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { MOCK_BOM_ITEMS } from '../constants';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import type { BoMItem, Opportunity } from '../types';
@@ -7,40 +6,46 @@ import type { BoMItem, Opportunity } from '../types';
 // BoM kalemlerinin UI'da kullanılan kısaltılmış biçimi (API'ye gönderilmeden önce BoMItem'a dönüştürülür)
 export interface AbbreviatedBoMItem {
   id?: string;
+  lineKey?: string;
   pn: string;
   desc: string;
   qty: number;
   cost: number;
   margin: number;
+  vendor?: string;
 }
+
+const newLineKey = () =>
+  (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `lk-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
 
 export const useBoM = (
   selectedOppId: string,
-  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>
+  setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
+  opportunities?: Opportunity[]
 ) => {
   const [bomItems, setBomItems] = useState<AbbreviatedBoMItem[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { setHasUnsavedChanges } = useUnsavedChanges();
 
   useEffect(() => {
-    if (selectedOppId) {
-      const items = MOCK_BOM_ITEMS
-        .filter(item => item.opportunityId === selectedOppId)
-        .map(item => ({
-          pn: item.partNumber,
-          desc: item.description,
-          qty: item.quantity,
-          cost: item.purchaseCost,
-          margin: item.marginPercentage
-        }));
-      setBomItems(items.length > 0 ? items : []);
-    } else {
-      setBomItems([]);
-    }
-  }, [selectedOppId]);
+    if (!selectedOppId) { setBomItems([]); return; }
+    // Gerçek (kaydedilmiş) BoM'u fırsattan yükle; her kaleme stabil lineKey ata
+    const opp = opportunities?.find(o => o.id === selectedOppId);
+    const real = (opp?.bomItems || []).map(item => ({
+      id: item.id,
+      lineKey: item.lineKey || newLineKey(),
+      pn: item.partNumber,
+      desc: item.description,
+      qty: item.quantity,
+      cost: item.purchaseCost,
+      margin: item.marginPercentage,
+      vendor: item.vendor || undefined,
+    }));
+    setBomItems(real);
+  }, [selectedOppId, opportunities]);
 
   const addBoMItem = (item: AbbreviatedBoMItem) => {
-    setBomItems(prev => [...prev, item]);
+    setBomItems(prev => [...prev, { ...item, lineKey: item.lineKey || newLineKey() }]);
     setHasUnsavedChanges(true);
   };
 
@@ -53,11 +58,13 @@ export const useBoM = (
     try {
       const properItems: BoMItem[] = bomItems.map((item, idx) => ({
         id: item.id ?? item.pn ?? String(idx),
+        lineKey: item.lineKey,
         partNumber: item.pn,
         description: item.desc,
         quantity: item.qty,
         purchaseCost: item.cost,
         marginPercentage: item.margin,
+        vendor: item.vendor,
       }));
 
       await apiService.saveBoMItems(selectedOppId, properItems, { handoff: true });

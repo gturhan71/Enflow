@@ -160,6 +160,7 @@ model Opportunity {
   agentTriage       String?       // JSON: { crm?:{recommendation,issues,at}, igpd?:{recommendation,expectedValue,valueTier,at} } — deterministik agent triyajı (annotation)
   procurementMethod String?       // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — fırsatın hangi satınalma usulüyle teklife dönüşeceği (Satış Destek tetikleyici)
   targetBidDate     DateTime?     // son teklif/dönüşüm tarihi — Satış Destek dosya hazırlık deadline'ı
+  bomEvaluation     String?       // JSON — handoff anında alınan BoM tedarikçi teklif değerlendirme snapshot'ı
   technicalStatus   String        @default("PENDING")
   bomStatus         String        @default("DRAFT")
   costConfig        String?       // JSON: { baseCurrency, rates, marginMode, globalMargin }
@@ -196,6 +197,7 @@ model Proposal {
 
 model BoMItem {
   id               String      @id @default(cuid())
+  lineKey          String?     // stabil satır kimliği (recreate'e rağmen teklif değerlendirme bağı)
   partNumber       String
   description      String
   quantity         Int
@@ -210,6 +212,28 @@ model BoMItem {
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   opportunity      Opportunity @relation(fields: [opportunityId], references: [id])
+}
+
+// Presales BoM kalemi için vendor teklif değerlendirmesi (fiyat + teknik uygunluk)
+model BoMLineQuote {
+  id                 String   @id @default(cuid())
+  tenantId           String
+  opportunityId      String
+  lineKey            String   // BoMItem.lineKey ile eşleşir
+  componentName      String?  // değerlendirilen kalem adı (cache)
+  vendorId           String?
+  vendorName         String
+  unitPrice          Float
+  currency           String   @default("TRY")
+  technicalCompliance String  @default("COMPLIANT") // COMPLIANT | PARTIAL | NON_COMPLIANT
+  specSummary        String?  // teknik uygunluk notu/özeti
+  deliveryDays       Int?
+  validUntil         DateTime?
+  notes              String?
+  isSelected         Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  @@index([opportunityId, lineKey])
 }
 
 model CostItem {

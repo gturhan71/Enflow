@@ -39,6 +39,11 @@ class ApiService {
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }
   async revertOpportunityApproval(oppId: string) { return crmService.revertOpportunityApproval(oppId); }
+  async getBomQuotes(oppId: string) { return apiClient.fetchWithAuth(`/bom-quotes?opportunityId=${encodeURIComponent(oppId)}`); }
+  async addBomQuote(data: Record<string, unknown>) { return apiClient.fetchWithAuth('/bom-quotes', { method: 'POST', body: JSON.stringify(data) }); }
+  async updateBomQuote(qid: string, data: Record<string, unknown>) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async deleteBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'DELETE' }); }
+  async selectBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}/select`, { method: 'POST' }); }
   async submitCostApproval(oppId: string) { return crmService.submitCostApproval(oppId); }
   async approveCost(oppId: string, data: { decision: 'APPROVE' | 'REJECT'; note?: string }) { return crmService.approveCost(oppId, data); }
 
