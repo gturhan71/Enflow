@@ -28,7 +28,8 @@ import {
   Cell
 } from 'recharts';
 import { motion, AnimatePresence } from 'motion/react';
-import { Opportunity, Project, TodoTask, Contract, Unit, Proposal } from '../types';
+import { Opportunity, Project, TodoTask, Contract, Unit, Proposal, DashboardPayload } from '../types';
+import { ROLE_LABELS } from '../constants';
 
 interface KPI {
   label: string;
@@ -90,6 +91,146 @@ const KPICard = React.memo(({ kpi, index }: { kpi: KPI, index: number }) => (
   </motion.div>
 ));
 
+// ── Role-bazlı Kokpit (zamana-duyarlı + KPI widget'ları) ─────────────────────────
+type WK = 'kpiOverview' | 'costApprovals' | 'tenderDeadlines' | 'guaranteeExpiries' | 'guaranteeRequests'
+  | 'financingGap' | 'tenderPipeline' | 'withdrawnTenders' | 'bomHandoffs' | 'invoicesDue'
+  | 'milestonesDue' | 'purchaseRequests' | 'myOpportunities' | 'myTasks' | 'projects';
+
+const ROLE_DASHBOARD: Record<string, WK[]> = {
+  GENERAL_MANAGER: ['kpiOverview', 'costApprovals', 'tenderDeadlines', 'guaranteeExpiries', 'financingGap', 'tenderPipeline', 'withdrawnTenders', 'bomHandoffs'],
+  OPERATIONS_MGR: ['kpiOverview', 'tenderDeadlines', 'tenderPipeline', 'projects'],
+  SALES_MGR: ['costApprovals', 'kpiOverview', 'tenderPipeline', 'myTasks'],
+  SALES_REP: ['myOpportunities', 'myTasks'],
+  SALES_SUPPORT: ['tenderDeadlines', 'guaranteeRequests', 'tenderPipeline', 'myTasks'],
+  ISAB_MGR: ['tenderDeadlines', 'tenderPipeline', 'guaranteeRequests', 'myTasks'],
+  PRESALES_MGR: ['bomHandoffs', 'myTasks'],
+  PRESALES_ENG: ['myOpportunities', 'myTasks'],
+  TECHNICAL_SPEC: ['myTasks'],
+  FINANCE_MGR: ['guaranteeRequests', 'guaranteeExpiries', 'invoicesDue', 'financingGap', 'costApprovals'],
+  PROCUREMENT_MGR: ['purchaseRequests', 'myTasks'],
+  PROJECT_MGR: ['projects', 'milestonesDue', 'myTasks'],
+};
+const DEFAULT_WIDGETS: WK[] = ['myTasks', 'myOpportunities'];
+
+const cfmt = (n: number, c = 'TRY') => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
+const byCurStr = (m: Record<string, number>) => Object.entries(m || {}).filter(([, v]) => v).map(([c, v]) => cfmt(v, c)).join(' · ') || '—';
+const dleftBadge = (d: number | null) => {
+  if (d == null) return { t: '—', c: 'text-slate-400' };
+  if (d < 0) return { t: 'süre doldu', c: 'text-red-600' };
+  if (d <= 2) return { t: `${d} gün`, c: 'text-red-600' };
+  if (d <= 7) return { t: `${d} gün`, c: 'text-amber-600' };
+  return { t: `${d} gün`, c: 'text-slate-500' };
+};
+
+const WCard: React.FC<{ title: string; count?: number | string; tone?: string; onClick?: () => void; children: React.ReactNode }> = ({ title, count, tone, onClick, children }) => (
+  <div onClick={onClick} className={`glass-panel rounded-3xl p-5 bg-white border border-slate-100 shadow-sm ${onClick ? 'cursor-pointer hover:shadow-lg transition-all' : ''}`}>
+    <div className="flex items-center justify-between mb-3">
+      <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">{title}</h4>
+      {count != null && <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full ${tone || 'bg-slate-100 text-slate-600'}`}>{count}</span>}
+    </div>
+    {children}
+  </div>
+);
+
+const RoleCockpit: React.FC<{ d: DashboardPayload; role?: string; go: (t: string) => void }> = ({ d, role, go }) => {
+  const widgets = ROLE_DASHBOARD[role || ''] || DEFAULT_WIDGETS;
+  const empty = (t: string) => <p className="text-xs text-slate-400 italic">{t}</p>;
+  const render = (w: WK) => {
+    switch (w) {
+      case 'kpiOverview': return (
+        <WCard key={w} title="Genel KPI">
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div><p className="text-[10px] text-slate-400 uppercase">Kazanım Oranı</p><p className="font-black text-slate-900">%{d.kpis.winRate}</p></div>
+            <div><p className="text-[10px] text-slate-400 uppercase">Açık Pipeline</p><p className="font-black text-slate-900">{cfmt(d.kpis.pipelineValue)}</p></div>
+            <div><p className="text-[10px] text-slate-400 uppercase">Kazanılan</p><p className="font-bold text-emerald-600">{d.kpis.won.count}</p></div>
+            <div><p className="text-[10px] text-slate-400 uppercase">İştirak Edilmeyen</p><p className="font-bold text-slate-500">{d.kpis.withdrawnCount}</p></div>
+          </div>
+        </WCard>);
+      case 'costApprovals': return (
+        <WCard key={w} title="Bekleyen Maliyet Onayı" count={d.timeSensitive.costApprovalsPending.length} tone="bg-amber-100 text-amber-700" onClick={() => go('crm-cost')}>
+          {d.timeSensitive.costApprovalsPending.length === 0 ? empty('Bekleyen onay yok.') :
+            <div className="space-y-1">{d.timeSensitive.costApprovalsPending.slice(0, 5).map(c => <div key={c.id} className="flex justify-between text-xs"><span className="truncate">{c.title}</span><span className="font-bold">{cfmt(c.value)}</span></div>)}</div>}
+        </WCard>);
+      case 'tenderDeadlines': return (
+        <WCard key={w} title="İhale Vadeleri" count={d.timeSensitive.tenderDeadlines.length} tone="bg-indigo-100 text-indigo-700" onClick={() => go('sales-support')}>
+          {d.timeSensitive.tenderDeadlines.length === 0 ? empty('Yaklaşan ihale vadesi yok.') :
+            <div className="space-y-1">{d.timeSensitive.tenderDeadlines.slice(0, 5).map(t => { const b = dleftBadge(t.daysLeft); return <div key={t.id} className="flex justify-between text-xs gap-2"><span className="truncate">{t.name}</span><span className={`font-bold ${b.c}`}>{b.t}</span></div>; })}</div>}
+        </WCard>);
+      case 'guaranteeExpiries': return (
+        <WCard key={w} title="Süresi Yaklaşan Teminat" count={d.timeSensitive.guaranteeExpiries.length} tone="bg-red-100 text-red-700" onClick={() => go('finance')}>
+          {d.timeSensitive.guaranteeExpiries.length === 0 ? empty('30 gün içinde dolan teminat yok.') :
+            <div className="space-y-1">{d.timeSensitive.guaranteeExpiries.slice(0, 5).map(g => { const b = dleftBadge(g.daysLeft); return <div key={g.id} className="flex justify-between text-xs gap-2"><span className="truncate">{cfmt(g.amount, g.currency)}</span><span className={`font-bold ${b.c}`}>{b.t}</span></div>; })}</div>}
+        </WCard>);
+      case 'guaranteeRequests': return (
+        <WCard key={w} title="Teminat Talepleri" count={d.timeSensitive.guaranteeRequests.length} tone="bg-amber-100 text-amber-700" onClick={() => go('finance')}>
+          {d.timeSensitive.guaranteeRequests.length === 0 ? empty('Bekleyen teminat talebi yok.') :
+            <div className="space-y-1">{d.timeSensitive.guaranteeRequests.slice(0, 5).map(g => <div key={g.id} className="flex justify-between text-xs"><span>{g.type === 'BID_BOND' ? 'Geçici' : 'Kesin'}{g.isIndefinite ? ' · süresiz' : ''}</span><span className="font-bold">{cfmt(g.amount, g.currency)}</span></div>)}</div>}
+        </WCard>);
+      case 'financingGap': return (
+        <WCard key={w} title="Finansman / Nakit Akış" onClick={() => go('finance')}>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between"><span className="text-slate-400">Alacak</span><span className="font-bold">{byCurStr(d.management.financing.receivableByCurrency)}</span></div>
+            <div className="flex justify-between"><span className="text-slate-400">Gecikmiş</span><span className="font-bold text-red-600">{byCurStr(d.management.financing.overdueByCurrency)}</span></div>
+          </div>
+        </WCard>);
+      case 'tenderPipeline': { const tp = d.management.tenderPipeline; return (
+        <WCard key={w} title="İhale Hattı" onClick={() => go('sales-support')}>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            <div><p className="font-black text-slate-900">{tp.active}</p><p className="text-[10px] text-slate-400">Aktif</p></div>
+            <div><p className="font-black text-indigo-600">{tp.submitted}</p><p className="text-[10px] text-slate-400">Teklif</p></div>
+            <div><p className="font-black text-emerald-600">{tp.won}</p><p className="text-[10px] text-slate-400">Kazanıldı</p></div>
+            <div><p className="font-black text-red-500">{tp.lost}</p><p className="text-[10px] text-slate-400">Kaybedildi</p></div>
+            <div><p className="font-black text-slate-500">{tp.withdrawn}</p><p className="text-[10px] text-slate-400">İştirak yok</p></div>
+          </div>
+        </WCard>); }
+      case 'withdrawnTenders': return (
+        <WCard key={w} title="İştirak Edilmeyen (Yönetim)" count={d.management.tenderPipeline.withdrawn} tone="bg-slate-100 text-slate-600">
+          <p className="text-xs text-slate-500">Yönetim kararıyla girilmeyen ihaleler — KPI'yı etkilemez.</p>
+        </WCard>);
+      case 'bomHandoffs': return (
+        <WCard key={w} title="Devredilen BoM" count={d.management.bomHandoffs.count} tone="bg-indigo-100 text-indigo-700" onClick={() => go('presales')}>
+          {d.management.bomHandoffs.recent.length === 0 ? empty('Henüz devir yok.') :
+            <div className="space-y-1">{d.management.bomHandoffs.recent.map(h => <div key={h.id} className="flex justify-between text-xs gap-2"><span className="truncate">{h.oppTitle}</span><span className="text-slate-400">{h.itemCount} kalem</span></div>)}</div>}
+        </WCard>);
+      case 'invoicesDue': return (
+        <WCard key={w} title="Fatura Vadeleri" count={d.timeSensitive.invoicesDue.length} tone="bg-amber-100 text-amber-700" onClick={() => go('finance')}>
+          {d.timeSensitive.invoicesDue.length === 0 ? empty('Bekleyen fatura yok.') :
+            <div className="space-y-1">{d.timeSensitive.invoicesDue.slice(0, 5).map(i => <div key={i.id} className="flex justify-between text-xs"><span className={i.overdue ? 'text-red-600 font-bold' : ''}>{i.invoiceNo || 'Fatura'}{i.overdue ? ' (gecikti)' : ''}</span><span className="font-bold">{cfmt(i.amount, i.currency)}</span></div>)}</div>}
+        </WCard>);
+      case 'milestonesDue': return (
+        <WCard key={w} title="Yaklaşan Milestone" count={d.timeSensitive.milestonesDue.length} tone="bg-indigo-100 text-indigo-700" onClick={() => go('project-mgmt')}>
+          {d.timeSensitive.milestonesDue.length === 0 ? empty('Yaklaşan milestone yok.') :
+            <div className="space-y-1">{d.timeSensitive.milestonesDue.slice(0, 5).map(m => { const b = dleftBadge(m.daysLeft); return <div key={m.id} className="flex justify-between text-xs gap-2"><span className="truncate">{m.title}</span><span className={`font-bold ${b.c}`}>{b.t}</span></div>; })}</div>}
+        </WCard>);
+      case 'purchaseRequests': return (
+        <WCard key={w} title="Satınalma Talepleri" onClick={() => go('procurement')}>
+          {Object.keys(d.management.purchaseRequests).length === 0 ? empty('Talep yok.') :
+            <div className="flex flex-wrap gap-2">{Object.entries(d.management.purchaseRequests).map(([s, n]) => <span key={s} className="text-[11px] font-bold bg-slate-100 px-2 py-0.5 rounded-full">{s}: {n}</span>)}</div>}
+        </WCard>);
+      case 'projects': return (
+        <WCard key={w} title="Projeler" count={d.management.projects.active} tone="bg-emerald-100 text-emerald-700" onClick={() => go('project-mgmt')}>
+          <p className="text-xs text-slate-500">Aktif proje · Ortalama marj <b>%{d.management.projects.avgMargin}</b></p>
+        </WCard>);
+      case 'myOpportunities': return (
+        <WCard key={w} title="Fırsatlarım" count={d.personal.myOpportunities.length} tone="bg-indigo-100 text-indigo-700" onClick={() => go('crm-opportunities')}>
+          {d.personal.myOpportunities.length === 0 ? empty('Atanmış aktif fırsat yok.') :
+            <div className="space-y-1">{d.personal.myOpportunities.slice(0, 6).map(o => <div key={o.id} className="flex justify-between text-xs gap-2"><span className="truncate">{o.title}</span><span className="text-slate-400">{o.technicalStatus === 'PENDING_APPROVAL' ? 'onayda' : o.status}</span></div>)}</div>}
+        </WCard>);
+      case 'myTasks': return (
+        <WCard key={w} title="Görevlerim" count={d.personal.myTasksPending} tone="bg-amber-100 text-amber-700" onClick={() => go('todo')}>
+          <p className="text-xs text-slate-500">{d.personal.myTasksPending} bekleyen görev · {d.personal.unreadNotifications} okunmamış bildirim</p>
+        </WCard>);
+      default: return null;
+    }
+  };
+  return (
+    <div>
+      <h4 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-3">{ROLE_LABELS[role || ''] || 'Kullanıcı'} Kokpiti — Zamana Duyarlı İşler & KPI</h4>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{widgets.map(render)}</div>
+    </div>
+  );
+};
+
 const Dashboard = ({
   opportunities = [],
   projects = [],
@@ -97,7 +238,8 @@ const Dashboard = ({
   contracts = [],
   units = [],
   proposals = [],
-  onApproveProposal
+  onApproveProposal,
+  onNavigate
 }: {
   opportunities: Opportunity[],
   projects: Project[],
@@ -105,7 +247,8 @@ const Dashboard = ({
   contracts?: Contract[],
   units?: Unit[],
   proposals?: Proposal[],
-  onApproveProposal?: (id: string) => void
+  onApproveProposal?: (id: string) => void,
+  onNavigate?: (tab: string) => void
 }) => {
   const { currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'performance'>('overview');
@@ -113,9 +256,16 @@ const Dashboard = ({
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [incomingReports, setIncomingReports] = useState<any[]>([]);
   const [allUnitReports, setAllUnitReports] = useState<any[]>([]);
+  const [dash, setDash] = useState<DashboardPayload | null>(null);
 
   const isGM = currentUser?.role === 'GENERAL_MANAGER';
   const isManager = isGM || /_MGR$/.test(currentUser?.role || '');
+
+  useEffect(() => {
+    let active = true;
+    apiService.getDashboard().then(d => { if (active) setDash(d as DashboardPayload); }).catch(() => {});
+    return () => { active = false; };
+  }, []);
 
   // Yönetici: kendisine yönlenen (escalate) bekleyen raporlar + birim KPI için tüm raporlar
   useEffect(() => {
@@ -490,7 +640,11 @@ const Dashboard = ({
         </div>
       </div>
 
-      {/* KPI Cards */}
+      {/* Role-bazlı kokpit — zamana duyarlı işler + KPI */}
+      {dash && <RoleCockpit d={dash} role={currentUser?.role} go={(t) => onNavigate?.(t)} />}
+
+      {/* Yönetici için klasik KPI kartları + grafikler (alt bölüm) */}
+      {isManager && <>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {kpis.map((kpi, i) => <KPICard key={kpi.label} kpi={kpi} index={i} />)}
       </div>
@@ -817,6 +971,7 @@ const Dashboard = ({
           </div>
         </div>
       )}
+      </>}
     </div>
   );
 };

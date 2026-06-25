@@ -48,6 +48,7 @@ class ApiService {
     const qs = params?.start && params?.end ? `?start=${params.start}&end=${params.end}` : '';
     return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);
   }
+  async getDashboard() { return apiClient.fetchWithAuth('/reports/dashboard'); }
   // Finans — Vade & Finansman Etkisi
   async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
   async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }

@@ -11,6 +11,7 @@ import {
   computeConsolidation,
   resolveEscalationTarget,
 } from '../services/unitReportingService';
+import { computeDashboard } from '../services/dashboardService';
 
 const router: Router = Router();
 
@@ -53,6 +54,12 @@ router.get('/overview', tenantMiddleware, asyncHandler(async (req: Request, res:
   const start = req.query.start ? String(req.query.start) : undefined;
   const end = req.query.end ? String(req.query.end) : undefined;
   const result = await computeOverview(req.tenantId, start, end);
+  res.json(result);
+}));
+
+// Role-bazlı Dashboard aggregator (zamana-duyarlı + KPI + kişisel)
+router.get('/dashboard', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const result = await computeDashboard(req.tenantId, req.userId);
   res.json(result);
 }));
 

@@ -309,7 +309,7 @@ const TenantAppInner = ({
     }
     
     switch (activeTab) {
-      case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} />;
+      case 'dashboard': return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} onNavigate={setActiveTab} />;
       case 'crm':
       case 'crm-dashboard':
       case 'crm-opportunities':
@@ -366,7 +366,7 @@ const TenantAppInner = ({
       case 'subscription': return <SubscriptionModule />;
       case 'license-gen': return <LicenseGeneratorModule />;
 
-      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} />;
+      default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} onNavigate={setActiveTab} />;
     }
   };
 
