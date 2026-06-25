@@ -419,4 +419,94 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
   res.json({ success: true, project, tasksCreated: createdTasks.length, tasks: createdTasks });
 }));
 
+// ── Sözleşme → Satınalma devri: BoM + referans alış fiyatlarıyla Satınalma Talebi (PR) ──
+router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: Response) => {
+  const id = pid(req);
+  const tenantId = req.tenantId;
+  const wf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId } });
+  if (!wf) return res.status(404).json({ error: 'Not found' });
+  if (!['SIGNED', 'TRANSFERRED'].includes(wf.status)) {
+    return res.status(409).json({ error: 'Yalnız imzalanmış sözleşme Satınalmaya aktarılabilir.' });
+  }
+  if (wf.procurementRequestId) {
+    return res.status(409).json({ error: 'Bu sözleşme zaten Satınalmaya aktarıldı.', procurementRequestId: wf.procurementRequestId });
+  }
+
+  // İş bilgisi + BoM (opportunity üzerinden)
+  const opp = wf.opportunityId
+    ? await prisma.opportunity.findFirst({ where: { id: wf.opportunityId, tenantId }, include: { bomItems: true, customer: true } })
+    : null;
+  const bomItems = opp?.bomItems ?? [];
+  const currency = bomItems[0]?.currency || 'TRY';
+
+  // Satınalma birimi (PROCUREMENT_MGR)
+  const procUser = await prisma.user.findFirst({ where: { tenantId, role: 'PROCUREMENT_MGR' } });
+
+  const descLines = [
+    `Sözleşme: ${wf.title}`,
+    wf.tenderNo ? `İKN: ${wf.tenderNo}` : '',
+    opp?.customer?.name ? `Müşteri: ${opp.customer.name}` : '',
+    `Sözleşme bedeli: ${wf.contractValue ?? 0} ${currency}`,
+    'Kaynak: imzalı sözleşme — BoM referans alış fiyatları üretici/distribütör ile yapılmıştır.',
+  ].filter(Boolean).join('\n');
+
+  const pr = await prisma.purchaseRequest.create({
+    data: {
+      tenantId,
+      title: `[Sözleşme] ${wf.projectName || wf.title}`,
+      description: descLines,
+      sourceType: 'BOM',
+      sourceBomId: wf.opportunityId || null,
+      projectId: wf.projectId || null,
+      requestedBy: req.userId || 'system',
+      requestedByName: null,
+      unitId: procUser?.unitId || null,
+      unitName: null,
+      status: 'DRAFT',
+      urgency: 'NORMAL',
+      budgetAmount: wf.contractValue || null,
+      currency,
+      items: bomItems.length ? {
+        create: bomItems.map(b => ({
+          name: b.partNumber || b.description || 'Kalem',
+          description: b.description || null,
+          quantity: b.quantity || 0,
+          unit: 'adet',
+          estimatedUnitPrice: b.purchaseCost ?? null, // referans ALIŞ fiyatı (satış fiyatı sızmaz)
+          currency: b.currency || currency,
+          refVendor: b.vendor || null,
+          refSource: b.source || null,
+        })),
+      } : undefined,
+    },
+    include: { items: true },
+  });
+
+  await prisma.contractWorkflow.update({ where: { id }, data: { procurementRequestId: pr.id, updatedAt: new Date() } });
+
+  // Satınalma'yı bilgilendir + görev
+  if (procUser?.id) {
+    await prisma.notification.create({
+      data: {
+        tenantId, userId: procUser.id, type: 'INFO',
+        title: 'Sözleşme → Satınalma',
+        message: `"${wf.projectName || wf.title}" sözleşmesi imzalandı. ${bomItems.length} kalemlik BoM ve referans alış fiyatları Satınalma Talebi olarak iletildi.`,
+      },
+    }).catch(() => {});
+  }
+  if (procUser?.unitId) {
+    await prisma.todoTask.create({
+      data: {
+        tenantId, title: `Satınalma: ${wf.projectName || wf.title}`,
+        description: `İmzalı sözleşmeden ${bomItems.length} kalemlik satınalma talebi oluştu. Referans alış fiyatlarını (üretici/distribütör) inceleyip teklif toplayın.`,
+        unitId: procUser.unitId, assignedBy: req.userId || 'system',
+        relatedModule: 'PROCUREMENT', relatedItemId: pr.id, priority: 'HIGH', status: 'PENDING', updatedAt: new Date(),
+      },
+    }).catch(() => {});
+  }
+
+  await logActivity({ tenantId, userId: req.userId, action: 'CONTRACT_TO_PROCUREMENT', entityType: 'CONTRACT_WORKFLOW', entityId: id, details: { purchaseRequestId: pr.id, items: pr.items.length } });
+  res.json({ success: true, purchaseRequest: pr });
+}));
+
 export default router;

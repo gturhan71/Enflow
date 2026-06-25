@@ -359,13 +359,20 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
                 <div className="space-y-2">
                   {pr.items.map((item: PurchaseItem) => (
                     <div key={item.id} className="bg-white/5 rounded-xl p-3 flex items-center justify-between">
-                      <div>
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold">{item.name}</p>
                         {item.description && <p className="text-xs text-slate-400">{item.description}</p>}
+                        {item.refVendor && (
+                          <p className="text-[11px] text-emerald-400 mt-0.5">Referans kaynak: {item.refVendor}{item.refSource ? ` (${item.refSource})` : ''}</p>
+                        )}
                       </div>
                       <div className="text-right shrink-0 ml-4">
                         <p className="text-sm font-bold">{item.quantity} {item.unit}</p>
-                        {item.estimatedUnitPrice && <p className="text-xs text-slate-400">{formatCurrency(item.estimatedUnitPrice, item.currency)}/birim</p>}
+                        {item.estimatedUnitPrice != null && (
+                          <p className="text-xs text-amber-300" title="BoM'dan gelen üretici/distribütör referans alış fiyatı">
+                            Ref. alış: {formatCurrency(item.estimatedUnitPrice, item.currency)}/birim
+                          </p>
+                        )}
                       </div>
                     </div>
                   ))}

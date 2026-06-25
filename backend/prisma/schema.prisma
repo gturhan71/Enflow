@@ -476,6 +476,7 @@ model ContractWorkflow {
   deadline        DateTime?
   notes           String?
   projectId       String?               // /transfer ile oluşturulan Project (idempotency + bağ)
+  procurementRequestId String?          // /handoff-procurement ile oluşturulan PurchaseRequest (idempotency + bağ)
   tenantId        String
   tenant          Tenant                @relation(fields: [tenantId], references: [id])
   documents       ContractWorkflowDoc[]
@@ -581,6 +582,8 @@ model PurchaseItem {
   estimatedUnitPrice Float?
   currency          String  @default("TRY")
   actualUnitPrice   Float?
+  refVendor         String?  // BoM kaynağı: üretici/distribütör adı (referans alış fiyatının kaynağı)
+  refSource         String?  // BoM source — referans fiyat kaynağı türü
   createdAt         DateTime @default(now())
 }
 

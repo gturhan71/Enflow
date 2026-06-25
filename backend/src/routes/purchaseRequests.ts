@@ -72,6 +72,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
         create: items.map((item: {
           name: string; description?: string; quantity: number;
           unit?: string; estimatedUnitPrice?: number; currency?: string;
+          refVendor?: string; refSource?: string;
         }) => ({
           name: item.name,
           description: item.description || null,
@@ -79,6 +80,8 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
           unit: item.unit || 'adet',
           estimatedUnitPrice: item.estimatedUnitPrice || null,
           currency: item.currency || currency || 'TRY',
+          refVendor: item.refVendor || null,
+          refSource: item.refSource || null,
         })),
       } : undefined,
     },

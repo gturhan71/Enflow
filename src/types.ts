@@ -546,6 +546,8 @@ export interface PurchaseItem {
   estimatedUnitPrice?: number | null;
   currency: string;
   actualUnitPrice?: number | null;
+  refVendor?: string | null;
+  refSource?: string | null;
   createdAt: string;
 }
 

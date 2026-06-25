@@ -5,7 +5,7 @@ import {
   Plus, Trash2, AlertCircle, CheckCircle2,
   Upload, ChevronRight, ChevronDown, Star, Shield, Banknote,
   Building2, FileCheck, Tag, ClipboardList, Loader2, Calendar,
-  TrendingUp, XCircle, BookOpen, Layers, Send, ExternalLink,
+  TrendingUp, XCircle, BookOpen, Layers, Send, ExternalLink, ShoppingCart,
   UserCheck, UserX, Clock
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
@@ -45,6 +45,7 @@ interface ContractWorkflow {
   deadline?: string | null;
   notes?: string | null;
   projectId?: string | null;
+  procurementRequestId?: string | null;
   documents: ContractWorkflowDoc[];
   createdAt: string;
 }
@@ -446,6 +447,24 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
       setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
       if (result.project) setTransferProject({ code: result.project.code, name: result.project.name });
       notify(`${result.project?.code ? `Proje ${result.project.code} oluşturuldu — ` : ''}${result.tasksCreated} görev Proje Yönetimi modülüne aktarıldı.`);
+    } catch (e) { notify((e as Error).message, true); }
+    finally { setTransferring(false); }
+  };
+
+  const handleHandoffProcurement = async () => {
+    if (!selected) return;
+    if (!['SIGNED', 'TRANSFERRED'].includes(selected.status)) { notify('Sözleşme önce imzalanmalı.', true); return; }
+    if (selected.procurementRequestId) { notify('Bu sözleşme zaten Satınalmaya aktarıldı.', true); return; }
+    setTransferring(true);
+    try {
+      const result = await apiFetch(`${BASE}/${selected.id}/handoff-procurement`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      });
+      const wf = await apiFetch(`${BASE}/${selected.id}`);
+      selectWorkflow(wf);
+      setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
+      const n = result.purchaseRequest?.items?.length ?? 0;
+      notify(`Satınalmaya aktarıldı — ${n} kalemlik satınalma talebi (referans alış fiyatlarıyla) oluşturuldu.`);
     } catch (e) { notify((e as Error).message, true); }
     finally { setTransferring(false); }
   };
@@ -1290,6 +1309,33 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
                               {transferring ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                               {transferring ? 'Aktarılıyor...' : 'Proje Yönetimine Aktar'}
                             </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Satınalmaya Aktar — BoM + referans alış fiyatları */}
+                      {(selected.status === 'SIGNED' || selected.status === 'TRANSFERRED') && (
+                        <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+                          {selected.procurementRequestId ? (
+                            <div className="flex items-center gap-3">
+                              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+                              <div>
+                                <p className="text-sm font-medium text-emerald-300">Satınalmaya aktarıldı</p>
+                                <p className="text-xs text-slate-400 mt-0.5">BoM ve referans alış fiyatları Satınalma Talebi olarak iletildi (Satın Alma modülünde DRAFT).</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="flex items-center gap-3 mb-3">
+                                <ShoppingCart className="w-5 h-5 text-blue-400" />
+                                <span className="text-sm font-medium text-slate-200">İşi Satınalmaya devret — BoM + üretici/distribütör alış fiyatlarıyla</span>
+                              </div>
+                              <button onClick={handleHandoffProcurement} disabled={transferring}
+                                className="btn-primary w-full flex items-center justify-center gap-2">
+                                {transferring ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShoppingCart className="w-4 h-4" />}
+                                {transferring ? 'Aktarılıyor...' : 'Satınalmaya Aktar'}
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
