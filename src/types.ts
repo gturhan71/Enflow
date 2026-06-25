@@ -705,7 +705,8 @@ export interface GuaranteeLetter {
   currency: string;
   issueDate?: string | null;
   expiryDate?: string | null;
-  status: 'ACTIVE' | 'RELEASED' | 'EXPIRED' | 'CALLED';
+  isIndefinite?: boolean;
+  status: 'REQUESTED' | 'ACTIVE' | 'RELEASED' | 'EXPIRED' | 'CALLED';
   refNo?: string | null;
   projectId?: string | null;
   contractId?: string | null;
@@ -713,6 +714,10 @@ export interface GuaranteeLetter {
   docNumber?: string | null;
   fileUrl?: string | null;
   notes?: string | null;
+  requestedById?: string | null;
+  requestNote?: string | null;
+  sampleText?: string | null;
+  sampleFileUrl?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -4,9 +4,13 @@ import {
   X, AlertTriangle, CheckCircle2, XCircle, Hash, CreditCard, CalendarClock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import * as XLSX from 'xlsx';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { Invoice, Payment, GuaranteeLetter, FinanceSummary } from '../types';
+
+const GUARANTEE_STATUS_TR: Record<string, string> = { REQUESTED: 'Talep Edildi', ACTIVE: 'Aktif', RELEASED: 'İade', EXPIRED: 'Süresi Doldu', CALLED: 'Nakde Çevrildi' };
+const GTYPE_TR: Record<string, string> = { BID_BOND: 'Geçici Teminat', PERFORMANCE: 'Kesin Teminat', ADVANCE: 'Avans Teminatı', WARRANTY: 'Garanti Teminatı' };
 
 interface CostApproval {
   id: string; description: string; category: string; plannedAmount: number; actualAmount: number;
@@ -109,7 +113,7 @@ const FinanceModule = () => {
         <CollectionTab items={invoices} onPay={(inv) => setPayInvoice(inv)} />
       )}
       {tab === 'guarantees' && (
-        <GuaranteesTab items={guarantees}
+        <GuaranteesTab items={guarantees} onChanged={load}
           onDelete={async (id) => { await apiService.deleteGuarantee(id); load(); }} />
       )}
       {tab === 'cost-approval' && (
@@ -232,40 +236,114 @@ const CollectionTab = ({ items, onPay }: { items: Invoice[]; onPay: (inv: Invoic
   );
 };
 
-const GuaranteesTab = ({ items, onDelete }: { items: GuaranteeLetter[]; onDelete: (id: string) => void }) => {
-  if (items.length === 0) return <EmptyState text="Henüz teminat mektubu yok." />;
+const GuaranteesTab = ({ items, onDelete, onChanged }: { items: GuaranteeLetter[]; onDelete: (id: string) => void; onChanged: () => void }) => {
+  const [fulfill, setFulfill] = useState<GuaranteeLetter | null>(null);
+  const [sampleView, setSampleView] = useState<GuaranteeLetter | null>(null);
   const now = Date.now();
   const soon = now + 30 * 24 * 60 * 60 * 1000;
+  const requested = items.filter(g => g.status === 'REQUESTED');
+
+  const exportExcel = () => {
+    const rows = items.map(g => ({
+      İş: g.tenderId || g.projectId || '—',
+      Tür: GTYPE_TR[g.type] || g.type,
+      Tutar: g.amount, Döviz: g.currency,
+      Vade: g.isIndefinite ? 'Süresiz' : (g.expiryDate ? new Date(g.expiryDate).toLocaleDateString('tr-TR') : '—'),
+      Banka: g.bankName || '—', Ref: g.refNo || '—',
+      Durum: GUARANTEE_STATUS_TR[g.status] || g.status,
+    }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Teminatlar');
+    XLSX.writeFile(wb, `Teminat_Mektuplari_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
+  if (items.length === 0) return <EmptyState text="Henüz teminat mektubu yok." />;
   return (
-    <div className="grid gap-3">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">{items.length} teminat{requested.length > 0 ? ` · ${requested.length} talep bekliyor` : ''}</span>
+        <button onClick={exportExcel} className="btn-secondary text-xs"><FileText size={14} /> Excel İndir</button>
+      </div>
       {items.map(g => {
         const exp = g.expiryDate ? new Date(g.expiryDate).getTime() : null;
-        const expired = exp != null && exp < now;
-        const expiring = exp != null && exp >= now && exp <= soon;
+        const expired = !g.isIndefinite && exp != null && exp < now;
+        const expiring = !g.isIndefinite && exp != null && exp >= now && exp <= soon;
         return (
-          <div key={g.id} className={`glass-card p-5 ${expired ? 'border-l-4 border-red-400' : expiring ? 'border-l-4 border-amber-300' : ''}`}>
+          <div key={g.id} className={`glass-card p-5 ${g.status === 'REQUESTED' ? 'border-l-4 border-amber-400' : expired ? 'border-l-4 border-red-400' : expiring ? 'border-l-4 border-amber-300' : ''}`}>
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">{g.type}</span>
-                  <h4 className="font-black text-slate-900">{g.bankName || 'Banka belirtilmedi'}</h4>
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${GUARANTEE_STATUS[g.status] || 'bg-slate-100 text-slate-600'}`}>{g.status}</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-indigo-50 text-indigo-600">{GTYPE_TR[g.type] || g.type}</span>
+                  <h4 className="font-black text-slate-900">{g.bankName || (g.status === 'REQUESTED' ? 'Talep (banka atanmadı)' : 'Banka belirtilmedi')}</h4>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : GUARANTEE_STATUS[g.status] || 'bg-slate-100 text-slate-600'}`}>{GUARANTEE_STATUS_TR[g.status] || g.status}</span>
+                  {g.isIndefinite && <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-lg bg-violet-100 text-violet-700">Süresiz</span>}
                   <DocBadge n={g.docNumber} />
                 </div>
                 <p className="text-xs text-slate-500">
-                  {g.refNo ? `Ref: ${g.refNo} · ` : ''}Sona erme: {fmtDate(g.expiryDate)}
+                  {g.refNo ? `Ref: ${g.refNo} · ` : ''}{g.isIndefinite ? 'Süresiz' : `Sona erme: ${fmtDate(g.expiryDate)}`}
                   {expired && <span className="text-red-600 font-bold"> · Süresi doldu</span>}
                   {expiring && <span className="text-amber-600 font-bold"> · Yakında doluyor</span>}
                 </p>
+                {g.sampleText && <button onClick={() => setSampleView(g)} className="text-[11px] font-bold text-indigo-600 hover:underline">Örnek metni gör</button>}
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className="text-lg font-black text-slate-900">{fmt(g.amount, g.currency)}</span>
-                <button onClick={() => onDelete(g.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                <div className="flex items-center gap-2">
+                  {g.status === 'REQUESTED' && <button onClick={() => setFulfill(g)} className="btn-primary text-xs">Karşıla</button>}
+                  <button onClick={() => onDelete(g.id)} className="text-slate-300 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                </div>
               </div>
             </div>
           </div>
         );
       })}
+      <AnimatePresence>
+        {fulfill && <FulfillGuaranteeForm g={fulfill} onClose={() => setFulfill(null)} onSaved={() => { setFulfill(null); onChanged(); }} />}
+        {sampleView && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50" onClick={() => setSampleView(null)}>
+            <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <h4 className="font-black text-slate-900 mb-3">Örnek Teminat Metni</h4>
+              <pre className="text-xs text-slate-700 whitespace-pre-wrap font-sans">{sampleView.sampleText}</pre>
+              <button onClick={() => setSampleView(null)} className="btn-secondary text-sm mt-4">Kapat</button>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+// Finans teminat talebini karşılar: banka/ref/tarih → ACTIVE (örnek metinden düzenler)
+const FulfillGuaranteeForm = ({ g, onClose, onSaved }: { g: GuaranteeLetter; onClose: () => void; onSaved: () => void }) => {
+  const [f, setF] = useState({ bankName: '', refNo: '', issueDate: new Date().toISOString().slice(0, 10), text: g.sampleText || '' });
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
+    setSaving(true);
+    try {
+      await apiService.updateGuarantee(g.id, {
+        status: 'ACTIVE', bankName: f.bankName || null, refNo: f.refNo || null,
+        issueDate: f.issueDate || null, sampleText: f.text || null,
+      });
+      onSaved();
+    } catch (e) { alert('Hata: ' + (e instanceof Error ? e.message : '')); }
+    finally { setSaving(false); }
+  };
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+      <div className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[88vh] overflow-y-auto space-y-3" onClick={e => e.stopPropagation()}>
+        <h4 className="font-black text-slate-900">Teminat Talebini Karşıla</h4>
+        <p className="text-xs text-slate-500">{GTYPE_TR[g.type] || g.type} · {fmt(g.amount, g.currency)} · {g.isIndefinite ? 'Süresiz' : `Vade ${fmtDate(g.expiryDate)}`}</p>
+        <input className="input-glass w-full text-sm" placeholder="Banka adı" value={f.bankName} onChange={e => setF({ ...f, bankName: e.target.value })} />
+        <input className="input-glass w-full text-sm" placeholder="Referans No" value={f.refNo} onChange={e => setF({ ...f, refNo: e.target.value })} />
+        <label className="text-xs text-slate-500">Düzenleme tarihi</label>
+        <input className="input-glass w-full text-sm" type="date" value={f.issueDate} onChange={e => setF({ ...f, issueDate: e.target.value })} />
+        <label className="text-xs text-slate-500">Teminat metni (örnek metinden düzenle)</label>
+        <textarea className="input-glass w-full text-xs" rows={6} value={f.text} onChange={e => setF({ ...f, text: e.target.value })} />
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="btn-secondary text-sm">Vazgeç</button>
+          <button onClick={submit} disabled={!f.bankName || saving} className="btn-primary text-sm disabled:opacity-50">Düzenlendi — Aktif Yap</button>
+        </div>
+      </div>
     </div>
   );
 };

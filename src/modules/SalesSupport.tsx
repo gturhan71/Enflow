@@ -468,69 +468,100 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
   );
 }
 
-// ── Teminat (BID_BOND — Finans ile paylaşımlı) ───────────────────────────────────
+// ── Teminat (Finans'a talep — geçici/kesin, süresiz, örnek metin) ─────────────────
+const GUARANTEE_STATUS_TR: Record<string, string> = { REQUESTED: 'Talep Edildi', ACTIVE: 'Aktif', RELEASED: 'İade', EXPIRED: 'Süresi Doldu', CALLED: 'Nakde Çevrildi' };
+
+function sampleGuaranteeText(tenderName: string, ikn: string | null | undefined, type: string, amount: string, currency: string, expiry: string, indefinite: boolean): string {
+  const tur = type === 'BID_BOND' ? 'GEÇİCİ' : 'KESİN';
+  const vade = indefinite ? 'SÜRESİZ' : (expiry ? new Date(expiry).toLocaleDateString('tr-TR') : '[VADE]');
+  return `${tur} TEMİNAT MEKTUBU\n\nİş: ${tenderName}${ikn ? ` (İKN: ${ikn})` : ''}\nTutar: ${amount || '[TUTAR]'} ${currency}\nVade: ${vade}\n\nİdaremize/işverene hitaben, yukarıda belirtilen iş için ${amount || '[TUTAR]'} ${currency} tutarında ${tur.toLowerCase()} teminat olarak işbu teminat mektubu düzenlenmiştir. Banka, ilk yazılı talepte protesto çekmeye gerek olmaksızın bedeli ödemeyi kabul ve taahhüt eder.`;
+}
+
 function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
   tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; userName?: string;
 }) {
   const [guarantees, setGuarantees] = useState<GuaranteeLetter[]>([]);
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
-  const [f, setF] = useState<Record<string, string>>({ bankName: '', amount: '', expiryDate: '', refNo: '' });
+  const [f, setF] = useState({ type: 'BID_BOND', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' });
 
   const load = useCallback(async () => {
     if (!tender) { setGuarantees([]); return; }
     setLoading(true);
-    try { setGuarantees((await apiService.getGuarantees({ tenderId: tender.id, type: 'BID_BOND' })) as GuaranteeLetter[]); }
+    try { setGuarantees((await apiService.getGuarantees({ tenderId: tender.id })) as GuaranteeLetter[]); }
     finally { setLoading(false); }
   }, [tender]);
   useEffect(() => { load(); }, [load]);
 
+  const openForm = () => {
+    setF(prev => ({ ...prev, sampleText: sampleGuaranteeText(tender?.name || '', tender?.ikn, prev.type, prev.amount, prev.currency, prev.expiryDate, prev.indefinite) }));
+    setShowForm(true);
+  };
+  const regenSample = (next: typeof f) => setF({ ...next, sampleText: sampleGuaranteeText(tender?.name || '', tender?.ikn, next.type, next.amount, next.currency, next.expiryDate, next.indefinite) });
+
   const save = async () => {
     if (!tender) return;
     await apiService.createGuarantee({
-      type: 'BID_BOND', tenderId: tender.id, bankName: f.bankName || null,
-      amount: parseFloat(f.amount) || 0, expiryDate: f.expiryDate || null, refNo: f.refNo || null,
-      notes: userName ? `Oluşturan: ${userName}` : null,
+      type: f.type, tenderId: tender.id, amount: parseFloat(f.amount) || 0, currency: f.currency,
+      expiryDate: f.indefinite ? null : (f.expiryDate || null), isIndefinite: f.indefinite,
+      status: 'REQUESTED', sampleText: f.sampleText || null,
+      requestNote: f.requestNote || (userName ? `Talep eden: ${userName}` : null),
     });
-    setShowForm(false); setF({ bankName: '', amount: '', expiryDate: '', refNo: '' }); load();
+    setShowForm(false); setF({ type: 'BID_BOND', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' }); load();
   };
 
   if (!tender)
-    return <TenderSelectorEmpty tenders={tenders} onSelectTender={onSelectTender} text="Geçici teminat için bir ihale seçin." />;
+    return <TenderSelectorEmpty tenders={tenders} onSelectTender={onSelectTender} text="Teminat talebi için bir ihale seçin." />;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-500"><b className="text-slate-700">{tender.name}</b> — geçici teminat mektupları (Finans modülüyle paylaşımlı)</p>
-        <button onClick={() => setShowForm(true)} className="btn-primary text-sm"><Plus className="w-4 h-4" /> Teminat Ekle</button>
+        <p className="text-sm text-slate-500"><b className="text-slate-700">{tender.name}</b> — teminat mektupları (Finans'a talep + düzenleme)</p>
+        <button onClick={openForm} className="btn-primary text-sm"><Plus className="w-4 h-4" /> Finans'a Teminat Talebi</button>
       </div>
       {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
       {guarantees.length === 0
-        ? <div className="glass-card p-12 text-center text-slate-400 italic">Bu ihaleye bağlı geçici teminat yok.</div>
+        ? <div className="glass-card p-12 text-center text-slate-400 italic">Bu ihaleye bağlı teminat talebi yok.</div>
         : guarantees.map(g => {
-            const dleft = daysUntil(g.expiryDate);
+            const dleft = g.isIndefinite ? null : daysUntil(g.expiryDate);
             return (
               <div key={g.id} className="glass-card p-4 flex items-center justify-between gap-4">
                 <div>
-                  <p className="font-bold text-slate-900">{g.bankName || 'Banka belirtilmedi'} · {fmt(g.amount, g.currency)}</p>
-                  <p className="text-xs text-slate-500">{g.refNo ? `Ref: ${g.refNo} · ` : ''}Geçerlilik: {fmtDate(g.expiryDate)}
-                    {dleft !== null && <span className={`ml-1 font-bold ${dleft < 0 ? 'text-red-600' : dleft <= 30 ? 'text-amber-600' : 'text-slate-400'}`}>
-                      ({dleft < 0 ? 'süresi doldu' : `${dleft} gün`})</span>}</p>
+                  <p className="font-bold text-slate-900">{METHOD_LABELS[g.type] || (g.type === 'BID_BOND' ? 'Geçici Teminat' : g.type === 'PERFORMANCE' ? 'Kesin Teminat' : g.type)} · {fmt(g.amount, g.currency)}
+                    {g.isIndefinite && <span className="ml-2 text-[10px] font-bold text-violet-700 bg-violet-100 px-1.5 py-0.5 rounded-full">SÜRESİZ</span>}</p>
+                  <p className="text-xs text-slate-500">{g.bankName ? `${g.bankName} · ` : ''}{g.isIndefinite ? 'Süresiz' : `Geçerlilik: ${fmtDate(g.expiryDate)}`}
+                    {dleft !== null && <span className={`ml-1 font-bold ${dleft < 0 ? 'text-red-600' : dleft <= 30 ? 'text-amber-600' : 'text-slate-400'}`}>({dleft < 0 ? 'süresi doldu' : `${dleft} gün`})</span>}</p>
                 </div>
-                <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-emerald-100 text-emerald-700 border border-emerald-200">{g.status}</span>
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>{GUARANTEE_STATUS_TR[g.status] || g.status}</span>
               </div>
             );
           })}
 
       <AnimatePresence>
         {showForm && (
-          <Modal title="Geçici Teminat (BID_BOND)" onClose={() => setShowForm(false)}>
-            <input className="input-glass w-full text-sm" placeholder="Banka adı" value={f.bankName} onChange={e => setF({ ...f, bankName: e.target.value })} />
-            <input className="input-glass w-full text-sm" type="number" placeholder="Tutar" value={f.amount} onChange={e => setF({ ...f, amount: e.target.value })} />
-            <input className="input-glass w-full text-sm" placeholder="Referans No" value={f.refNo} onChange={e => setF({ ...f, refNo: e.target.value })} />
-            <label className="text-xs text-slate-500">Geçerlilik sonu</label>
-            <input className="input-glass w-full text-sm" type="date" value={f.expiryDate} onChange={e => setF({ ...f, expiryDate: e.target.value })} />
-            <button onClick={save} className="btn-primary w-full text-sm">Kaydet</button>
+          <Modal title="Finans'a Teminat Mektubu Talebi" onClose={() => setShowForm(false)}>
+            <div className="space-y-2">
+              <select className="input-glass w-full text-sm" value={f.type} onChange={e => regenSample({ ...f, type: e.target.value })}>
+                <option value="BID_BOND">Geçici Teminat</option><option value="PERFORMANCE">Kesin Teminat</option>
+              </select>
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input-glass text-sm" type="number" placeholder="Tutar" value={f.amount} onChange={e => regenSample({ ...f, amount: e.target.value })} />
+                <select className="input-glass text-sm" value={f.currency} onChange={e => regenSample({ ...f, currency: e.target.value })}>
+                  <option>TRY</option><option>USD</option><option>EUR</option>
+                </select>
+              </div>
+              <label className="flex items-center gap-2 text-xs font-semibold text-slate-600">
+                <input type="checkbox" checked={f.indefinite} onChange={e => regenSample({ ...f, indefinite: e.target.checked })} /> Süresiz teminat
+              </label>
+              {!f.indefinite && <>
+                <label className="text-xs text-slate-500">Vade (geçerlilik sonu)</label>
+                <input className="input-glass w-full text-sm" type="date" value={f.expiryDate} onChange={e => regenSample({ ...f, expiryDate: e.target.value })} />
+              </>}
+              <label className="text-xs text-slate-500">Örnek teminat metni (şartnameden — Finans düzenler)</label>
+              <textarea className="input-glass w-full text-xs" rows={5} value={f.sampleText} onChange={e => setF({ ...f, sampleText: e.target.value })} />
+              <input className="input-glass w-full text-sm" placeholder="Talep notu (opsiyonel)" value={f.requestNote} onChange={e => setF({ ...f, requestNote: e.target.value })} />
+              <button onClick={save} disabled={!f.amount || (!f.indefinite && !f.expiryDate)} className="btn-primary w-full text-sm disabled:opacity-50">Finans'a Talep Gönder</button>
+            </div>
           </Modal>
         )}
       </AnimatePresence>

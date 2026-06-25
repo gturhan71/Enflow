@@ -959,11 +959,16 @@ model GuaranteeLetter {
   currency    String    @default("TRY")
   issueDate   DateTime?
   expiryDate  DateTime?
-  status      String    @default("ACTIVE") // ACTIVE|RELEASED|EXPIRED|CALLED
+  isIndefinite Boolean  @default(false) // süresiz teminat (expiryDate yok)
+  status      String    @default("ACTIVE") // REQUESTED|ACTIVE|RELEASED|EXPIRED|CALLED
   refNo       String?
   docNumber   String?
   fileUrl     String?
   notes       String?
+  requestedById String? // Satış Destek talep eden (status=REQUESTED)
+  requestNote   String? // talep notu
+  sampleText    String? // idari şartnameden örnek teminat metni
+  sampleFileUrl String? // yüklü örnek teminat dosyası
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   @@index([tenantId, status])

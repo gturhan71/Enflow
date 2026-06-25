@@ -180,9 +180,11 @@ router.post('/guarantees', tenantMiddleware, asyncHandler(async (req: Request, r
   const {
     type, bankName, amount, currency, issueDate, expiryDate, status,
     refNo, projectId, contractId, tenderId, notes, categoryCode,
+    isIndefinite, requestedById, requestNote, sampleText, sampleFileUrl,
   } = req.body;
   if (amount == null) return res.status(400).json({ error: 'Teminat tutarı zorunlu.' });
   const docNumber = await maybeDocNumber(req.tenantId, categoryCode);
+  const indefinite = isIndefinite === true;
   const item = await prisma.guaranteeLetter.create({
     data: {
       tenantId: req.tenantId,
@@ -191,17 +193,33 @@ router.post('/guarantees', tenantMiddleware, asyncHandler(async (req: Request, r
       amount: Number(amount) || 0,
       currency: currency || 'TRY',
       issueDate: issueDate ? new Date(issueDate) : null,
-      expiryDate: expiryDate ? new Date(expiryDate) : null,
+      expiryDate: indefinite ? null : (expiryDate ? new Date(expiryDate) : null),
+      isIndefinite: indefinite,
       status: status || 'ACTIVE',
       refNo: refNo || null,
       projectId: projectId || null,
       contractId: contractId || null,
       tenderId: tenderId || null,
       notes: notes || null,
+      requestedById: requestedById || req.userId || null,
+      requestNote: requestNote || null,
+      sampleText: sampleText || null,
+      sampleFileUrl: sampleFileUrl || null,
       docNumber,
     },
   });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'GUARANTEE', entityId: item.id, details: { type: item.type, amount: item.amount } });
+  // Satış Destek → Finans teminat talebi: Finans birimini bilgilendir
+  if (item.status === 'REQUESTED') {
+    const fin = await prisma.user.findFirst({ where: { tenantId: req.tenantId, role: 'FINANCE_MGR' } });
+    if (fin) {
+      await prisma.notification.create({ data: {
+        tenantId: req.tenantId, userId: fin.id, type: 'APPROVAL',
+        title: 'Teminat mektubu talebi',
+        message: `Satış Destek ${item.type === 'BID_BOND' ? 'geçici' : 'kesin'} teminat talep etti: ${item.amount.toLocaleString('tr-TR')} ${item.currency}${indefinite ? ' (süresiz)' : item.expiryDate ? ` · vade ${item.expiryDate.toLocaleDateString('tr-TR')}` : ''}. Örnek metinle düzenleyin.`,
+      } }).catch(() => {});
+    }
+  }
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: item.status === 'REQUESTED' ? 'GUARANTEE_REQUESTED' : 'CREATE', entityType: 'GUARANTEE', entityId: item.id, details: { type: item.type, amount: item.amount, status: item.status } });
   res.json(item);
 }));
 
@@ -209,7 +227,8 @@ router.put('/guarantees/:id', tenantMiddleware, asyncHandler(async (req: Request
   const id = String(req.params.id);
   const record = await prisma.guaranteeLetter.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Teminat bulunamadı.' });
-  const { type, bankName, amount, currency, issueDate, expiryDate, status, refNo, projectId, contractId, tenderId, notes } = req.body;
+  const { type, bankName, amount, currency, issueDate, expiryDate, status, refNo, projectId, contractId, tenderId, notes, isIndefinite, sampleText } = req.body;
+  const indefinite = isIndefinite !== undefined ? isIndefinite === true : record.isIndefinite;
   const item = await prisma.guaranteeLetter.update({
     where: { id },
     data: {
@@ -217,10 +236,15 @@ router.put('/guarantees/:id', tenantMiddleware, asyncHandler(async (req: Request
       amount: amount != null ? Number(amount) : record.amount,
       currency,
       issueDate: issueDate ? new Date(issueDate) : record.issueDate,
-      expiryDate: expiryDate ? new Date(expiryDate) : record.expiryDate,
+      expiryDate: indefinite ? null : (expiryDate ? new Date(expiryDate) : record.expiryDate),
+      isIndefinite: indefinite,
       status, refNo, projectId, contractId, tenderId, notes,
+      ...(sampleText !== undefined && { sampleText: sampleText || null }),
     },
   });
+  if (status && status !== record.status) {
+    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `GUARANTEE_${status}`, entityType: 'GUARANTEE', entityId: id, details: { from: record.status, to: status } });
+  }
   res.json(item);
 }));
 
