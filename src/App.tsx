@@ -60,6 +60,7 @@ import ActivityLogModule from './modules/ActivityLogModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AIGateProvider } from './contexts/AIGateContext';
 import { apiService } from './services/apiService';
 import { ThemeProvider } from './contexts/ThemeContext';
 
@@ -372,8 +373,9 @@ const TenantAppInner = ({
 
   return (
     <UnsavedChangesProvider>
+      <AIGateProvider onNavigateToIntegrations={() => setActiveTab('settings-integrations')}>
       <div className="flex h-screen bg-background overflow-hidden font-geist relative">
-        <Sidebar 
+        <Sidebar
           activeTab={activeTab} 
           setActiveTab={setActiveTab} 
           onLogout={onLogout} 
@@ -405,6 +407,7 @@ const TenantAppInner = ({
           </div>
         </main>
       </div>
+      </AIGateProvider>
     </UnsavedChangesProvider>
   );
 };

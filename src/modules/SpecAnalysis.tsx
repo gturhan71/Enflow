@@ -20,7 +20,8 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as pdfjs from 'pdfjs-dist';
-import { GoogleGenAI, Type } from "@google/genai";
+import { apiService } from '../services/apiService';
+import { useAIGate } from '../contexts/AIGateContext';
 import { AnalysisResult } from '../types';
 
 // Configure PDF.js worker using a reliable CDN with modern mjs support
@@ -51,14 +52,13 @@ interface SpecAnalysisProps {
 }
 
 const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => {
+  const { requireAI } = useAIGate();
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isTransferring, setIsTransferring] = useState(false);
-
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || '' });
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -109,6 +109,9 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
       return;
     }
 
+    // YZ kapısı — entegre YZ yoksa popup açılır + Entegrasyonlar'a yönlendirir.
+    if (!(await requireAI('Şartname analizi'))) return;
+
     setIsAnalyzing(true);
     setError(null);
 
@@ -123,48 +126,21 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
         throw new Error('Dosyalardan metin ayıklanamadı.');
       }
 
-      const response = await ai.models.generateContent({
-        model: "gemini-3-flash-preview",
-        contents: `Analiz etmen gereken teknik şartname metni aşağıdadır. 
-        Bu metinden şunları çıkar:
-        1. Şartnamenin başlığı.
-        2. Kısa bir özet.
-        3. Teknik detayların özeti.
-        4. İstenen ürünlerin listesi (Part Number, Açıklama, Adet).
-        
-        Giriş Metni:
-        ${combinedText.substring(0, 30000)}`, // Limit text size for safety
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              summary: { type: Type.STRING },
-              specDetails: { type: Type.STRING },
-              extractedProducts: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    pn: { type: Type.STRING },
-                    description: { type: Type.STRING },
-                    quantity: { type: Type.NUMBER }
-                  },
-                  required: ["pn", "description", "quantity"]
-                }
-              }
-            },
-            required: ["title", "summary", "specDetails", "extractedProducts"]
-          }
-        }
+      // Analiz sunucuda yapılır — tenant'ın yapılandırdığı YZ (Entegrasyonlar),
+      // sağlayıcıdan bağımsız. Metin ayıklama client'ta kaldı; API key client'a asla gelmez.
+      const data = await apiService.presalesSpecExtract({ text: combinedText, opportunityId });
+      if (!data.usedAI && (!data.extractedProducts || data.extractedProducts.length === 0)) {
+        setError(data.summary || 'Yapay zeka entegrasyonu yapılandırılmadı. Ayarlar → Entegrasyonlar bölümünden bir YZ bağlayın.');
+        return;
+      }
+      setResult({
+        title: data.title,
+        summary: data.summary,
+        specDetails: data.specDetails,
+        extractedProducts: data.extractedProducts,
       });
-
-      const analysisData = JSON.parse(response.text || '{}');
-      setResult(analysisData);
-    } catch (err) {
-      console.error('Analysis error:', err);
-      setError('Analiz sırasında bir hata oluştu: ' + (err instanceof Error ? err.message : 'Bilinmeyen hata'));
+    } catch {
+      setError('Analiz sırasında bir hata oluştu. Lütfen tekrar deneyin.');
     } finally {
       setIsAnalyzing(false);
     }

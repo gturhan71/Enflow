@@ -14,7 +14,7 @@ import { apiService } from '../services/apiService';
 import { useModuleSettings } from '../hooks/useEnflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { PROMOTABLE_TEST_MODULES, NAV_ITEMS } from '../constants';
-import { FlaskConical, CheckCircle2, Users as UsersIcon, Lock, ShieldCheck } from 'lucide-react';
+import { FlaskConical, CheckCircle2, Users as UsersIcon, Lock, ShieldCheck, Cpu, KeyRound, Loader2 } from 'lucide-react';
 
 interface SettingsModuleProps {
   companyLogo: string | null;
@@ -161,6 +161,120 @@ const ModuleManagement: React.FC<{ tenantId: string }> = ({ tenantId }) => {
   );
 };
 
+// ── YZ (Yapay Zeka) Entegrasyonu — sağlayıcıdan bağımsız ────────────────────
+// Tenant kendi API key'ini girer; hangi YZ olduğu önemsiz (OpenAI-uyumlu uç).
+// Key sunucuda saklanır, maskeli gösterilir, asla geri çekilmez.
+const AISettingsCard: React.FC = () => {
+  const [baseUrl, setBaseUrl] = useState('');
+  const [model, setModel] = useState('');
+  const [label, setLabel] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [hasKey, setHasKey] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    apiService.getAISettings()
+      .then(s => { setBaseUrl(s.baseUrl); setModel(s.model); setLabel(s.label); setHasKey(s.hasKey); })
+      .catch(() => undefined)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    setSaved(false);
+    try {
+      const res = await apiService.updateAISettings({ baseUrl, model, label, apiKey: apiKey || undefined });
+      setHasKey(res.hasKey);
+      setApiKey('');
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const connected = hasKey && Boolean(baseUrl) && Boolean(model);
+
+  return (
+    <div className="glass-card p-6 rounded-2xl border border-slate-200/60">
+      <div className="flex items-center gap-3 mb-1">
+        <div className="w-10 h-10 rounded-xl bg-indigo-500/10 flex items-center justify-center">
+          <Cpu className="w-5 h-5 text-indigo-500" />
+        </div>
+        <div className="flex-1">
+          <h5 className="text-lg font-bold text-slate-900">Yapay Zeka (YZ) Entegrasyonu</h5>
+          <p className="text-xs text-slate-500">Şartname/sözleşme analizi için istediğiniz YZ sağlayıcısını bağlayın (OpenAI-uyumlu uç).</p>
+        </div>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${connected ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-500/10 text-slate-500'}`}>
+          {connected ? '● Bağlı' : '○ Yapılandırılmadı'}
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="text-sm text-slate-400 py-6 text-center">Yükleniyor…</div>
+      ) : (
+        <div className="space-y-4 mt-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">API Base URL</label>
+              <input
+                value={baseUrl}
+                onChange={e => setBaseUrl(e.target.value)}
+                placeholder="https://api.saglayici.com/v1"
+                className="input-glass w-full text-sm"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">OpenAI-uyumlu uç (sağlayıcı belgenizdeki base URL).</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Model adı</label>
+              <input
+                value={model}
+                onChange={e => setModel(e.target.value)}
+                placeholder="örn. model-adı"
+                className="input-glass w-full text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1 flex items-center gap-1">
+                <KeyRound className="w-3 h-3" /> API Key
+              </label>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={e => setApiKey(e.target.value)}
+                placeholder={hasKey ? '•••••••• (kayıtlı — değiştirmek için yeni anahtar girin)' : 'API anahtarınız'}
+                className="input-glass w-full text-sm"
+                autoComplete="off"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">Anahtar yalnız sunucuda saklanır, geri gösterilmez.</p>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-600 mb-1">Etiket (opsiyonel)</label>
+              <input
+                value={label}
+                onChange={e => setLabel(e.target.value)}
+                placeholder="örn. Şirket YZ'si"
+                className="input-glass w-full text-sm"
+              />
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button onClick={save} disabled={saving} className="btn-primary text-sm flex items-center gap-2">
+              {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+              Kaydet
+            </button>
+            {saved && <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> Kaydedildi</span>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── Ana bileşen ───────────────────────────────────────────────────────────
 const SettingsModule = ({
   companyLogo,
@@ -246,8 +360,9 @@ const SettingsModule = ({
           <div className="space-y-6">
             <div>
               <h4 className="text-xl font-bold text-slate-900">Entegrasyon Yönetimi</h4>
-              <p className="text-sm text-slate-500 mb-6">T-Ecosystem modülleri ve harici servis bağlantılarını yapılandırın.</p>
+              <p className="text-sm text-slate-500 mb-6">Yapay zeka, doküman ve iletişim servis bağlantılarını yapılandırın.</p>
             </div>
+            <AISettingsCard />
             <IntegrationWizard
               ncConfig={{ url: '', username: '', appPassword: '' }}
               setNcConfig={() => {}}

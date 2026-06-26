@@ -59,7 +59,7 @@ Enflow, B2B teknoloji şirketleri için tasarlanmış **çok kiracılı (multi-t
 | UI | Tailwind CSS, glassmorphism (`glass-card`, `input-glass`, `btn-primary`, `btn-secondary`), `motion/react` animasyonları |
 | Backend | Express.js v5, TypeScript, Prisma ORM |
 | Veritabanı | SQLite (geliştirme), Prisma migrations ile şema yönetimi |
-| AI | Claude claude-sonnet-4-6 (sözleşme analizi + görev üretimi) |
+| YZ | İstenilen YZ — tenant-yapılandırmalı, sağlayıcıdan bağımsız (OpenAI-uyumlu uç; Ayarlar→Entegrasyonlar). Sözleşme analizi + görev üretimi; yoksa mock fallback |
 
 ---
 
@@ -396,7 +396,7 @@ Modül açılışında fırsat dropdown'u görünür. Kaydedilmemiş değişikli
 #### Şartname Analizi (AI)
 
 **Şartname Analizi sekmesi → İdari / teknik şartname metni yapıştır → Analiz Et:**
-- Claude claude-sonnet-4-6 gereksinimleri çıkarır
+- Yapılandırılan YZ (istenilen sağlayıcı) gereksinimleri çıkarır
 - Çıkarılan ürün listesi BoM'a ekleme için sunulur
 
 #### Yöneticiye Gönderme
@@ -551,7 +551,7 @@ Sözleşmenin temel bilgileri:
 
 **AI Destekli Sözleşme Analizi:**
 1. Sözleşme metni ve idari şartname metnini yapıştır
-2. **AI ile Analiz Et** → Claude claude-sonnet-4-6 çalışır
+2. **YZ ile Analiz Et** → tenant'ın yapılandırdığı YZ (istenilen sağlayıcı) çalışır
 
 **Analiz Çıktısı:**
 - **Önemli Maddeler:** Cezai şartlar, teslim süreleri, özel yükümlülükler
@@ -1388,7 +1388,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter · LegalCase → ilgili modüller → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
-| **5 · AI / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis(Gemini)/ContractWorkflow(Claude) → `/plugins` |
+| **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`) → `/plugins` |
 | **6 · Entegrasyon & Admin** | IntegrationWizard, SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
 
 ### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"

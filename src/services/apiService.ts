@@ -187,6 +187,22 @@ class ApiService {
     });
   }
 
+  // --- YZ ENTEGRASYONU (sağlayıcıdan bağımsız — tenant kendi key'i) ---
+  // Sır içermez, tüm roller okuyabilir — modül-bazlı YZ kapısı için.
+  async getAIStatus(): Promise<{ configured: boolean }> {
+    return apiClient.fetchWithAuth('/tenants/ai-status');
+  }
+  // GM-only — Entegrasyonlar kartı için (maskeli).
+  async getAISettings(): Promise<{ baseUrl: string; model: string; label: string; hasKey: boolean }> {
+    return apiClient.fetchWithAuth('/tenants/ai-settings');
+  }
+  async updateAISettings(data: { baseUrl: string; model: string; label?: string; apiKey?: string }): Promise<{ baseUrl: string; model: string; label: string; hasKey: boolean }> {
+    return apiClient.fetchWithAuth('/tenants/ai-settings', { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async presalesSpecExtract(data: { text: string; opportunityId?: string }): Promise<{ usedAI: boolean; title: string; summary: string; specDetails: string; extractedProducts: { pn: string; description: string; quantity: number }[] }> {
+    return apiClient.fetchWithAuth('/presales/spec-extract', { method: 'POST', body: JSON.stringify(data) });
+  }
+
   // --- PROCUREMENT ---
   async getVendors() { return apiClient.fetchWithAuth('/vendors'); }
   async createVendor(data: Record<string, unknown>) {

@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../services/apiClient';
 import { apiService } from '../services/apiService';
+import { useAIGate } from '../contexts/AIGateContext';
 import { Opportunity, Proposal, LegalCase, LegalRequest } from '../types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -151,6 +152,8 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
+  const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
+  const { requireAI } = useAIGate();
   const fileInputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const notify = (msg: string, isError = false) => {
@@ -171,6 +174,9 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
   }, []);
 
   useEffect(() => { loadWorkflows(); }, [loadWorkflows]);
+  useEffect(() => {
+    apiService.getAIStatus().then(s => setAiConfigured(s.configured)).catch(() => setAiConfigured(false));
+  }, []);
 
   const selectWorkflow = (wf: ContractWorkflow) => {
     setSelected(wf);
@@ -238,6 +244,8 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
 
   const handleAnalyse = async () => {
     if (!selected) return;
+    // YZ kapısı — entegre YZ yoksa popup açılır + Entegrasyonlar'a yönlendirir.
+    if (!(await requireAI('Sözleşme analizi'))) return;
     setAnalysing(true);
     try {
       await apiFetch(`${BASE}/${selected.id}`, {
@@ -874,9 +882,9 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
                           {analysing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Cpu className="w-3.5 h-3.5" />}
                           {analysing ? 'AI Analiz Yapıyor...' : 'AI ile Analiz Et'}
                         </button>
-                        {!process.env.ANTHROPIC_API_KEY && (
+                        {aiConfigured === false && (
                           <span className="text-xs text-amber-400 flex items-center gap-1 ml-auto">
-                            <AlertCircle className="w-3 h-3" /> API anahtarı yok — örnek çıktı gösterilecek
+                            <AlertCircle className="w-3 h-3" /> YZ yapılandırılmadı (Ayarlar → Entegrasyonlar) — örnek çıktı gösterilecek
                           </span>
                         )}
                       </div>

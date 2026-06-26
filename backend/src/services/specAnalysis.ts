@@ -1,11 +1,12 @@
 // Enflow — Şartname/Sözleşme analizi (ortak servis)
 // ─────────────────────────────────────────────────────────────────────────────
 // İdari/teknik şartname + sözleşme metnini analiz edip "verilmesi gereken
-// dökümanlar" listesi (+ görev/madde/özet) üretir. Anthropic Claude varsa onu,
-// yoksa deterministik mock fallback'i kullanır. Hem contractWorkflow hem tenders
-// route'ları bu servisi kullanır (DRY).
+// dökümanlar" listesi (+ görev/madde/özet) üretir. Tenant'ın yapılandırdığı YZ
+// (istenilen sağlayıcı — Entegrasyonlar ekranı) varsa onu, yoksa deterministik
+// mock fallback'i kullanır. Hem contractWorkflow hem tenders route'ları bu
+// servisi kullanır (DRY).
 
-import Anthropic from '@anthropic-ai/sdk';
+import { chatJSON } from './aiClient';
 
 export interface AnalyzedDoc {
   name: string;
@@ -97,30 +98,22 @@ function mockAnalysis(fallbackName?: string | null, fallbackNo?: string | null):
   };
 }
 
-/** Şartname/sözleşme metnini analiz eder; AI yoksa deterministik mock döner. */
+/**
+ * Şartname/sözleşme metnini analiz eder; tenant YZ'si yapılandırılmamışsa ya da
+ * hata olursa deterministik mock döner. Sağlayıcıdan bağımsız (bkz. aiClient).
+ */
 export async function analyzeSpec(
   inputText: string,
-  opts: { fallbackName?: string | null; fallbackNo?: string | null } = {},
+  opts: { tenantId: string; fallbackName?: string | null; fallbackNo?: string | null },
 ): Promise<{ analysis: SpecAnalysis; usedAI: boolean }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (apiKey) {
-    try {
-      const client = new Anthropic({ apiKey });
-      const message = await client.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        messages: [{ role: 'user', content: PROMPT_HEADER + inputText }],
-      });
-      const raw = (message.content[0] as { type: string; text: string }).text.trim();
-      const jsonStart = raw.indexOf('{');
-      const jsonEnd = raw.lastIndexOf('}');
-      const analysis = JSON.parse(raw.slice(jsonStart, jsonEnd + 1)) as SpecAnalysis;
-      if (!analysis.documents || analysis.documents.length === 0) analysis.documents = mockDocuments();
-      return { analysis, usedAI: true };
-    } catch {
-      // AI hatası → mock'a düş
-      return { analysis: mockAnalysis(opts.fallbackName, opts.fallbackNo), usedAI: false };
-    }
+  const result = await chatJSON<SpecAnalysis>({
+    tenantId: opts.tenantId,
+    user: PROMPT_HEADER + inputText,
+    maxTokens: 4096,
+  });
+  if (result) {
+    if (!result.documents || result.documents.length === 0) result.documents = mockDocuments();
+    return { analysis: result, usedAI: true };
   }
   return { analysis: mockAnalysis(opts.fallbackName, opts.fallbackNo), usedAI: false };
 }

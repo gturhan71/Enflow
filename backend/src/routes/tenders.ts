@@ -265,7 +265,7 @@ router.post('/:id/analyze', tenantMiddleware, tenderUpload.single('file'), async
     return res.status(400).json({ error: 'Analiz için şartname metni veya dosya gerekli.' });
   }
 
-  const { analysis, usedAI } = await analyzeSpec(specText, { fallbackName: tender.name, fallbackNo: tender.ikn });
+  const { analysis, usedAI } = await analyzeSpec(specText, { tenantId: req.tenantId, fallbackName: tender.name, fallbackNo: tender.ikn });
 
   await prisma.tender.update({ where: { id }, data: { specText, aiAnalysis: JSON.stringify(analysis), status: tender.status === 'DRAFT' ? 'PREPARING' : tender.status } });
 

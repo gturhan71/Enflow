@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useAIGate } from '../contexts/AIGateContext';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
 interface SalesSupportProps {
@@ -262,6 +263,7 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
   tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; onChanged?: () => void;
   isGM?: boolean; onWithdraw?: (t: Tender) => void;
 }) {
+  const { requireAI } = useAIGate();
   const [items, setItems] = useState<TenderChecklistItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
@@ -287,6 +289,7 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
   // Analiz: şartname metniyle AI
   const analyzeText = async () => {
     if (!tender || !specText.trim()) return;
+    if (!(await requireAI('İhale şartname analizi'))) return;
     setAnalyzing(true); setInfo('');
     try {
       const r = await apiService.analyzeTender(tender.id, { specText }) as { usedAI: boolean; autoMatched: number };
@@ -299,6 +302,7 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
   // Analiz: dosya (PDF/TXT) yükle
   const analyzeFile = async (file: File) => {
     if (!tender) return;
+    if (!(await requireAI('İhale şartname analizi'))) return;
     setAnalyzing(true); setInfo('');
     try {
       const fd = new FormData(); fd.append('file', file);
