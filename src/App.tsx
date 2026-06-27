@@ -47,6 +47,7 @@ import ProjectManagementModule from './modules/ProjectManagementModule';
 import VisitPlanModule from './modules/VisitPlanModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
+import BackupModule from './modules/BackupModule';
 import ArchiveModule from './modules/ArchiveModule';
 import SubscriptionModule from './modules/SubscriptionModule';
 import ContractWorkflowModule from './modules/ContractWorkflowModule';
@@ -357,6 +358,7 @@ const TenantAppInner = ({
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
       case 'corporate-governance': return <CorporateGovernanceModule />;
+      case 'backup': return <BackupModule />;
       case 'finance': return <FinanceModule />;
       case 'management-reports': return <ManagementReportingModule />;
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;

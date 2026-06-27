@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Yedekleme artefaktları (commit edilmez)
+backend/backups/

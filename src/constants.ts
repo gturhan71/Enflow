@@ -28,7 +28,8 @@ import {
   Banknote,
   Key,
   FlaskConical,
-  ShieldCheck
+  ShieldCheck,
+  DatabaseBackup
 } from 'lucide-react';
 
 import { 
@@ -69,7 +70,8 @@ export const ROLE_LABELS: Record<string, string> = {
   KGD_MGR: 'Kalite Güvence Direktörü (KGD)',
   KSU_MGR: 'Kontrat & Sözleşme Uzmanı (KSU)',
   ISAB_MGR: 'İhale Satın Alma Birimi Yöneticisi (İSAB)',
-  LEGAL_MGR: 'Hukuk Müdürü / Şirket Avukatı'
+  LEGAL_MGR: 'Hukuk Müdürü / Şirket Avukatı',
+  BACKUP_ADMIN: 'Yedek Yöneticisi'
 };
 
 export const MOCK_TENANTS: Tenant[] = [
@@ -115,6 +117,7 @@ export const NAV_ITEMS = [
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },
   { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
+  { id: 'backup',            label: 'Yedekleme',           icon: DatabaseBackup, requiredPermission: 'BACKUP_VIEW' },
   {
     id: 'settings',
     label: 'Şirket Ayarları',

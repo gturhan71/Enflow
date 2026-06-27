@@ -22,17 +22,46 @@ export const tenantMiddleware = asyncHandler(async (req: Request, res: Response,
     try {
       const userId = Buffer.from(token, 'base64').toString('utf-8');
       // Çözülen string'in gerçek bir kullanıcı ID'si olup olmadığını kontrol et.
-      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, tenantId: true } });
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, tenantId: true, role: true } });
       if (user) {
         if (user.tenantId !== tenantId) {
           return res.status(403).json({ error: 'Bu tenant\'a erişim yetkiniz yok.' });
         }
         req.userId = user.id;
+        req.userRole = user.role;
       }
     } catch { /* geçersiz base64 — kimlik doğrulamasız devam */ }
   }
 
   req.tenantId = tenantId;
+  next();
+});
+
+// Salt-okunur roller: hiçbir modülde/veride mutasyon yapamaz.
+// BACKUP_ADMIN tüm akışa dahil (GET) ama yalnız /api/backup altında yazabilir.
+// App-düzeyinde (router'lardan ÖNCE) mount edilir; rolü token'dan kendisi çözer
+// (yalnız mutasyon isteklerinde DB'ye bakar → ek yük minimal).
+const READ_ONLY_ROLES = new Set(['BACKUP_ADMIN']);
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+
+export const enforceReadOnlyRoles = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  if (SAFE_METHODS.has(req.method)) return next();
+  const p = req.path || req.url || '';
+  // Yedek/restore + oturum muaf
+  if (p.startsWith('/api/backup') || p.startsWith('/backup') || p.startsWith('/api/auth') || p.startsWith('/auth')) return next();
+
+  const token = (req.headers['authorization'] as string | undefined)?.replace('Bearer ', '').trim();
+  if (!token) return next();
+  let role: string | undefined;
+  try {
+    const userId = Buffer.from(token, 'base64').toString('utf-8');
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
+    role = user?.role;
+  } catch { /* geçersiz token — guard atlanır, ilgili route kendi auth'unu uygular */ }
+
+  if (role && READ_ONLY_ROLES.has(role)) {
+    return res.status(403).json({ error: 'Salt-okunur rol: bu işlem için değişiklik yetkiniz yok (yalnız yedekleme).' });
+  }
   next();
 });
 

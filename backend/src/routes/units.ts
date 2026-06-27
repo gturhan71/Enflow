@@ -4,7 +4,8 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
-const GM_OR_PRESALES = requireRole(['GENERAL_MANAGER', 'PRESALES_ENG']);
+// Birim listesi okuma — GM + Presales + Yedek Yöneticisi (salt-okunur akış dahli)
+const GM_OR_PRESALES = requireRole(['GENERAL_MANAGER', 'PRESALES_ENG', 'BACKUP_ADMIN']);
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Request, res: Response) => {

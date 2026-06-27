@@ -14,7 +14,10 @@ import customersRouter from './routes/customers';
 import opportunitiesRouter from './routes/opportunities';
 import bomQuotesRouter from './routes/bomQuotes';
 import presalesRouter from './routes/presales';
+import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
+import { enforceReadOnlyRoles } from './middleware';
+import { startBackupScheduler } from './services/backupScheduler';
 import projectsRouter from './routes/projects';
 import tasksRouter from './routes/tasks';
 import contractsRouter from './routes/contracts';
@@ -56,6 +59,10 @@ app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Salt-okunur rol guard'ı — domain router'lardan ÖNCE (BACKUP_ADMIN mutasyonları
+// /api/backup hariç 403). Güvenli metodlar + /api/auth + /api/backup muaf.
+app.use(enforceReadOnlyRoles);
+
 app.use('/api/logs/notifications', logsRouter);
 app.use('/api/activity-logs', activityLogsRouter);
 app.use('/api/auth', authRouter);
@@ -67,6 +74,7 @@ app.use('/api/customers', customersRouter);
 app.use('/api/opportunities', opportunitiesRouter);
 app.use('/api/bom-quotes', bomQuotesRouter);
 app.use('/api/presales', presalesRouter);
+app.use('/api/backup', backupRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/tasks', tasksRouter);
@@ -100,4 +108,5 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 
 app.listen(port, () => {
   console.log(`[Enflow Backend] Server is running at http://localhost:${port}`);
+  startBackupScheduler();
 });

@@ -284,6 +284,28 @@ export const ROLE_MATRIX: RoleSpec[] = [
     reviewed: 'DONE',
     notes: 'Hukuk yöneticisi — hukuki görüş/vaka + sözleşme incelemesi. Onay swimlane\'inde değil (danışman). DB personeli yok; Legal agent yalnız ADVISORY (hukuk, asla otonom).',
   },
+  {
+    role: 'BACKUP_ADMIN', unit: 'Sistem', kind: 'STAFF', staffing: 'HUMAN',
+    // Tüm akışa SALT-OKUNUR dahil: tüm modül *_VIEW izinleri + BACKUP_VIEW.
+    modules: [
+      'DASHBOARD_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'VISIT_PLAN_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW',
+      'COST_ANALYSIS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'PRESALES_VIEW', 'SALES_SUPPORT_VIEW',
+      'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'FINANCE_VIEW', 'TODO_VIEW',
+      'DOCUMENTS_VIEW', 'ARCHIVE_VIEW', 'CORPORATE_GOV_VIEW', 'BACKUP_VIEW',
+    ],
+    endpointDomains: ['backup'],
+    decisionRights: [
+      { decision: 'Sistem yedeği alma + doğrulama', via: 'endpoint:backup/jobs (+ /jobs/:id/verify)' },
+      { decision: 'Yedekten geri yükleme (diff analizi + onaylı)', via: 'endpoint:backup/restore (analyze→confirm)' },
+      { decision: 'Yedekleme zamanlaması (aralık/hedef)', via: 'endpoint:backup/settings' },
+    ],
+    tasks: [
+      { task: 'Belirli aralıkla yedek (zamanlayıcı) + arka planda doğrulama', raci: 'R', via: 'service:backupScheduler' },
+    ],
+    approvalIn: [],
+    reviewed: 'DONE',
+    notes: 'Yedek Yöneticisi — tüm akışa SALT-OKUNUR dahil (hiçbir modülde/veride mutasyon yapamaz; backend enforceReadOnlyRoles ile zorlanır). Yalnız /api/backup altında yazabilir (yedek/doğrula/restore/ayar).',
+  },
 ];
 
 export const MATRIX_ROLES = new Set(ROLE_MATRIX.map((r) => r.role));

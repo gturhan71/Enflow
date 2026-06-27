@@ -1,8 +1,67 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Building, X, ShieldCheck, Hash, Plus, Trash2, Save } from 'lucide-react';
+import { Building, X, ShieldCheck, Hash, Plus, Trash2, Save, DatabaseBackup, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Tenant } from '../../types';
+import { Tenant, BackupSettings } from '../../types';
 import { apiService } from '../../services/apiService';
+
+// Yedekleme zamanlaması — eşik değer Şirket Profili'nden girilir (detay: Yedekleme modülü).
+const BackupScheduleSettings: React.FC = () => {
+  const [s, setS] = useState<BackupSettings | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+  useEffect(() => { apiService.getBackupSettings().then(r => setS(r as BackupSettings)).catch(() => undefined); }, []);
+  if (!s) return null;
+  const upd = (p: Partial<BackupSettings>) => setS({ ...s, ...p });
+  const save = async () => {
+    setSaving(true); setSaved(false);
+    try {
+      const res = await apiService.updateBackupSettings({ enabled: s.enabled, intervalHours: s.intervalHours, scope: s.scope, kind: s.kind, targetType: s.targetType, location: s.location });
+      setS(res as BackupSettings); setSaved(true); setTimeout(() => setSaved(false), 2500);
+    } finally { setSaving(false); }
+  };
+  return (
+    <div className="bg-white border border-slate-100 rounded-[2rem] p-8 mt-8">
+      <div className="flex items-center gap-2 mb-1">
+        <DatabaseBackup size={18} className="text-indigo-500" />
+        <h3 className="text-lg font-black text-slate-900">Yedekleme Zamanlaması</h3>
+      </div>
+      <p className="text-xs text-slate-500 mb-5">Otomatik sistem yedeği aralığı (eşik değer). Hedef kimlik bilgileri ve manuel işlemler <b>Yedekleme</b> modülünde.</p>
+      <label className="flex items-center gap-2 text-sm text-slate-700 mb-4">
+        <input type="checkbox" checked={s.enabled} onChange={e => upd({ enabled: e.target.checked })} /> Otomatik yedeklemeyi etkinleştir
+      </label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aralık (saat)</label>
+          <input type="number" min={1} value={s.intervalHours} onChange={e => upd({ intervalHours: Number(e.target.value) })} className="w-full mt-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm" />
+        </div>
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kapsam</label>
+          <select value={s.scope} onChange={e => upd({ scope: e.target.value as BackupSettings['scope'] })} className="w-full mt-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm">
+            <option value="PLATFORM">Platform (tüm DB)</option><option value="TENANT">Yalnız kiracı</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tür</label>
+          <select value={s.kind} onChange={e => upd({ kind: e.target.value as BackupSettings['kind'] })} className="w-full mt-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm">
+            <option value="FULL">Tam</option><option value="STATE">State</option><option value="DATA">Veri</option>
+          </select>
+        </div>
+        <div>
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Hedef</label>
+          <select value={s.targetType} onChange={e => upd({ targetType: e.target.value as BackupSettings['targetType'] })} className="w-full mt-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm">
+            <option value="LOCAL">Yerel</option><option value="NEXTCLOUD">Nextcloud</option><option value="S3">S3</option>
+          </select>
+        </div>
+      </div>
+      <div className="flex items-center gap-3 mt-5">
+        <button onClick={save} disabled={saving} className="bg-slate-900 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all flex items-center gap-2">
+          {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Kaydet
+        </button>
+        {saved && <span className="text-xs text-emerald-600 flex items-center gap-1"><CheckCircle2 size={14} /> Kaydedildi</span>}
+      </div>
+    </div>
+  );
+};
 
 interface DocCodingProfile {
   companyCode: string;
@@ -305,6 +364,9 @@ export const TenantSettings = ({
 
     {/* Doküman Kodlama Notasyonu (Faz 3) */}
     <DocumentCodingSettings />
+
+    {/* Yedekleme Zamanlaması (eşik değer) */}
+    <BackupScheduleSettings />
     </div>
   );
 };

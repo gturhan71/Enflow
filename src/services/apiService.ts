@@ -203,6 +203,26 @@ class ApiService {
     return apiClient.fetchWithAuth('/presales/spec-extract', { method: 'POST', body: JSON.stringify(data) });
   }
 
+  // --- YEDEKLEME / GERİ YÜKLEME (Backup Admin) ---
+  async getBackupJobs() { return apiClient.fetchWithAuth('/backup/jobs'); }
+  async createBackupJob(data: { scope: string; kind: string; targetType: string; location?: string }) {
+    return apiClient.fetchWithAuth('/backup/jobs', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async getBackupJob(id: string) { return apiClient.fetchWithAuth(`/backup/jobs/${id}`); }
+  async verifyBackupJob(id: string) { return apiClient.fetchWithAuth(`/backup/jobs/${id}/verify`, { method: 'POST' }); }
+  async getBackupSettings() { return apiClient.fetchWithAuth('/backup/settings'); }
+  async updateBackupSettings(data: Record<string, unknown>) {
+    return apiClient.fetchWithAuth('/backup/settings', { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async analyzeRestore(backupId: string) {
+    return apiClient.fetchWithAuth('/backup/restore/analyze', { method: 'POST', body: JSON.stringify({ backupId }) });
+  }
+  async getRestoreJobs() { return apiClient.fetchWithAuth('/backup/restore'); }
+  async getRestoreJob(id: string) { return apiClient.fetchWithAuth(`/backup/restore/${id}`); }
+  async confirmRestore(id: string, mode: 'LOGICAL' | 'STATE') {
+    return apiClient.fetchWithAuth(`/backup/restore/${id}/confirm`, { method: 'POST', body: JSON.stringify({ mode }) });
+  }
+
   // --- PROCUREMENT ---
   async getVendors() { return apiClient.fetchWithAuth('/vendors'); }
   async createVendor(data: Record<string, unknown>) {

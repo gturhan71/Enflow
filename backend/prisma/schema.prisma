@@ -1147,3 +1147,49 @@ model CollectionInstallment {
   updatedAt     DateTime @updatedAt
   @@index([tenantId, opportunityId])
 }
+
+// ── Yedekleme / Geri Yükleme (faz_backup) ───────────────────────────────────
+// Backup Admin tarafından yönetilir; salt-okunur rol /api/backup'ta mutasyona izinli.
+model BackupJob {
+  id           String    @id @default(cuid())
+  tenantId     String
+  scope        String    @default("PLATFORM") // PLATFORM | TENANT
+  kind         String    @default("FULL")     // FULL | STATE | DATA
+  dbProvider   String    @default("SQLITE")   // SQLITE | POSTGRES
+  trigger      String    @default("MANUAL")   // MANUAL | SCHEDULED
+  targetType   String    @default("LOCAL")    // LOCAL | NEXTCLOUD | S3
+  location     String?                         // hedef dizin/uri
+  status       String    @default("PENDING")  // PENDING | RUNNING | COMPLETED | FAILED
+  sizeBytes    Int       @default(0)
+  checksum     String?                         // sha256 (data artefaktı)
+  stateRef     String?                         // state dosyası adı/yolu
+  dataRef      String?                         // logical data dosyası adı/yolu
+  modelCounts  String?                         // JSON: model -> satır sayısı
+  verifyStatus String    @default("PENDING")  // PENDING | PASSED | FAILED
+  verifyReport String?                         // JSON
+  verifiedAt   DateTime?
+  startedById  String?
+  startedByName String?
+  error        String?
+  startedAt    DateTime  @default(now())
+  completedAt  DateTime?
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+}
+
+model RestoreJob {
+  id                String    @id @default(cuid())
+  tenantId          String
+  backupId          String
+  mode              String    @default("LOGICAL") // LOGICAL | STATE
+  status            String    @default("ANALYZING") // ANALYZING | AWAITING_CONFIRM | RESTORING | COMPLETED | FAILED
+  diffReport        String?                          // JSON: model -> {added,removed,changed,samples}
+  preRestoreBackupId String?                         // güvenlik snapshot
+  startedById       String?
+  startedByName     String?
+  error             String?
+  startedAt         DateTime  @default(now())
+  completedAt       DateTime?
+  @@index([tenantId, status])
+  @@index([tenantId, backupId])
+}
