@@ -9,3 +9,7 @@ coverage/
 
 # Yedekleme artefaktları (commit edilmez)
 backend/backups/
+
+# Kurulum paketi çıktısı
+dist-installer/
+.env.local
