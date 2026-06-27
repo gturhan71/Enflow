@@ -29,6 +29,26 @@ const statusBadge = (s: string) => {
 };
 const targetIcon = (t: string) => t === 'NEXTCLOUD' ? <Cloud className="w-3.5 h-3.5" /> : t === 'S3' ? <Server className="w-3.5 h-3.5" /> : <HardDrive className="w-3.5 h-3.5" />;
 
+// Yetki header'lı indirme — tarayıcı navigasyonu x-tenant-id/Authorization gönderemez,
+// bu yüzden blob'u fetch ile çekip client-side indir.
+const downloadArtifact = async (id: string, artifact: 'data' | 'state') => {
+  const tid = localStorage.getItem('enflow_active_tenant_id') || '';
+  const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+  const res = await fetch(`/api/backup/jobs/${id}/download?artifact=${artifact}`, {
+    headers: { 'x-tenant-id': tid, Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) { alert('İndirme başarısız: ' + res.status); return; }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `backup-${id}-${artifact}.${artifact === 'state' ? 'db' : 'json'}`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
 const BackupModule = () => {
   const [tab, setTab] = useState<TabKey>('jobs');
   const [jobs, setJobs] = useState<BackupJob[]>([]);
@@ -163,7 +183,10 @@ const JobsTab = ({ jobs, form, setForm, busy, onRun, onVerify, onRestore }: {
                     {busy === 'verify-' + j.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                   </button>
                   {j.targetType === 'LOCAL' && j.dataRef && (
-                    <a href={`/api/backup/jobs/${j.id}/download?artifact=data`} title="Veri indir" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><Download className="w-4 h-4" /></a>
+                    <button onClick={() => downloadArtifact(j.id, 'data')} title="Veri indir (JSON)" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><Download className="w-4 h-4" /></button>
+                  )}
+                  {j.targetType === 'LOCAL' && j.stateRef && (
+                    <button onClick={() => downloadArtifact(j.id, 'state')} title="State indir (.db)" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><HardDrive className="w-4 h-4" /></button>
                   )}
                   <button onClick={() => onRestore(j.id)} disabled={busy === 'analyze-' + j.id || j.status !== 'COMPLETED' || !j.dataRef} title="Geri yükle (analiz)" className="p-1.5 rounded-lg hover:bg-slate-100 text-indigo-500 disabled:opacity-40">
                     {busy === 'analyze-' + j.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
