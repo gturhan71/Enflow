@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Bot, KeyRound, Power, PlayCircle, CheckCircle2, XCircle, AlertTriangle,
-  Sparkles, Clock, Hash, ShieldCheck, Zap, Lightbulb, Wand2, Copy, ArrowDownToLine,
+  Sparkles, Clock, Hash, ShieldCheck, Zap, Lightbulb,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
@@ -40,10 +40,7 @@ const VirtualAgentsTestModule = () => {
   const [notice, setNotice] = useState<string | null>(null);
 
   // license generation (satıcı/yönetici konsolu)
-  const [genPlugin, setGenPlugin] = useState<string>('');
-  const [genDays, setGenDays] = useState<string>('365');
-  const [genKey, setGenKey] = useState<string>('');
-  const [copied, setCopied] = useState(false);
+  // Lisans ÜRETİMİ kaldırıldı (vendor aracına taşındı) — burada yalnız aktivasyon var.
 
   // license activation
   const [licenseKey, setLicenseKey] = useState('');
@@ -77,36 +74,6 @@ const VirtualAgentsTestModule = () => {
 
   const flash = (msg: string) => { setNotice(msg); setTimeout(() => setNotice(null), 3500); };
 
-  const handleGenerate = async () => {
-    setError(null);
-    setGenKey('');
-    setCopied(false);
-    if (!genPlugin) { setError('Önce bir eklenti seçin.'); return; }
-    const days = genDays.trim() === '' ? 0 : parseInt(genDays, 10);
-    if (genDays.trim() !== '' && (Number.isNaN(days) || days < 0)) { setError('Geçersiz gün değeri.'); return; }
-    try {
-      const res = await apiService.generatePluginLicenseKey(genPlugin, days);
-      if (res?.ok && res.licenseKey) {
-        setGenKey(res.licenseKey);
-        flash('Lisans anahtarı üretildi.');
-      } else {
-        setError(res?.error || 'Anahtar üretilemedi.');
-      }
-    } catch {
-      setError('Anahtar üretilemedi.');
-    }
-  };
-
-  const handleCopyKey = async () => {
-    if (!genKey) return;
-    try { await navigator.clipboard.writeText(genKey); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch { /* ignore */ }
-  };
-
-  const handleUseKey = () => {
-    if (!genKey) return;
-    setLicenseKey(genKey);
-    flash('Anahtar aktivasyon alanına aktarıldı.');
-  };
 
   const handleActivate = async () => {
     setError(null);
@@ -234,53 +201,15 @@ const VirtualAgentsTestModule = () => {
       {/* ── CATALOG ─────────────────────────────────────────────── */}
       {tab === 'catalog' && (
         <div className="space-y-5">
-          {/* License generation — satıcı/yönetici konsolu (GM-only) */}
-          <div className="glass-card rounded-2xl p-4 border border-amber-200/60 bg-amber-50/30">
-            <div className="flex items-center justify-between gap-2 mb-3">
-              <div className="flex items-center gap-2">
-                <Wand2 size={16} className="text-amber-600" />
-                <h3 className="font-bold text-slate-900 text-sm">Lisans Anahtarı Üret</h3>
-              </div>
-              <span className="text-[9px] px-2 py-0.5 rounded bg-amber-100 text-amber-700 border border-amber-200 font-black uppercase tracking-widest">GM Only</span>
+          {/* Lisans üretimi kaldırıldı — vendor lisans aracına taşındı (güvenlik) */}
+          <div className="glass-card rounded-2xl p-4 border border-slate-200/60 bg-slate-50/40">
+            <div className="flex items-center gap-2 mb-1">
+              <ShieldCheck size={16} className="text-indigo-500" />
+              <h3 className="font-bold text-slate-900 text-sm">Lisans üretimi artık burada değil</h3>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2">
-              <select value={genPlugin} onChange={(e) => setGenPlugin(e.target.value)} className="input-glass text-sm sm:w-72">
-                <option value="">Eklenti seç…</option>
-                {items.map((i) => (
-                  <option key={i.plugin.key} value={i.plugin.key}>{i.plugin.name} ({i.plugin.key})</option>
-                ))}
-              </select>
-              <div className="relative sm:w-44">
-                <input
-                  type="number"
-                  min={0}
-                  value={genDays}
-                  onChange={(e) => setGenDays(e.target.value)}
-                  placeholder="Gün (boş=süresiz)"
-                  className="input-glass w-full text-sm pr-12"
-                />
-                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-bold">GÜN</span>
-              </div>
-              <button onClick={handleGenerate} className="btn-primary text-sm whitespace-nowrap flex items-center gap-1.5">
-                <Wand2 size={14} /> Üret
-              </button>
-            </div>
-            <p className="text-[11px] text-slate-400 mt-2">
-              İmzalı anahtar (HMAC). Gün boş bırakılırsa süresiz lisans. Üretilen anahtarı kopyalayıp müşteriye iletin veya aşağıdaki aktivasyona aktarın.
+            <p className="text-[12px] text-slate-500">
+              Güvenlik gereği lisanslar <b>vendor lisans aracıyla</b> (ayrı program, Ed25519 imza) üretilir; bu yazılım yalnız <b>doğrular/aktive eder</b>. Size verilen imzalı lisansı aşağıya girin.
             </p>
-            {genKey && (
-              <div className="mt-3 p-3 rounded-xl bg-slate-900 flex flex-col sm:flex-row sm:items-center gap-2">
-                <code className="flex-1 text-[12px] font-mono text-emerald-300 break-all">{genKey}</code>
-                <div className="flex gap-2 shrink-0">
-                  <button onClick={handleCopyKey} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-white/10 text-white hover:bg-white/20">
-                    {copied ? <><CheckCircle2 size={13} /> Kopyalandı</> : <><Copy size={13} /> Kopyala</>}
-                  </button>
-                  <button onClick={handleUseKey} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-primary text-white hover:opacity-90">
-                    <ArrowDownToLine size={13} /> Aktivasyona aktar
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
 
           {/* License activation */}

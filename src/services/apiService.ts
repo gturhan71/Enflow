@@ -562,9 +562,6 @@ class ApiService {
   // --- PLUGINS: Sanal Agent Eklentileri (Faz 8 — ticari sürüm dışı upsell) ---
   async getPluginCatalog() { return apiClient.fetchWithAuth('/plugins/catalog'); }
   async getPluginEntitlements() { return apiClient.fetchWithAuth('/plugins/entitlements'); }
-  async generatePluginLicenseKey(pluginKey: string, days?: number) {
-    return apiClient.fetchWithAuth('/plugins/generate-key', { method: 'POST', body: JSON.stringify({ pluginKey, days }) });
-  }
   async activatePluginLicense(licenseKey: string, activatedById?: string) {
     return apiClient.fetchWithAuth('/plugins/activate', { method: 'POST', body: JSON.stringify({ licenseKey, activatedById }) });
   }

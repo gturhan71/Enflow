@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { asyncHandler, tenantMiddleware } from '../middleware';
 import { PLUGIN_CATALOG } from '../services/pluginCatalog';
 import {
   listEntitlementsWithCatalog,
   activatePluginLicense,
   updateEntitlement,
-  generateLicenseKey,
 } from '../services/entitlementService';
 import { runAgent, ratifyAgentRun, hasHandler } from '../services/virtualAgentService';
 
@@ -23,27 +22,14 @@ router.get('/entitlements', tenantMiddleware, asyncHandler(async (req: Request, 
   res.json(data);
 }));
 
-// Lisans anahtarı ÜRET — yalnızca GM (satıcı/yönetici konsolu). İmzalı anahtar döner.
-router.post('/generate-key', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
-  const { pluginKey, days } = req.body as { pluginKey?: string; days?: number };
-  if (!pluginKey) {
-    res.status(400).json({ error: 'pluginKey gerekli' });
-    return;
-  }
-  const parsedDays = days != null && days !== 0 ? Number(days) : undefined;
-  if (parsedDays != null && (!Number.isFinite(parsedDays) || parsedDays < 0)) {
-    res.status(400).json({ error: 'Geçersiz gün değeri' });
-    return;
-  }
-  const result = generateLicenseKey(pluginKey, parsedDays);
-  if (!result.ok) {
-    res.status(400).json({ error: result.error });
-    return;
-  }
-  res.json({ ok: true, licenseKey: result.licenseKey, pluginKey, days: parsedDays ?? null });
+// Lisans ÜRETİMİ bu yazılımdan KALDIRILDI (güvenlik): lisanslar vendor'un ayrı
+// aracıyla (Ed25519 private key) üretilir; tenant yalnız doğrular/aktive eder.
+// Eski uç geriye-uyumluluk için 410 döner. Bkz. docs/LICENSING_ARCHITECTURE.md.
+router.post('/generate-key', tenantMiddleware, asyncHandler(async (_req: Request, res: Response) => {
+  res.status(410).json({ error: 'Lisans üretimi kaldırıldı. Lisanslar vendor lisans aracıyla üretilir; bu ekranda yalnız aktive edebilirsiniz.' });
 }));
 
-// Lisans aktivasyonu (anahtar ile)
+// Lisans aktivasyonu (imzalı bundle token ile — doğrula + yetkilendir)
 router.post('/activate', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { licenseKey, activatedById } = req.body as { licenseKey?: string; activatedById?: string };
   if (!licenseKey) {

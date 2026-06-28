@@ -1,36 +1,11 @@
-import crypto from 'crypto';
 import { prisma } from '../prismaClient';
 import { getPlugin, PLUGIN_CATALOG, type AgentMode } from './pluginCatalog';
+import { verifyLicenseToken } from './licenseVerify';
 
-// Lisans imzalama sırrı. Üretimde ortam değişkeninden gelir; aksi halde sabit
-// bir geliştirme sırrı kullanılır. İmza, anahtarın müşteri tarafından kolayca
-// taklit edilmesini engeller (upsell SKU'su olduğu için).
-const LICENSE_SECRET = process.env.PLUGIN_LICENSE_SECRET || 'enflow-plugin-license-secret-v1';
-
-/** pluginKey + gün için deterministik kısa imza (HMAC-SHA256 → 10 hex). */
-function signaturePart(pluginKey: string, days?: number): string {
-  return crypto
-    .createHmac('sha256', LICENSE_SECRET)
-    .update(`${pluginKey}:${days ?? 0}`)
-    .digest('hex')
-    .slice(0, 10)
-    .toUpperCase();
-}
-
-/**
- * İmzalı lisans anahtarı üretir (parseLicenseKey'in tersi).
- * Format: ENF-PLUGIN-<PLUGINKEY>[-D<gün>]-<İMZA>
- *   örn. ENF-PLUGIN-AGENT_TENDER-D365-3F9A2C7B10
- * Süresiz (perpetual) için gün atlanır: ENF-PLUGIN-AGENT_TENDER-<İMZA>
- */
-export function generateLicenseKey(pluginKey: string, days?: number): { ok: boolean; error?: string; licenseKey?: string } {
-  const plugin = getPlugin(pluginKey);
-  if (!plugin) return { ok: false, error: 'Bilinmeyen eklenti' };
-  const validDays = days && days > 0 ? Math.floor(days) : undefined;
-  const sig = signaturePart(plugin.key, validDays);
-  const daysPart = validDays ? `-D${validDays}` : '';
-  return { ok: true, licenseKey: `ENF-PLUGIN-${plugin.key}${daysPart}-${sig}` };
-}
+// NOT: Lisans ÜRETİMİ (imzalama) bu yazılımdan KALDIRILDI. Lisanslar vendor'un
+// ayrı aracı (Ed25519 private key) tarafından üretilir; burada yalnız PUBLIC key
+// ile DOĞRULANIR (licenseVerify.ts). Eski simetrik HMAC üretimi + PLUGIN_LICENSE_SECRET
+// güvenlik gereği silindi (tenant kendine lisans basamaz). Bkz. docs/LICENSING_ARCHITECTURE.md.
 
 // ── Eklenti Yetkilendirme Servisi (Entitlement) ──────────────────────────────
 // Çekirdek abonelikten bağımsız, eklenti-bazlı lisans kapısı.
@@ -70,48 +45,48 @@ export async function listEntitlementsWithCatalog(tenantId: string) {
 }
 
 /**
- * Lisans anahtarı aktivasyonu. Bu pilot sürümde anahtar formatı:
- *   ENF-PLUGIN-<PLUGINKEY>[-<gün>]   örn. ENF-PLUGIN-AGENT_TENDER-365
- * Gerçek dağıtımda imzalı anahtar/JWT ile değiştirilebilir; arayüz korunur.
- * Geçerliyse PluginEntitlement upsert eder (ACTIVE).
+ * Lisans aktivasyonu — yalnız DOĞRULAMA (Ed25519 imzalı, tenant-bağlı bundle token).
+ * Token: ENF1.<payload>.<sig>; payload.plugins[] içindeki tüm eklentileri tenant'a
+ * AKTİF yetkilendirir (PluginEntitlement upsert). İmza/binding/süre geçmezse reddeder.
+ * (Eski imzasız/HMAC ENF-PLUGIN-* anahtarları artık KABUL EDİLMEZ — sert kesim.)
  */
 export async function activatePluginLicense(
   tenantId: string,
   licenseKey: string,
   activatedById?: string,
-): Promise<{ ok: boolean; error?: string; pluginKey?: string }> {
-  const parsed = parseLicenseKey(licenseKey);
-  if (!parsed) return { ok: false, error: 'Geçersiz lisans anahtarı formatı' };
-  if (parsed.signed && !parsed.valid) return { ok: false, error: 'Lisans imzası doğrulanamadı' };
-  const plugin = getPlugin(parsed.pluginKey);
-  if (!plugin) return { ok: false, error: 'Bilinmeyen eklenti' };
+): Promise<{ ok: boolean; error?: string; pluginKeys?: string[] }> {
+  const res = verifyLicenseToken(licenseKey, tenantId);
+  if (!res.ok) {
+    const msg: Record<string, string> = {
+      BICIM_HATASI: 'Geçersiz lisans biçimi (ENF1 imzalı token bekleniyor).',
+      IMZA_GECERSIZ: 'Lisans imzası doğrulanamadı (geçersiz/kurcalanmış).',
+      TENANT_UYUSMAZ: 'Bu lisans başka bir kiracı için üretilmiş.',
+      SURESI_DOLMUS: 'Lisansın süresi dolmuş.',
+      COZUMLEME_HATASI: 'Lisans çözümlenemedi.',
+    };
+    return { ok: false, error: msg[res.reason] || 'Lisans doğrulanamadı.' };
+  }
 
-  const expiresAt =
-    parsed.days && parsed.days > 0
-      ? new Date(Date.now() + parsed.days * 24 * 60 * 60 * 1000)
-      : null;
+  const payload = res.payload;
+  const valid = (payload.plugins || []).map(getPlugin).filter((p): p is NonNullable<typeof p> => !!p);
+  if (valid.length === 0) return { ok: false, error: 'Lisansta tanınan eklenti yok.' };
 
-  await prisma.pluginEntitlement.upsert({
-    where: { tenantId_pluginKey: { tenantId, pluginKey: plugin.key } },
-    create: {
-      tenantId,
-      pluginKey: plugin.key,
-      status: 'ACTIVE',
-      licenseKey,
-      mode: plugin.defaultMode ?? 'ADVISORY',
-      activatedById: activatedById ?? null,
-      activatedAt: new Date(),
-      expiresAt,
-    },
-    update: {
-      status: 'ACTIVE',
-      licenseKey,
-      activatedById: activatedById ?? null,
-      activatedAt: new Date(),
-      expiresAt,
-    },
-  });
-  return { ok: true, pluginKey: plugin.key };
+  const expiresAt = payload.expiresAt ? new Date(payload.expiresAt) : null;
+  for (const plugin of valid) {
+    await prisma.pluginEntitlement.upsert({
+      where: { tenantId_pluginKey: { tenantId, pluginKey: plugin.key } },
+      create: {
+        tenantId, pluginKey: plugin.key, status: 'ACTIVE', licenseKey,
+        mode: plugin.defaultMode ?? 'ADVISORY',
+        activatedById: activatedById ?? null, activatedAt: new Date(), expiresAt,
+      },
+      update: {
+        status: 'ACTIVE', licenseKey,
+        activatedById: activatedById ?? null, activatedAt: new Date(), expiresAt,
+      },
+    });
+  }
+  return { ok: true, pluginKeys: valid.map(p => p.key) };
 }
 
 /** Eklenti modunu/yapılandırmasını güncelle (yalnız izinli modlar). */
@@ -142,31 +117,3 @@ export async function updateEntitlement(
   return { ok: true };
 }
 
-/**
- * Lisans anahtarını ayrıştırır. Hem yeni imzalı hem eski imzasız formatı destekler:
- *   ENF-PLUGIN-<PLUGINKEY>[-D<gün>]-<İMZA>   (yeni, imzalı)
- *   ENF-PLUGIN-<PLUGINKEY>[-<gün>]            (eski, imzasız — geriye uyumlu)
- * `signed` imzanın var olup olmadığını, `valid` imzanın doğrulanıp doğrulanmadığını belirtir.
- */
-function parseLicenseKey(
-  key: string,
-): { pluginKey: string; days?: number; signed: boolean; valid: boolean } | null {
-  const trimmed = (key || '').trim().toUpperCase();
-  const prefix = 'ENF-PLUGIN-';
-  if (!trimmed.startsWith(prefix)) return null;
-  const tokens = trimmed.slice(prefix.length).split('-');
-  const pluginKey = tokens[0];
-  if (!pluginKey || !/^[A-Z_]+$/.test(pluginKey)) return null;
-
-  let days: number | undefined;
-  let signature: string | undefined;
-  for (const t of tokens.slice(1)) {
-    if (/^D\d+$/.test(t)) days = parseInt(t.slice(1), 10);       // yeni gün gösterimi
-    else if (/^\d+$/.test(t)) days = parseInt(t, 10);            // eski (imzasız) gün
-    else signature = t;                                          // imza
-  }
-
-  const signed = !!signature;
-  const valid = signed ? signature === signaturePart(pluginKey, days) : true;
-  return { pluginKey, days, signed, valid };
-}

@@ -65,11 +65,19 @@ kendine sınırsız lisans basabilir; bir lisans her tenant'ta çalışır. Tica
 **Sonuç (`node license-poc/demo.mjs` → 6/6):** geçerli→KABUL · yanlış tenant→RED(binding) ·
 tamper→RED(imza) · sahte anahtar→RED(forge) · süresi dolmuş→RED.
 
-## 6. Sonraki adımlar (onayında)
+## 6. Durum & sonraki adımlar
 
-1. Vendor **ayrı private repo** iskeleti + GUI (issue formu) — PoC çekirdeğini sarar.
-2. Tenant tarafı verify-only entegrasyonu (Bölüm 4) — aşamalı, test edilerek.
-3. Mevcut müşterilere yeni imzalı lisansların yeniden düzenlenmesi (operasyonel).
+- [x] **PoC** (Ed25519, tenant-bağlı) — `license-poc/`, 6/6.
+- [x] **Vendor üreteç (GUI)** — `license-tool/` (yerel web GUI; ayrı özel repoya taşınacak).
+- [x] **Tenant verify-only — EKLENTİ/AGENT yolu (Faz 1):** `backend/src/config/licensePublicKey.ts`
+  (public key) + `licenseVerify.ts` (Ed25519+binding+süre) + `entitlementService` (HMAC üretimi
+  KALDIRILDI → bundle verify-only) + `/plugins/generate-key` **410** + frontend üretim UI kaldırıldı.
+  Doğrulama: yeni token→KABUL · yanlış tenant→RED · eski HMAC→RED · generate-key→410. tsc 0.
+- [ ] **Faz 2 — ABONELİK yolu:** `/tenants/activate-license` + `LicenseGeneratorModule` + `ProvisionWizard`
+  aynı Ed25519 doğrulayıcıya geçirilir; uygulama-içi abonelik üretimi kaldırılır.
+- [ ] **RBAC:** `rbac.config.ts`'te `/plugins/generate-key` beklentisi güncellenir (artık 410); `settings-license-generate` (abonelik üretimi) Faz 2'de kalkar. (RBAC süiti kullanıcı isteyince.)
+- [ ] **Üretim:** `licensePublicKey.ts` vendor'un gerçek public key'iyle değiştirilir; `PLUGIN_LICENSE_SECRET` env'den çıkarılır (artık kullanılmıyor).
+- [ ] Mevcut müşterilere yeni imzalı lisansların yeniden düzenlenmesi (operasyonel).
 
 ## Güvenlik notları
 - Private key **asla** tenant repo/dağıtımında olmaz; PoC'nin ürettiği `*.pem` **gitignore**.
