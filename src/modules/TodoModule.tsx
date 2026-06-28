@@ -32,6 +32,37 @@ import {
   Proposal,
   ApprovalChain
 } from '../types';
+
+// Modül-bazlı İŞLEVSEL görev kataloğu — atanan görevin ne yapacağı zorunlu seçilir
+// (örn. "Presales: BoM hazırla → Fırsat X"). GENERAL dışı modüllerde eylem zorunludur.
+const TASK_ACTIONS: Record<string, { key: string; label: string }[]> = {
+  OPPORTUNITY: [
+    { key: 'BOM_PREPARE', label: 'BoM (malzeme listesi) hazırla' },
+    { key: 'COST_ANALYSIS', label: 'Maliyet analizi yap' },
+    { key: 'SPEC_ANALYSIS', label: 'Şartname analizi yap' },
+    { key: 'PROPOSAL_PREPARE', label: 'Teklif hazırla' },
+    { key: 'NEGOTIATION', label: 'Pazarlık yürüt' },
+  ],
+  PROJECT: [
+    { key: 'MILESTONE_UPDATE', label: 'Milestone güncelle' },
+    { key: 'HANDOVER_DOCS', label: 'Devir paketi evrakı hazırla' },
+    { key: 'COST_ENTRY', label: 'Maliyet kalemi gir' },
+  ],
+  PROCUREMENT: [
+    { key: 'VENDOR_QUOTE', label: 'Tedarikçi teklifi al' },
+    { key: 'PO_ISSUE', label: 'Satınalma siparişi (PO) oluştur' },
+    { key: 'DELIVERY_RECORD', label: 'Teslimat kaydı gir' },
+  ],
+  CONTRACT: [
+    { key: 'DOC_PREPARE', label: 'Sözleşme evrakı hazırla' },
+    { key: 'SIGN_APPROVE', label: 'İmza onayına sun' },
+  ],
+  LEGAL: [
+    { key: 'CONTRACT_REVIEW', label: 'Sözleşme hukuki incelemesi' },
+    { key: 'CASE_OPEN', label: 'Hukuki dosya aç' },
+    { key: 'OPINION', label: 'Hukuki görüş hazırla' },
+  ],
+};
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import AgentTag from '../components/AgentTag';
@@ -115,19 +146,46 @@ const TodoModule = ({
     status: 'PENDING',
     relatedModule: 'GENERAL'
   });
+  const [taskAction, setTaskAction] = useState('');
+
+  // İlgili modülün seçilebilir kayıtları (fırsat/proje).
+  const itemsForModule = (mod?: string): { id: string; name: string }[] => {
+    if (mod === 'OPPORTUNITY') return (opportunities || []).map(o => ({ id: o.id, name: o.title }));
+    if (mod === 'PROJECT' || mod === 'PROCUREMENT') return (projects || []).map(p => ({ id: p.id, name: p.name }));
+    return [];
+  };
+  // İşlevsel görev başlığını eylem + ilgili kayıttan kompoze eder.
+  const composedTitle = (): string => {
+    const mod = newTask.relatedModule || 'GENERAL';
+    if (mod === 'GENERAL') return newTask.title || '';
+    const action = TASK_ACTIONS[mod]?.find(a => a.key === taskAction);
+    if (!action) return '';
+    const item = itemsForModule(mod).find(i => i.id === newTask.relatedItemId);
+    return item ? `${action.label} — ${item.name}` : action.label;
+  };
 
   const handleAddTask = async () => {
-    if (!newTask.title || !newTask.unitId) return alert('Lütfen zorunlu alanları doldurun.');
+    const mod = newTask.relatedModule || 'GENERAL';
+    if (!newTask.unitId) return alert('Lütfen bir birim seçin.');
+    let title = newTask.title;
+    if (mod !== 'GENERAL') {
+      if (!taskAction) return alert('İşlevsel görev tanımını seçin (örn. BoM hazırla).');
+      if (itemsForModule(mod).length > 0 && !newTask.relatedItemId) return alert('İlgili kaydı (fırsat/proje) seçin.');
+      title = composedTitle();
+    }
+    if (!title) return alert('Görev tanımı eksik.');
     setLoading(true);
     try {
       const task = await apiService.createTask({
         ...newTask,
+        title,
         assignedBy: currentUser?.id,
         createdAt: new Date().toISOString()
       });
       setTasks([task, ...tasks]);
       setShowNewTaskModal(false);
       setNewTask({ priority: 'MEDIUM', status: 'PENDING', relatedModule: 'GENERAL' });
+      setTaskAction('');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Görev atanamadı.');
     } finally {
@@ -826,22 +884,13 @@ const TodoModule = ({
                 </button>
               </div>
               <div className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Görev Başlığı</label>
-                  <input 
-                    type="text" 
-                    placeholder="Örn: Haftalık Satış Raporu"
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"
-                    onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                  />
-                </div>
                 <div className="grid grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">İlgili Modül</label>
-                    <select 
+                    <select
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none appearance-none"
                       value={newTask.relatedModule || 'GENERAL'}
-                      onChange={(e) => setNewTask({...newTask, relatedModule: e.target.value, relatedItemId: ''})}
+                      onChange={(e) => { setNewTask({...newTask, relatedModule: e.target.value, relatedItemId: ''}); setTaskAction(''); }}
                     >
                       <option value="GENERAL">Genel Görev</option>
                       <option value="PROJECT">Proje Yönetimi</option>
@@ -863,6 +912,56 @@ const TodoModule = ({
                     </select>
                   </div>
                 </div>
+
+                {/* İşlevsel görev tanımı — GENEL dışı modüllerde ZORUNLU */}
+                {(newTask.relatedModule && newTask.relatedModule !== 'GENERAL') ? (
+                  <>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">İşlevsel Görev *</label>
+                      <select
+                        className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none"
+                        value={taskAction}
+                        onChange={(e) => setTaskAction(e.target.value)}
+                      >
+                        <option value="">Seçiniz (örn. BoM hazırla)</option>
+                        {(TASK_ACTIONS[newTask.relatedModule] || []).map(a => (
+                          <option key={a.key} value={a.key}>{a.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {itemsForModule(newTask.relatedModule).length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">İlgili Kayıt *</label>
+                        <select
+                          className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none"
+                          value={newTask.relatedItemId || ''}
+                          onChange={(e) => setNewTask({...newTask, relatedItemId: e.target.value})}
+                        >
+                          <option value="">{newTask.relatedModule === 'OPPORTUNITY' ? 'Fırsat seçiniz' : 'Proje seçiniz'}</option>
+                          {itemsForModule(newTask.relatedModule).map(i => (
+                            <option key={i.id} value={i.id}>{i.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                    {composedTitle() && (
+                      <div className="text-[12px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-2xl px-5 py-3">
+                        Görev: {composedTitle()}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Görev Başlığı</label>
+                    <input
+                      type="text"
+                      placeholder="Örn: Haftalık Satış Raporu"
+                      value={newTask.title || ''}
+                      className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none focus:ring-4 focus:ring-indigo-500/10"
+                      onChange={(e) => setNewTask({...newTask, title: e.target.value})}
+                    />
+                  </div>
+                )}
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Kime (Kişi) — boş: birim yöneticisine</label>
                   <select
