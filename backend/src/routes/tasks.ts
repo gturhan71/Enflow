@@ -45,6 +45,20 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     }
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'TASK', entityId: task.id, details: { title: task.title, relatedModule: task.relatedModule } });
+
+  // Atanan kişiye bildirim (kendi oluşturduğu değilse). assignedToUserId, extension
+  // ile birim yöneticisine çözülmüş olabilir → güncel task'tan oku.
+  if (task.assignedToUserId && task.assignedToUserId !== req.userId) {
+    await prisma.notification.create({
+      data: {
+        tenantId: req.tenantId,
+        userId: task.assignedToUserId,
+        type: 'TASK',
+        title: 'Size yeni bir görev atandı',
+        message: task.title,
+      },
+    }).catch(() => {});
+  }
   res.json(task);
 }));
 

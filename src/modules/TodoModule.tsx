@@ -18,7 +18,8 @@ import {
   Bell,
   SendHorizonal,
   Landmark,
-  UserCircle
+  UserCircle,
+  ArrowUpRight
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -63,6 +64,24 @@ const TASK_ACTIONS: Record<string, { key: string; label: string }[]> = {
     { key: 'OPINION', label: 'Hukuki görüş hazırla' },
   ],
 };
+
+// İşlevsel eylem → o işin yapıldığı modül sekmesi (deep-link hedefi).
+const ACTION_TARGET: Record<string, string> = {
+  BOM_PREPARE: 'presales', SPEC_ANALYSIS: 'presales',
+  COST_ANALYSIS: 'crm-cost', PROPOSAL_PREPARE: 'crm-proposals', NEGOTIATION: 'crm-negotiation',
+  MILESTONE_UPDATE: 'project-mgmt', HANDOVER_DOCS: 'project-mgmt', COST_ENTRY: 'project-mgmt',
+  VENDOR_QUOTE: 'procurement', PO_ISSUE: 'procurement', DELIVERY_RECORD: 'procurement',
+  DOC_PREPARE: 'contract-workflow', SIGN_APPROVE: 'contract-workflow',
+  CONTRACT_REVIEW: 'contract-workflow', CASE_OPEN: 'contract-workflow', OPINION: 'contract-workflow',
+};
+// Eylem yoksa modüle göre kaba hedef.
+const MODULE_TARGET: Record<string, string> = {
+  OPPORTUNITY: 'crm-opportunities', PROJECT: 'project-mgmt', PROCUREMENT: 'procurement',
+  CONTRACT: 'contract-workflow', LEGAL: 'contract-workflow',
+};
+// Bir görevin gidilecek modül sekmesi (eylem önce, sonra modül).
+export const taskTargetTab = (t: { actionKey?: string | null; relatedModule?: string | null }): string | null =>
+  (t.actionKey ? ACTION_TARGET[t.actionKey] : undefined) || (t.relatedModule ? MODULE_TARGET[t.relatedModule] : undefined) || null;
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import AgentTag from '../components/AgentTag';
@@ -91,7 +110,8 @@ const TodoModule = ({
   units,
   users,
   proposals,
-  setProposals
+  setProposals,
+  onNavigate
 }: {
   tasks: TodoTask[],
   setTasks: React.Dispatch<React.SetStateAction<TodoTask[]>>,
@@ -101,7 +121,8 @@ const TodoModule = ({
   units?: Unit[],
   users?: User[],
   proposals?: Proposal[],
-  setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>
+  setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>,
+  onNavigate?: (tab: string) => void
 }) => {
   const { currentUser } = useAuth();
   const [filterUnit, setFilterUnit] = useState<string>('all');
@@ -179,6 +200,7 @@ const TodoModule = ({
       const task = await apiService.createTask({
         ...newTask,
         title,
+        actionKey: mod !== 'GENERAL' ? taskAction : undefined,
         assignedBy: currentUser?.id,
         createdAt: new Date().toISOString()
       });
@@ -616,6 +638,15 @@ const TodoModule = ({
                       {todo.status.replace('_', ' ')}
                     </span>
                   </div>
+                  {onNavigate && taskTargetTab(todo) && (
+                    <button
+                      onClick={() => onNavigate(taskTargetTab(todo)!)}
+                      title="İlgili modüldeki işe git"
+                      className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"
+                    >
+                      <ArrowUpRight size={15} /> Git
+                    </button>
+                  )}
                   <button
                     onClick={() => handleStatusChange(todo.id, todo.status === 'COMPLETED' ? 'PENDING' : 'COMPLETED')}
                     className={cn(

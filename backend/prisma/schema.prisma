@@ -385,6 +385,7 @@ model TodoTask {
   unitId        String
   assignedBy    String
   assignedToUserId String?  // kişi-bazlı atama (yoksa birim yöneticisine çözülür)
+  actionKey     String?  // işlevsel görev eylemi (BOM_PREPARE vb.) — modül ekranına deep-link
   priority      String   @default("MEDIUM")
   status        String   @default("PENDING")
   dueDate       DateTime?
