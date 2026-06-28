@@ -55,7 +55,9 @@ export type RoleName =
   | "operations_mgr"
   | "hr_mgr"
   | "auditor"
-  | "kgd_mgr";
+  | "kgd_mgr"
+  // Yedek Yöneticisi — tüm akışa SALT-OKUNUR dahil; yalnız /backup yazabilir:
+  | "backup_admin";
 
 export const ROLE_NAMES: RoleName[] = [
   "general_manager",
@@ -77,6 +79,7 @@ export const ROLE_NAMES: RoleName[] = [
   "hr_mgr",
   "auditor",
   "kgd_mgr",
+  "backup_admin",
 ];
 
 // 19 rolün tamamı gerçek DB kullanıcısı (2026-06-21: eksik roller için kalıcı
@@ -110,6 +113,7 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
   hr_mgr:          { email: "ik.muduru@enflow.com",           tenantId: "tenant-1" },
   auditor:         { email: "denetci@enflow.com",             tenantId: "tenant-1" },
   kgd_mgr:         { email: "kalite.muduru@enflow.com",       tenantId: "tenant-1" },
+  backup_admin:    { email: "backup@t-ecosystem.com",         tenantId: "tenant-1" },
 };
 
 // Başka tenant'tan kullanıcı — izolasyon testleri için
@@ -143,10 +147,11 @@ type Perm = "allow" | "deny";
 // Çoğu endpoint GM/özel-rol kapılı → yeni rollerin tümü deny; gate'siz GET'ler → tümü allow.
 // Akış-dışı 7 rol (admin/presales_mgr/technical_spec/operations_mgr/hr_mgr/auditor/kgd_mgr)
 // hiçbir requireRole gate'inde yok → ND/NCW=deny, NA(gate'siz GET)=allow.
-const ND = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny" } as const; // gate'li (GM/özel) → bu roller deny
-const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "allow", isab_mgr: "allow", admin: "allow", presales_mgr: "allow", technical_spec: "allow", operations_mgr: "allow", hr_mgr: "allow", auditor: "allow", kgd_mgr: "allow" } as const; // gate'siz (tenantMiddleware) → tümü allow
-// contract-workflows 7-rol gate: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL_MGR+FINANCE_MGR+IGPD_MGR
-const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny" } as const;
+// backup_admin: salt-okunur (enforceReadOnlyRoles) → tüm mutasyonlar deny; gate'siz GET allow.
+const ND = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const; // gate'li (GM/özel) → bu roller deny
+const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "allow", isab_mgr: "allow", admin: "allow", presales_mgr: "allow", technical_spec: "allow", operations_mgr: "allow", hr_mgr: "allow", auditor: "allow", kgd_mgr: "allow", backup_admin: "allow" } as const; // gate'siz GET (tenantMiddleware) → tümü allow
+// contract-workflows 7-rol gate: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL_MGR+FINANCE_MGR+IGPD_MGR (backup_admin yok → deny)
+const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
 
 export interface ApiCase {
   name: string;
@@ -220,7 +225,8 @@ export const apiMatrix: ApiCase[] = [
     name: "Birim listesi",
     method: "GET",
     path: "/api/units",
-    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "deny", ...ND },
+    // backup_admin units GET kapısına eklendi (salt-okunur akış dahli) → allow
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "deny", ...ND, backup_admin: "allow" },
   },
   {
     name: "Birim oluştur",
@@ -259,6 +265,14 @@ export const apiMatrix: ApiCase[] = [
     method: "GET",
     path: "/api/archive",
     expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
+  },
+
+  // --- Yedekleme (BACKUP_ADMIN + GM kapısı) ---
+  {
+    name: "Yedek listesi (backup gate)",
+    method: "GET",
+    path: "/api/backup/jobs",
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, backup_admin: "allow" },
   },
 ];
 
@@ -317,11 +331,13 @@ export interface UiCase {
 }
 
 // UI görünürlük — yeni roller (seed izinleri = matris modülleri; sales_mgr/support gerçek DB izinleri).
-const UH = { sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden" } as const;
-// Presales üst menü: PRESALES_VIEW veya COST_ANALYSIS_VIEW → sales_mgr + presales_mgr + technical_spec
-const UPRES = { ...UH, sales_mgr: "visible", presales_mgr: "visible", technical_spec: "visible" } as const;
-// CRM üst menü: CRM_VIEW → sales_mgr + igpd_mgr + presales_mgr
-const UCRM = { ...UH, sales_mgr: "visible", igpd_mgr: "visible", presales_mgr: "visible" } as const;
+// backup_admin tüm *_VIEW izinlerine sahip (salt-okunur) → menüler GÖRÜNÜR; ama Test
+// Ortamı (GM-only) ve Ayarlar (SETTINGS_VIEW yok) gizli. UH'te hidden; aşağıda override.
+const UH = { sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden" } as const;
+// Presales üst menü: PRESALES_VIEW veya COST_ANALYSIS_VIEW → sales_mgr + presales_mgr + technical_spec + backup_admin
+const UPRES = { ...UH, sales_mgr: "visible", presales_mgr: "visible", technical_spec: "visible", backup_admin: "visible" } as const;
+// CRM üst menü: CRM_VIEW → sales_mgr + igpd_mgr + presales_mgr + backup_admin
+const UCRM = { ...UH, sales_mgr: "visible", igpd_mgr: "visible", presales_mgr: "visible", backup_admin: "visible" } as const;
 
 export const uiMatrix: UiCase[] = [
   {
