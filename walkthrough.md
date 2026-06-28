@@ -1339,7 +1339,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 > 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
 >
-> Ölçek (2026-06-20): **51 veri modeli · 29 ekran modülü · 29 API alanı · 11 servis · 8 sanal agent · 7 katman.** (Faz 0–9 tamam; birimler-arası geçiş zinciri otomatik.)
+> Ölçek (2026-06-27): **56 veri modeli · 30+ ekran modülü · 34 API alanı · 24 servis · 8 sanal agent · 20 rol · 7 katman.** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi.)
 
 ### 27.1 Enflow nedir? (tek paragraf)
 
@@ -1377,7 +1377,7 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
 
 Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGPD→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller).
 
-> ⚙️ **Not (akış olgunluğu):** Bazı birimler-arası geçişler bugün **manuel/yarı-otomatik**tir (örn. Sözleşme→Proje kaydı, Satınalma faturası→Finans, İhale→Sözleşme, Proje→Satınalma maliyet bağı). Bunlar tasarımda var; otomatik akış halkaları geliştirme yol haritasındadır (bkz. `CLAUDE.md` Sonraki Adımlar).
+> ⚙️ **Not (akış olgunluğu):** Birimler-arası geçiş halkaları **otomatik**tir (Faz 9): İhale WON→Sözleşme (T3) · Sözleşme SIGNED→Proje (T4) · Proje→Satınalma maliyet kalemi (T5) · Satınalma faturası→Finans (T6) · WON Fırsat→Proje (T1). Para tutarları kuruş hassasiyetinde yuvarlanır (`financeEngine`); döviz toplamları daima ayrı (sessiz tek-toplam yok).
 
 ### 27.3 Katmanlı bileşen haritası
 
@@ -1388,8 +1388,9 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter · LegalCase → ilgili modüller → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
-| **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`) → `/plugins` |
-| **6 · Entegrasyon & Admin** | IntegrationWizard, SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
+| **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/tenants/ai-settings` |
+| **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
+| **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt) → `/tenants/governance-settings`, `/finance/calc` |
 
 ### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"
 
@@ -1403,12 +1404,37 @@ Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:
 
 ### 27.5 Roller & birimler
 
-GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma). İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
+GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
 
-### 27.6 Wiki kılavuzluk notu
+> **Görev Ayrılığı (SoD):** Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. **Onay matrisi (DoA):** tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). **Optimistic locking:** eşzamanlı onay/red yarışı 409 ile engellenir.
 
-Yapılacak statik **enflow-wiki** how-to sayfası bu bölümü kaynak alacak: (a) 27.1–27.2 → "Enflow nedir / iş nasıl akar" giriş sayfası; (b) 27.3 → bileşen referansı; (c) 27.4 → "birimler nasıl bağlanır" teknik how-to; (d) her domain modülü için bu belgenin ilgili bölümleri (§1–§26) adım-adım kullanım kılavuzu olur. Hedef: **yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.**
+### 27.6 Modül kılavuzu (özet)
+
+Sidebar'daki her modül: ne yapar, kim kullanır.
+
+| Modül | Ne yapar | Kim |
+|---|---|---|
+| Dashboard | Role göre kişisel kokpit: KPI, zamana-duyarlı işler, bekleyen onaylar | Herkes |
+| Ziyaret Planı | Haftalık ziyaret + günlük rapor; plan↔gerçekleşen mutabakatı | Satış / Saha |
+| CRM | Müşteri & fırsat, teklif, pazarlık; Maliyet Analizi (forward-kur + marj, müdür onayı) | Satış |
+| Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) → Satışa devir | Presales / Teknik |
+| Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İSAB |
+| Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir | KSU + Yönetim |
+| Satın Alma | BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura) | Satın Alma |
+| Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık; 11 zorunlu devir evrakı | Proje |
+| Finans | Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi | Finans |
+| Görevler & Takip | Birimler-arası görev havuzu + "Bekleyen Onaylarım"; iş-günü SLA | Tüm birimler |
+| Yönetim Raporları | Birim metrik + darboğaz + dönem raporu (escalation) + yazdırma | GM + Müdürler |
+| Genel Hususlar | Dersler/risk/KPI/dış doküman + doküman kodlama | Kalite / Yönetim |
+| Şirket Evrakları | Kurumsal doküman envanteri (geçerlilik tarihli) | İdari |
+| Fiziksel Arşiv | Kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik | İdari |
+| Yedekleme | Sistem yedeği (LOCAL/Nextcloud/S3) → doğrulama → fark-analizli restore → zamanlama | Backup Admin |
+| Şirket Ayarları | Birim/kullanıcı, RBAC, YZ & entegrasyonlar, abonelik, lisans, sanal-agent | ADMIN / GM |
+
+### 27.7 Wiki kılavuzluk notu
+
+Statik **enflow-wiki** (`wiki/index.html`) bu bölümden **otomatik üretilir** (`node wiki/build.mjs`). Akış değişince **önce §27 güncellenir, sonra generator yeniden çalıştırılır** — tek doğruluk kaynağı §27'dir. Hedef: **yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.**
 
 ---
 
-*Bu belge Enflow v2026-06-19 sürümüne aittir. Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = gelecek enflow-wiki kaynağı.*
+*Bu belge Enflow v2026-06-27 sürümüne aittir. Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = enflow-wiki kaynağı; statik wiki `wiki/index.html` bu bölümden üretilir.*

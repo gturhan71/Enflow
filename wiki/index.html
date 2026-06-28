@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enflow Wiki — Uçtan Uca Kılavuz</title>
+<meta name="description" content="Enflow süreç yönetim platformunu hiç bilmeyen birine baştan sona anlatan statik kılavuz." />
+<style>
+  :root{--bg:#0b1220;--panel:#111a2b;--card:#0f1828;--line:#1e2c44;--txt:#e6edf6;--muted:#9fb0c7;
+    --primary:#16a34a;--primary-2:#22c55e;--accent:#38bdf8;--amber:#f59e0b;--chip:#16233a;--radius:14px;--maxw:1180px;}
+  *{box-sizing:border-box} html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,#0b1220,#0c1424);color:var(--txt);
+    font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,sans-serif;}
+  a{color:var(--accent);text-decoration:none} a:hover{text-decoration:underline}
+  code{background:#0c1626;border:1px solid var(--line);border-radius:6px;padding:.1em .4em;font-size:.85em;color:#cbd5e1}
+  .wrap{display:grid;grid-template-columns:280px 1fr;max-width:var(--maxw);margin:0 auto}
+  aside{position:sticky;top:0;height:100vh;overflow:auto;padding:26px 18px;border-right:1px solid var(--line);background:#0a111e}
+  .brand{display:flex;align-items:center;gap:10px} .logo{width:38px;height:38px;border-radius:11px;
+    background:linear-gradient(135deg,var(--primary),var(--primary-2));display:grid;place-items:center;font-weight:800;color:#04210f;font-size:20px}
+  .brand b{font-size:18px} .brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:2px;text-transform:uppercase}
+  .toc{margin-top:18px;font-size:13.5px} .toc a{display:block;color:var(--muted);padding:6px 10px;border-radius:8px;border-left:2px solid transparent}
+  .toc a:hover{background:#0e1828;color:var(--txt);text-decoration:none}
+  .toc a.active{color:#fff;background:#0e1f17;border-left-color:var(--primary-2)}
+  main{padding:42px 46px 120px;min-width:0}
+  .hero{background:radial-gradient(900px 300px at 0% -10%,rgba(34,197,94,.18),transparent),var(--panel);
+    border:1px solid var(--line);border-radius:var(--radius);padding:34px 32px;margin-bottom:34px}
+  .hero h1{margin:.1em 0 .3em;font-size:30px;line-height:1.15}
+  .hero p{color:var(--muted);max-width:74ch}
+  .pill{display:inline-block;background:var(--chip);border:1px solid var(--line);color:var(--muted);
+    font-size:12px;border-radius:999px;padding:4px 11px;margin:6px 6px 0 0} .pill b{color:var(--primary-2)}
+  section{scroll-margin-top:18px;margin:0 0 38px}
+  h2{font-size:22px;margin:0 0 10px} h2 .n{color:var(--primary-2);font-weight:700;margin-right:10px}
+  p{max-width:80ch} h2 + p{color:var(--muted)}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:13.5px;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{background:#0c1626;color:#bcd;font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.4px}
+  tr:last-child td{border-bottom:none}
+  ul{margin:10px 0;padding-left:20px} li{margin:4px 0;color:#d6e2f0}
+  pre.code{background:#0a1422;border:1px solid var(--line);border-left:3px solid var(--primary-2);border-radius:10px;
+    padding:14px 16px;overflow:auto;font-size:12.5px;line-height:1.5;color:#bcd}
+  .note{background:#0e1a16;border:1px solid #1d3a28;border-left:3px solid var(--primary-2);border-radius:10px;
+    padding:13px 16px;margin:14px 0;color:#cfe9da;font-size:14px}
+  .note.amber{background:#1c160a;border-color:#473410;border-left-color:var(--amber);color:#f5e6c8}
+  footer{color:#5b6c83;font-size:12.5px;border-top:1px solid var(--line);padding-top:18px;margin-top:30px}
+  @media(max-width:880px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}main{padding:28px 20px 80px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <div class="brand"><div class="logo">⚡</div><div><b>Enflow</b><small>Wiki · Kılavuz</small></div></div>
+    <nav class="toc" id="toc">
+      <a href="#s27-1">Enflow nedir? (tek paragraf)</a>
+      <a href="#s27-2">Uçtan uca akış — bir işin yolculuğu (newcomer anlatımı)</a>
+      <a href="#s27-3">Katmanlı bileşen haritası</a>
+      <a href="#s27-4">Akış motoru — birimler birbiriyle nasıl "konuşur"</a>
+      <a href="#s27-5">Roller &amp; birimler</a>
+      <a href="#s27-6">Modül kılavuzu (özet)</a>
+      <a href="#s27-7">Wiki kılavuzluk notu</a>
+    </nav>
+  </aside>
+  <main>
+    <div class="hero">
+      <h1>Enflow — uçtan uca süreç yönetimi</h1>
+      <p>Bir işin müşteri ilgisinden (fırsat) başlayıp teklif → sözleşme → proje → satınalma → faturalamaya kadar tüm yolculuğunu tek platformda yöneten, çok-kiracılı kurumsal yazılım. Bu sayfa yazılımı <b>hiç bilmeyen</b> birine baştan sona anlatır.</p>
+      <div><span class="pill"><b>56</b> veri modeli</span><span class="pill"><b>30+</b> ekran modülü</span><span class="pill"><b>34</b> API alanı</span><span class="pill"><b>24</b> servis</span><span class="pill"><b>8</b> sanal agent</span><span class="pill"><b>20</b> rol</span><span class="pill"><b>7</b> katman</span></div>
+    </div>
+
+    <section id="s27-1">
+  <h2><span class="n">1</span>Enflow nedir? (tek paragraf)</h2>
+  <p>Enflow, bir işin <b>müşteri ilgisinden</b> (fırsat) başlayıp <b>teklif → sözleşme → proje → satınalma → faturalama</b>ya kadar tüm yolculuğunu tek platformda yöneten, <b>çok-kiracılı (multi-tenant)</b> bir kurumsal <b>süreç yönetim yazılımıdır</b>. Her aşama bir <b>birime</b> (Satış, Presales, İhale, Hukuk, Proje, Satınalma, Finans…) aittir. İşler birimler arasında <b>görevler</b>, <b>onay zincirleri</b> ve <b>hand-off (devir)</b> mekanizmasıyla akar; her adım kayıt altına alınır (log/bildirim).</p>
+</section>
+
+<section id="s27-2">
+  <h2><span class="n">2</span>Uçtan uca akış — bir işin yolculuğu (newcomer anlatımı)</h2>
+  <pre class="code">[Saha/Ziyaret]    Müşteri ziyaret planlanır, günlük rapor girilir
+     │
+     ▼
+[CRM]             Fırsat açılır (müşteri + tahmini değer). Kazanılır/kaybedilir.
+     │
+     ▼
+[Presales]        Fırsata BoM (malzeme listesi) + maliyet/marj hazırlanır → Teklif
+     │            (Şartname varsa SpecAnalysis ile AI analizi)
+     ▼
+[Teklif/Müzakere] Teklif versiyonlanır, onaya gönderilir (Onay Zinciri devreye girer),
+     │            müşteriyle pazarlık turları yürütülür
+     ▼
+[İhale/İSAB]      (Kamu işi ise) İhale dosyası + uygunluk checklist + geçici teminat
+     │
+     ▼
+[Sözleşme]        ContractWorkflow: evrak hazırlık → imza onayı → SIGNED
+     │            (Birim yöneticisi onayı; AI ile sözleşme/şartname analizi)
+     ▼
+[Proje Yönetimi]  Kazanılan iş projeye döner: milestone'lar, maliyet, karlılık,
+     │            11 zorunlu evrakla "Devir Paketi"
+     ▼
+[Satınalma]       Talep → tedarikçi teklifi → PO → teslimat → fatura (9 statü)
+     │
+     ▼
+[Finans]          Faturalama, tahsilat (kısmi), teminat mektupları, maliyet onayı</pre>
+<p>Bu hattın <b>üstünde</b> çalışan kesişen bileşenler: <b>Onay Swimlane</b> (Finans→İGPD→GM→KSU), <b>Hukuk</b> (vaka takibi), <b>Genel Hususlar</b> (risk/ders/KPI), <b>Yönetim Raporları</b> (birim metrikleri), <b>Sanal Agentlar</b> (boş birim koltuğunu dolduran vekiller).</p>
+<div class="note amber">⚙️ <b>Not (akış olgunluğu):</b> Birimler-arası geçiş halkaları <b>otomatik</b>tir (Faz 9): İhale WON→Sözleşme (T3) · Sözleşme SIGNED→Proje (T4) · Proje→Satınalma maliyet kalemi (T5) · Satınalma faturası→Finans (T6) · WON Fırsat→Proje (T1). Para tutarları kuruş hassasiyetinde yuvarlanır (<code>financeEngine</code>); döviz toplamları daima ayrı (sessiz tek-toplam yok).</div>
+</section>
+
+<section id="s27-3">
+  <h2><span class="n">3</span>Katmanlı bileşen haritası</h2>
+  <table><thead><tr><th>Katman</th><th>Bileşenler (model → modül → API)</th></tr></thead><tbody><tr><td><b>0 · Platform/SaaS</b></td><td>Tenant, Subscription, UsageMetric → SubscriptionModule / LicenseTypes / LicenseGenerator / ProvisionWizard → <code>/tenants</code></td></tr><tr><td><b>1 · Kimlik &amp; Yetki (RBAC)</b></td><td>User, Unit → UserManagement / UnitManagement / PermissionSettings → <code>/auth</code>, <code>/users</code>, <code>/units</code></td></tr><tr><td><b>2 · Akış motoru</b></td><td>Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + <code>workflowService</code> → <code>/workflows</code>, <code>/tasks</code>, <code>/approval-chains</code>, <code>/notifications</code></td></tr><tr><td><b>3 · Domain birimleri</b></td><td>VisitPlan/Visit/DailyReport · Customer/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter · LegalCase → ilgili modüller → <code>/visits</code>,<code>/customers</code>,<code>/opportunities</code>,<code>/proposals</code>,<code>/tenders</code>,<code>/contracts</code>,<code>/contract-workflows</code>,<code>/projects</code>,<code>/purchase-requests</code>,<code>/vendors</code>,<code>/finance</code>,<code>/legal</code></td></tr><tr><td><b>4 · Yönetişim &amp; Belge</b></td><td>DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → <code>/document-coding</code>,<code>/corporate-governance</code>,<code>/documents</code>,<code>/archive</code>,<code>/reports</code></td></tr><tr><td><b>5 · YZ / Sanal Agent</b></td><td>PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, <code>aiClient</code>; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → <code>/plugins</code>, <code>/presales/spec-extract</code>, <code>/tenants/ai-settings</code></td></tr><tr><td><b>6 · Entegrasyon &amp; Admin</b></td><td>IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → <code>/sync</code>, <code>/admin/security-test</code></td></tr><tr><td><b>7 · Yedekleme &amp; Yönetişim</b></td><td>BackupJob, RestoreJob → BackupModule + <b>Backup Admin</b> (salt-okunur rol) → <code>backupService</code>/<code>backupVerifyService</code>/<code>restoreService</code>/<code>backupScheduler</code> (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → <code>/backup</code>. <b>Yönetişim:</b> <code>governance</code> (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), <code>financeEngine</code> (kuruş tabanlı net/KDV/brüt) → <code>/tenants/governance-settings</code>, <code>/finance/calc</code></td></tr></tbody></table>
+</section>
+
+<section id="s27-4">
+  <h2><span class="n">4</span>Akış motoru — birimler birbiriyle nasıl "konuşur"</h2>
+  <p>Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:</p>
+<ul><li><b>İş Akışı Şablonu (Workflow/WorkflowStep):</b> Tenant'ın aktif birimlerinden türeyen kanonik sıra; bir birim çıkarılınca iş otomatik bir sonraki <b>aktif</b> birime yönlenir (skip-logic, deadlock olmaz).</li><li><b>Görevler (TodoTask):</b> Birimler-arası iş, görev olarak atanır. <code>relatedModule</code> etiketi işin hangi modüle ait olduğunu söyler: <b>OPPORTUNITY · PROPOSAL · CONTRACT · PROJECT · PROCUREMENT · DELIVERY · LEGAL · GENERAL</b>. İş günü SLA ile termin otomatik hesaplanır.</li><li><b>Hand-off / Devir (<code>workflowService.triggerHandOff</code>):</b> Bir birim işini bitirince sonraki birime devreder → e-posta + bildirim + log üretilir.</li><li><b>Onay Zinciri (ApprovalChain/Stage):</b> Çok-aşamalı onay (Finans→İGPD→GM→KSU). "Bekleyen Onaylarım" sekmesi role göre sırası gelmiş onayları gösterir; aktif kullanıcısı olmayan rol otomatik atlanır (orphan-skip).</li><li><b>Bildirim &amp; Log (Notification / ActivityLog):</b> Kullanıcı bildirimleri + değişiklik/denetim izi (provenance: <code>AGENT:&lt;key&gt;</code> ile agent kökeni dahil).</li></ul>
+</section>
+
+<section id="s27-5">
+  <h2><span class="n">5</span>Roller &amp; birimler</h2>
+  <p>GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme &amp; Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat &amp; Sözleşme), ISAB_MGR (İhale Satın Alma) + <b>BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)</b>. Toplam <b>20 rol</b>. İzinler kullanıcının <code>permissions</code> JSON'undan gelir; GM her şeyi görür.</p>
+<div class="note"><b>Görev Ayrılığı (SoD):</b> Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. <b>Onay matrisi (DoA):</b> tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). <b>Optimistic locking:</b> eşzamanlı onay/red yarışı 409 ile engellenir.</div>
+</section>
+
+<section id="s27-6">
+  <h2><span class="n">6</span>Modül kılavuzu (özet)</h2>
+  <p>Sidebar'daki her modül: ne yapar, kim kullanır.</p>
+<table><thead><tr><th>Modül</th><th>Ne yapar</th><th>Kim</th></tr></thead><tbody><tr><td>Dashboard</td><td>Role göre kişisel kokpit: KPI, zamana-duyarlı işler, bekleyen onaylar</td><td>Herkes</td></tr><tr><td>Ziyaret Planı</td><td>Haftalık ziyaret + günlük rapor; plan↔gerçekleşen mutabakatı</td><td>Satış / Saha</td></tr><tr><td>CRM</td><td>Müşteri &amp; fırsat, teklif, pazarlık; Maliyet Analizi (forward-kur + marj, müdür onayı)</td><td>Satış</td></tr><tr><td>Presales &amp; Dizayn</td><td>BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) → Satışa devir</td><td>Presales / Teknik</td></tr><tr><td>Satış Destek (İhale)</td><td>Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma</td><td>Satış Destek / İSAB</td></tr><tr><td>Sözleşme Yönetimi</td><td>Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir</td><td>KSU + Yönetim</td></tr><tr><td>Satın Alma</td><td>BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura)</td><td>Satın Alma</td></tr><tr><td>Proje Yönetimi</td><td>Otomatik proje + milestone şablonu; karlılık; 11 zorunlu devir evrakı</td><td>Proje</td></tr><tr><td>Finans</td><td>Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi</td><td>Finans</td></tr><tr><td>Görevler &amp; Takip</td><td>Birimler-arası görev havuzu + "Bekleyen Onaylarım"; iş-günü SLA</td><td>Tüm birimler</td></tr><tr><td>Yönetim Raporları</td><td>Birim metrik + darboğaz + dönem raporu (escalation) + yazdırma</td><td>GM + Müdürler</td></tr><tr><td>Genel Hususlar</td><td>Dersler/risk/KPI/dış doküman + doküman kodlama</td><td>Kalite / Yönetim</td></tr><tr><td>Şirket Evrakları</td><td>Kurumsal doküman envanteri (geçerlilik tarihli)</td><td>İdari</td></tr><tr><td>Fiziksel Arşiv</td><td>Kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik</td><td>İdari</td></tr><tr><td>Yedekleme</td><td>Sistem yedeği (LOCAL/Nextcloud/S3) → doğrulama → fark-analizli restore → zamanlama</td><td>Backup Admin</td></tr><tr><td>Şirket Ayarları</td><td>Birim/kullanıcı, RBAC, YZ &amp; entegrasyonlar, abonelik, lisans, sanal-agent</td><td>ADMIN / GM</td></tr></tbody></table>
+</section>
+
+<section id="s27-7">
+  <h2><span class="n">7</span>Wiki kılavuzluk notu</h2>
+  <p>Statik <b>enflow-wiki</b> (<code>wiki/index.html</code>) bu bölümden <b>otomatik üretilir</b> (<code>node wiki/build.mjs</code>). Akış değişince <b>önce §27 güncellenir, sonra generator yeniden çalıştırılır</b> — tek doğruluk kaynağı §27'dir. Hedef: <b>yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.</b></p>
+</section>
+
+    <footer>Enflow Wiki · kaynağı <code>walkthrough.md §27</code> (tek doğruluk kaynağı) · <code>node wiki/build.mjs</code> ile üretildi · 2026-06-28.</footer>
+  </main>
+</div>
+<script>
+  const links=[...document.querySelectorAll('.toc a')];
+  const map=new Map(links.map(a=>[a.getAttribute('href').slice(1),a]));
+  const obs=new IntersectionObserver(es=>es.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=map.get(e.target.id);if(a)a.classList.add('active');}}),{rootMargin:'-20% 0px -70% 0px'});
+  document.querySelectorAll('section[id]').forEach(s=>obs.observe(s));
+</script>
+</body>
+</html>
