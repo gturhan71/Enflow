@@ -17,3 +17,5 @@ dist-installer/
 # Lisans anahtarları — ASLA commit edilmez
 *.pem
 license-poc/*.pem
+
+license-tool/keys/

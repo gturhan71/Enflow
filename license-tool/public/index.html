@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enflow Lisans Üreteci (Vendor)</title>
+<style>
+  :root{--bg:#0b1220;--panel:#111a2b;--card:#0f1828;--line:#1e2c44;--txt:#e6edf6;--muted:#9fb0c7;--primary:#16a34a;--primary-2:#22c55e;--amber:#f59e0b;--red:#ef4444}
+  *{box-sizing:border-box} body{margin:0;background:linear-gradient(180deg,#0b1220,#0c1424);color:var(--txt);font:15px/1.6 -apple-system,Segoe UI,Roboto,Inter,sans-serif}
+  .wrap{max-width:780px;margin:0 auto;padding:34px 22px 80px}
+  h1{font-size:24px;margin:.2em 0} .sub{color:var(--muted);margin:0 0 8px}
+  .warn{background:#1c160a;border:1px solid #473410;border-left:3px solid var(--amber);border-radius:10px;padding:11px 14px;color:#f5e6c8;font-size:13.5px;margin:14px 0}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px;margin:16px 0}
+  .card h2{font-size:15px;margin:0 0 12px;color:#dbe7f5}
+  label{display:block;font-size:12px;color:var(--muted);margin:10px 0 4px;font-weight:600}
+  input,select{width:100%;background:#0c1626;border:1px solid var(--line);border-radius:9px;color:var(--txt);padding:9px 11px;font-size:14px;outline:none}
+  input:focus,select:focus{border-color:var(--primary-2)}
+  .row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .plugins{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-top:6px}
+  .plugins label{display:flex;align-items:center;gap:7px;margin:0;color:#cdd9e8;font-weight:500;font-size:13px;cursor:pointer}
+  .plugins input{width:auto}
+  button{background:var(--primary);border:none;color:#04210f;font-weight:700;border-radius:10px;padding:10px 18px;cursor:pointer;font-size:14px}
+  button:hover{background:var(--primary-2)} button.ghost{background:#13233a;color:var(--txt);border:1px solid var(--line)}
+  .status{font-size:13px;margin:8px 0}
+  .ok{color:var(--primary-2)} .err{color:var(--red)}
+  textarea{width:100%;min-height:90px;background:#0a1422;border:1px solid var(--line);border-radius:10px;color:#bcd;padding:12px;font:12.5px/1.5 ui-monospace,Menlo,monospace;resize:vertical}
+  .muted{color:var(--muted);font-size:12.5px} code{background:#0c1626;border:1px solid var(--line);border-radius:5px;padding:.1em .4em;font-size:.85em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⚿ Enflow Lisans Üreteci</h1>
+  <p class="sub">Vendor aracı — tenant'a özel <b>imzalı lisans</b> üretir. Tenant yalnız doğrular.</p>
+  <div class="warn">⚠️ Bu araç <b>tenant yazılımından bağımsızdır</b> ve <b>ayrı özel repoda</b> tutulmalıdır. <b>private key</b> yalnız bu makinede (<code>keys/private.pem</code>) — asla paylaşma/commit etme.</div>
+
+  <div class="card">
+    <h2>1 · İmza Anahtarı</h2>
+    <div id="keyStatus" class="status muted">kontrol ediliyor…</div>
+    <button id="genBtn" class="ghost">Anahtar Üret</button>
+    <label style="margin-top:14px">Tenant'a gömülecek <b>public key</b> (yalnız doğrulama):</label>
+    <textarea id="pub" readonly placeholder="(anahtar üretilince burada görünür)"></textarea>
+  </div>
+
+  <div class="card">
+    <h2>2 · Lisans Bilgileri</h2>
+    <div class="row">
+      <div><label>Tenant ID *</label><input id="tenantId" placeholder="örn. tenant-1" /></div>
+      <div><label>SKU / Plan</label><select id="sku"><option>STARTER</option><option selected>PRO</option><option>ENTERPRISE</option><option>CUSTOM</option></select></div>
+    </div>
+    <div class="row">
+      <div><label>Kullanıcı limiti</label><input id="users" type="number" min="1" placeholder="örn. 25" /></div>
+      <div><label>Geçerlilik (gün) — boş = süresiz</label><input id="days" type="number" min="1" placeholder="örn. 365" /></div>
+    </div>
+    <label>Eklenti / Agent lisansları</label>
+    <div class="plugins" id="plugins"></div>
+    <div style="margin-top:16px"><button id="issueBtn">Lisans Üret</button></div>
+    <div id="issueStatus" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Üretilen Lisans (müşteriye verilir)</h2>
+    <textarea id="token" readonly placeholder="(lisans burada görünür)"></textarea>
+    <button id="copyBtn" class="ghost" style="margin-top:8px">Kopyala</button>
+    <p class="muted" id="payloadInfo"></p>
+  </div>
+</div>
+
+<script>
+  const PLUGINS = ['AGENT_TENDER','AGENT_PROJECT','AGENT_PRESALES','AGENT_PROCUREMENT','AGENT_FINANCE','AGENT_LEGAL','AGENT_CRM','AGENT_IGPD'];
+  const $ = (id) => document.getElementById(id);
+  $('plugins').innerHTML = PLUGINS.map(p => `<label><input type="checkbox" value="${p}"/> ${p.replace('AGENT_','')}</label>`).join('');
+
+  async function refreshKey(){
+    const r = await fetch('/api/pubkey').then(x=>x.json());
+    if(r.hasKey){ $('keyStatus').innerHTML='<span class="ok">✓ İmza anahtarı hazır</span>'; $('pub').value=r.publicPem; $('genBtn').disabled=true; }
+    else { $('keyStatus').innerHTML='<span class="err">Anahtar yok — önce üretin.</span>'; }
+  }
+  $('genBtn').onclick = async () => {
+    const r = await fetch('/api/keygen',{method:'POST'}).then(x=>x.json());
+    if(r.error){ $('keyStatus').innerHTML='<span class="err">'+r.error+'</span>'; }
+    else { await refreshKey(); }
+  };
+  $('issueBtn').onclick = async () => {
+    const plugins = [...document.querySelectorAll('#plugins input:checked')].map(c=>c.value);
+    const data = { tenantId:$('tenantId').value.trim(), sku:$('sku').value, users:$('users').value, days:$('days').value, plugins };
+    if(!data.tenantId){ $('issueStatus').innerHTML='<span class="err">Tenant ID zorunlu.</span>'; return; }
+    const r = await fetch('/api/issue',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(x=>x.json());
+    if(r.error){ $('issueStatus').innerHTML='<span class="err">'+r.error+'</span>'; return; }
+    $('issueStatus').innerHTML='<span class="ok">✓ Lisans üretildi ('+data.tenantId+')</span>';
+    $('token').value=r.token;
+    const exp = r.payload.expiresAt ? new Date(r.payload.expiresAt).toLocaleDateString('tr-TR') : 'süresiz';
+    $('payloadInfo').textContent = `SKU: ${r.payload.sku} · plugins: ${r.payload.plugins.join(', ')||'—'} · limit: ${JSON.stringify(r.payload.limits)} · son: ${exp}`;
+  };
+  $('copyBtn').onclick = () => { navigator.clipboard.writeText($('token').value); $('copyBtn').textContent='Kopyalandı ✓'; setTimeout(()=>$('copyBtn').textContent='Kopyala',1500); };
+  refreshKey();
+</script>
+</body>
+</html>
