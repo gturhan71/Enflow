@@ -7,7 +7,6 @@ import { UnitManagement } from '../components/settings/UnitManagement';
 import { UserManagement } from '../components/settings/UserManagement';
 import { SubscriptionSettings } from '../components/settings/SubscriptionSettings';
 import { PermissionSettings } from '../components/settings/PermissionSettings';
-import LicenseGeneratorModule from './LicenseGeneratorModule';
 import LicenseTypesModule from './LicenseTypesModule';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
@@ -349,10 +348,16 @@ const SettingsModule = ({
         return <SubscriptionSettings subscription={subscription} usage={usage} currentUser={currentUser} fetchSubscriptionData={fetchSubscriptionData} />;
       case 'license-types': // settings-license-types
         return <LicenseTypesModule />;
-      case 'license-generate': // settings-license-generate
-        return <LicenseGeneratorModule />;
+      case 'license-generate': // settings-license-generate (kaldırıldı)
       case 'license': // geriye dönük uyumluluk
-        return <LicenseGeneratorModule />;
+        return (
+          <div className="p-8">
+            <div className="glass-card rounded-2xl p-6 border border-slate-200/60 max-w-2xl">
+              <h3 className="text-lg font-bold text-slate-900 mb-1">Lisans üretimi artık burada değil</h3>
+              <p className="text-sm text-slate-500">Güvenlik gereği lisanslar <b>vendor lisans aracıyla</b> (ayrı program, Ed25519 imza) üretilir; bu yazılım yalnız <b>doğrular/aktive eder</b>. Lisansınızı <b>Abonelik &amp; Kullanım</b> veya <b>Lisans Planları</b> ekranından girebilirsiniz.</p>
+            </div>
+          </div>
+        );
       case 'workflow':
         return <WorkflowBuilder units={units} />;
       case 'integrations':

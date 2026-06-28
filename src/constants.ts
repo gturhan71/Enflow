@@ -132,7 +132,6 @@ export const NAV_ITEMS = [
       { id: 'settings-integrations', label: 'Entegrasyonlar',         requiredPermission: 'SETTINGS_INTEGRATIONS' },
       { id: 'settings-subscription',      label: 'Abonelik & Kullanım',       requiredPermission: 'SETTINGS_VIEW' },
       { id: 'settings-license-types',    label: 'Lisans Planları',            requiredPermission: 'SETTINGS_VIEW' },
-      { id: 'settings-license-generate', label: 'Lisans Anahtarı Oluştur',   requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
     ],
   },

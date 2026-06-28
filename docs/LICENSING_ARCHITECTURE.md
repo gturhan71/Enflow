@@ -73,8 +73,10 @@ tamper→RED(imza) · sahte anahtar→RED(forge) · süresi dolmuş→RED.
   (public key) + `licenseVerify.ts` (Ed25519+binding+süre) + `entitlementService` (HMAC üretimi
   KALDIRILDI → bundle verify-only) + `/plugins/generate-key` **410** + frontend üretim UI kaldırıldı.
   Doğrulama: yeni token→KABUL · yanlış tenant→RED · eski HMAC→RED · generate-key→410. tsc 0.
-- [ ] **Faz 2 — ABONELİK yolu:** `/tenants/activate-license` + `LicenseGeneratorModule` + `ProvisionWizard`
-  aynı Ed25519 doğrulayıcıya geçirilir; uygulama-içi abonelik üretimi kaldırılır.
+- [x] **Faz 2 — ABONELİK yolu:** `/tenants/activate-license` → `verifyLicenseToken` (Ed25519 + binding);
+  eski imzasız base64-JSON lisans (sahte `signature`) KABUL EDİLMEZ. `LicenseGeneratorModule` **silindi**,
+  `settings-license-generate` nav + App `license-gen` tab kaldırıldı. ProvisionWizard (tenant provizyon) korundu.
+  Doğrulama: eski base64→RED · yeni Ed25519→KABUL (plan PROFESSIONAL) · tenant-2→403. tsc 0.
 - [ ] **RBAC:** `rbac.config.ts`'te `/plugins/generate-key` beklentisi güncellenir (artık 410); `settings-license-generate` (abonelik üretimi) Faz 2'de kalkar. (RBAC süiti kullanıcı isteyince.)
 - [ ] **Üretim:** `licensePublicKey.ts` vendor'un gerçek public key'iyle değiştirilir; `PLUGIN_LICENSE_SECRET` env'den çıkarılır (artık kullanılmıyor).
 - [ ] Mevcut müşterilere yeni imzalı lisansların yeniden düzenlenmesi (operasyonel).

@@ -3,6 +3,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { isAIConfigured } from '../services/aiClient';
+import { verifyLicenseToken } from '../services/licenseVerify';
 
 const router: Router = Router();
 
@@ -44,67 +45,45 @@ router.put('/:id/subscription', tenantMiddleware, asyncHandler(async (req: Reque
   res.json(subscription);
 }));
 
-// ── Lisans aktivasyonu ─────────────────────────────────────────────────────
+// ── Lisans aktivasyonu (Ed25519 imzalı, tenant-bağlı — yalnız DOĞRULA) ───────
+// Lisans vendor aracıyla üretilir; burada yalnız PUBLIC key ile doğrulanır.
+// Eski imzasız base64-JSON lisansları KABUL EDİLMEZ (sert kesim).
 router.post('/activate-license', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { licenseKey } = req.body as { licenseKey: string };
   if (!licenseKey) return res.status(400).json({ error: 'Lisans anahtarı zorunludur.' });
 
-  let payload: {
-    tenantId: string;
-    companyName: string;
-    model: string;
-    expiryDate: string;
-    isTrial?: boolean;
-    limits: { users: number; storage: number };
-    signature: string;
-  };
-
-  try {
-    payload = JSON.parse(Buffer.from(licenseKey, 'base64').toString('utf-8'));
-  } catch {
-    return res.status(400).json({ error: 'Geçersiz lisans anahtarı formatı.' });
+  const result = verifyLicenseToken(licenseKey, req.tenantId);
+  if (!result.ok) {
+    const msg: Record<string, string> = {
+      BICIM_HATASI: 'Geçersiz lisans biçimi (imzalı lisans bekleniyor).',
+      IMZA_GECERSIZ: 'Lisans imzası doğrulanamadı (geçersiz/kurcalanmış).',
+      TENANT_UYUSMAZ: 'Bu lisans şirketiniz için üretilmemiş.',
+      SURESI_DOLMUS: 'Lisansın süresi dolmuş.',
+      COZUMLEME_HATASI: 'Lisans çözümlenemedi.',
+    };
+    return res.status(result.reason === 'TENANT_UYUSMAZ' ? 403 : 400).json({ error: msg[result.reason] || 'Lisans doğrulanamadı.' });
   }
 
-  // Tenant uniqueness check — anahtar başka bir tenant için üretilmiş
-  if (payload.tenantId !== req.tenantId) {
-    return res.status(403).json({ error: 'Bu lisans anahtarı şirketiniz için üretilmemiş.' });
-  }
-
-  // Expiry check
-  if (new Date(payload.expiryDate) < new Date()) {
-    return res.status(400).json({ error: 'Bu lisans anahtarının süresi dolmuştur.' });
-  }
-
-  // Model → Plan mapping
+  const p = result.payload;
   const planMap: Record<string, 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
-    KOBI: 'STARTER',
-    PAY_AS_YOU_GO: 'PROFESSIONAL',
-    ON_PREMISE: 'ENTERPRISE',
+    STARTER: 'STARTER', PRO: 'PROFESSIONAL', PROFESSIONAL: 'PROFESSIONAL', ENTERPRISE: 'ENTERPRISE', CUSTOM: 'PROFESSIONAL',
   };
-  const plan = planMap[payload.model];
-  if (!plan) return res.status(400).json({ error: 'Bilinmeyen lisans modeli.' });
+  const plan = planMap[(p.sku || '').toUpperCase()] || 'PROFESSIONAL';
 
+  const data = {
+    plan,
+    licenseKey,
+    licenseModel: p.sku,
+    licenseExpiryDate: p.expiresAt ? new Date(p.expiresAt) : null,
+    licensedUserLimit: p.limits?.users ?? null,
+    licensedStorageLimit: p.limits?.storageGB ?? null,
+  };
   const subscription = await prisma.subscription.upsert({
     where: { tenantId: req.tenantId },
-    update: {
-      plan,
-      licenseKey,
-      licenseModel: payload.model,
-      licenseExpiryDate: new Date(payload.expiryDate),
-      licensedUserLimit: payload.limits.users,
-      licensedStorageLimit: payload.limits.storage,
-    },
-    create: {
-      tenantId: req.tenantId,
-      plan,
-      licenseKey,
-      licenseModel: payload.model,
-      licenseExpiryDate: new Date(payload.expiryDate),
-      licensedUserLimit: payload.limits.users,
-      licensedStorageLimit: payload.limits.storage,
-    },
+    update: data,
+    create: { tenantId: req.tenantId, ...data },
   });
-
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'LICENSE_ACTIVATED', entityType: 'SUBSCRIPTION', entityId: subscription.id, details: { sku: p.sku, plan } });
   res.json(subscription);
 }));
 

@@ -140,7 +140,6 @@ const Header = ({
       case 'project-mgmt': return 'Proje Yönetim Paneli';
       case 'todo': return 'İşlerim & Görev Havuzu';
       case 'subscription': return 'Lisans & Abonelik Yönetimi';
-      case 'license-gen': return 'Master Lisans Üretici';
       default: return 'Enflow ERP';
     }
   };

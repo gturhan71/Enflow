@@ -52,7 +52,6 @@ import ArchiveModule from './modules/ArchiveModule';
 import SubscriptionModule from './modules/SubscriptionModule';
 import ContractWorkflowModule from './modules/ContractWorkflowModule';
 import SecurityTestModule from './modules/SecurityTestModule';
-import LicenseGeneratorModule from './modules/LicenseGeneratorModule';
 import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
 import FinanceModule from './modules/FinanceModule';
 import ManagementReportingModule from './modules/ManagementReportingModule';
@@ -367,7 +366,6 @@ const TenantAppInner = ({
 
       // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
       case 'subscription': return <SubscriptionModule />;
-      case 'license-gen': return <LicenseGeneratorModule />;
 
       default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} onNavigate={setActiveTab} />;
     }
