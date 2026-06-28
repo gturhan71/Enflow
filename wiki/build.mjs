@@ -159,7 +159,8 @@ const CSS = `
   @media(max-width:880px){.wrap{grid-template-columns:1fr}aside{position:static;height:auto;border-right:none;border-bottom:1px solid var(--line)}main{padding:28px 20px 80px}}
 `;
 
-const dateStr = new Date().toISOString().slice(0, 10);
+// Tarih §27 kaynağından (deterministik çıktı — her üretimde dosya değişmesin).
+const dateStr = (scaleLine && scaleLine.match(/\((\d{4}-\d{2}-\d{2})\)/)?.[1]) || '—';
 const out = `<!DOCTYPE html>
 <html lang="tr">
 <head>

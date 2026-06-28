@@ -1,0 +1,49 @@
+name: Enflow Wiki → GitHub Pages
+
+# walkthrough §27 (kaynak) veya generator değişince wiki'yi yeniden üretip yayınlar.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'walkthrough.md'
+      - 'wiki/build.mjs'
+      - 'wiki/index.html'
+      - '.github/workflows/wiki-pages.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Generate wiki from walkthrough §27
+        run: node wiki/build.mjs
+      - name: Stage site (yalnız index.html)
+        run: |
+          mkdir -p _site
+          cp wiki/index.html _site/index.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

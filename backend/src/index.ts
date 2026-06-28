@@ -49,6 +49,8 @@ import path from 'path';
 
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Enflow-Wiki — walkthrough §27'den üretilen statik sayfa (GET /wiki)
+app.use('/wiki', express.static(path.join(__dirname, '../../wiki')));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(cors({
   origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
@@ -109,4 +111,14 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 app.listen(port, () => {
   console.log(`[Enflow Backend] Server is running at http://localhost:${port}`);
   startBackupScheduler();
+  // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
+  // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.
+  try {
+    const { spawn } = require('child_process');
+    const nodeFs = require('fs');
+    const wikiBuild = path.join(__dirname, '../../wiki/build.mjs');
+    if (nodeFs.existsSync(wikiBuild)) {
+      spawn('node', [wikiBuild], { stdio: 'ignore', detached: false });
+    }
+  } catch { /* yut — wiki üretimi ana akışı etkilemez */ }
 });
