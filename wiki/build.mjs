@@ -2,6 +2,7 @@
 /* Enflow Wiki üretici — TEK doğruluk kaynağı: walkthrough.md §27.
  * Kullanım: node wiki/build.mjs   →  wiki/index.html üretir.
  * Akış değişince: önce §27'yi güncelle, sonra bunu çalıştır. Bağımlılık yok.
+ * Yayın: GitHub Pages https://gturhan71.github.io/Enflow/ · backend GET /wiki.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
