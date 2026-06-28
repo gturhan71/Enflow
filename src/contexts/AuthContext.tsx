@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { MOCK_SYSTEM_USERS } from '../constants';
 import { User } from '../types';
+
+// Kayıtlı kullanıcı yoksa (tutarsız durum) → İZİNSİZ misafir. ASLA GM'e düşme:
+// eski davranış MOCK_SYSTEM_USERS[0] (GM superuser) idi ve her girişte tüm
+// modülleri açıyordu. Misafir hiçbir izne sahip değil → boş arayüz (güvenli).
+const guestUser = (tenantId: string): User => ({
+  id: '', name: '', email: '', role: 'NONE', permissions: [], status: 'ACTIVE', tenantId,
+});
 
 interface AuthContextType {
   currentUser: User;
@@ -14,7 +20,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children, tenantId }: { children: ReactNode, tenantId: string }) => {
   const [currentUser, setCurrentUserState] = useState<User>(() => {
     const saved = localStorage.getItem(`enflow_current_user_${tenantId}`);
-    return saved ? JSON.parse(saved) : MOCK_SYSTEM_USERS[0];
+    return saved ? JSON.parse(saved) : guestUser(tenantId);
   });
 
   useEffect(() => {

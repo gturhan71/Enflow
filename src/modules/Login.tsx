@@ -3,9 +3,10 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Lock, User, ArrowRight, Settings, Loader2, Mail, ChevronLeft } from 'lucide-react';
 import { APP_VERSION } from '../constants';
 import { apiService } from '../services/apiService';
+import type { User as EnflowUser } from '../types';
 
 interface LoginProps {
-  onLogin: (tenantId: string, token: string) => void;
+  onLogin: (tenantId: string, token: string, user: EnflowUser) => void;
 }
 
 const Login = ({ onLogin }: LoginProps) => {
@@ -25,7 +26,8 @@ const Login = ({ onLogin }: LoginProps) => {
       if (view === 'LOGIN') {
         const data = await apiService.login(email);
         apiService.setAuth(data.user.tenantId, data.token);
-        onLogin(data.user.tenantId, data.token);
+        // Kimliği doğrulanan GERÇEK kullanıcıyı taşı — UI artık kendi rolüne göre açılır.
+        onLogin(data.user.tenantId, data.token, data.user as EnflowUser);
       } else {
         const data = await apiService.forgotPassword(email);
         setSuccessMessage(data.message);

@@ -19,9 +19,6 @@ if (typeof window !== 'undefined') {
     }
   };
 }
-import { 
-  MOCK_SYSTEM_USERS 
-} from './constants';
 import {
   Contract,
   Customer,
@@ -59,7 +56,7 @@ import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
 import ActivityLogModule from './modules/ActivityLogModule';
 import Login from './modules/Login';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 import { AIGateProvider } from './contexts/AIGateContext';
 import { apiService } from './services/apiService';
 import { ThemeProvider } from './contexts/ThemeContext';
@@ -176,7 +173,6 @@ const TenantAppInner = ({
   onLogout: () => void, 
   companyLogo: string | null 
 }) => {
-  const { currentUser, setCurrentUser } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -184,12 +180,6 @@ const TenantAppInner = ({
     setIsSidebarOpen(false);
   }, [activeTab]);
 
-  useEffect(() => {
-    if (currentUser?.id === 'user1') {
-      logger.debug('🧹 Legacy user ID detected, updating to default...');
-      setCurrentUser(MOCK_SYSTEM_USERS[0]);
-    }
-  }, [currentUser, setCurrentUser]);
   
   useEffect(() => {
     const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
@@ -424,14 +414,17 @@ const App = () => {
     }
   }, [activeTenantId]);
 
-  const handleLogin = (tenantId: string, token: string) => {
+  const handleLogin = (tenantId: string, token: string, user: User) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
     localStorage.setItem('enflow_auth_token', token);
+    // Giriş yapan GERÇEK kullanıcıyı yaz → AuthProvider bunu okur, GM'e düşmez.
+    localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(user));
     setActiveTenantId(tenantId);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
+    if (activeTenantId) localStorage.removeItem(`enflow_current_user_${activeTenantId}`);
     localStorage.removeItem('enflow_active_tenant_id');
     localStorage.removeItem('enflow_auth_token');
     setActiveTenantId(null);
