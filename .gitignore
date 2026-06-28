@@ -13,3 +13,7 @@ backend/backups/
 # Kurulum paketi çıktısı
 dist-installer/
 .env.local
+
+# Lisans anahtarları — ASLA commit edilmez
+*.pem
+license-poc/*.pem
