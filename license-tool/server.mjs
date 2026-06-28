@@ -8,6 +8,13 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { keygen, makePayload, issue, publicFromPrivate } from './core.mjs';
 
+// public.pem eksik ama private.pem varsa → public'i private'tan türet (öksüz durum onarımı).
+function ensurePublic() {
+  if (existsSync(PRIV) && !existsSync(PUB)) {
+    try { writeFileSync(PUB, publicFromPrivate(readFileSync(PRIV, 'utf-8'))); } catch { /* yut */ }
+  }
+}
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const KEYS = join(HERE, 'keys');
 const PRIV = join(KEYS, 'private.pem');
@@ -26,6 +33,7 @@ const server = createServer(async (req, res) => {
     }
     // Anahtar durumu
     if (req.method === 'GET' && req.url === '/api/pubkey') {
+      ensurePublic();
       if (!existsSync(PUB)) return json(res, 200, { hasKey: false });
       return json(res, 200, { hasKey: true, publicPem: readFileSync(PUB, 'utf-8') });
     }
