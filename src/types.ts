@@ -389,6 +389,7 @@ export interface TodoTask {
   description?: string;
   unitId: string;
   assignedBy: string;
+  assignedToUserId?: string | null;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
   status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
   dueDate?: string;

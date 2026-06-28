@@ -17,7 +17,8 @@ import {
   TrendingUp,
   Bell,
   SendHorizonal,
-  Landmark
+  Landmark,
+  UserCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
@@ -27,6 +28,7 @@ import {
   Project,
   Contract,
   Unit,
+  User,
   Proposal,
   ApprovalChain
 } from '../types';
@@ -56,6 +58,7 @@ const TodoModule = ({
   opportunities,
   contracts,
   units,
+  users,
   proposals,
   setProposals
 }: {
@@ -65,6 +68,7 @@ const TodoModule = ({
   opportunities?: Opportunity[],
   contracts?: Contract[],
   units?: Unit[],
+  users?: User[],
   proposals?: Proposal[],
   setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>
 }) => {
@@ -520,6 +524,12 @@ const TodoModule = ({
                       <Briefcase size={13} />
                       {units?.find(u => u.id === todo.unitId)?.name}
                     </div>
+                    {todo.assignedToUserId && (
+                      <div className="flex items-center gap-2 text-[10px] text-emerald-700 font-black uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-lg">
+                        <UserCircle size={13} />
+                        {users?.find(u => u.id === todo.assignedToUserId)?.name || 'Atanan kişi'}
+                      </div>
+                    )}
                     {todo.relatedModule && todo.relatedModule !== 'GENERAL' && (
                       <div className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-3 py-1 rounded-lg">
                         <Target size={13} />
@@ -843,14 +853,29 @@ const TodoModule = ({
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">İlgili Birim</label>
-                    <select 
+                    <select
                       className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none"
-                      onChange={(e) => setNewTask({...newTask, unitId: e.target.value})}
+                      value={newTask.unitId || ''}
+                      onChange={(e) => setNewTask({...newTask, unitId: e.target.value, assignedToUserId: undefined})}
                     >
                       <option value="">Seçiniz</option>
                       {units?.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                     </select>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Kime (Kişi) — boş: birim yöneticisine</label>
+                  <select
+                    className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-3xl text-sm font-bold outline-none disabled:opacity-50"
+                    value={newTask.assignedToUserId || ''}
+                    disabled={!newTask.unitId}
+                    onChange={(e) => setNewTask({...newTask, assignedToUserId: e.target.value || undefined})}
+                  >
+                    <option value="">Birim yöneticisi (varsayılan)</option>
+                    {users?.filter(u => u.unitId === newTask.unitId).map(u => (
+                      <option key={u.id} value={u.id}>{u.name} — {u.role}</option>
+                    ))}
+                  </select>
                 </div>
                 
                 <div className="grid grid-cols-2 gap-6">

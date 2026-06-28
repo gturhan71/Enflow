@@ -26,6 +26,22 @@ export const prisma = new PrismaClient({ adapter }).$extends({
           } else {
             roundMoneyData(model, a.data);
           }
+
+          // Görev kişi-bazlı atama: TodoTask oluşturulurken assignedToUserId yoksa
+          // hedef birimin yöneticisine çöz (sistem hand-off'ları da kişiye gider).
+          if (model === 'TodoTask' && (operation === 'create' || operation === 'createMany')) {
+            const rows = operation === 'createMany'
+              ? (Array.isArray(a.data) ? a.data : [a.data])
+              : [a.data];
+            for (const row of rows as Array<Record<string, unknown> | undefined>) {
+              if (row && !row.assignedToUserId && typeof row.unitId === 'string') {
+                try {
+                  const unit = await prisma.unit.findUnique({ where: { id: row.unitId }, select: { managerId: true } });
+                  if (unit?.managerId) row.assignedToUserId = unit.managerId;
+                } catch { /* yut — atama çözülemezse null kalır (birim fallback) */ }
+              }
+            }
+          }
         }
         return query(args);
       },

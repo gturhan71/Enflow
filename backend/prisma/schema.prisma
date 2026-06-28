@@ -384,6 +384,7 @@ model TodoTask {
   description   String?
   unitId        String
   assignedBy    String
+  assignedToUserId String?  // kişi-bazlı atama (yoksa birim yöneticisine çözülür)
   priority      String   @default("MEDIUM")
   status        String   @default("PENDING")
   dueDate       DateTime?
