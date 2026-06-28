@@ -6,8 +6,21 @@ import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
+// Kullanıcı kapsamı: bir kullanıcı YALNIZ kendi birimine iletilen (unitId) veya
+// kendi oluşturduğu/ilgilendiği (assignedBy) görevleri görür. GM gözetim için
+// tüm görevleri görür. (TodoTask kullanıcıya değil birime atanır; assignedBy = oluşturan.)
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tasks = await prisma.todoTask.findMany({ where: { tenantId: req.tenantId } });
+  const user = req.userId
+    ? await prisma.user.findUnique({ where: { id: req.userId }, select: { role: true, unitId: true } })
+    : null;
+
+  const where: { tenantId: string; OR?: Array<{ unitId?: string; assignedBy?: string }> } = { tenantId: req.tenantId };
+  if (user && user.role !== 'GENERAL_MANAGER') {
+    where.OR = [{ assignedBy: req.userId }];
+    if (user.unitId) where.OR.push({ unitId: user.unitId });
+  }
+
+  const tasks = await prisma.todoTask.findMany({ where });
   res.json(tasks);
 }));
 
