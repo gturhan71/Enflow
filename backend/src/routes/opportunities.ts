@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '../services/approvalChainService';
+import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 
 const GM = requireRole(['GENERAL_MANAGER']);
@@ -348,7 +349,8 @@ router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: 
   });
 
   // Faz 0 — kalıcı onay zinciri: Finans → İGPD → Üst Yönetim (GM) → KSU
-  await ensureApprovalChain(tenantId, 'OPPORTUNITY', opportunityId);
+  // DoA: tenant onay matrisi tanımlıysa fırsat tutarına göre roller seçilir (opt-in).
+  await ensureApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, undefined, opp.value);
 
   res.json({ message: 'Teklif onay sürecine gönderildi.' });
 }));
@@ -399,8 +401,17 @@ router.post('/:id/approve-cost', tenantMiddleware, requireRole(['GENERAL_MANAGER
   if (!opp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
   if (opp.technicalStatus !== 'PENDING_APPROVAL') return res.status(409).json({ error: 'Yalnız onay bekleyen analiz onaylanabilir.' });
 
+  // Görev Ayrılığı (SoD): fırsatı oluşturan kendi maliyet analizini onaylayamaz.
+  const sod = await sodViolation(tenantId, req.userId, 'OPPORTUNITY', opportunityId);
+  if (sod) return res.status(403).json({ error: sod });
+
   const newStatus = decision === 'APPROVE' ? 'APPROVED' : 'REJECTED';
-  await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: newStatus } });
+  // Optimistic locking: yalnız PENDING_APPROVAL iken geçiş (TOCTOU yarışını kapatır).
+  const upd = await prisma.opportunity.updateMany({
+    where: { id: opportunityId, technicalStatus: 'PENDING_APPROVAL' },
+    data: { technicalStatus: newStatus },
+  });
+  if (upd.count === 0) return res.status(409).json({ error: 'Onay durumu değişmiş (eşzamanlı işlem). Sayfayı yenileyin.' });
 
   // İlgili onay görevini kapat
   await prisma.todoTask.updateMany({
@@ -425,6 +436,10 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
 
   const record = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
+
+  // Görev Ayrılığı (SoD): oluşturan kendi fırsatını onaylayamaz.
+  const sod = await sodViolation(tenantId, req.userId, 'OPPORTUNITY', opportunityId);
+  if (sod) return res.status(403).json({ error: sod });
 
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },

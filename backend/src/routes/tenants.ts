@@ -195,6 +195,40 @@ router.put('/ai-settings', tenantMiddleware, GM, asyncHandler(async (req: Reques
   res.json({ baseUrl: ai.baseUrl, model: ai.model, label: ai.label, hasKey: Boolean(ai.apiKey) });
 }));
 
+// ── Yönetişim ayarları — Görev Ayrılığı (SoD) toggle (GM only) ──────────────
+interface ApprovalTierBody { maxAmount: number; roles: string[] }
+router.get('/governance-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const g = (ms.governance as { enforceSoD?: boolean; approvalMatrix?: ApprovalTierBody[] }) || {};
+  res.json({
+    enforceSoD: g.enforceSoD !== false,
+    approvalMatrix: Array.isArray(g.approvalMatrix) ? g.approvalMatrix : null, // null = sabit swimlane şablonu
+  });
+}));
+
+router.put('/governance-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const { enforceSoD, approvalMatrix } = req.body as { enforceSoD?: boolean; approvalMatrix?: ApprovalTierBody[] | null };
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const prev = (ms.governance as Record<string, unknown>) || {};
+  const next: Record<string, unknown> = { ...prev, enforceSoD: enforceSoD !== false };
+  if (approvalMatrix !== undefined) {
+    // Geçerli matris: tutar+rol dizisi; boş/null → matrisi kaldır (şablona dön).
+    const valid = Array.isArray(approvalMatrix)
+      && approvalMatrix.length > 0
+      && approvalMatrix.every(t => typeof t?.maxAmount === 'number' && Array.isArray(t?.roles) && t.roles.length > 0);
+    if (valid) next.approvalMatrix = approvalMatrix;
+    else delete next.approvalMatrix;
+  }
+  ms.governance = next;
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'GOVERNANCE_SETTINGS_UPDATED', entityType: 'TENANT', entityId: req.tenantId, details: { enforceSoD: next.enforceSoD, hasMatrix: Boolean(next.approvalMatrix) } });
+  res.json({ enforceSoD: next.enforceSoD, approvalMatrix: next.approvalMatrix ?? null });
+}));
+
 // ── Tenant adı güncelle (bare `/:id` — sabit segment rotalarından SONRA) ─────
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const { name } = req.body;

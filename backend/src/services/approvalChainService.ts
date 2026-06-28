@@ -1,6 +1,7 @@
 import { prisma } from '../prismaClient';
 import { getAgentPluginForRole } from './pluginCatalog';
 import { agentActorId } from './agentProvenance';
+import { resolveApproverRoles } from './governance';
 
 // Faz 0 — diyagramdaki kurumsal onay sırası:
 // Presales hazırlar → Finans değerlendirir → İGPD onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
@@ -22,7 +23,8 @@ export async function ensureApprovalChain(
   tenantId: string,
   entityType: string,
   entityId: string,
-  roles?: string[]
+  roles?: string[],
+  amount?: number | null,
 ) {
   const existing = await prisma.approvalChain.findFirst({
     where: { tenantId, entityType, entityId, status: 'PENDING' },
@@ -30,7 +32,12 @@ export async function ensureApprovalChain(
   });
   if (existing) return existing;
 
-  const stageRoles = roles || APPROVAL_CHAIN_TEMPLATES[entityType] || ['GENERAL_MANAGER'];
+  // DoA: explicit roles > tutar-bazlı matris (opt-in) > sabit şablon > GM.
+  let stageRoles = roles;
+  if (!stageRoles) {
+    const matrixRoles = await resolveApproverRoles(tenantId, amount);
+    stageRoles = matrixRoles || APPROVAL_CHAIN_TEMPLATES[entityType] || ['GENERAL_MANAGER'];
+  }
 
   return prisma.approvalChain.create({
     data: {

@@ -8,6 +8,7 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
 import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
+import { sumByCurrency, presentBreakdown, LineInput } from '../services/financeEngine';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -498,6 +499,18 @@ router.post('/financing-effect/apply', tenantMiddleware, requireRole(['GENERAL_M
   }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'FINANCING_COST_APPLIED', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { created } });
   res.json({ ok: true, created, byCurrency: result.byCurrency });
+}));
+
+// ── Finance Engine önizleme — canonical net/KDV/brüt, kuruş, döviz-bazlı ──────
+// POST /finance/calc { lines:[{ qty, unitPrice, vatRate?, currency?, discountPct? }] }
+// → byCurrency: { TRY:{net,vat,gross}, USD:{...} } (sessiz tek-toplam YOK).
+router.post('/calc', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { lines } = req.body as { lines?: LineInput[] };
+  if (!Array.isArray(lines)) return res.status(400).json({ error: 'lines dizisi zorunlu.' });
+  const totals = sumByCurrency(lines);
+  const byCurrency: Record<string, { net: number; vat: number; gross: number; currency: string }> = {};
+  for (const [cur, b] of Object.entries(totals)) byCurrency[cur] = presentBreakdown(b);
+  res.json({ byCurrency, currencies: Object.keys(byCurrency) });
 }));
 
 export default router;

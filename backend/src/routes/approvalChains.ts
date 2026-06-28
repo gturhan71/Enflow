@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { autoSkipOrphanStages } from '../services/approvalChainService';
+import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
@@ -91,10 +92,16 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   const stage = chain.stages.find(s => s.id === stageId);
   if (!stage) return res.status(404).json({ error: 'Onay aşaması bulunamadı.' });
 
-  await prisma.approvalStage.update({
-    where: { id: stageId },
+  // Görev Ayrılığı (SoD): oluşturan kendi kaydını onaylayamaz.
+  const sod = await sodViolation(req.tenantId, req.userId, chain.entityType, chain.entityId);
+  if (sod) return res.status(403).json({ error: sod });
+
+  // Optimistic locking: yalnız PENDING aşama onaylanır (eşzamanlı approve/reject yarışı).
+  const upd = await prisma.approvalStage.updateMany({
+    where: { id: stageId, status: 'PENDING' },
     data: { status: 'APPROVED', approverId, note, approvedAt: new Date() }
   });
+  if (upd.count === 0) return res.status(409).json({ error: 'Bu aşama zaten işlenmiş (eşzamanlı işlem).' });
 
   // Kalan aşamalarda tenant'ta aktif olmayan rolleri atla; geriye PENDING
   // kalmazsa zincir COMPLETED olur (SKIPPED aşamalar bloklamaz).
@@ -111,10 +118,12 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
   const chain = await prisma.approvalChain.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!chain) return res.status(404).json({ error: 'Onay zinciri bulunamadı.' });
 
-  await prisma.approvalStage.update({
-    where: { id: stageId },
+  // Optimistic locking: yalnız PENDING aşama reddedilebilir (eşzamanlı yarış).
+  const upd = await prisma.approvalStage.updateMany({
+    where: { id: stageId, status: 'PENDING' },
     data: { status: 'REJECTED', approverId, note, approvedAt: new Date() }
   });
+  if (upd.count === 0) return res.status(409).json({ error: 'Bu aşama zaten işlenmiş (eşzamanlı işlem).' });
   await prisma.approvalChain.update({ where: { id }, data: { status: 'REJECTED' } });
 
   const updated = await prisma.approvalChain.findFirst({
