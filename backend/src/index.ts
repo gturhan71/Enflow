@@ -8,6 +8,7 @@ import activityLogsRouter from './routes/activityLogs';
 import authRouter from './routes/auth';
 import tenantsRouter from './routes/tenants';
 import subscriptionRouter from './routes/subscription';
+import setupRouter from './routes/setup';
 import unitsRouter from './routes/units';
 import usersRouter from './routes/users';
 import customersRouter from './routes/customers';
@@ -72,6 +73,10 @@ app.get('/api/version', (_req, res) => {
     checkedAt: status?.checkedAt || null,
   });
 });
+
+// İlk-çalıştırma kurulumu — AÇIK (auth/tenant gerektirmez, boş-DB-kilitli).
+// Readonly guard ve domain router'lardan ÖNCE mount (kurulum henüz kullanıcısız).
+app.use('/api/setup', setupRouter);
 
 // Salt-okunur rol guard'ı — domain router'lardan ÖNCE (BACKUP_ADMIN mutasyonları
 // /api/backup hariç 403). Güvenli metodlar + /api/auth + /api/backup muaf.

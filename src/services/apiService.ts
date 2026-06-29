@@ -23,6 +23,19 @@ class ApiService {
     return apiClient.forgotPassword(email);
   }
 
+  // --- İLK-ÇALIŞTIRMA KURULUMU (auth gerektirmez; boş-DB-kilitli) ---
+  async getSetupStatus(): Promise<{ initialized: boolean }> {
+    const r = await fetch('/api/setup/status');
+    if (!r.ok) throw new Error('Kurulum durumu alınamadı.');
+    return r.json();
+  }
+  async runSetup(payload: { company: { name: string }; admin: { name: string; email: string }; license?: string }): Promise<{ tenantId: string; token: string; user: { id: string; name: string; email: string; role: string; tenantId: string; unitId: string | null; permissions: string[] } }> {
+    const r = await fetch('/api/setup/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data?.error || 'Kurulum başarısız.');
+    return data;
+  }
+
   // --- CUSTOMERS ---
   async getCustomers() { return crmService.getCustomers(); }
   async createCustomer(data: Partial<Customer>) { return crmService.createCustomer(data); }

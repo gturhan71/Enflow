@@ -55,6 +55,7 @@ import ManagementReportingModule from './modules/ManagementReportingModule';
 import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
 import ActivityLogModule from './modules/ActivityLogModule';
 import Login from './modules/Login';
+import SetupWizard from './modules/SetupWizard';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
 import { AuthProvider } from './contexts/AuthContext';
 import { AIGateProvider } from './contexts/AIGateContext';
@@ -415,6 +416,8 @@ const App = () => {
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => localStorage.getItem('enflow_active_tenant_id'));
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('enflow_auth_token'));
   const [companyLogo, setCompanyLogoState] = useState<string | null>(null);
+  // İlk-çalıştırma kurulumu: null = kontrol ediliyor, true/false = kurulu mu.
+  const [initialized, setInitialized] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (activeTenantId) {
@@ -422,6 +425,14 @@ const App = () => {
       setCompanyLogoState(savedLogo);
     }
   }, [activeTenantId]);
+
+  // Boş DB ise kurulum sihirbazı göster (giriş yerine). Hata → kurulu varsay (login akışı).
+  useEffect(() => {
+    if (isAuthenticated && activeTenantId) { setInitialized(true); return; }
+    apiService.getSetupStatus()
+      .then((s) => setInitialized(s.initialized))
+      .catch(() => setInitialized(true));
+  }, [isAuthenticated, activeTenantId]);
 
   const handleLogin = (tenantId: string, token: string, user: User) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
@@ -445,7 +456,11 @@ const App = () => {
       <ThemeProvider>
         <HealthBanner />
         <Toaster position="top-right" richColors />
-        {!isAuthenticated || !activeTenantId ? (
+        {!isAuthenticated && initialized === null ? (
+          <div className="min-h-screen flex items-center justify-center bg-slate-50 text-slate-400 text-sm font-bold">Yükleniyor…</div>
+        ) : !isAuthenticated && initialized === false ? (
+          <SetupWizard onComplete={handleLogin} />
+        ) : !isAuthenticated || !activeTenantId ? (
           <Login onLogin={handleLogin} />
         ) : (
           <AuthProvider tenantId={activeTenantId}>

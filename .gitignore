@@ -24,3 +24,11 @@ license-tool/keys/
 upgrade-tool/config.json
 update-status.json
 backend/*.pre-upgrade-*
+
+# Veritabanı dosyaları — kuruluma demo veri taşımamak için izlenmez (boş DB hedefi)
+backend/*.db
+backend/*.db-shm
+backend/*.db-wal
+
+# Installer portatif Node indirme dizini (otomatik kurulum)
+install/.tools/
