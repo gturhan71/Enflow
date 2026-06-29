@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Users, ShieldCheck, Save, Loader2 } from 'lucide-react';
+import { Users, ShieldCheck, Save, Loader2, CheckSquare, Square } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { User } from '../../types';
-import { ROLE_LABELS, NAV_ITEMS } from '../../constants';
+import { ROLE_LABELS } from '../../constants';
+import { buildPermissionGroups } from '../../lib/permissionTree';
 import { apiService } from '../../services/apiService';
 
 interface PermissionSettingsProps {
@@ -10,12 +11,48 @@ interface PermissionSettingsProps {
   setUsers: React.Dispatch<React.SetStateAction<User[]>>;
 }
 
+// Sidebar tek kaynağından türetilen yetki ağacı (parent + alt modüller).
+const PERMISSION_GROUPS = buildPermissionGroups();
+
+// Küçük toggle bileşeni (parent ve alt-modüller için ortak).
+const Toggle = ({ on, onClick }: { on: boolean; onClick: () => void }) => (
+  <div
+    onClick={onClick}
+    className={cn(
+      'w-14 h-7 rounded-full relative cursor-pointer transition-all duration-300 shadow-inner shrink-0',
+      on ? 'bg-primary' : 'bg-slate-200'
+    )}
+  >
+    <div className={cn(
+      'absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm flex items-center justify-center',
+      on ? 'right-1' : 'left-1'
+    )}>
+      {on && <ShieldCheck size={10} className="text-primary" />}
+    </div>
+  </div>
+);
+
 export const PermissionSettings = ({
   users,
   setUsers
 }: PermissionSettingsProps) => {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const has = (perm: string) => editingUser?.permissions?.includes(perm) ?? false;
+  const toggle = (perm: string) => {
+    if (!editingUser) return;
+    const cur = editingUser.permissions || [];
+    const next = cur.includes(perm) ? cur.filter((p) => p !== perm) : [...cur, perm];
+    setEditingUser({ ...editingUser, permissions: next });
+  };
+  // Bir grubun TÜM izinlerini (parent + alt) topluca aç/kapa.
+  const setGroup = (perms: string[], on: boolean) => {
+    if (!editingUser) return;
+    const cur = new Set(editingUser.permissions || []);
+    perms.forEach((p) => (on ? cur.add(p) : cur.delete(p)));
+    setEditingUser({ ...editingUser, permissions: [...cur] });
+  };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
@@ -46,48 +83,58 @@ export const PermissionSettings = ({
 
       {editingUser ? (
         <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {NAV_ITEMS.filter(item => item.requiredPermission).map((item) => (
-              <div 
-                key={item.id} 
-                className="glass-panel p-8 rounded-[32px] bg-white border border-slate-100 shadow-sm group hover:border-primary/40 transition-all flex flex-col gap-6 relative overflow-hidden"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                      <item.icon size={24} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {PERMISSION_GROUPS.map((group) => {
+              const allPerms = [group.permission, ...group.children.map((c) => c.permission)];
+              const allOn = allPerms.every((p) => has(p));
+              return (
+                <div
+                  key={group.id}
+                  className="glass-panel p-7 rounded-[32px] bg-white border border-slate-100 shadow-sm group hover:border-primary/40 transition-all flex flex-col gap-4 relative overflow-hidden"
+                >
+                  {/* Parent (üst modül) satırı */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4 min-w-0">
+                      <div className="w-12 h-12 bg-slate-50 text-slate-400 rounded-2xl flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-colors shrink-0">
+                        <group.icon size={24} />
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-black text-slate-900 uppercase tracking-tighter italic truncate">{group.label}</h4>
+                        <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest truncate">Erişim Kodu: {group.permission}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="font-black text-slate-900 uppercase tracking-tighter italic">{item.label}</h4>
-                      <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Erişim Kodu: {item.requiredPermission}</p>
-                    </div>
+                    <Toggle on={has(group.permission)} onClick={() => toggle(group.permission)} />
                   </div>
-                  <div
-                    onClick={() => {
-                      const currentPerms = editingUser.permissions || [];
-                      const newPerms = currentPerms.includes(item.requiredPermission)
-                        ? currentPerms.filter(p => p !== item.requiredPermission)
-                        : [...currentPerms, item.requiredPermission];
-                      setEditingUser({ ...editingUser, permissions: newPerms });
-                    }}
-                    className={cn(
-                      "w-14 h-7 rounded-full relative cursor-pointer transition-all duration-300 shadow-inner",
-                      editingUser.permissions?.includes(item.requiredPermission) ? "bg-primary" : "bg-slate-200"
-                    )}
-                  >
-                    <div className={cn(
-                      "absolute top-1 w-5 h-5 bg-white rounded-full transition-all duration-300 shadow-sm flex items-center justify-center",
-                      editingUser.permissions?.includes(item.requiredPermission) ? "right-1" : "left-1"
-                    )}>
-                      {editingUser.permissions?.includes(item.requiredPermission) && (
-                        <ShieldCheck size={10} className="text-primary" />
-                      )}
+
+                  {/* Alt modüller (sub-items) — her biri kendi izniyle ayrı toggle */}
+                  {group.children.length > 0 && (
+                    <div className="border-t border-slate-100 pt-3 mt-1 flex flex-col gap-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Alt Modüller</span>
+                        <button
+                          type="button"
+                          onClick={() => setGroup(allPerms, !allOn)}
+                          className="flex items-center gap-1 text-[9px] font-black text-primary uppercase tracking-widest hover:opacity-70 transition-opacity"
+                        >
+                          {allOn ? <CheckSquare size={12} /> : <Square size={12} />}
+                          {allOn ? 'Tümünü Kapat' : 'Tümünü Aç'}
+                        </button>
+                      </div>
+                      {group.children.map((child) => (
+                        <div key={child.permission} className="flex items-center justify-between pl-2">
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-700 truncate">{child.label}</p>
+                            <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest truncate">{child.permission}</p>
+                          </div>
+                          <Toggle on={has(child.permission)} onClick={() => toggle(child.permission)} />
+                        </div>
+                      ))}
                     </div>
-                  </div>
+                  )}
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <div className="absolute top-0 right-0 w-24 h-24 bg-primary/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex justify-end gap-4 pt-6">
