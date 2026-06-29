@@ -12,16 +12,19 @@ hazırlar ve başlatma adımlarını gösterir.
 | Bileşen | Minimum | Önerilen |
 |---|---|---|
 | İşletim sistemi | Windows 10 / Ubuntu 20.04 / macOS 12 | Windows 11 / Ubuntu 22.04+ / macOS 14 |
-| **Node.js** | 20 LTS | 22 LTS veya 24 |
+| **Node.js** | 20 LTS (yoksa **otomatik kurulur**) | 22 LTS veya 24 |
 | **pnpm** | 10 (sihirbaz `corepack` ile kurar) | 10.33+ |
-| **git** | 2.30+ | güncel |
+| **git** | 2.30+ (yoksa otomatik denenir) | güncel |
 | RAM | 2 GB | 4 GB+ |
 | Disk | ~1.5 GB boş (node_modules dahil) | 3 GB+ |
 | Veritabanı | SQLite (gömülü, varsayılan) | PostgreSQL 14+ (üretim) |
 | Ağ | İlk kurulumda internet (Git + paketler) | — |
 | Açık portlar | 3000 (frontend), 3002 (backend) | yapılandırılabilir |
 
-> Node ve git önceden kurulu olmalıdır. Sihirbaz pnpm'i `corepack` ile etkinleştirir.
+> **Bağımlılıklar otomatik kurulur.** Node/git yoksa bootstrap **hibrit** sağlar:
+> önce sistem paket yöneticisi (Windows `winget`, macOS `brew`, Linux `apt`/`dnf`),
+> olmazsa **portatif** resmi Node binary'sini `install/.tools/` altına indirir (admin gerektirmez),
+> o da olmazsa net yönlendirir. pnpm `corepack` ile, Prisma `pnpm install` ile gelir.
 
 ---
 
@@ -37,17 +40,21 @@ curl -fsSL https://raw.githubusercontent.com/gturhan71/Enflow/main/install/insta
 bash install.sh --dir ~/Enflow
 ```
 
-### Windows (PowerShell)
+### Windows
+**En kolay:** `install\install.bat` dosyasına **çift tıklayın** (yetki/erişim kontrol eder,
+çalıştırma politikasını kendi içinde aşar, Node/git'i otomatik sağlar). Sistem geneli kurulum
+için sağ tık → *Yönetici olarak çalıştır* (yetki yoksa portatif mod yine de çalışır).
+
+PowerShell ile elle:
 ```powershell
-# Gerekirse (yalnız bu oturum için):
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
-
-# A) Depo elinizdeyse:
+# A) Depo elinizdeyse:           (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
 .\install\install.ps1
-
 # B) Tek başına:
 .\install.ps1 -Dir C:\Enflow
 ```
+
+> İlk açılışta uygulama **boş** gelir: tarayıcıda **Kurulum Sihirbazı** şirketinizi, ilk
+> yöneticiyi ve lisansı tanımlar (lisans girmezseniz **30 günlük deneme** ile başlar).
 
 ### Etkileşimsiz (CI / otomasyon)
 ```bash

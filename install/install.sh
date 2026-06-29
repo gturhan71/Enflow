@@ -27,14 +27,47 @@ done
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 say "Enflow kurulum (Linux/macOS)"
 
-# ── önkoşullar ────────────────────────────────────────────────────────────────
-command -v node >/dev/null 2>&1 || die "Node.js bulunamadı. Kurun: https://nodejs.org (≥ 20 LTS)."
-NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
-[[ "$NODE_MAJOR" -ge 20 ]] || die "Node $(node -v) çok eski — en az 20 gerekli."
-ok "Node $(node -v)"
-command -v git >/dev/null 2>&1 || die "git bulunamadı. Kurun: https://git-scm.com"
-ok "$(git --version)"
-corepack enable >/dev/null 2>&1 || true
+NODE_VERSION="${ENFLOW_NODE_VERSION:-22.11.0}" # portatif indirme için pinli LTS
+
+# ── önkoşullar (HİBRİT auto-install: pkg-mgr → portatif → yönlendir) ──────────
+node_ok() { command -v node >/dev/null 2>&1 && [[ "$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)" -ge 20 ]]; }
+
+ensure_node() {
+  if node_ok; then ok "Node $(node -v)"; return; fi
+  command -v node >/dev/null 2>&1 && say "Node $(node -v) eski — uygun sürüm sağlanıyor…" || say "Node.js yok — otomatik sağlanıyor…"
+  # 1) sistem paket yöneticisi (macOS brew)
+  if [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1; then
+    brew install node >/dev/null 2>&1 || true; node_ok && { ok "Node (brew) $(node -v)"; return; }
+  fi
+  # 2) portatif indirme (admin'siz; .tools/ altına)
+  local os arch ext url dir
+  case "$(uname -s)" in Darwin) os=darwin; ext=tar.gz;; Linux) os=linux; ext=tar.xz;; *) die "Desteklenmeyen OS — Node'u elle kurun: https://nodejs.org";; esac
+  case "$(uname -m)" in x86_64|amd64) arch=x64;; arm64|aarch64) arch=arm64;; *) die "Desteklenmeyen mimari $(uname -m)";; esac
+  dir="$SCRIPT_DIR/.tools"; mkdir -p "$dir"
+  url="https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-${os}-${arch}.${ext}"
+  say "Portatif Node indiriliyor: $url"
+  if command -v curl >/dev/null 2>&1; then curl -fsSL "$url" -o "$dir/node.${ext}" || die "Node indirilemedi (ağ/erişim?). Elle: https://nodejs.org"
+  elif command -v wget >/dev/null 2>&1; then wget -qO "$dir/node.${ext}" "$url" || die "Node indirilemedi (ağ?). Elle: https://nodejs.org"
+  else die "curl/wget yok — Node otomatik indirilemiyor. Elle kurun: https://nodejs.org"; fi
+  tar -xf "$dir/node.${ext}" -C "$dir" || die "Node arşivi açılamadı."
+  export PATH="$dir/node-v${NODE_VERSION}-${os}-${arch}/bin:$PATH"
+  node_ok || die "Portatif Node PATH'e eklenemedi."
+  ok "Portatif Node $(node -v) (.tools — yalnız bu kurulum)"
+}
+
+ensure_git() {
+  command -v git >/dev/null 2>&1 && { ok "$(git --version)"; return; }
+  say "git yok — sağlanıyor…"
+  [[ "$(uname -s)" == "Darwin" ]] && command -v brew >/dev/null 2>&1 && brew install git >/dev/null 2>&1 || true
+  if ! command -v git >/dev/null 2>&1 && command -v apt-get >/dev/null 2>&1; then sudo apt-get update -y >/dev/null 2>&1 && sudo apt-get install -y git >/dev/null 2>&1 || true; fi
+  if ! command -v git >/dev/null 2>&1 && command -v dnf >/dev/null 2>&1; then sudo dnf install -y git >/dev/null 2>&1 || true; fi
+  command -v git >/dev/null 2>&1 || die "git otomatik kurulamadı. Kurun: https://git-scm.com"
+  ok "$(git --version)"
+}
+
+ensure_node
+ensure_git
+corepack enable >/dev/null 2>&1 || true # pnpm sihirbazda corepack ile sağlanır
 
 # ── depo: klonla (tek başına) veya güncelle (depo içi) ────────────────────────
 if [[ -f "$SCRIPT_DIR/../package.json" && -d "$SCRIPT_DIR/../backend" ]]; then
