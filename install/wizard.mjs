@@ -159,15 +159,11 @@ async function main() {
   };
   prismaRun(['generate']);
   prismaRun(['migrate', 'deploy']);
-  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : 'Prisma client üretildi + migration\'lar uygulandı');
+  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : 'Prisma client üretildi + migration\'lar uygulandı (BOŞ veritabanı)');
 
-  if (await askYN('Başlangıç "Yedek Yöneticisi" (backup_admin) kullanıcısı oluşturulsun mu?', true)) {
-    if (DRY) { warn('[dry-run] backup_admin seed atlandı.'); }
-    else {
-      const r = spawnSync('node', ['scripts/seed_backup_admin.mjs'], { cwd: join(REPO, 'backend'), stdio: 'inherit', shell: isWin, env });
-      if (r.status === 0) ok('backup_admin kullanıcısı hazır'); else warn('backup_admin seed atlandı.');
-    }
-  }
+  // NOT: Hiçbir kullanıcı/tenant tohumlanmaz. Veritabanı BOŞ kalmalı ki ilk açılışta
+  // tarayıcıdaki Kurulum Sihirbazı şirket + ilk yönetici + lisansı tanımlasın.
+  // (Yedek Yöneticisi gibi ek kullanıcılar sonradan Ayarlar → Kullanıcılar'dan eklenir.)
 
   // ── 6) Derleme (opsiyonel — üretim) ────────────────────────────────────────────
   head('6/6 · Frontend derleme');
@@ -189,8 +185,10 @@ ${C.b}Başlatma:${C.r}
   ${C.c}# Frontend — üretim (derlenmiş dist'i sun)${C.r}
   cd "${REPO}" && pnpm preview --port ${frontendPort} --host
 
-${C.b}İlk giriş:${C.r} tarayıcı → http://localhost:${frontendPort}
-${C.dim}Yedekleme/Backup Admin · YZ entegrasyonu uygulama içi Ayarlar → Entegrasyonlar.${C.r}
+${C.b}İlk açılış:${C.r} tarayıcı → http://localhost:${frontendPort}
+  ${C.dim}Veritabanı BOŞTUR → ekrana KURULUM SİHİRBAZI gelir:${C.r}
+  ${C.dim}şirket + ilk yönetici (GM) + lisans (yoksa 30 günlük deneme). Tamamlanınca otomatik giriş.${C.r}
+${C.dim}Ek kullanıcı (Yedek Yöneticisi vb.) · YZ entegrasyonu sonradan Ayarlar'dan eklenir.${C.r}
 ${C.dim}Sırlar backend/.env içinde (JWT_SECRET, PLUGIN_LICENSE_SECRET). Üretimde gizli tutun.${C.r}
 ${C.dim}(Kabuk: ${py})${C.r}`);
 }

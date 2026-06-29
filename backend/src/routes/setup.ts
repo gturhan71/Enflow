@@ -8,15 +8,16 @@ import { bootstrapTenant } from '../services/bootstrapTenant';
 
 const router: Router = Router();
 
-// Sistem kurulu mu? (en az bir kullanıcı varsa kurulu sayılır)
+// Sistem kurulu mu? (en az bir TENANT/şirket tanımlıysa kurulu sayılır — başıboş
+// kullanıcı kayıtlarından etkilenmez; semantik olarak "bir şirket kurulu mu").
 router.get('/status', asyncHandler(async (_req: Request, res: Response) => {
-  const users = await prisma.user.count();
-  res.json({ initialized: users > 0 });
+  const tenants = await prisma.tenant.count();
+  res.json({ initialized: tenants > 0 });
 }));
 
-// İlk kurulum — yalnız boş DB'de. Tenant + varsayılan birimler + ilk GM + abonelik (lisans/deneme).
+// İlk kurulum — yalnız tenant yokken. Tenant + varsayılan birimler + ilk GM + abonelik (lisans/deneme).
 router.post('/init', asyncHandler(async (req: Request, res: Response) => {
-  const existing = await prisma.user.count();
+  const existing = await prisma.tenant.count();
   if (existing > 0) return res.status(403).json({ error: 'Sistem zaten kurulmuş. Kurulum tekrar çalıştırılamaz.' });
 
   const { company, admin, license } = req.body as { company?: { name?: string }; admin?: { name?: string; email?: string }; license?: string };

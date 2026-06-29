@@ -1,0 +1,19 @@
+# Satır-sonu normalizasyonu — Windows klonlarında script bozulmasını önler.
+# Varsayılan: metin dosyalarını otomatik normalize et (depo'da LF).
+* text=auto eol=lf
+
+# Unix kabuk/Node betikleri DAİMA LF (CRLF bash/node'u kırar).
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.js   text eol=lf
+
+# Windows-yerel betikler CRLF (cmd/PowerShell daha güvenilir çalışır).
+*.bat  text eol=crlf
+*.ps1  text eol=crlf
+
+# İkili dosyalar — dokunma.
+*.png  binary
+*.jpg  binary
+*.ico  binary
+*.db   binary
+*.pdf  binary
