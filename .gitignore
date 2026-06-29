@@ -19,3 +19,8 @@ dist-installer/
 license-poc/*.pem
 
 license-tool/keys/
+
+# Upgrade tool runtime (operatör makinesine özel + uygulama tarafı durum köprüsü)
+upgrade-tool/config.json
+update-status.json
+backend/*.pre-upgrade-*

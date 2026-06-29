@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Enflow Upgrade Tool</title>
+<style>
+  :root { --bg:#0b1220; --card:#131c2e; --line:#243049; --txt:#e6edf7; --mut:#8aa0c0; --pri:#22c55e; --warn:#f59e0b; --err:#ef4444; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto; background:var(--bg); color:var(--txt); }
+  .wrap { max-width:880px; margin:0 auto; padding:28px 20px 60px; }
+  h1 { font-size:20px; letter-spacing:.5px; margin:0 0 2px; }
+  .sub { color:var(--mut); font-size:12px; margin-bottom:22px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; margin-bottom:16px; }
+  .row { display:flex; gap:18px; flex-wrap:wrap; }
+  .col { flex:1; min-width:220px; }
+  .lbl { color:var(--mut); font-size:11px; text-transform:uppercase; letter-spacing:.08em; margin-bottom:4px; }
+  .val { font-size:15px; font-weight:600; word-break:break-all; }
+  .badge { display:inline-block; padding:3px 10px; border-radius:999px; font-size:12px; font-weight:700; }
+  .b-ok { background:rgba(34,197,94,.15); color:var(--pri); }
+  .b-up { background:rgba(245,158,11,.18); color:var(--warn); }
+  .b-err{ background:rgba(239,68,68,.18); color:var(--err); }
+  button { background:var(--pri); color:#06210f; border:0; border-radius:10px; padding:10px 16px; font-weight:700; cursor:pointer; }
+  button.sec { background:transparent; color:var(--txt); border:1px solid var(--line); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  input,select { background:#0d1626; color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .field { margin-bottom:10px; }
+  pre { background:#070d18; border:1px solid var(--line); border-radius:10px; padding:12px; max-height:300px; overflow:auto; font-size:12px; color:#bcd; white-space:pre-wrap; }
+  .toggle { display:flex; align-items:center; gap:8px; }
+  .muted { color:var(--mut); font-size:12px; }
+  .actions { display:flex; gap:10px; margin-top:14px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>⬆ Enflow Upgrade Tool</h1>
+  <div class="sub">On-prem self-upgrade · ayrı operatör aracı · <span id="home"></span></div>
+
+  <div class="card">
+    <div class="row">
+      <div class="col"><div class="lbl">Yerel sürüm</div><div class="val" id="cur">—</div><div class="muted" id="curDate"></div></div>
+      <div class="col"><div class="lbl">En son yayınlanan</div><div class="val" id="lat">—</div><div class="muted" id="latDate"></div></div>
+      <div class="col"><div class="lbl">Durum</div><div id="state"><span class="badge b-ok">—</span></div></div>
+    </div>
+    <div class="muted" id="notes" style="margin-top:10px"></div>
+    <div class="actions">
+      <button id="btnCheck" class="sec">Şimdi Kontrol Et</button>
+      <button id="btnUpgrade">Şimdi Yükselt</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="lbl" style="margin-bottom:10px">Ayarlar</div>
+    <div class="grid2">
+      <div class="field"><div class="lbl">Kanal</div>
+        <select id="channel"><option value="auto">auto (tag varsa tag, yoksa commit)</option><option value="tag">tag (semver)</option><option value="commit">commit (origin/main)</option></select>
+      </div>
+      <div class="field"><div class="lbl">Otomatik kontrol (saat)</div><input id="autoCheckHours" type="number" min="1" /></div>
+      <div class="field toggle"><input id="autoUpgrade" type="checkbox" style="width:auto" /> <label for="autoUpgrade">Bakım penceresinde otomatik yükselt</label></div>
+      <div class="field"></div>
+      <div class="field"><div class="lbl">Bakım penceresi (başlangıç saati)</div><input id="maintenanceFrom" type="number" min="0" max="23" /></div>
+      <div class="field"><div class="lbl">Bakım penceresi (bitiş saati)</div><input id="maintenanceTo" type="number" min="0" max="23" /></div>
+      <div class="field" style="grid-column:1/3"><div class="lbl">Restart komutu (yükseltme sonrası)</div><input id="restartCommand" placeholder="ör. sudo systemctl restart enflow-backend" /></div>
+    </div>
+    <div class="actions"><button id="btnSave" class="sec">Ayarları Kaydet</button> <span class="muted" id="saved"></span></div>
+  </div>
+
+  <div class="card">
+    <div class="lbl" style="margin-bottom:8px">Yükseltme logu</div>
+    <pre id="log">—</pre>
+  </div>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+let pollTimer = null;
+
+function renderStatus(d) {
+  $('home').textContent = d.home || '';
+  const c = d.current || {};
+  $('cur').textContent = c.tag || c.shortSha || '—';
+  $('curDate').textContent = c.date ? new Date(c.date).toLocaleString('tr') : '';
+  const u = (d.status && d.status.update) || {};
+  $('lat').textContent = u.target ? `${u.kind}:${u.target}` : '—';
+  $('latDate').textContent = u.publishedAt ? new Date(u.publishedAt).toLocaleString('tr') : '';
+  $('notes').textContent = u.notes ? ('Not: ' + u.notes) : '';
+  let badge = '<span class="badge b-ok">Güncel</span>';
+  if (u.failed) badge = '<span class="badge b-err">Yükseltme başarısız (rollback)</span>';
+  else if (u.applied) badge = '<span class="badge b-ok">Güncellendi</span>';
+  else if (u.available) badge = '<span class="badge b-up">⬆ Güncelleme var</span>';
+  $('state').innerHTML = badge;
+  $('btnUpgrade').disabled = d.busy;
+  $('log').textContent = (d.log && d.log.length) ? d.log.join('\n') : '—';
+  if (d.busy && !pollTimer) pollTimer = setInterval(refresh, 1500);
+  if (!d.busy && pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+}
+function renderSettings(c) {
+  $('channel').value = c.channel; $('autoCheckHours').value = c.autoCheckHours;
+  $('autoUpgrade').checked = !!c.autoUpgrade; $('maintenanceFrom').value = c.maintenanceFrom;
+  $('maintenanceTo').value = c.maintenanceTo; $('restartCommand').value = c.restartCommand || '';
+}
+async function refresh() { const d = await (await fetch('/api/status')).json(); renderStatus(d); if (d.config) renderSettings(d.config); }
+
+$('btnCheck').onclick = async () => { $('btnCheck').disabled = true; try { await fetch('/api/check', { method:'POST' }); await refresh(); } finally { $('btnCheck').disabled = false; } };
+$('btnUpgrade').onclick = async () => { if (!confirm('Yükseltme yıkıcıdır (ön-yedek alınır, hata olursa geri alınır). Devam?')) return; await fetch('/api/upgrade', { method:'POST' }); if (!pollTimer) pollTimer = setInterval(refresh, 1500); };
+$('btnSave').onclick = async () => {
+  const patch = { channel:$('channel').value, autoCheckHours:Number($('autoCheckHours').value), autoUpgrade:$('autoUpgrade').checked, maintenanceFrom:Number($('maintenanceFrom').value), maintenanceTo:Number($('maintenanceTo').value), restartCommand:$('restartCommand').value };
+  await fetch('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+  $('saved').textContent = 'kaydedildi ✓'; setTimeout(() => $('saved').textContent = '', 2000);
+};
+refresh();
+</script>
+</body>
+</html>
