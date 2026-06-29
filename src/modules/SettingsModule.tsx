@@ -274,6 +274,44 @@ const AISettingsCard: React.FC = () => {
   );
 };
 
+// Sürüm/Güncelleme bilgi kartı — ayrı upgrade-tool'un yazdığı durumu gösterir
+// (salt-okunur; yükseltme bu uygulamada DEĞİL, ayrı araçtadır).
+const UpdateInfoCard: React.FC = () => {
+  const [v, setV] = useState<Awaited<ReturnType<typeof apiService.getVersion>> | null>(null);
+  useEffect(() => { apiService.getVersion().then(setV).catch(() => undefined); }, []);
+  const u = v?.update;
+  const cur = v?.current;
+  return (
+    <div className="glass-card p-6 rounded-2xl">
+      <div className="flex items-center gap-2 mb-1">
+        <Cpu className="w-4 h-4 text-primary" />
+        <h5 className="font-bold text-slate-900">Güncellemeler</h5>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">Sürüm durumu, ayrı <span className="font-mono">upgrade-tool</span> aracı tarafından güncellenir.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Yerel sürüm</div>
+          <div className="font-mono font-semibold text-slate-800">{cur?.tag || cur?.shortSha || '—'}</div>
+        </div>
+        <div>
+          <div className="text-[10px] uppercase tracking-widest text-slate-400 font-bold">Durum</div>
+          {u?.failed ? (
+            <span className="text-xs font-bold text-red-500">Son yükseltme başarısız (geri alındı)</span>
+          ) : u?.applied ? (
+            <span className="text-xs font-bold text-emerald-600">Güncellendi → {u.target}</span>
+          ) : u?.available ? (
+            <span className="text-xs font-bold text-amber-600">⬆ Yeni sürüm mevcut: {u.target}{u.publishedAt ? ` (${new Date(u.publishedAt).toLocaleDateString('tr-TR')})` : ''}</span>
+          ) : (
+            <span className="text-xs font-bold text-emerald-600">Güncel</span>
+          )}
+        </div>
+      </div>
+      {u?.available && u?.notes && <p className="text-xs text-slate-500 mt-3">Not: {u.notes}</p>}
+      {!v && <p className="text-xs text-slate-400 mt-2">Sürüm bilgisi alınamadı (araç henüz çalışmamış olabilir).</p>}
+    </div>
+  );
+};
+
 // ── Ana bileşen ───────────────────────────────────────────────────────────
 const SettingsModule = ({
   companyLogo,
@@ -368,6 +406,7 @@ const SettingsModule = ({
               <p className="text-sm text-slate-500 mb-6">Yapay zeka, doküman ve iletişim servis bağlantılarını yapılandırın.</p>
             </div>
             <AISettingsCard />
+            <UpdateInfoCard />
             <IntegrationWizard
               ncConfig={{ url: '', username: '', appPassword: '' }}
               setNcConfig={() => {}}

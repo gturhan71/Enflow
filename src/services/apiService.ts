@@ -210,6 +210,10 @@ class ApiService {
   }
   async getBackupJob(id: string) { return apiClient.fetchWithAuth(`/backup/jobs/${id}`); }
   async verifyBackupJob(id: string) { return apiClient.fetchWithAuth(`/backup/jobs/${id}/verify`, { method: 'POST' }); }
+  // Sürüm/güncelleme durumu — ayrı upgrade-tool'un yazdığı update-status.json'u yansıtır.
+  async getVersion(): Promise<{ current: { shortSha?: string | null; tag?: string | null; date?: string | null } | null; update: { available?: boolean; applied?: boolean; failed?: boolean; kind?: string; target?: string | null; notes?: string | null; publishedAt?: string | null }; checkedAt: string | null }> {
+    return apiClient.fetchWithAuth('/version');
+  }
   async getBackupSettings() { return apiClient.fetchWithAuth('/backup/settings'); }
   async updateBackupSettings(data: Record<string, unknown>) {
     return apiClient.fetchWithAuth('/backup/settings', { method: 'PUT', body: JSON.stringify(data) });

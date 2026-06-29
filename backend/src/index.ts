@@ -18,6 +18,7 @@ import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles } from './middleware';
 import { startBackupScheduler } from './services/backupScheduler';
+import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import projectsRouter from './routes/projects';
 import tasksRouter from './routes/tasks';
 import contractsRouter from './routes/contracts';
@@ -59,6 +60,17 @@ app.use(cors({
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Sürüm bilgisi (ayrı upgrade-tool'un yazdığı update-status.json'u yansıtır;
+// burada sürüm/upgrade mantığı YOK — yalnız okur). Frontend "Güncellemeler" kartı + dinamik sürüm.
+app.get('/api/version', (_req, res) => {
+  const status = readUpdateStatus();
+  res.json({
+    current: status?.current || null,
+    update: status?.update || { available: false },
+    checkedAt: status?.checkedAt || null,
+  });
 });
 
 // Salt-okunur rol guard'ı — domain router'lardan ÖNCE (BACKUP_ADMIN mutasyonları
@@ -111,6 +123,7 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 app.listen(port, () => {
   console.log(`[Enflow Backend] Server is running at http://localhost:${port}`);
   startBackupScheduler();
+  startUpdateNotifier();
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
   // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.
   try {
