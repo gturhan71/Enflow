@@ -21,16 +21,18 @@ import { Notification } from '../types';
 import { apiService } from '../services/apiService';
 
 const Header = ({ 
-  title, 
-  activeTab, 
+  title,
+  activeTab,
   setActiveTab,
+  onNavigate,
   onLogout,
   onMenuToggle,
   isSidebarOpen
-}: { 
-  title?: string, 
-  activeTab?: string, 
+}: {
+  title?: string,
+  activeTab?: string,
   setActiveTab?: (id: string) => void,
+  onNavigate?: (tab: string, itemId?: string | null) => void,
   onLogout?: () => void,
   onMenuToggle?: () => void,
   isSidebarOpen?: boolean
@@ -112,11 +114,12 @@ const Header = ({
       apiService.updateNotification(notification.id, { isRead: true }).catch(() => {});
     }
 
-    // Navigate if possible
-    if (notification.relatedModule && setActiveTab) {
-      setActiveTab(notification.relatedModule);
+    // Deep-link: ilgili modül ekranına (ve kayda) git.
+    if (notification.relatedModule) {
+      if (onNavigate) onNavigate(notification.relatedModule, notification.relatedItemId);
+      else if (setActiveTab) setActiveTab(notification.relatedModule);
     }
-    
+
     setShowNotifications(false);
   };
 

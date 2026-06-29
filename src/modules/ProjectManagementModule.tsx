@@ -885,9 +885,10 @@ interface ProjectManagementModuleProps {
   units?: Unit[];
   customers?: { id: string; name: string }[];
   setActiveTab?: (tab: string) => void;
+  initialItemId?: string | null;
 }
 
-const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users = [], customers = [], setActiveTab }) => {
+const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users = [], customers = [], setActiveTab, initialItemId }) => {
   const { currentUser } = useAuth();
   const [view, setView] = useState<'dashboard' | 'list'>('dashboard');
   const [projects, setProjects] = useState<Project[]>([]);
@@ -920,6 +921,13 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
   }, []);
 
   useEffect(() => { loadProjects(); loadWonOpportunities(); }, []);
+
+  // Deep-link: bildirim/görev "Git" ile gelen projeyi otomatik aç.
+  useEffect(() => {
+    if (!initialItemId) return;
+    const p = projects.find(x => x.id === initialItemId);
+    if (p) { setView('list'); setSelectedProject(p); }
+  }, [initialItemId, projects]);
 
   const existingProjectOppIds = useMemo(
     () => new Set(projects.map(p => p.opportunityId).filter(Boolean) as string[]),

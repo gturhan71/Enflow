@@ -39,14 +39,22 @@ interface PresalesModuleProps {
   proposals?: Proposal[];
   setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>;
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>;
+  initialOppId?: string | null;  // görev "Git" / bildirim deep-link ile gelen fırsat
 }
 
-const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks }: PresalesModuleProps) => {
+const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks, initialOppId }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS' | 'HANDOFFS'>('BOM');
   const isPresalesMgr = currentUser?.role === 'PRESALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState<string>('');
+
+  // Deep-link: dışarıdan gelen fırsatı otomatik seç (varsa ve listede ise).
+  useEffect(() => {
+    if (initialOppId && opportunities.some(o => o.id === initialOppId)) {
+      setSelectedOppId(initialOppId);
+    }
+  }, [initialOppId, opportunities]);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [isHandingOff, setIsHandingOff] = useState(false);
 

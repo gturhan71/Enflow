@@ -122,7 +122,7 @@ const TodoModule = ({
   users?: User[],
   proposals?: Proposal[],
   setProposals?: React.Dispatch<React.SetStateAction<Proposal[]>>,
-  onNavigate?: (tab: string) => void
+  onNavigate?: (tab: string, itemId?: string | null) => void
 }) => {
   const { currentUser } = useAuth();
   const [filterUnit, setFilterUnit] = useState<string>('all');
@@ -640,7 +640,7 @@ const TodoModule = ({
                   </div>
                   {onNavigate && taskTargetTab(todo) && (
                     <button
-                      onClick={() => onNavigate(taskTargetTab(todo)!)}
+                      onClick={() => onNavigate(taskTargetTab(todo)!, todo.relatedItemId)}
                       title="İlgili modüldeki işe git"
                       className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95 shadow-lg shadow-indigo-100"
                     >

@@ -61,6 +61,7 @@ interface AiAnalysis {
 interface Props {
   opportunities?: Opportunity[];
   proposals?: Proposal[];
+  initialItemId?: string | null;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────
@@ -132,7 +133,7 @@ function bestProposalPrice(opportunityId: string, proposals: Proposal[]): number
   return best?.price ?? null;
 }
 
-export function ContractWorkflowModule({ opportunities = [], proposals = [] }: Props) {
+export function ContractWorkflowModule({ opportunities = [], proposals = [], initialItemId }: Props) {
   const [mode, setMode] = useState<'contracts' | 'legal'>('contracts');
   const [tab, setTab] = useState<TabId>('context');
   const [workflows, setWorkflows] = useState<ContractWorkflow[]>([]);
@@ -189,6 +190,14 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [] }: P
       setAnalysis(null);
     }
   };
+
+  // Deep-link: bildirim/görev "Git" ile gelen sözleşme akışını otomatik aç.
+  useEffect(() => {
+    if (!initialItemId) return;
+    const wf = workflows.find(w => w.id === initialItemId);
+    if (wf && selected?.id !== wf.id) { setMode('contracts'); selectWorkflow(wf); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialItemId, workflows]);
 
   // ── Context Tab ──────────────────────────────────────────────────────────────
 

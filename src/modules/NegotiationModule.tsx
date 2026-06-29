@@ -47,12 +47,14 @@ const NegotiationModule = ({
   opportunities = [],
   setOpportunities,
   proposals = [],
-  setActiveTab
+  setActiveTab,
+  initialOppId,
 }: {
   opportunities: Opportunity[];
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
   proposals?: Proposal[];
   setActiveTab?: (tab: string) => void;
+  initialOppId?: string | null;
 }) => {
   const { currentUser } = useAuth();
   
@@ -85,6 +87,13 @@ const NegotiationModule = ({
 
   const [selectedProposalId, setSelectedProposalId] = useState('');
   const [selectedOppId, setSelectedOppId] = useState('');
+
+  // Deep-link: bildirim/görev "Git" ile gelen fırsatın pazarlığa açık teklifini otomatik seç.
+  useEffect(() => {
+    if (!initialOppId) return;
+    const p = openProposals.find(x => x.opportunityId === initialOppId);
+    if (p) setSelectedProposalId(p.id);
+  }, [initialOppId, openProposals]);
   
   // Get currently selected proposal
   const selectedProposal = useMemo(() => {

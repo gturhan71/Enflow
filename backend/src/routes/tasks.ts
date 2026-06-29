@@ -6,6 +6,22 @@ import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
 
+// İşlevsel eylem → o işin yapıldığı modül sekmesi (deep-link hedefi; frontend ile aynı).
+const ACTION_TARGET: Record<string, string> = {
+  BOM_PREPARE: 'presales', SPEC_ANALYSIS: 'presales',
+  COST_ANALYSIS: 'crm-cost', PROPOSAL_PREPARE: 'crm-proposals', NEGOTIATION: 'crm-negotiation',
+  MILESTONE_UPDATE: 'project-mgmt', HANDOVER_DOCS: 'project-mgmt', COST_ENTRY: 'project-mgmt',
+  VENDOR_QUOTE: 'procurement', PO_ISSUE: 'procurement', DELIVERY_RECORD: 'procurement',
+  DOC_PREPARE: 'contract-workflow', SIGN_APPROVE: 'contract-workflow',
+  CONTRACT_REVIEW: 'contract-workflow', CASE_OPEN: 'contract-workflow', OPINION: 'contract-workflow',
+};
+const MODULE_TARGET: Record<string, string> = {
+  OPPORTUNITY: 'crm-opportunities', PROJECT: 'project-mgmt', PROCUREMENT: 'procurement',
+  CONTRACT: 'contract-workflow', LEGAL: 'contract-workflow',
+};
+const targetTab = (actionKey?: string | null, relatedModule?: string | null): string | null =>
+  (actionKey ? ACTION_TARGET[actionKey] : undefined) || (relatedModule ? MODULE_TARGET[relatedModule] : undefined) || null;
+
 // Kullanıcı kapsamı (KİŞİ-BAZLI): bir kullanıcı YALNIZ kendisine atanan
 // (assignedToUserId) veya kendi oluşturduğu (assignedBy) görevleri görür.
 // Atanmamış (legacy/null) görevler için birim fallback'i: kendi biriminin
@@ -56,6 +72,9 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
         type: 'TASK',
         title: 'Size yeni bir görev atandı',
         message: task.title,
+        // Bildirime tıklayınca ilgili modül ekranına (ve kayda) deep-link.
+        relatedModule: targetTab(task.actionKey, task.relatedModule),
+        relatedItemId: task.relatedItemId,
       },
     }).catch(() => {});
   }

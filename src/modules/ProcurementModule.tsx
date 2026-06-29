@@ -808,9 +808,10 @@ const PRForm: React.FC<PRFormProps> = ({ projects, units, currentUserId, current
 interface ProcurementModuleProps {
   projects?: Project[];
   units?: Unit[];
+  initialItemId?: string | null;
 }
 
-export const ProcurementModule: React.FC<ProcurementModuleProps> = ({ projects = [], units = [] }) => {
+export const ProcurementModule: React.FC<ProcurementModuleProps> = ({ projects = [], units = [], initialItemId }) => {
   const { currentUser } = useAuth();
   const [mainTab, setMainTab] = useState<'requests' | 'vendors' | 'summary'>('requests');
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
@@ -840,6 +841,13 @@ export const ProcurementModule: React.FC<ProcurementModuleProps> = ({ projects =
   }, [filterStatus, selectedPR?.id]);
 
   useEffect(() => { loadData(); }, [filterStatus]);
+
+  // Deep-link: bildirim/görev "Git" ile gelen satınalma talebini otomatik aç.
+  useEffect(() => {
+    if (!initialItemId) return;
+    const pr = requests.find(r => r.id === initialItemId);
+    if (pr) { setMainTab('requests'); setSelectedPR(pr); }
+  }, [initialItemId, requests]);
 
   const handleCreatePR = async (data: Record<string, unknown>) => {
     await apiService.createPurchaseRequest(data);

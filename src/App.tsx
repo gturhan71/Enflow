@@ -174,7 +174,14 @@ const TenantAppInner = ({
   companyLogo: string | null 
 }) => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [navItemId, setNavItemId] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  // Sekme + ilgili kayıt ile yönlendirme (görev "Git" / bildirim deep-link).
+  const navigate = (tab: string, itemId?: string | null) => {
+    setNavItemId(itemId ?? null);
+    setActiveTab(tab);
+  };
 
   useEffect(() => {
     setIsSidebarOpen(false);
@@ -316,34 +323,35 @@ const TenantAppInner = ({
             proposals={proposals}
             setProposals={setProposals}
             activeTab={activeTab} 
-            tasks={tasks} 
-            setTasks={setTasks} 
+            tasks={tasks}
+            setTasks={setTasks}
             setActiveTab={setActiveTab}
+            initialItemId={navItemId}
           />
         );
       // Presales & alt sekmeler
       case 'presales':
       case 'presales-bom':
-        return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} />;
+        return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} initialOppId={navItemId} />;
       case 'crm-cost':
       case 'presales-cost': // geriye dönük uyumluluk (eski Presales konumu)
       case 'cost-analysis': // geriye dönük uyumluluk
-        return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} />;
+        return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} initialItemId={navItemId} />;
 
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
 
       // Sözleşme — yeni ContractWorkflow ana modül
       case 'contract-workflow':
       case 'contract-workflow-test': // geriye dönük uyumluluk (legacy alias)
-        return <ContractWorkflowModule opportunities={opportunities} proposals={proposals} />;
+        return <ContractWorkflowModule opportunities={opportunities} proposals={proposals} initialItemId={navItemId} />;
 
       // Eski sözleşme modülü — erişim kapanmadı, sadece menüden çıkarıldı
       case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
 
-      case 'procurement': return <ProcurementModule projects={projects} units={units} />;
-      case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} />;
+      case 'procurement': return <ProcurementModule projects={projects} units={units} initialItemId={navItemId} />;
+      case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} initialItemId={navItemId} />;
       case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} opportunities={opportunities.map(o => ({ id: o.id, title: o.title }))} projects={projects.map(p => ({ id: p.id, name: p.name }))} />;
-      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} onNavigate={setActiveTab} />;
+      case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} onNavigate={navigate} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;
       case 'archive': return <ArchiveModule />;
       case 'corporate-governance': return <CorporateGovernanceModule />;
@@ -366,18 +374,19 @@ const TenantAppInner = ({
       <AIGateProvider onNavigateToIntegrations={() => setActiveTab('settings-integrations')}>
       <div className="flex h-screen bg-background overflow-hidden font-geist relative">
         <Sidebar
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          onLogout={onLogout} 
+          activeTab={activeTab}
+          setActiveTab={navigate}
+          onLogout={onLogout}
           companyLogo={companyLogo} 
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
         />
         <main className="flex-1 flex flex-col min-w-0 relative h-screen overflow-hidden">
-          <Header 
-            activeTab={activeTab} 
-            setActiveTab={setActiveTab} 
-            onLogout={onLogout} 
+          <Header
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            onNavigate={navigate}
+            onLogout={onLogout}
             onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
             isSidebarOpen={isSidebarOpen}
           />

@@ -435,6 +435,8 @@ model Notification {
   title     String
   message   String
   type      String
+  relatedModule String?  // tıklayınca gidilecek sekme (deep-link)
+  relatedItemId String?  // ilgili kayıt (fırsat/proje) — hedef modülde açılır
   isRead    Boolean  @default(false)
   timestamp DateTime @default(now())
   tenantId  String

@@ -62,7 +62,8 @@ const CRMModule = ({
   activeTab = 'crm-opportunities',
   tasks = [],
   setTasks,
-  setActiveTab
+  setActiveTab,
+  initialItemId,
 }: {
   opportunities: Opportunity[],
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>,
@@ -73,7 +74,8 @@ const CRMModule = ({
   activeTab?: string,
   tasks?: TodoTask[],
   setTasks?: React.Dispatch<React.SetStateAction<TodoTask[]>>,
-  setActiveTab?: (tab: string) => void
+  setActiveTab?: (tab: string) => void,
+  initialItemId?: string | null,
 }) => {
   const { currentUser } = useAuth();
   const [loading, setLoading] = useState(false);
@@ -87,6 +89,16 @@ const CRMModule = ({
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
   const [customerReportTarget, setCustomerReportTarget] = useState<Customer | null>(null);
+
+  // Deep-link: bildirim/görev "Git" ile gelen fırsatı otomatik aç (teklif sekmesinde
+  // teklif editörünü açar; diğer sekmelerde fırsatı seçili getirir).
+  React.useEffect(() => {
+    if (!initialItemId) return;
+    const opp = opportunities.find(o => o.id === initialItemId);
+    if (!opp) return;
+    setSelectedOpp(opp);
+    if (activeTab === 'crm-proposals') setShowProposalEditor(true);
+  }, [initialItemId, opportunities, activeTab]);
 
   const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
     if (!handOffTarget || !currentUser) return;
@@ -1369,6 +1381,7 @@ const CRMModule = ({
           setOpportunities={setOpportunities}
           proposals={proposals}
           setActiveTab={setActiveTab}
+          initialOppId={activeTab === 'crm-negotiation' ? initialItemId : null}
         />
       ) : activeTab === 'crm-opportunities' ? renderOpportunities()
         : activeTab === 'crm-customers' ? renderCustomers()

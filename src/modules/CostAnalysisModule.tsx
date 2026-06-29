@@ -27,16 +27,22 @@ const DEFAULT_SPOT: Record<Currency, Record<string, number>> = {
 const OPERATIONAL_CATS: CostCategory[] = ['LABOR', 'LOGISTICS', 'TECHNICAL_SERVICE', 'TRAVEL', 'ACCOMMODATION', 'ACCEPTANCE', 'NOTARY', 'CUSTOMS', 'OTHER'];
 
 const CostAnalysisModule = ({
-  opportunities, setOpportunities, setActiveTab,
+  opportunities, setOpportunities, setActiveTab, initialItemId,
 }: {
   opportunities: Opportunity[];
   setOpportunities: React.Dispatch<React.SetStateAction<Opportunity[]>>;
   setActiveTab?: (tab: string) => void;
   tenantId?: string;
+  initialItemId?: string | null;
 }) => {
   const { currentUser } = useAuth();
   const canApprove = currentUser?.role === 'SALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState('');
+
+  // Deep-link: bildirim/görev "Git" ile gelen fırsatı otomatik seç.
+  React.useEffect(() => {
+    if (initialItemId && opportunities.some(o => o.id === initialItemId)) setSelectedOppId(initialItemId);
+  }, [initialItemId, opportunities]);
   const [loading, setLoading] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [submitted, setSubmitted] = useState(false);
