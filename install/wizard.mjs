@@ -9,7 +9,7 @@
 import { createInterface } from 'node:readline/promises';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync, readFileSync, mkdirSync } from 'node:fs';
+import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout, platform, exit } from 'node:process';
@@ -27,6 +27,7 @@ const getArg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 
 const has = (k) => args.includes(k);
 const YES = has('--yes') || has('-y');
 const DRY = has('--dry-run');
+const RESET_DB = has('--reset-db'); // temiz kurulum: mevcut SQLite dev.db'yi sil
 const isWin = platform === 'win32';
 const SELF_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(getArg('--repo', join(SELF_DIR, '..')));
@@ -157,9 +158,24 @@ async function main() {
     const r = spawnSync('pnpm', ['prisma', ...a], { cwd: join(REPO, 'backend'), stdio: 'inherit', shell: isWin, env });
     if (r.status !== 0) throw new Error(`prisma ${a.join(' ')} başarısız`);
   };
+  // Temiz kurulum güvencesi: önceki kurulumdan kalan SQLite dev.db veriyle gelir
+  // (git rm --cached izlemeyi bıraktı ama yerel dosya silinmez). Varsa sor/sıfırla.
+  if (!usePg && !DRY) {
+    const dbFile = join(REPO, 'backend', 'dev.db');
+    if (existsSync(dbFile)) {
+      const doReset = RESET_DB || (!YES && await askYN('Mevcut veritabani (backend/dev.db) bulundu. TEMIZ kurulum icin SIFIRLANSIN mi? (Hayir = mevcut veri/kullanicilar korunur)', false));
+      if (doReset) {
+        for (const ext of ['', '-shm', '-wal']) { try { if (existsSync(dbFile + ext)) unlinkSync(dbFile + ext); } catch { /* yut */ } }
+        ok('Mevcut veritabani sifirlandi → bos kurulum (ilk acilista Kurulum Sihirbazi gelir).');
+      } else {
+        warn('Mevcut veritabani korundu — eski veri/kullanicilar gelir. (Temiz icin: --reset-db)');
+      }
+    }
+  }
+
   prismaRun(['generate']);
   prismaRun(['migrate', 'deploy']);
-  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : 'Prisma client üretildi + migration\'lar uygulandı (BOŞ veritabanı)');
+  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : 'Prisma client üretildi + migration\'lar uygulandı');
 
   // NOT: Hiçbir kullanıcı/tenant tohumlanmaz. Veritabanı BOŞ kalmalı ki ilk açılışta
   // tarayıcıdaki Kurulum Sihirbazı şirket + ilk yönetici + lisansı tanımlasın.
