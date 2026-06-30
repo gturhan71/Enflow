@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Building, Edit3, Trash2, X, Users, Save, Loader2 } from 'lucide-react';
+import { Plus, Building, Edit3, Trash2, X, Users, Save, Loader2, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Unit, User } from '../../types';
@@ -24,6 +24,24 @@ export const UnitManagement = ({
   const [unitToDelete, setUnitToDelete] = useState<Unit | null>(null);
   const [transferTargetId, setTransferTargetId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [seeding, setSeeding] = useState(false);
+
+  // Varsayılan şablonu yükle: eksik birimler + varsayılan iş akışı (idempotent).
+  const handleSeedTemplate = async () => {
+    setSeeding(true);
+    try {
+      const res = await apiService.seedDefaultTemplate();
+      const fresh = await apiService.getUnits() as Unit[];
+      setUnits(fresh);
+      alert(res.addedCount > 0
+        ? `${res.addedCount} şablon birim eklendi + varsayılan iş akışı hazır.`
+        : 'Tüm şablon birimler zaten mevcut — varsayılan iş akışı hazır.');
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Şablon yüklenemedi.');
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   const handleSaveUnit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,12 +113,22 @@ export const UnitManagement = ({
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center justify-between">
         <h4 className="text-xl font-bold text-slate-900">Kurumsal Birimler</h4>
-        <button 
-          onClick={() => { setEditingUnit(null); setShowUnitModal(true); }} 
-          className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
-        >
-          <Plus size={18} /> Yeni Birim Ekle
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleSeedTemplate}
+            disabled={seeding}
+            title="Eksik şablon birimleri ekler ve varsayılan iş akışını oluşturur (mevcutlara dokunmaz)"
+            className="bg-white border border-slate-200 text-slate-700 px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 hover:border-primary/40 transition-all disabled:opacity-50"
+          >
+            {seeding ? <Loader2 size={18} className="animate-spin" /> : <Layers size={18} />} Varsayılan Şablonu Yükle
+          </button>
+          <button
+            onClick={() => { setEditingUnit(null); setShowUnitModal(true); }}
+            className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+          >
+            <Plus size={18} /> Yeni Birim Ekle
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -156,6 +156,10 @@ class ApiService {
     return apiClient.fetchWithAuth(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
   async deleteUnit(id: string, transferId?: string) { return settingsService.deleteUnit(id, transferId); }
+  // Varsayılan şablonu yükle: eksik birimleri ekler + varsayılan iş akışını oluşturur (idempotent).
+  async seedDefaultTemplate(): Promise<{ addedUnits: { id: string; name: string }[]; addedCount: number; workflowId: string; workflowName: string }> {
+    return apiClient.fetchWithAuth('/units/seed-defaults', { method: 'POST', body: JSON.stringify({}) });
+  }
 
   // --- USERS ---
   async getUsers() { return settingsService.getUsers(); }

@@ -5,7 +5,8 @@ import { prisma } from '../prismaClient';
 import { verifyLicenseToken } from './licenseVerify';
 
 // Varsayılan birim seti (kurumsal süreç swimlane'leri — seed.ts ile aynı).
-const DEFAULT_UNITS: { key: string; name: string; description: string }[] = [
+// Kurulumda otomatik oluşturulur; sonradan "şablon yükle" ile de eklenir (units.ts).
+export const DEFAULT_UNITS: { key: string; name: string; description: string }[] = [
   { key: 'sales', name: 'Satış & Pazarlama', description: 'Müşteri ilişkileri ve yeni fırsat yönetimi.' },
   { key: 'technical', name: 'Teknik Çözümler & Presales', description: 'Dizayn, BoM ve teknik şartname analizi.' },
   { key: 'finance', name: 'Finans', description: 'Maliyet ve finansman değerlendirmesi.' },

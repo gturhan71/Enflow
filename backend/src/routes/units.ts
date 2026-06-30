@@ -2,11 +2,15 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { DEFAULT_UNITS } from '../services/bootstrapTenant';
+import { ensureDefaultWorkflow } from '../services/workflowTemplateService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 // Birim listesi okuma — GM + Presales + Yedek Yöneticisi (salt-okunur akış dahli)
 const GM_OR_PRESALES = requireRole(['GENERAL_MANAGER', 'PRESALES_ENG', 'BACKUP_ADMIN']);
 const router: Router = Router();
+
+const norm = (s: string) => s.trim().toLocaleLowerCase('tr-TR');
 
 router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Request, res: Response) => {
   const units = await prisma.unit.findMany({
@@ -14,6 +18,26 @@ router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Reque
     include: { users: true }
   });
   res.json(units);
+}));
+
+// Varsayılan şablonu yükle (idempotent): eksik şablon birimlerini ekler + varsayılan
+// iş akışını oluşturur. Mevcut birimlere/iş akışına dokunmaz (isimle eşleşeni atlar).
+router.post('/seed-defaults', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const existing = await prisma.unit.findMany({ where: { tenantId: req.tenantId }, select: { name: true } });
+  const have = new Set(existing.map((u) => norm(u.name)));
+
+  const created: { id: string; name: string }[] = [];
+  for (const u of DEFAULT_UNITS) {
+    if (have.has(norm(u.name))) continue; // mevcut birime dokunma
+    const unit = await prisma.unit.create({ data: { name: u.name, description: u.description, tenantId: req.tenantId } });
+    created.push({ id: unit.id, name: unit.name });
+  }
+
+  // Varsayılan iş akışı (birimlerden türetilir; zaten varsa mevcudu döner).
+  const workflow = await ensureDefaultWorkflow(req.tenantId);
+
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SEED_TEMPLATE', entityType: 'UNIT', entityId: req.tenantId, details: { addedUnits: created.length, workflowId: workflow.id } });
+  res.json({ addedUnits: created, addedCount: created.length, workflowId: workflow.id, workflowName: workflow.name });
 }));
 
 router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
