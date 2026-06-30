@@ -426,13 +426,26 @@ const App = () => {
     }
   }, [activeTenantId]);
 
-  // Boş DB ise kurulum sihirbazı göster (giriş yerine). Hata → kurulu varsay (login akışı).
+  // Boot'ta DAİMA kurulum durumunu doğrula. DB'de tenant yoksa (initialized:false)
+  // tarayıcıda kalmış ESKİ oturumu (DB sıfırlandıysa ölü tenant) temizle ve kurulum
+  // sihirbazını göster — aksi halde ölü tenant ile "Tenant bulunamadı" alınır.
   useEffect(() => {
-    if (isAuthenticated && activeTenantId) { setInitialized(true); return; }
     apiService.getSetupStatus()
-      .then((s) => setInitialized(s.initialized))
-      .catch(() => setInitialized(true));
-  }, [isAuthenticated, activeTenantId]);
+      .then((s) => {
+        if (!s.initialized && (localStorage.getItem('enflow_auth_token') || localStorage.getItem('enflow_active_tenant_id'))) {
+          const stale = localStorage.getItem('enflow_active_tenant_id');
+          if (stale) localStorage.removeItem(`enflow_current_user_${stale}`);
+          localStorage.removeItem('enflow_auth_token');
+          localStorage.removeItem('enflow_active_tenant_id');
+          setIsAuthenticated(false);
+          setActiveTenantId(null);
+        }
+        setInitialized(s.initialized);
+      })
+      .catch(() => setInitialized(true)); // backend erişilemiyorsa kurulu varsay (login akışı)
+    // yalnız boot'ta bir kez
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLogin = (tenantId: string, token: string, user: User) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
