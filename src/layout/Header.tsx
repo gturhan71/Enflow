@@ -16,7 +16,6 @@ import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
-import { MOCK_NOTIFICATIONS } from '../constants';
 import { Notification } from '../types';
 import { apiService } from '../services/apiService';
 
@@ -43,20 +42,21 @@ const Header = ({
   const [showNotifications, setShowNotifications] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
-  const [notifications, setNotifications] = useState<Notification[]>(MOCK_NOTIFICATIONS);
+  // BOŞ başla — sahte demo bildirimleri ASLA gösterme (tenant izolasyonu: yalnız
+  // backend'in döndürdüğü, bu kullanıcı+tenant'a ait gerçek bildirimler görünür).
+  const [notifications, setNotifications] = useState<Notification[]>([]);
 
-  // Gerçek (backend) bildirimlerini kullanıcı bazında çek; varsa mock'un yerini alır
+  // Gerçek (backend) bildirimlerini kullanıcı bazında çek.
   useEffect(() => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) { setNotifications([]); return; }
     let active = true;
     const load = async () => {
       try {
         const real = await apiService.getNotifications(currentUser.id);
-        if (active && Array.isArray(real) && real.length > 0) {
-          setNotifications(real as Notification[]);
-        }
+        // Boş gelse bile yaz → eski/yanlış bildirimler temizlenir.
+        if (active && Array.isArray(real)) setNotifications(real as Notification[]);
       } catch {
-        // sessizce mock'ta kal
+        // erişilemiyorsa mevcut listeyi koru (mock'a düşme)
       }
     };
     load();
