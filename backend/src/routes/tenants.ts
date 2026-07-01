@@ -7,9 +7,11 @@ import { verifyLicenseToken } from '../services/licenseVerify';
 
 const router: Router = Router();
 
-router.get('/', asyncHandler(async (_req: Request, res: Response) => {
-  const tenants = await prisma.tenant.findMany({ orderBy: { name: 'asc' } });
-  res.json(tenants);
+// Tenant izolasyonu: yalnız çağıranın KENDİ tenant'ını döndür (tüm şirketleri
+// listelemek sızıntıydı). tenantMiddleware token↔tenant eşleşmesini doğrular.
+router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  res.json(tenant ? [tenant] : []);
 }));
 
 router.post('/', asyncHandler(async (req: Request, res: Response) => {

@@ -463,7 +463,7 @@ router.put('/payment-term', tenantMiddleware, asyncHandler(async (req: Request, 
   if (!itemId || !kind) return res.status(400).json({ error: 'kind ve itemId zorunlu.' });
   const days = paymentTermDays == null || paymentTermDays === undefined ? null : parseInt(String(paymentTermDays));
   if (kind === 'BOM') {
-    const b = await prisma.boMItem.findFirst({ where: { id: itemId } });
+    const b = await prisma.boMItem.findFirst({ where: { id: itemId, opportunity: { tenantId: req.tenantId } } });
     if (!b) return res.status(404).json({ error: 'Kalem bulunamadı.' });
     await prisma.boMItem.update({ where: { id: itemId }, data: { paymentTermDays: days } });
   } else if (kind === 'COST') {

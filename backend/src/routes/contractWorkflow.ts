@@ -296,7 +296,8 @@ router.put('/:id/documents/:docId', asyncHandler(async (req: Request, res: Respo
 }));
 
 router.delete('/:id/documents/:docId', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.contractWorkflowDoc.delete({ where: { id: String(req.params.docId) } });
+  const delDoc = await prisma.contractWorkflowDoc.deleteMany({ where: { id: String(req.params.docId), tenantId: req.tenantId } });
+  if (delDoc.count === 0) return res.status(404).json({ error: 'Evrak bulunamadı.' });
   res.json({ success: true });
 }));
 

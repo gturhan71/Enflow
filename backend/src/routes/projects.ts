@@ -11,6 +11,13 @@ import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 const router: Router = Router();
 router.use(tenantMiddleware);
 
+// IDOR/tenant-izolasyon guard'ı: URL'deki proje bu tenant'a ait mi?
+// Alt-kaynak (milestone/cost/handover) işlemlerinden ÖNCE çağrılır.
+async function ownsProject(req: Request): Promise<boolean> {
+  const p = await prisma.project.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId }, select: { id: true } });
+  return !!p;
+}
+
 const PROJECT_INCLUDE = {
   milestones: { orderBy: { order: 'asc' as const } },
   projectCostItems: { orderBy: { createdAt: 'desc' as const } },
@@ -156,6 +163,7 @@ router.get('/:id/milestones', asyncHandler(async (req: Request, res: Response) =
 }));
 
 router.post('/:id/milestones', asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   const {
     title, description, milestoneType = 'CUSTOM',
     assignedToId, assignedToName,
@@ -186,6 +194,7 @@ router.post('/:id/milestones', asyncHandler(async (req: Request, res: Response) 
 }));
 
 router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   const data: Record<string, unknown> = {};
   const dateFields = ['plannedStart','plannedEnd','actualStart','actualEnd'];
   const numFields  = ['progress','budgetAmount','actualCost','order'];
@@ -200,7 +209,10 @@ router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Respo
   if (data.status === 'COMPLETED' && !data.actualEnd) data.actualEnd = new Date();
   if (data.status === 'IN_PROGRESS' && !data.actualStart) data.actualStart = new Date();
 
-  const ms = await prisma.projectMilestone.update({ where: { id: String(req.params.msId) }, data });
+  // Milestone bu projeye (dolayısıyla bu tenant'a) ait mi — değilse dokunma.
+  const upd = await prisma.projectMilestone.updateMany({ where: { id: String(req.params.msId), projectId: String(req.params.id) }, data });
+  if (upd.count === 0) return res.status(404).json({ error: 'Milestone bulunamadı.' });
+  const ms = await prisma.projectMilestone.findFirst({ where: { id: String(req.params.msId), projectId: String(req.params.id) } });
 
   // Proje ilerlemesini güncelle
   const allMs = await prisma.projectMilestone.findMany({ where: { projectId: String(req.params.id) } });
@@ -220,7 +232,8 @@ router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Respo
 }));
 
 router.delete('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.projectMilestone.delete({ where: { id: String(req.params.msId) } });
+  const del = await prisma.projectMilestone.deleteMany({ where: { id: String(req.params.msId), project: { tenantId: req.tenantId } } });
+  if (del.count === 0) return res.status(404).json({ error: 'Milestone bulunamadı.' });
   res.json({ ok: true });
 }));
 
@@ -240,6 +253,7 @@ router.post('/:id/costs', asyncHandler(async (req: Request, res: Response) => {
     milestoneId, purchaseRequestId, date, invoiceNo, notes,
   } = req.body;
   if (!description) return res.status(400).json({ error: 'Açıklama zorunludur.' });
+  if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
 
   const cost = await prisma.projectCostItem.create({
     data: {
@@ -262,8 +276,8 @@ router.post('/:id/costs', asyncHandler(async (req: Request, res: Response) => {
 
 router.put('/:id/costs/:costId', asyncHandler(async (req: Request, res: Response) => {
   const { category, description, plannedAmount, actualAmount, currency, amountTRY, date, invoiceNo, notes } = req.body;
-  res.json(await prisma.projectCostItem.update({
-    where: { id: String(req.params.costId) },
+  const upd = await prisma.projectCostItem.updateMany({
+    where: { id: String(req.params.costId), project: { tenantId: req.tenantId } },
     data: {
       ...(category    !== undefined && { category }),
       ...(description !== undefined && { description }),
@@ -275,11 +289,14 @@ router.put('/:id/costs/:costId', asyncHandler(async (req: Request, res: Response
       ...(invoiceNo   !== undefined && { invoiceNo: invoiceNo ?? null }),
       ...(notes       !== undefined && { notes: notes ?? null }),
     },
-  }));
+  });
+  if (upd.count === 0) return res.status(404).json({ error: 'Maliyet kalemi bulunamadı.' });
+  res.json(await prisma.projectCostItem.findFirst({ where: { id: String(req.params.costId), project: { tenantId: req.tenantId } } }));
 }));
 
 router.delete('/:id/costs/:costId', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.projectCostItem.delete({ where: { id: String(req.params.costId) } });
+  const del = await prisma.projectCostItem.deleteMany({ where: { id: String(req.params.costId), project: { tenantId: req.tenantId } } });
+  if (del.count === 0) return res.status(404).json({ error: 'Maliyet kalemi bulunamadı.' });
   res.json({ ok: true });
 }));
 
@@ -361,8 +378,8 @@ router.post('/:id/handover-docs', asyncHandler(async (req: Request, res: Respons
 router.put('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res: Response) => {
   const docId = String(req.params.docId);
   const { status, fileUrl, notes, name, docType, description } = req.body;
-  const doc = await prisma.projectHandoverDoc.update({
-    where: { id: docId },
+  const upd = await prisma.projectHandoverDoc.updateMany({
+    where: { id: docId, tenantId: req.tenantId },
     data: {
       ...(status !== undefined && { status }),
       ...(fileUrl !== undefined && { fileUrl }),
@@ -373,11 +390,14 @@ router.put('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res: R
       updatedAt: new Date(),
     },
   });
+  if (upd.count === 0) return res.status(404).json({ error: 'Devir evrakı bulunamadı.' });
+  const doc = await prisma.projectHandoverDoc.findFirst({ where: { id: docId, tenantId: req.tenantId } });
   res.json(doc);
 }));
 
 router.delete('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.projectHandoverDoc.delete({ where: { id: String(req.params.docId) } });
+  const del = await prisma.projectHandoverDoc.deleteMany({ where: { id: String(req.params.docId), tenantId: req.tenantId } });
+  if (del.count === 0) return res.status(404).json({ error: 'Devir evrakı bulunamadı.' });
   res.json({ ok: true });
 }));
 

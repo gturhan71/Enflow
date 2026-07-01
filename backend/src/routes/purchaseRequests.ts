@@ -259,12 +259,15 @@ router.post('/:id/items', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.delete('/:id/items/:itemId', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.purchaseItem.delete({ where: { id: String(req.params.itemId) } });
+  const del = await prisma.purchaseItem.deleteMany({ where: { id: String(req.params.itemId), purchaseRequest: { tenantId: req.tenantId } } });
+  if (del.count === 0) return res.status(404).json({ error: 'Kalem bulunamadı.' });
   res.json({ ok: true });
 }));
 
 // ── QUOTES ────────────────────────────────────────────────────────────────
 router.post('/:id/quotes', asyncHandler(async (req: Request, res: Response) => {
+  const owns = await prisma.purchaseRequest.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId }, select: { id: true } });
+  if (!owns) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
   const { vendorId, vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes } = req.body;
   const quote = await prisma.purchaseQuote.create({
     data: {
@@ -285,8 +288,8 @@ router.post('/:id/quotes', asyncHandler(async (req: Request, res: Response) => {
 
 router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) => {
   const { vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes } = req.body;
-  const quote = await prisma.purchaseQuote.update({
-    where: { id: String(req.params.qid) },
+  const upd = await prisma.purchaseQuote.updateMany({
+    where: { id: String(req.params.qid), purchaseRequest: { tenantId: req.tenantId } },
     data: {
       vendorName, totalAmount: Number(totalAmount), currency,
       totalAmountTRY: totalAmountTRY ? Number(totalAmountTRY) : Number(totalAmount),
@@ -294,13 +297,14 @@ router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) 
       validUntil: validUntil ? new Date(validUntil) : null,
       notes: notes || null,
     },
-    include: { vendor: true },
   });
-  res.json(quote);
+  if (upd.count === 0) return res.status(404).json({ error: 'Teklif bulunamadı.' });
+  res.json(await prisma.purchaseQuote.findFirst({ where: { id: String(req.params.qid), purchaseRequest: { tenantId: req.tenantId } }, include: { vendor: true } }));
 }));
 
 router.delete('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) => {
-  await prisma.purchaseQuote.delete({ where: { id: String(req.params.qid) } });
+  const del = await prisma.purchaseQuote.deleteMany({ where: { id: String(req.params.qid), purchaseRequest: { tenantId: req.tenantId } } });
+  if (del.count === 0) return res.status(404).json({ error: 'Teklif bulunamadı.' });
   res.json({ ok: true });
 }));
 
