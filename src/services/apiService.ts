@@ -68,6 +68,8 @@ class ApiService {
   async getTenderAnalytics(): Promise<import('../types').TenderAnalytics> { return apiClient.fetchWithAuth('/reports/tender-analytics'); }
   async getBomVariance(): Promise<import('../types').BomVarianceReport> { return apiClient.fetchWithAuth('/reports/bom-variance'); }
   async getConcentration(): Promise<import('../types').ConcentrationReport> { return apiClient.fetchWithAuth('/reports/concentration'); }
+  async getForecast(): Promise<import('../types').ForecastReport> { return apiClient.fetchWithAuth('/reports/forecast'); }
+  async setSalesTarget(target: number): Promise<{ target: number }> { return apiClient.fetchWithAuth('/reports/sales-target', { method: 'PUT', body: JSON.stringify({ target }) }); }
   // Finans — Vade & Finansman Etkisi
   async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
   async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }

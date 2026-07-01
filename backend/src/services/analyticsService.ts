@@ -152,6 +152,41 @@ export async function computeBomVariance(tenantId: string): Promise<BomVarianceR
 }
 const NOTE = 'Varyans proje/fırsat seviyesindedir; döviz/tedarikçi ayrımı satır-bazlı gerçekleşen maliyet (lineKey bağı) gerektirir — ileri faz.';
 
+// ── Weighted Forecast + Coverage · #1 ────────────────────────────────────────
+// Olasılık-ağırlıklı pipeline (Σ value×probability/100) + hedefe (kota) kapsama oranı.
+// Hedef Tenant.moduleSettings.salesTarget'ta tutulur (yeni model yok).
+const OPEN_STATUSES = new Set(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION']);
+export interface ForecastReport {
+  rawPipeline: number; weightedPipeline: number; wonValue: number;
+  target: number; coverage: number;
+  byStage: { status: string; count: number; weighted: number }[];
+}
+
+export async function getSalesTarget(tenantId: string): Promise<number> {
+  const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { moduleSettings: true } });
+  try { const n = Number((JSON.parse(t?.moduleSettings || '{}') as Record<string, unknown>).salesTarget); return Number.isFinite(n) ? n : 0; } catch { return 0; }
+}
+
+export async function computeForecast(tenantId: string): Promise<ForecastReport> {
+  const opps = await prisma.opportunity.findMany({ where: { tenantId }, select: { value: true, probability: true, status: true } });
+  const target = await getSalesTarget(tenantId);
+
+  const open = opps.filter(o => OPEN_STATUSES.has(o.status));
+  const rawPipeline = open.reduce((s, o) => s + (o.value || 0), 0);
+  const weightedPipeline = open.reduce((s, o) => s + (o.value || 0) * ((o.probability || 0) / 100), 0);
+  const wonValue = opps.filter(o => o.status === 'WON').reduce((s, o) => s + (o.value || 0), 0);
+
+  const stageMap: Record<string, { count: number; weighted: number }> = {};
+  for (const o of open) {
+    if (!stageMap[o.status]) stageMap[o.status] = { count: 0, weighted: 0 };
+    stageMap[o.status].count += 1;
+    stageMap[o.status].weighted += (o.value || 0) * ((o.probability || 0) / 100);
+  }
+  const byStage = Object.entries(stageMap).map(([status, v]) => ({ status, ...v })).sort((a, b) => b.weighted - a.weighted);
+
+  return { rawPipeline, weightedPipeline, wonValue, target, coverage: target > 0 ? weightedPipeline / target : 0, byStage };
+}
+
 // ── Müşteri & Kamu Konsantrasyonu · #12 ──────────────────────────────────────
 // Kazanılan (WON) gelir üzerinden müşteri yoğunlaşması (HHI + top-N) + kamu payı.
 // Kamu payı best-effort: müşteri adı/sektörü kamu terimleri içeriyor mu (heuristik, note).

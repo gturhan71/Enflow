@@ -907,6 +907,12 @@ export interface ConcentrationReport {
   totalRevenue: number; customerCount: number; publicPct: number; note: string;
 }
 
+export interface ForecastReport {
+  rawPipeline: number; weightedPipeline: number; wonValue: number;
+  target: number; coverage: number;
+  byStage: { status: string; count: number; weighted: number }[];
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

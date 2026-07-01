@@ -350,6 +350,12 @@ export const isolationMatrix: IsolationCase[] = [
     path: "/api/reports/concentration",
     targetTenantId: "tenant-1",
   },
+  {
+    name: "Başka tenant forecast okuma (IDOR)",
+    method: "GET",
+    path: "/api/reports/forecast",
+    targetTenantId: "tenant-1",
+  },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------

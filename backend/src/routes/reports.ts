@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import {
   UNIT_DEFINITIONS,
@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -34,6 +34,23 @@ router.get('/bom-variance', tenantMiddleware, asyncHandler(async (req: Request, 
 // Müşteri & kamu konsantrasyonu (#12)
 router.get('/concentration', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeConcentration(req.tenantId));
+}));
+
+// Olasılık-ağırlıklı forecast + hedefe kapsama (#1)
+router.get('/forecast', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeForecast(req.tenantId));
+}));
+
+// Satış hedefi (kota) — moduleSettings.salesTarget; PUT yalnız GM.
+router.put('/sales-target', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
+  const target = Number((req.body as { target?: unknown }).target);
+  if (!Number.isFinite(target) || target < 0) return res.status(400).json({ error: 'Geçerli bir hedef girin.' });
+  const t = await prisma.tenant.findUnique({ where: { id: req.tenantId }, select: { moduleSettings: true } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(t?.moduleSettings || '{}'); } catch { ms = {}; }
+  ms.salesTarget = target;
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  res.json({ target });
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)
