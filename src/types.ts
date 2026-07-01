@@ -891,6 +891,13 @@ export interface FunnelReport {
   entered: number;
 }
 
+export interface TenderGroup { key: string; won: number; lost: number; winRate: number; wonValue: number; total: number }
+export interface TenderAnalytics {
+  byAuthority: TenderGroup[];
+  byMethod: TenderGroup[];
+  overall: { winRate: number; wonValue: number; lostValue: number; activePipeline: number; avgBidValue: number; wonCount: number; lostCount: number };
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

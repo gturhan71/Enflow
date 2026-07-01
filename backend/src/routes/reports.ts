@@ -12,13 +12,18 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics } from '../services/analyticsService';
 
 const router: Router = Router();
 
-// ── Büyüme Analitiği Faz 1: Funnel dönüşüm (#2) — salt-okunur, tenant-scoped ──
+// ── Büyüme Analitiği Faz 1 — salt-okunur, tenant-scoped ──────────────────────
 router.get('/funnel', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeFunnel(req.tenantId));
+}));
+
+// Tender kazanma kırılımı (#4)
+router.get('/tender-analytics', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeTenderAnalytics(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)

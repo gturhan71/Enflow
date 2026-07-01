@@ -53,3 +53,53 @@ export async function computeFunnel(tenantId: string): Promise<FunnelResult> {
 
   return { stages, lossByReason, entered: inFunnel.length };
 }
+
+// ── Tender Kazanma Kırılımı · #4 ──────────────────────────────────────────────
+export interface TenderGroup { key: string; won: number; lost: number; winRate: number; wonValue: number; total: number }
+export interface TenderAnalytics {
+  byAuthority: TenderGroup[];
+  byMethod: TenderGroup[];
+  overall: { winRate: number; wonValue: number; lostValue: number; activePipeline: number; avgBidValue: number; wonCount: number; lostCount: number };
+}
+
+export async function computeTenderAnalytics(tenantId: string): Promise<TenderAnalytics> {
+  const tenders = await prisma.tender.findMany({
+    where: { tenantId },
+    select: { status: true, authority: true, method: true, estimatedValue: true },
+  });
+
+  const group = (keyOf: (t: typeof tenders[number]) => string): TenderGroup[] => {
+    const m: Record<string, { won: number; lost: number; wonValue: number; total: number }> = {};
+    for (const t of tenders) {
+      const k = keyOf(t) || 'Belirtilmemiş';
+      if (!m[k]) m[k] = { won: 0, lost: 0, wonValue: 0, total: 0 };
+      m[k].total += 1;
+      if (t.status === 'WON') { m[k].won += 1; m[k].wonValue += t.estimatedValue || 0; }
+      else if (t.status === 'LOST') m[k].lost += 1;
+    }
+    return Object.entries(m)
+      .map(([key, v]) => ({ key, won: v.won, lost: v.lost, wonValue: v.wonValue, total: v.total, winRate: (v.won + v.lost) > 0 ? v.won / (v.won + v.lost) : 0 }))
+      .sort((a, b) => b.total - a.total);
+  };
+
+  const won = tenders.filter(t => t.status === 'WON');
+  const lost = tenders.filter(t => t.status === 'LOST');
+  const active = tenders.filter(t => t.status === 'SUBMITTED' || t.status === 'EVALUATING');
+  const wonValue = won.reduce((s, t) => s + (t.estimatedValue || 0), 0);
+  const lostValue = lost.reduce((s, t) => s + (t.estimatedValue || 0), 0);
+  const decided = won.length + lost.length;
+
+  return {
+    byAuthority: group(t => t.authority ?? ''),
+    byMethod: group(t => t.method ?? ''),
+    overall: {
+      winRate: decided > 0 ? won.length / decided : 0,
+      wonValue,
+      lostValue,
+      activePipeline: active.reduce((s, t) => s + (t.estimatedValue || 0), 0),
+      avgBidValue: tenders.length > 0 ? tenders.reduce((s, t) => s + (t.estimatedValue || 0), 0) / tenders.length : 0,
+      wonCount: won.length,
+      lostCount: lost.length,
+    },
+  };
+}

@@ -11,7 +11,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -568,19 +568,57 @@ function FunnelCard({ f }: { f: FunnelReport }) {
   );
 }
 
+function TenderCard({ t }: { t: TenderAnalytics }) {
+  const o = t.overall;
+  return (
+    <div className="glass-card p-6 space-y-4">
+      <div className="flex items-center gap-2"><BarChart3 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İhale Kazanma Kırılımı</h4></div>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kazanma%</p><p className="text-2xl font-black text-emerald-600">{pct(o.winRate)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kazanılan Değer</p><p className="text-lg font-black text-slate-800">{fmtTRY(o.wonValue)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Aktif Pipeline</p><p className="text-lg font-black text-indigo-600">{fmtTRY(o.activePipeline)}</p></div>
+      </div>
+      <div className="border-t border-slate-100 pt-2">
+        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Yönteme Göre</p>
+        {t.byMethod.slice(0, 5).map(g => (
+          <div key={g.key} className="flex items-center justify-between text-xs py-0.5">
+            <span className="font-bold text-slate-700">{g.key}</span>
+            <span className="text-slate-400">{g.total} ihale · <span className={g.winRate >= 0.5 ? 'text-emerald-600' : 'text-slate-500'}>kazanma {pct(g.winRate)}</span></span>
+          </div>
+        ))}
+      </div>
+      {t.byAuthority.length > 0 && (
+        <div className="border-t border-slate-100 pt-2">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">İdareye Göre (ilk 5)</p>
+          {t.byAuthority.slice(0, 5).map(g => (
+            <div key={g.key} className="flex items-center justify-between text-xs py-0.5">
+              <span className="font-bold text-slate-700 truncate max-w-[60%]">{g.key}</span>
+              <span className="text-slate-400">{g.won}K/{g.lost}Kyb · {pct(g.winRate)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
+  const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
     let active = true;
-    apiService.getFunnel().then(d => { if (active) setFunnel(d); }).catch(() => { if (active) setErr(true); });
+    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics()])
+      .then(([f, t]) => { if (active) { setFunnel(f); setTender(t); } })
+      .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!funnel) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!funnel || !tender) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <FunnelCard f={funnel} />
+      <TenderCard t={tender} />
     </div>
   );
 }

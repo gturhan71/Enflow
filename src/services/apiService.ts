@@ -65,6 +65,7 @@ class ApiService {
   // Büyüme Analitiği Faz 1 — salt-okunur raporlar
   async getAging(): Promise<import('../types').AgingReport> { return apiClient.fetchWithAuth('/finance/aging'); }
   async getFunnel(): Promise<import('../types').FunnelReport> { return apiClient.fetchWithAuth('/reports/funnel'); }
+  async getTenderAnalytics(): Promise<import('../types').TenderAnalytics> { return apiClient.fetchWithAuth('/reports/tender-analytics'); }
   // Finans — Vade & Finansman Etkisi
   async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
   async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }
