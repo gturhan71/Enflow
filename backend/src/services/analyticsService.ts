@@ -518,3 +518,99 @@ export async function computeProjectHealth(tenantId: string): Promise<ProjectHea
     note: 'Aktif proje sağlığı: Marj (40%, sözleşme değeri vs gerçek maliyet) · Takvim (35%, geciken milestone + son tarih riski) · Bütçe (25%, aşım). Deterministik.',
   };
 }
+
+// ── Müşteri Sağlık Skoru · #14c ──────────────────────────────────────────────
+// Müşteri bazında ödeme davranışı + kazanma oranı + aktivite + sadakat/kayıp.
+export interface CustomerHealthLine {
+  id: string; name: string;
+  score: number; status: 'LOYAL' | 'STABLE' | 'AT_RISK';
+  wonRevenue: number; openPipeline: number; winPct: number | null;
+  overdueAmount: number; lastActivityDays: number | null; oppCount: number;
+  factors: { payment: number; winRate: number; activity: number; loyalty: number };
+}
+export interface CustomerHealthReport {
+  customers: CustomerHealthLine[];
+  summary: { total: number; loyal: number; stable: number; atRisk: number; avgScore: number };
+  note: string;
+}
+
+export async function computeCustomerHealth(tenantId: string): Promise<CustomerHealthReport> {
+  const [customers, opps, invoices] = await Promise.all([
+    prisma.customer.findMany({ where: { tenantId }, select: { id: true, name: true } }),
+    prisma.opportunity.findMany({ where: { tenantId }, select: { customerId: true, value: true, status: true, updatedAt: true } }),
+    prisma.invoice.findMany({ where: { tenantId, type: 'SALES' }, select: { customerName: true, amount: true, paidAmount: true, status: true, dueDate: true } }),
+  ]);
+
+  const now = Date.now();
+  const oppsByCust = new Map<string, typeof opps>();
+  for (const o of opps) { const a = oppsByCust.get(o.customerId) || []; a.push(o); oppsByCust.set(o.customerId, a); }
+
+  // Fatura → müşteri adı eşleşmesi (Invoice'ta customerId FK yok)
+  const recByName = new Map<string, { overdue: number; open: number }>();
+  for (const inv of invoices) {
+    const name = (inv.customerName || '').trim();
+    if (!name) continue;
+    const rem = inv.amount - inv.paidAmount;
+    if (inv.status === 'DRAFT' || inv.status === 'CANCELLED' || inv.status === 'PAID' || rem <= 0) continue;
+    const cur = recByName.get(name) || { overdue: 0, open: 0 };
+    cur.open += rem;
+    if (inv.dueDate && inv.dueDate.getTime() < now) cur.overdue += rem;
+    recByName.set(name, cur);
+  }
+
+  const lines: CustomerHealthLine[] = [];
+  for (const c of customers) {
+    const co = oppsByCust.get(c.id) || [];
+    const rec = recByName.get(c.name.trim());
+    if (co.length === 0 && !rec) continue; // aktivitesi olmayan müşteriyi atla
+
+    const won = co.filter(o => o.status === 'WON');
+    const lost = co.filter(o => o.status === 'LOST');
+    const open = co.filter(o => !['WON', 'LOST', 'WITHDRAWN'].includes(o.status));
+    const wonRevenue = won.reduce((s, o) => s + (o.value || 0), 0);
+    const openPipeline = open.reduce((s, o) => s + (o.value || 0), 0);
+    const resolved = won.length + lost.length;
+    const winPct = resolved > 0 ? won.length / resolved : null;
+
+    // Ödeme (0.35) — vadesi geçmiş oranı
+    const overdueAmount = rec?.overdue || 0;
+    const openReceivable = rec?.open || 0;
+    const overdueRatio = openReceivable > 0 ? overdueAmount / openReceivable : 0;
+    const fPayment = rec ? clampScore(100 - overdueRatio * 100) : 70;
+
+    // Kazanma (0.30)
+    const fWin = winPct === null ? 50 : clampScore(winPct * 100);
+
+    // Aktivite (0.20) — son fırsat güncellemesi tazeliği (90g tam → 365g sıfır)
+    const lastAt = co.length ? Math.max(...co.map(o => o.updatedAt.getTime())) : null;
+    const lastActivityDays = lastAt ? Math.floor((now - lastAt) / 86400000) : null;
+    const fActivity = lastActivityDays === null ? 40 : lastActivityDays <= 90 ? 100 : clampScore(100 - ((lastActivityDays - 90) / 275) * 100);
+
+    // Sadakat (0.15) — kayıp sıklığı + kazanılmış gelir varlığı
+    const lossRatio = co.length > 0 ? lost.length / co.length : 0;
+    const fLoyalty = clampScore(100 - lossRatio * 100 + (wonRevenue > 0 ? 10 : 0));
+
+    const score = clampScore(0.35 * fPayment + 0.30 * fWin + 0.20 * fActivity + 0.15 * fLoyalty);
+    const status: CustomerHealthLine['status'] = score >= 70 ? 'LOYAL' : score >= 45 ? 'STABLE' : 'AT_RISK';
+
+    lines.push({
+      id: c.id, name: c.name,
+      score, status,
+      wonRevenue, openPipeline, winPct,
+      overdueAmount, lastActivityDays, oppCount: co.length,
+      factors: { payment: fPayment, winRate: fWin, activity: fActivity, loyalty: fLoyalty },
+    });
+  }
+  lines.sort((a, b) => a.score - b.score); // en riskli önce
+
+  const loyal = lines.filter(l => l.status === 'LOYAL').length;
+  const stable = lines.filter(l => l.status === 'STABLE').length;
+  const atRisk = lines.filter(l => l.status === 'AT_RISK').length;
+  const avgScore = lines.length ? Math.round(lines.reduce((s, l) => s + l.score, 0) / lines.length) : 0;
+
+  return {
+    customers: lines,
+    summary: { total: lines.length, loyal, stable, atRisk, avgScore },
+    note: 'Müşteri sağlığı: Ödeme (35%, vadesi geçmiş alacak) · Kazanma (30%) · Aktivite (20%, son fırsat tazeliği) · Sadakat (15%, kayıp sıklığı). Fatura eşleşmesi müşteri adına göre. Deterministik.',
+  };
+}

@@ -959,6 +959,19 @@ export interface ProjectHealthReport {
   note: string;
 }
 
+export interface CustomerHealthLine {
+  id: string; name: string;
+  score: number; status: 'LOYAL' | 'STABLE' | 'AT_RISK';
+  wonRevenue: number; openPipeline: number; winPct: number | null;
+  overdueAmount: number; lastActivityDays: number | null; oppCount: number;
+  factors: { payment: number; winRate: number; activity: number; loyalty: number };
+}
+export interface CustomerHealthReport {
+  customers: CustomerHealthLine[];
+  summary: { total: number; loyal: number; stable: number; atRisk: number; avgScore: number };
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

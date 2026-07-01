@@ -11,7 +11,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport, CustomerHealthReport,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -904,9 +904,63 @@ function ProjectHealthCard({ p }: { p: ProjectHealthReport }) {
   );
 }
 
+const CUST_STATUS: Record<string, { label: string; badge: string }> = {
+  LOYAL: { label: 'Sadık', badge: 'bg-emerald-100 text-emerald-700' },
+  STABLE: { label: 'İstikrarlı', badge: 'bg-amber-100 text-amber-700' },
+  AT_RISK: { label: 'Riskli', badge: 'bg-red-100 text-red-600' },
+};
+
+function CustomerHealthCard({ c }: { c: CustomerHealthReport }) {
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri Sağlığı</h4></div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Aktif</p><p className="text-2xl font-black text-slate-800">{c.summary.total}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sadık</p><p className="text-2xl font-black text-emerald-600">{c.summary.loyal}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">İstikrarlı</p><p className="text-2xl font-black text-amber-600">{c.summary.stable}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Riskli</p><p className="text-2xl font-black text-red-600">{c.summary.atRisk}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ort. Skor</p><p className="text-2xl font-black text-primary">{c.summary.avgScore}</p></div>
+      </div>
+      {c.customers.length === 0 ? (
+        <p className="text-[11px] text-slate-400 italic">Aktivitesi olan müşteri yok.</p>
+      ) : (
+        <div className="space-y-2">
+          {c.customers.slice(0, 8).map(cu => {
+            const st = CUST_STATUS[cu.status];
+            return (
+              <div key={cu.id} className="flex items-center gap-3 border-b border-slate-100 pb-2 last:border-0">
+                <div className="w-8 shrink-0 text-center"><span className={`text-lg font-black ${healthColor(cu.score)}`}>{cu.score}</span></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">{cu.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {cu.winPct !== null && `kazanma %${Math.round(cu.winPct * 100)} · `}
+                    {`${cu.oppCount} fırsat`}
+                    {cu.wonRevenue > 0 && ` · gelir ${fmtTRY(cu.wonRevenue)}`}
+                    {cu.overdueAmount > 0 && ` · ⚠ gecikmiş ${fmtTRY(cu.overdueAmount)}`}
+                    {cu.lastActivityDays !== null && ` · son ${cu.lastActivityDays}g`}
+                  </p>
+                  <div className="flex gap-0.5 mt-1 h-1.5">
+                    <div className="bg-indigo-400 rounded-sm" style={{ width: `${cu.factors.payment * 0.35}%` }} title="Ödeme" />
+                    <div className="bg-emerald-400 rounded-sm" style={{ width: `${cu.factors.winRate * 0.30}%` }} title="Kazanma" />
+                    <div className="bg-sky-400 rounded-sm" style={{ width: `${cu.factors.activity * 0.20}%` }} title="Aktivite" />
+                    <div className="bg-amber-400 rounded-sm" style={{ width: `${cu.factors.loyalty * 0.15}%` }} title="Sadakat" />
+                  </div>
+                </div>
+                <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded ${st.badge}`}>{st.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 italic">{c.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [health, setHealth] = useState<BusinessHealth | null>(null);
   const [projectHealth, setProjectHealth] = useState<ProjectHealthReport | null>(null);
+  const [customerHealth, setCustomerHealth] = useState<CustomerHealthReport | null>(null);
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
@@ -917,19 +971,20 @@ function AnalyticsTab() {
   const [err, setErr] = useState(false);
   const load = useCallback(() => {
     let active = true;
-    Promise.all([apiService.getBusinessHealth(), apiService.getProjectHealth(), apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
-      .then(([hh, ph, f, t, v, c, fc, sc, dp]) => { if (active) { setHealth(hh); setProjectHealth(ph); setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
+    Promise.all([apiService.getBusinessHealth(), apiService.getProjectHealth(), apiService.getCustomerHealth(), apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
+      .then(([hh, ph, ch, f, t, v, c, fc, sc, dp]) => { if (active) { setHealth(hh); setProjectHealth(ph); setCustomerHealth(ch); setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   useEffect(() => load(), [load]);
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!health || !projectHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!health || !projectHealth || !customerHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <BusinessHealthCard h={health} />
       <ProjectHealthCard p={projectHealth} />
+      <CustomerHealthCard c={customerHealth} />
       <ForecastCard f={forecast} onSaved={reloadForecast} />
       <FunnelCard f={funnel} />
       <BidScorecardCard s={scorecard} />

@@ -74,6 +74,7 @@ class ApiService {
   async getDocumentPortfolio(): Promise<import('../types').DocumentPortfolio> { return apiClient.fetchWithAuth('/reports/document-portfolio'); }
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getProjectHealth(): Promise<import('../types').ProjectHealthReport> { return apiClient.fetchWithAuth('/reports/project-health'); }
+  async getCustomerHealth(): Promise<import('../types').CustomerHealthReport> { return apiClient.fetchWithAuth('/reports/customer-health'); }
   // Finans — Vade & Finansman Etkisi
   async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
   async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }
