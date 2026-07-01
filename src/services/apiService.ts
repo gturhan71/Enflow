@@ -62,6 +62,8 @@ class ApiService {
     return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);
   }
   async getDashboard() { return apiClient.fetchWithAuth('/reports/dashboard'); }
+  // Büyüme Analitiği Faz 1 — salt-okunur raporlar
+  async getAging(): Promise<import('../types').AgingReport> { return apiClient.fetchWithAuth('/finance/aging'); }
   // Finans — Vade & Finansman Etkisi
   async getFinanceSettings() { return apiClient.fetchWithAuth('/finance/settings'); }
   async updateFinanceSettings(data: { interestRates: Record<string, number> }) { return apiClient.fetchWithAuth('/finance/settings', { method: 'PUT', body: JSON.stringify(data) }); }

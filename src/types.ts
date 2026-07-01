@@ -876,6 +876,15 @@ export interface ReportOverview {
   bottlenecks: WorkflowBottleneck[];
 }
 
+// ── Büyüme Analitiği Faz 1 ──────────────────────────────────────────────────
+export interface AgingBuckets { notDue: number; d0_30: number; d31_60: number; d61_90: number; d90plus: number }
+export interface AgingReport {
+  buckets: AgingBuckets;
+  dso: number;
+  totalReceivable: number;
+  byCurrency: Record<string, { totalReceivable: number; buckets: AgingBuckets }>;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

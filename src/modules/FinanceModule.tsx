@@ -7,7 +7,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
-import { Invoice, Payment, GuaranteeLetter, FinanceSummary, Opportunity, BoMItem, CostItem } from '../types';
+import { Invoice, Payment, GuaranteeLetter, FinanceSummary, Opportunity, BoMItem, CostItem, AgingReport } from '../types';
 
 interface FinancingByCurrency { cost: number; benefit: number; net: number }
 interface FinancingResult { closingDate: string; interestRates: Record<string, number>; byCurrency: Record<string, FinancingByCurrency>; cashFlowGap: { currency: string; maxDeficit: number }[] }
@@ -56,6 +56,7 @@ const FinanceModule = () => {
   const [guarantees, setGuarantees] = useState<GuaranteeLetter[]>([]);
   const [costApprovals, setCostApprovals] = useState<CostApproval[]>([]);
   const [summary, setSummary] = useState<FinanceSummary | null>(null);
+  const [aging, setAging] = useState<AgingReport | null>(null);
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showGuaranteeForm, setShowGuaranteeForm] = useState(false);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
@@ -64,12 +65,14 @@ const FinanceModule = () => {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [inv, g, ca, s] = await Promise.all([
+      const [inv, g, ca, s, ag] = await Promise.all([
         apiService.getInvoices(), apiService.getGuarantees(),
         apiService.getCostApprovals(), apiService.getFinanceSummary(),
+        apiService.getAging().catch(() => null),
       ]);
       setInvoices(inv as Invoice[]); setGuarantees(g as GuaranteeLetter[]);
       setCostApprovals(ca as CostApproval[]); setSummary(s as FinanceSummary);
+      setAging(ag as AgingReport | null);
     } finally { setLoading(false); }
   }, []);
 
@@ -129,7 +132,7 @@ const FinanceModule = () => {
             load();
           }} />
       )}
-      {tab === 'summary' && <SummaryTab s={summary} />}
+      {tab === 'summary' && <SummaryTab s={summary} aging={aging} />}
 
       <AnimatePresence>
         {showInvoiceForm && (
@@ -521,7 +524,52 @@ const CostApprovalTab = ({ items, onDecide }: {
   );
 };
 
-const SummaryTab = ({ s }: { s: FinanceSummary | null }) => {
+const AGING_BUCKETS: { key: keyof AgingReport['buckets']; label: string; color: string }[] = [
+  { key: 'notDue', label: 'Vadesi Gelmemiş', color: 'bg-emerald-500' },
+  { key: 'd0_30', label: '0–30 gün', color: 'bg-amber-400' },
+  { key: 'd31_60', label: '31–60 gün', color: 'bg-orange-500' },
+  { key: 'd61_90', label: '61–90 gün', color: 'bg-red-500' },
+  { key: 'd90plus', label: '90+ gün', color: 'bg-red-700' },
+];
+
+const AgingCard = ({ aging }: { aging: AgingReport }) => {
+  const total = aging.totalReceivable || 1;
+  return (
+    <div className="glass-card p-6 space-y-4 md:col-span-2 lg:col-span-3">
+      <div className="flex items-end justify-between flex-wrap gap-4">
+        <div>
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Alacak Yaşlandırma</p>
+          <p className="text-sm text-slate-500">Toplam açık alacak: <span className="font-bold text-slate-800">{fmt(aging.totalReceivable)}</span></p>
+        </div>
+        <div className="text-right">
+          <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">DSO (Ort. Tahsil Süresi)</p>
+          <p className={`text-3xl font-black ${aging.dso > 90 ? 'text-red-600' : aging.dso > 45 ? 'text-amber-600' : 'text-emerald-600'}`}>{aging.dso} <span className="text-base">gün</span></p>
+        </div>
+      </div>
+      {/* Yatay yığılmış bar */}
+      <div className="flex h-4 rounded-full overflow-hidden bg-slate-100">
+        {AGING_BUCKETS.map(b => {
+          const v = aging.buckets[b.key];
+          const pct = (v / total) * 100;
+          return pct > 0 ? <div key={b.key} className={b.color} style={{ width: `${pct}%` }} title={`${b.label}: ${fmt(v)}`} /> : null;
+        })}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+        {AGING_BUCKETS.map(b => (
+          <div key={b.key} className="text-center">
+            <div className="flex items-center justify-center gap-1.5">
+              <span className={`w-2.5 h-2.5 rounded-sm ${b.color}`} />
+              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">{b.label}</span>
+            </div>
+            <p className="text-sm font-bold text-slate-800 mt-1">{fmt(aging.buckets[b.key])}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SummaryTab = ({ s, aging }: { s: FinanceSummary | null; aging: AgingReport | null }) => {
   if (!s) return <EmptyState text="Özet yükleniyor..." />;
   const cards = [
     { label: 'Toplam Alacak', value: fmt(s.totalReceivable), accent: 'text-amber-600' },
@@ -533,6 +581,7 @@ const SummaryTab = ({ s }: { s: FinanceSummary | null }) => {
   ];
   return (
     <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {aging && <AgingCard aging={aging} />}
       {cards.map(c => (
         <div key={c.label} className="glass-card p-6 space-y-2">
           <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{c.label}</p>

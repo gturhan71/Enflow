@@ -319,6 +319,13 @@ export const isolationMatrix: IsolationCase[] = [
     path: "/api/users",
     targetTenantId: "tenant-1",
   },
+  // Büyüme Analitiği Faz 1 — yeni salt-okunur raporlar (IDOR koruması)
+  {
+    name: "Başka tenant alacak yaşlandırma okuma (IDOR)",
+    method: "GET",
+    path: "/api/finance/aging",
+    targetTenantId: "tenant-1",
+  },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------
