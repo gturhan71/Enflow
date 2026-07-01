@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -61,6 +61,11 @@ router.get('/bid-scorecard', tenantMiddleware, asyncHandler(async (req: Request,
 // Belge portföyü (#11) — Şirket Evrakları envanteri + geçerlilik + yeniden-kullanım
 router.get('/document-portfolio', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeDocumentPortfolio(req.tenantId));
+}));
+
+// Kurumsal kompozit sağlık skoru (#14a) — 5 sütun tek skor
+router.get('/business-health', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeBusinessHealth(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)

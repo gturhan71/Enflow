@@ -377,3 +377,75 @@ export async function computeConcentration(tenantId: string): Promise<Concentrat
     note: 'Kamu payı, müşteri adı/sektör metnindeki kamu terimlerinden türetilir (heuristik). HHI 0–10000; >2500 yüksek yoğunlaşma.',
   };
 }
+
+// ── Kurumsal Kompozit Sağlık Skoru · #14a ────────────────────────────────────
+// Mevcut analitik boyutlarını 5 sütuna toplayan tek iş-sağlığı skoru (0-100).
+// Salt-okunur; alt-compute'ları yeniden kullanır + finans sinyalini yerinde hesaplar.
+const clampScore = (n: number) => Math.max(0, Math.min(100, Math.round(n)));
+export interface HealthPillar { key: string; label: string; score: number; detail: string; }
+export interface BusinessHealth {
+  overall: number;
+  status: 'GÜÇLÜ' | 'ORTA' | 'ZAYIF';
+  pillars: HealthPillar[];
+  weakest: string;
+  note: string;
+}
+
+export async function computeBusinessHealth(tenantId: string): Promise<BusinessHealth> {
+  const [funnel, tender, scorecard, conc, portfolio, forecast] = await Promise.all([
+    computeFunnel(tenantId), computeTenderAnalytics(tenantId), computeBidScorecard(tenantId),
+    computeConcentration(tenantId), computeDocumentPortfolio(tenantId), computeForecast(tenantId),
+  ]);
+
+  // Finans sinyali: açık SALES alacaklarında vadesi geçmiş oranı
+  const invoices = await prisma.invoice.findMany({ where: { tenantId, type: 'SALES' }, select: { amount: true, paidAmount: true, status: true, dueDate: true } });
+  const now = Date.now();
+  const open = invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED' && i.status !== 'PAID' && (i.amount - i.paidAmount) > 0);
+  let totalReceivable = 0, overdueReceivable = 0;
+  for (const i of open) {
+    const rem = i.amount - i.paidAmount;
+    totalReceivable += rem;
+    if (i.dueDate && i.dueDate.getTime() < now) overdueReceivable += rem;
+  }
+  const overdueRatio = totalReceivable > 0 ? overdueReceivable / totalReceivable : 0;
+
+  // 1) Satış — hedef varsa kapsama, yoksa huni dönüşümü (%25 dönüşüm = tam sağlık)
+  const wonStage = funnel.stages.find(s => s.status === 'WON');
+  const overallConv = funnel.entered > 0 && wonStage ? wonStage.count / funnel.entered : 0;
+  const salesScore = forecast.target > 0 ? clampScore(Math.min(1, forecast.coverage) * 100) : clampScore(Math.min(1, overallConv / 0.25) * 100);
+
+  // 2) İhale — kazanma oranı (0.6) + teklif hazırlığı (0.4)
+  const hasTenderHistory = tender.overall.wonCount + tender.overall.lostCount > 0;
+  const tenderScore = hasTenderHistory
+    ? clampScore(0.6 * tender.overall.winRate * 100 + 0.4 * scorecard.summary.avgScore)
+    : clampScore(scorecard.summary.total > 0 ? scorecard.summary.avgScore : 50);
+
+  // 3) Finans — vadesi geçmiş oranı cezası
+  const financeScore = totalReceivable > 0 ? clampScore(100 - overdueRatio * 70) : 70;
+
+  // 4) Müşteri — yoğunlaşma (HHI) + kamu bağımlılığı cezası
+  const customerScore = conc.customerCount > 0 ? clampScore(100 - (conc.hhi / 10000) * 70 - conc.publicPct * 30) : 60;
+
+  // 5) Uyum — belge geçerliliği (süresi dolmuş/dolacak cezası)
+  const dt = portfolio.summary.total;
+  const complianceScore = dt > 0 ? clampScore(100 - (portfolio.summary.expired / dt) * 70 - (portfolio.summary.expiringSoon / dt) * 25) : 60;
+
+  const pillars: (HealthPillar & { weight: number })[] = [
+    { key: 'sales', label: 'Satış', score: salesScore, weight: 0.25, detail: forecast.target > 0 ? `Hedef kapsama %${Math.round(forecast.coverage * 100)}` : `Huni dönüşümü %${Math.round(overallConv * 100)}` },
+    { key: 'tender', label: 'İhale', score: tenderScore, weight: 0.20, detail: hasTenderHistory ? `Kazanma %${Math.round(tender.overall.winRate * 100)} · hazırlık ${scorecard.summary.avgScore}` : 'Geçmiş yok · hazırlık bazlı' },
+    { key: 'finance', label: 'Finans', score: financeScore, weight: 0.25, detail: totalReceivable > 0 ? `Vadesi geçmiş alacak %${Math.round(overdueRatio * 100)}` : 'Açık alacak yok' },
+    { key: 'customer', label: 'Müşteri', score: customerScore, weight: 0.15, detail: `HHI ${conc.hhi} · kamu %${Math.round(conc.publicPct * 100)}` },
+    { key: 'compliance', label: 'Uyum', score: complianceScore, weight: 0.15, detail: dt > 0 ? `${portfolio.summary.expired} dolmuş · ${portfolio.summary.expiringSoon} dolacak` : 'Belge yok' },
+  ];
+
+  const overall = clampScore(pillars.reduce((s, p) => s + p.score * p.weight, 0));
+  const status: BusinessHealth['status'] = overall >= 75 ? 'GÜÇLÜ' : overall >= 55 ? 'ORTA' : 'ZAYIF';
+  const weakest = pillars.reduce((a, b) => (b.score < a.score ? b : a)).label;
+
+  return {
+    overall, status,
+    pillars: pillars.map(({ weight, ...p }) => { void weight; return p; }),
+    weakest,
+    note: 'Kompozit skor: Satış (25%) · İhale (20%) · Finans (25%) · Müşteri (15%) · Uyum (15%). Alt-analitiklerden türetilir; deterministik.',
+  };
+}

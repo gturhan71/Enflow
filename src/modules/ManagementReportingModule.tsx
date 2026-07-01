@@ -5,13 +5,13 @@ import {
 } from 'recharts';
 import {
   BarChart3, AlertTriangle, RefreshCw, TrendingUp, Clock, LayoutGrid, Building2,
-  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge, ClipboardCheck, FileStack,
+  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge, ClipboardCheck, FileStack, HeartPulse,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -815,7 +815,45 @@ function DocPortfolioCard({ d }: { d: DocumentPortfolio }) {
   );
 }
 
+const healthColor = (n: number) => n >= 75 ? 'text-emerald-600' : n >= 55 ? 'text-amber-600' : 'text-red-600';
+const healthBar = (n: number) => n >= 75 ? 'bg-emerald-500' : n >= 55 ? 'bg-amber-500' : 'bg-red-500';
+
+function BusinessHealthCard({ h }: { h: BusinessHealth }) {
+  const statusBadge = h.status === 'GÜÇLÜ' ? 'bg-emerald-100 text-emerald-700' : h.status === 'ORTA' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600';
+  return (
+    <div className="glass-card p-6 space-y-5 lg:col-span-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İş Sağlığı Skoru</h4></div>
+        <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${statusBadge}`}>{h.status}</span>
+      </div>
+      <div className="flex items-center gap-6">
+        <div className="text-center shrink-0">
+          <p className={`text-5xl font-black ${healthColor(h.overall)}`}>{h.overall}</p>
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">/ 100</p>
+        </div>
+        <div className="flex-1 space-y-2">
+          {h.pillars.map(p => (
+            <div key={p.key} className="flex items-center gap-3">
+              <span className="w-20 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right shrink-0">{p.label}</span>
+              <div className="flex-1 bg-slate-100 rounded h-5 overflow-hidden relative">
+                <div className={`${healthBar(p.score)} h-full`} style={{ width: `${p.score}%` }} />
+                <span className="absolute inset-0 flex items-center px-2 text-[10px] font-bold text-slate-600">{p.detail}</span>
+              </div>
+              <span className={`w-8 text-right text-sm font-black shrink-0 ${healthColor(p.score)}`}>{p.score}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+        <span className="text-slate-400 font-bold">Zayıf halka: <span className="text-red-500">{h.weakest}</span></span>
+      </div>
+      <p className="text-[10px] text-slate-400 italic">{h.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
+  const [health, setHealth] = useState<BusinessHealth | null>(null);
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
@@ -826,17 +864,18 @@ function AnalyticsTab() {
   const [err, setErr] = useState(false);
   const load = useCallback(() => {
     let active = true;
-    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
-      .then(([f, t, v, c, fc, sc, dp]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
+    Promise.all([apiService.getBusinessHealth(), apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
+      .then(([hh, f, t, v, c, fc, sc, dp]) => { if (active) { setHealth(hh); setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   useEffect(() => load(), [load]);
-  const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); }, []);
+  const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!health || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
+      <BusinessHealthCard h={health} />
       <ForecastCard f={forecast} onSaved={reloadForecast} />
       <FunnelCard f={funnel} />
       <BidScorecardCard s={scorecard} />

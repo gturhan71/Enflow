@@ -937,6 +937,15 @@ export interface DocumentPortfolio {
   note: string;
 }
 
+export interface HealthPillar { key: string; label: string; score: number; detail: string; }
+export interface BusinessHealth {
+  overall: number;
+  status: 'GÜÇLÜ' | 'ORTA' | 'ZAYIF';
+  pillars: HealthPillar[];
+  weakest: string;
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;
