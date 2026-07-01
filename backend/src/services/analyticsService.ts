@@ -151,3 +151,51 @@ export async function computeBomVariance(tenantId: string): Promise<BomVarianceR
   return { lines, marginErosionPct: totalQuoted > 0 ? (totalActual - totalQuoted) / totalQuoted : 0, note: NOTE };
 }
 const NOTE = 'Varyans proje/fırsat seviyesindedir; döviz/tedarikçi ayrımı satır-bazlı gerçekleşen maliyet (lineKey bağı) gerektirir — ileri faz.';
+
+// ── Müşteri & Kamu Konsantrasyonu · #12 ──────────────────────────────────────
+// Kazanılan (WON) gelir üzerinden müşteri yoğunlaşması (HHI + top-N) + kamu payı.
+// Kamu payı best-effort: müşteri adı/sektörü kamu terimleri içeriyor mu (heuristik, note).
+const PUBLIC_RE = /bakanlı|beledi|genel müdürl|müdürlüğü|kamu|üniversite|hastane|il özel|valilik|başkanlığ|müsteşarl|kaymakam/i;
+export interface ConcentrationReport {
+  topCustomers: { name: string; revenue: number; sharePct: number; isPublic: boolean }[];
+  hhi: number; top1Pct: number; top3Pct: number;
+  totalRevenue: number; customerCount: number;
+  publicPct: number; note: string;
+}
+
+export async function computeConcentration(tenantId: string): Promise<ConcentrationReport> {
+  const won = await prisma.opportunity.findMany({
+    where: { tenantId, status: 'WON' },
+    select: { value: true, customer: { select: { name: true, industry: true } } },
+  });
+
+  const byCustomer = new Map<string, { revenue: number; isPublic: boolean }>();
+  let total = 0;
+  for (const o of won) {
+    const name = o.customer?.name || 'Bilinmeyen';
+    const isPublic = PUBLIC_RE.test(name) || PUBLIC_RE.test(o.customer?.industry || '');
+    const cur = byCustomer.get(name) || { revenue: 0, isPublic };
+    cur.revenue += o.value || 0; cur.isPublic = cur.isPublic || isPublic;
+    byCustomer.set(name, cur);
+    total += o.value || 0;
+  }
+  const T = total || 1;
+
+  const rows = [...byCustomer.entries()]
+    .map(([name, v]) => ({ name, revenue: v.revenue, sharePct: v.revenue / T, isPublic: v.isPublic }))
+    .sort((a, b) => b.revenue - a.revenue);
+
+  const hhi = Math.round(rows.reduce((s, r) => s + Math.pow(r.sharePct * 100, 2), 0));
+  const publicRev = rows.filter(r => r.isPublic).reduce((s, r) => s + r.revenue, 0);
+
+  return {
+    topCustomers: rows.slice(0, 8),
+    hhi,
+    top1Pct: rows[0]?.sharePct ?? 0,
+    top3Pct: rows.slice(0, 3).reduce((s, r) => s + r.sharePct, 0),
+    totalRevenue: total,
+    customerCount: rows.length,
+    publicPct: publicRev / T,
+    note: 'Kamu payı, müşteri adı/sektör metnindeki kamu terimlerinden türetilir (heuristik). HHI 0–10000; >2500 yüksek yoğunlaşma.',
+  };
+}

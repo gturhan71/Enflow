@@ -11,7 +11,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -634,24 +634,53 @@ function BomVarianceCard({ v }: { v: BomVarianceReport }) {
   );
 }
 
+function ConcentrationCard({ c }: { c: ConcentrationReport }) {
+  const risk = c.hhi > 2500 ? { t: 'Yüksek yoğunlaşma', col: 'text-red-600' } : c.hhi > 1500 ? { t: 'Orta yoğunlaşma', col: 'text-amber-600' } : { t: 'Dağınık (sağlıklı)', col: 'text-emerald-600' };
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center gap-2"><Building2 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri & Kamu Konsantrasyonu</h4></div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">HHI</p><p className={`text-2xl font-black ${risk.col}`}>{c.hhi}</p><p className="text-[9px] text-slate-400">{risk.t}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">En Büyük Müşteri</p><p className="text-2xl font-black text-slate-800">{pct(c.top1Pct)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">İlk 3 Müşteri</p><p className="text-2xl font-black text-slate-800">{pct(c.top3Pct)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kamu Payı</p><p className="text-2xl font-black text-indigo-600">{pct(c.publicPct)}</p></div>
+      </div>
+      {c.topCustomers.length > 0 && (
+        <div className="space-y-1">
+          {c.topCustomers.slice(0, 5).map((cu, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="w-40 text-xs font-bold text-slate-700 truncate">{cu.name}{cu.isPublic && <span className="ml-1 text-[8px] bg-indigo-100 text-indigo-600 px-1 rounded uppercase">kamu</span>}</span>
+              <div className="flex-1 bg-slate-100 rounded h-4 overflow-hidden"><div className="bg-primary/70 h-full" style={{ width: `${Math.max(2, cu.sharePct * 100)}%` }} /></div>
+              <span className="w-14 text-right text-xs font-bold text-slate-500">{pct(cu.sharePct)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 italic">{c.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
+  const [conc, setConc] = useState<ConcentrationReport | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
     let active = true;
-    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance()])
-      .then(([f, t, v]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); } })
+    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration()])
+      .then(([f, t, v, c]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); setConc(c); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!funnel || !tender || !variance) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!funnel || !tender || !variance || !conc) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <FunnelCard f={funnel} />
       <TenderCard t={tender} />
+      <ConcentrationCard c={conc} />
       <BomVarianceCard v={variance} />
     </div>
   );

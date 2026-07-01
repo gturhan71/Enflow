@@ -901,6 +901,12 @@ export interface TenderAnalytics {
 export interface BomVarianceLine { name: string; quoted: number; actual: number; variance: number; variancePct: number }
 export interface BomVarianceReport { lines: BomVarianceLine[]; marginErosionPct: number; note: string }
 
+export interface ConcentrationReport {
+  topCustomers: { name: string; revenue: number; sharePct: number; isPublic: boolean }[];
+  hhi: number; top1Pct: number; top3Pct: number;
+  totalRevenue: number; customerCount: number; publicPct: number; note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;
