@@ -16,6 +16,7 @@ import {
   Calendar,
   AlertCircle,
   CheckCircle2,
+  Copy,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -131,6 +132,7 @@ const LicenseTypesModule: React.FC = () => {
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
   const [activateSuccess, setActivateSuccess] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const fetchSub = () => {
     apiService.getSubscription()
@@ -249,6 +251,23 @@ const LicenseTypesModule: React.FC = () => {
       {/* Lisans aktivasyonu */}
       <div className="glass-card rounded-[20px] p-5 border border-white/20 space-y-3">
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Lisans Anahtarı Aktivasyonu</p>
+
+        {/* Tenant ID — lisans üretiminde BU değer kullanılmalı (şirket adı DEĞİL) */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 space-y-1">
+          <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Bu şirketin Tenant ID'si</p>
+          <div className="flex items-center gap-2">
+            <code className="flex-1 text-xs font-mono font-bold text-slate-800 bg-white/70 rounded-lg px-2 py-1.5 select-all break-all">{currentUser?.tenantId || '—'}</code>
+            <button
+              type="button"
+              onClick={() => { if (currentUser?.tenantId) { navigator.clipboard?.writeText(currentUser.tenantId).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1500); } }}
+              className="btn-secondary text-xs flex items-center gap-1 px-3 py-1.5 shrink-0"
+            >
+              <Copy size={13} /> {copied ? 'Kopyalandı' : 'Kopyala'}
+            </button>
+          </div>
+          <p className="text-[11px] text-amber-700">Lisans üreticisinde <b>“Tenant ID”</b> alanına şirket adını değil <b>tam olarak bu değeri</b> girin — aksi halde “bu lisans bu tenant için üretilmemiş” hatası alırsınız.</p>
+        </div>
+
         <div className="flex gap-2">
           <textarea
             value={licenseInput}
