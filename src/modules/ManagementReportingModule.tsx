@@ -11,7 +11,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -852,8 +852,61 @@ function BusinessHealthCard({ h }: { h: BusinessHealth }) {
   );
 }
 
+const HEALTH_STATUS: Record<string, { label: string; badge: string; bar: string }> = {
+  HEALTHY: { label: 'Sağlıklı', badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
+  WATCH: { label: 'İzlemede', badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500' },
+  CRITICAL: { label: 'Kritik', badge: 'bg-red-100 text-red-600', bar: 'bg-red-500' },
+};
+
+function ProjectHealthCard({ p }: { p: ProjectHealthReport }) {
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Proje Sağlığı</h4></div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Aktif</p><p className="text-2xl font-black text-slate-800">{p.summary.total}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kritik</p><p className="text-2xl font-black text-red-600">{p.summary.critical}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">İzlemede</p><p className="text-2xl font-black text-amber-600">{p.summary.watch}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sağlıklı</p><p className="text-2xl font-black text-emerald-600">{p.summary.healthy}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ort. Skor</p><p className="text-2xl font-black text-primary">{p.summary.avgScore}</p></div>
+      </div>
+      {p.projects.length === 0 ? (
+        <p className="text-[11px] text-slate-400 italic">Aktif proje yok.</p>
+      ) : (
+        <div className="space-y-2">
+          {p.projects.map(pr => {
+            const st = HEALTH_STATUS[pr.status];
+            return (
+              <div key={pr.id} className="flex items-center gap-3 border-b border-slate-100 pb-2 last:border-0">
+                <div className="w-8 shrink-0 text-center"><span className={`text-lg font-black ${healthColor(pr.score)}`}>{pr.score}</span></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">{pr.code ? `${pr.code} · ` : ''}{pr.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {`marj %${Math.round(pr.actualMarginPct * 100)}`}
+                    {` · ilerleme %${pr.progress}`}
+                    {pr.milestoneCount > 0 && ` · ${pr.overdueMilestones}/${pr.milestoneCount} geciken`}
+                    {pr.budgetUsedPct > 0 && ` · bütçe %${Math.round(pr.budgetUsedPct * 100)}`}
+                    {pr.deadlineRisk && ' · ⚠ son tarih geçti'}
+                  </p>
+                  <div className="flex gap-0.5 mt-1 h-1.5">
+                    <div className="bg-emerald-400 rounded-sm" style={{ width: `${pr.factors.margin * 0.4}%` }} title="Marj" />
+                    <div className="bg-sky-400 rounded-sm" style={{ width: `${pr.factors.schedule * 0.35}%` }} title="Takvim" />
+                    <div className="bg-amber-400 rounded-sm" style={{ width: `${pr.factors.budget * 0.25}%` }} title="Bütçe" />
+                  </div>
+                </div>
+                <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded ${st.badge}`}>{st.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 italic">{p.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [health, setHealth] = useState<BusinessHealth | null>(null);
+  const [projectHealth, setProjectHealth] = useState<ProjectHealthReport | null>(null);
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
@@ -864,18 +917,19 @@ function AnalyticsTab() {
   const [err, setErr] = useState(false);
   const load = useCallback(() => {
     let active = true;
-    Promise.all([apiService.getBusinessHealth(), apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
-      .then(([hh, f, t, v, c, fc, sc, dp]) => { if (active) { setHealth(hh); setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
+    Promise.all([apiService.getBusinessHealth(), apiService.getProjectHealth(), apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard(), apiService.getDocumentPortfolio()])
+      .then(([hh, ph, f, t, v, c, fc, sc, dp]) => { if (active) { setHealth(hh); setProjectHealth(ph); setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); setPortfolio(dp); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   useEffect(() => load(), [load]);
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!health || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!health || !projectHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <BusinessHealthCard h={health} />
+      <ProjectHealthCard p={projectHealth} />
       <ForecastCard f={forecast} onSaved={reloadForecast} />
       <FunnelCard f={funnel} />
       <BidScorecardCard s={scorecard} />

@@ -449,3 +449,72 @@ export async function computeBusinessHealth(tenantId: string): Promise<BusinessH
     note: 'Kompozit skor: Satış (25%) · İhale (20%) · Finans (25%) · Müşteri (15%) · Uyum (15%). Alt-analitiklerden türetilir; deterministik.',
   };
 }
+
+// ── Proje Sağlık Skoru · #14b ────────────────────────────────────────────────
+// Aktif projelerin (PLANNING|IN_PROGRESS|ON_HOLD) marj/takvim/bütçe sağlığı.
+const ACTIVE_PROJECT_STATUSES = new Set(['PLANNING', 'IN_PROGRESS', 'ON_HOLD']);
+export interface ProjectHealthLine {
+  id: string; code: string | null; name: string;
+  score: number; status: 'CRITICAL' | 'WATCH' | 'HEALTHY';
+  actualMarginPct: number; overdueMilestones: number; milestoneCount: number;
+  budgetUsedPct: number; progress: number; deadlineRisk: boolean;
+  factors: { margin: number; schedule: number; budget: number };
+}
+export interface ProjectHealthReport {
+  projects: ProjectHealthLine[];
+  summary: { total: number; critical: number; watch: number; healthy: number; avgScore: number };
+  note: string;
+}
+
+export async function computeProjectHealth(tenantId: string): Promise<ProjectHealthReport> {
+  const projects = await prisma.project.findMany({
+    where: { tenantId },
+    include: { milestones: true, projectCostItems: true },
+  });
+  const now = Date.now();
+  const lines: ProjectHealthLine[] = [];
+
+  for (const p of projects.filter(x => ACTIVE_PROJECT_STATUSES.has(x.status))) {
+    const actualCost = p.projectCostItems.filter(c => c.approvalStatus !== 'REJECTED').reduce((s, c) => s + (c.actualAmount || 0), 0);
+    const contractValue = p.totalValue || 0;
+
+    // Marj: sözleşme değerine göre gerçek marj
+    const actualMargin = contractValue > 0 ? (contractValue - actualCost) / contractValue : 0;
+    const fMargin = contractValue > 0 ? clampScore(Math.min(1, Math.max(0, actualMargin / 0.20)) * 100) : 50;
+
+    // Takvim: geciken milestone oranı + proje son tarihi riski
+    const msCount = p.milestones.length;
+    const overdue = p.milestones.filter(m => m.plannedEnd && m.plannedEnd.getTime() < now && m.status !== 'COMPLETED' && m.status !== 'CANCELLED').length;
+    const projDeadline = p.deadline || p.plannedEndDate;
+    const deadlineRisk = !!(projDeadline && projDeadline.getTime() < now && p.status !== 'COMPLETED');
+    let fSchedule = msCount > 0 ? clampScore(100 - (overdue / msCount) * 100) : 60;
+    if (deadlineRisk) fSchedule = Math.min(fSchedule, 40);
+
+    // Bütçe: gerçek maliyet / bütçe (aşım cezası)
+    const overrun = p.budgetTotal > 0 ? actualCost / p.budgetTotal : 0;
+    const fBudget = p.budgetTotal > 0 ? (overrun <= 1 ? 100 : clampScore(100 - (overrun - 1) * 100)) : 60;
+
+    const score = clampScore(0.4 * fMargin + 0.35 * fSchedule + 0.25 * fBudget);
+    const status: ProjectHealthLine['status'] = score < 40 ? 'CRITICAL' : score < 70 ? 'WATCH' : 'HEALTHY';
+
+    lines.push({
+      id: p.id, code: p.code, name: p.name,
+      score, status,
+      actualMarginPct: actualMargin, overdueMilestones: overdue, milestoneCount: msCount,
+      budgetUsedPct: overrun, progress: p.progress || 0, deadlineRisk,
+      factors: { margin: fMargin, schedule: fSchedule, budget: fBudget },
+    });
+  }
+  lines.sort((a, b) => a.score - b.score); // en riskli önce
+
+  const critical = lines.filter(l => l.status === 'CRITICAL').length;
+  const watch = lines.filter(l => l.status === 'WATCH').length;
+  const healthy = lines.filter(l => l.status === 'HEALTHY').length;
+  const avgScore = lines.length ? Math.round(lines.reduce((s, l) => s + l.score, 0) / lines.length) : 0;
+
+  return {
+    projects: lines,
+    summary: { total: lines.length, critical, watch, healthy, avgScore },
+    note: 'Aktif proje sağlığı: Marj (40%, sözleşme değeri vs gerçek maliyet) · Takvim (35%, geciken milestone + son tarih riski) · Bütçe (25%, aşım). Deterministik.',
+  };
+}

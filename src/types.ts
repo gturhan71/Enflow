@@ -946,6 +946,19 @@ export interface BusinessHealth {
   note: string;
 }
 
+export interface ProjectHealthLine {
+  id: string; code: string | null; name: string;
+  score: number; status: 'CRITICAL' | 'WATCH' | 'HEALTHY';
+  actualMarginPct: number; overdueMilestones: number; milestoneCount: number;
+  budgetUsedPct: number; progress: number; deadlineRisk: boolean;
+  factors: { margin: number; schedule: number; budget: number };
+}
+export interface ProjectHealthReport {
+  projects: ProjectHealthLine[];
+  summary: { total: number; critical: number; watch: number; healthy: number; avgScore: number };
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;
