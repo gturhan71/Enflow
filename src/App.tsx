@@ -39,7 +39,6 @@ import DocumentsModule from './modules/DocumentsModule';
 import ProcurementModule from './modules/ProcurementModule';
 import TodoModule from './modules/TodoModule';
 import SettingsModule from './modules/SettingsModule';
-import ContractModule from './modules/ContractModule';
 import ProjectManagementModule from './modules/ProjectManagementModule';
 import VisitPlanModule from './modules/VisitPlanModule';
 import CRMModule from './modules/CRMModule';
@@ -344,10 +343,8 @@ const TenantAppInner = ({
       // Sözleşme — yeni ContractWorkflow ana modül
       case 'contract-workflow':
       case 'contract-workflow-test': // geriye dönük uyumluluk (legacy alias)
+      case 'contracts':              // eski mock-tabanlı ContractModule kaldırıldı → gerçek modüle yönlendir
         return <ContractWorkflowModule opportunities={opportunities} proposals={proposals} initialItemId={navItemId} />;
-
-      // Eski sözleşme modülü — erişim kapanmadı, sadece menüden çıkarıldı
-      case 'contracts': return <ContractModule contracts={contracts} setContracts={setContracts} opportunities={opportunities} projects={projects} setProjects={setProjects} tasks={tasks} setTasks={setTasks} />;
 
       case 'procurement': return <ProcurementModule projects={projects} units={units} initialItemId={navItemId} />;
       case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} initialItemId={navItemId} />;

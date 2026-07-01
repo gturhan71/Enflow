@@ -10,7 +10,6 @@ import { cn } from '../lib/utils';
 import { Unit, Workflow, WorkflowStep, ApprovalStage } from '../types';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
-import { SIMULATION_STEPS } from '../constants/simulationSteps';
 
 const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
   const { setHasUnsavedChanges } = useUnsavedChanges();
@@ -34,19 +33,34 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     blocked: boolean;
   } | null>(null);
 
+  // Simülasyon adımları = GERÇEK aktif iş akışının adımları (sahte senaryo yok).
+  // Birim adı units prop'undan; sıra order'a göre; tip/gereklilik/etkin bilgisi gerçek.
+  const simSteps = useMemo(() => {
+    const steps = [...(activeWorkflow?.steps ?? [])].sort((a, b) => a.order - b.order);
+    return steps.map((s, i) => ({
+      id: s.id,
+      index: i,
+      unit: units.find(u => u.id === s.unitId)?.name || 'Birim',
+      description: s.description || '',
+      type: s.type,
+      enabled: s.enabled !== false,
+      requiresCompletion: !!s.requiresCompletion,
+    }));
+  }, [activeWorkflow, units]);
+
   useEffect(() => {
     fetchWorkflows();
   }, []);
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
-    if (isAutoPlaying) {
+    if (isAutoPlaying && simSteps.length > 0) {
       interval = setInterval(() => {
-        setCurrentSimStep(prev => (prev === SIMULATION_STEPS.length - 1 ? 0 : prev + 1));
+        setCurrentSimStep(prev => (prev >= simSteps.length - 1 ? 0 : prev + 1));
       }, 5000);
     }
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, simSteps.length]);
 
   const fetchWorkflows = async () => {
     setLoading(true);
@@ -215,12 +229,7 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     }
   };
 
-  const simulationPath = useMemo(() => {
-    if (!activeWorkflow) return [];
-    return activeWorkflow.steps || [];
-  }, [activeWorkflow]);
-
-  const activeSimStep = SIMULATION_STEPS[currentSimStep] || SIMULATION_STEPS[0];
+  const activeSimStep = simSteps[currentSimStep] || simSteps[0];
 
   if (loading) {
     return (
@@ -432,18 +441,24 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
             {activeWorkflow && renderApprovalBuilder()}
           </div>
         </div>
+      ) : simSteps.length === 0 || !activeSimStep ? (
+        <div className="h-[400px] flex flex-col items-center justify-center text-center p-12 glass-panel rounded-[40px] border-dashed bg-slate-50/50 animate-in fade-in duration-500">
+          <div className="w-20 h-20 bg-white text-slate-300 rounded-3xl flex items-center justify-center mb-6 shadow-sm"><GitBranch size={40} /></div>
+          <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">Simüle Edilecek Akış Yok</h4>
+          <p className="text-sm text-slate-400 font-bold max-w-xs mt-2 italic">Önce Tasarım sekmesinden bu şirketin iş akışını (adımları) tanımlayın; simülasyon gerçek akışı adım adım gösterir.</p>
+        </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 animate-in fade-in duration-700">
           <div className="lg:col-span-4 space-y-4">
             <div className="glass-panel p-6 rounded-[32px] bg-slate-900 text-white relative overflow-hidden">
                <div className="relative z-10">
-                 <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-2 italic">Akış Durumu</p>
+                 <p className="text-[10px] font-black text-primary uppercase tracking-[0.2em] mb-2 italic">Akış Durumu (gerçek)</p>
                  <h4 className="text-lg font-black uppercase italic tracking-tighter leading-tight mb-4">Dijital Süreç İzleyici</h4>
                  <div className="space-y-3">
-                   {SIMULATION_STEPS.map((s, i) => (
+                   {simSteps.map((s, i) => (
                      <div key={s.id} className={cn("flex items-center gap-3 p-3 rounded-2xl transition-all", i === currentSimStep ? "bg-white/20 border border-white/20 shadow-lg" : "opacity-40")}>
                         <div className={cn("w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black", i === currentSimStep ? "bg-primary text-white" : "bg-white/10 text-white")}>{i+1}</div>
-                        <span className="text-[10px] font-bold uppercase tracking-widest">{s.title}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-widest truncate">{s.unit}</span>
                      </div>
                    ))}
                  </div>
@@ -469,58 +484,36 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 bg-primary/10 text-primary rounded-2xl flex items-center justify-center"><Activity size={24} /></div>
                         <div>
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aşama {currentSimStep + 1}</p>
-                          <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">{activeSimStep.title}</h4>
+                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Aşama {currentSimStep + 1} / {simSteps.length}</p>
+                          <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">{activeSimStep.unit}</h4>
                         </div>
                       </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sorumlu Birim</span>
-                        <span className="text-sm font-black text-primary italic uppercase tracking-tighter">{activeSimStep.unit}</span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className={cn("text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest", activeSimStep.type === 'AUTO' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700")}>
+                          {activeSimStep.type === 'AUTO' ? 'Otomatik Adım' : 'Manuel Adım'}
+                        </span>
+                        {!activeSimStep.enabled && <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Atlanıyor (devre dışı)</span>}
                       </div>
                    </div>
 
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-6">
-                        <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
-                          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><ListTodo size={12} /> İşlem Detayı</p>
-                          <p className="text-sm text-slate-700 font-medium leading-relaxed italic">"{activeSimStep.description}"</p>
-                        </div>
-                        <div className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl">
-                          <div className="w-10 h-10 rounded-full bg-slate-900 flex items-center justify-center text-white text-xs font-black">{activeSimStep.assignee.split(' ').map(n => n[0]).join('')}</div>
-                          <div>
-                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Sorumlu Personel</p>
-                            <p className="text-xs font-bold text-slate-900">{activeSimStep.assignee} ({activeSimStep.role})</p>
-                          </div>
-                        </div>
+                      <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><ListTodo size={12} /> İşlem Detayı</p>
+                        <p className="text-sm text-slate-700 font-medium leading-relaxed italic">{activeSimStep.description ? `"${activeSimStep.description}"` : 'Bu adım için açıklama girilmemiş.'}</p>
                       </div>
-
                       <div className="space-y-4">
-                        <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-3xl">
-                          <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Zap size={12} /> Prisma Kaydı (Entity)</p>
-                          <p className="text-[11px] font-mono text-indigo-700 bg-white/50 p-3 rounded-xl border border-indigo-50 leading-tight">
-                            {JSON.stringify(activeSimStep.entityCreated, null, 2)}
+                        <div className="p-5 bg-indigo-50 border border-indigo-100 rounded-3xl flex items-center gap-3">
+                          <Zap size={16} className="text-indigo-500 shrink-0" />
+                          <p className="text-[11px] text-indigo-700 font-bold">
+                            {activeSimStep.requiresCompletion ? 'Tamamlanması ZORUNLU — bir sonraki birime geçmeden önce bu adım kapatılmalı.' : 'Tamamlanması opsiyonel — akış beklemeden ilerleyebilir.'}
                           </p>
                         </div>
-                        <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-3xl">
-                          <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-3 flex items-center gap-2"><ArrowRight size={12} /> Tetiklenen Görev</p>
-                          <p className="text-[11px] text-emerald-700 font-bold italic">"{activeSimStep.taskCreated}"</p>
+                        <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-3xl flex items-center gap-3">
+                          <ArrowRight size={16} className="text-emerald-500 shrink-0" />
+                          <p className="text-[11px] text-emerald-700 font-bold">
+                            {currentSimStep < simSteps.length - 1 ? `Sonraki birim: ${simSteps[currentSimStep + 1].unit}` : 'Son adım — akış burada tamamlanır.'}
+                          </p>
                         </div>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                   <div className="glass-panel p-6 rounded-[32px] bg-white border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><RefreshCw size={12} /> WhatsApp Bildirimi</p>
-                      <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl">
-                        <p className="text-xs text-emerald-700 font-medium">{activeSimStep.whatsapp}</p>
-                      </div>
-                   </div>
-                   <div className="glass-panel p-6 rounded-[32px] bg-white border-slate-100">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2"><Mail size={12} /> Exchange E-Posta</p>
-                      <div className="p-4 bg-primary/5 border border-primary/10 rounded-2xl">
-                        <p className="text-[10px] font-black text-primary uppercase mb-1">{activeSimStep.email.subject}</p>
-                        <p className="text-[9px] text-slate-500 line-clamp-2">{activeSimStep.email.body}</p>
                       </div>
                    </div>
                 </div>
@@ -528,11 +521,11 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                 <div className="flex justify-between items-center pt-4">
                   <button onClick={() => setCurrentSimStep(prev => Math.max(0, prev - 1))} disabled={currentSimStep === 0} className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest hover:text-primary transition-all disabled:opacity-30 flex items-center gap-2"><ChevronRight size={14} className="rotate-180" /> Önceki Adım</button>
                   <div className="flex gap-2">
-                    {SIMULATION_STEPS.map((_, i) => (
+                    {simSteps.map((_, i) => (
                       <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all", i === currentSimStep ? "bg-primary w-4" : "bg-slate-200")} />
                     ))}
                   </div>
-                  <button onClick={() => setCurrentSimStep(prev => Math.min(SIMULATION_STEPS.length - 1, prev + 1))} disabled={currentSimStep === SIMULATION_STEPS.length - 1} className="px-6 py-3 text-[10px] font-black text-primary uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-2">Sonraki Adım <ChevronRight size={14} /></button>
+                  <button onClick={() => setCurrentSimStep(prev => Math.min(simSteps.length - 1, prev + 1))} disabled={currentSimStep === simSteps.length - 1} className="px-6 py-3 text-[10px] font-black text-primary uppercase tracking-widest hover:scale-105 transition-all disabled:opacity-30 flex items-center gap-2">Sonraki Adım <ChevronRight size={14} /></button>
                 </div>
               </motion.div>
             </AnimatePresence>

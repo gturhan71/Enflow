@@ -55,24 +55,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
-import { 
-  NAV_ITEMS, 
-  MOCK_CUSTOMERS,
-  MOCK_PROJECTS, 
-  MOCK_DOCUMENTS, 
-  MOCK_WORK_EXPERIENCE, 
-  MOCK_CERTIFICATES,
-  MOCK_UNITS,
-  MOCK_PERMISSIONS,
-  MOCK_SYSTEM_USERS,
-  MOCK_BOM_ITEMS,
-  MOCK_COST_REQUIREMENTS,
-  MOCK_CONTRACTS,
-  MOCK_CONTRACT_DOCS,
-  MOCK_PROJECT_TASKS,
-  MOCK_TODO_TASKS,
-  MOCK_OPPORTUNITIES
-} from '../constants';
+import { NAV_ITEMS } from '../constants';
 import {
   NextcloudConfig,
   ExchangeConfig,

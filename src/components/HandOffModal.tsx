@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, ArrowRight, User, GitBranch } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'motion/react';
+import { X, ArrowRight, Loader2 } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface HandOffModalProps {
   isOpen: boolean;
@@ -9,20 +10,51 @@ interface HandOffModalProps {
   itemTitle: string;
 }
 
-// Mock units and users for selection
-const MOCK_UNITS = [{ id: 'unit_sales', name: 'Satış' }, { id: 'unit_technical', name: 'Teknik' }, { id: 'unit_procurement', name: 'Satın Alma' }];
-const MOCK_USERS = [{ id: 'user_1', name: 'Ahmet Yılmaz' }, { id: 'user_2', name: 'Ayşe Demir' }];
+interface UnitLite { id: string; name: string }
+interface UserLite { id: string; name: string; unitId?: string | null }
 
 export const HandOffModal: React.FC<HandOffModalProps> = ({ isOpen, onClose, onConfirm, itemTitle }) => {
-  const [toUnit, setToUnit] = useState(MOCK_UNITS[0].id);
-  const [toUser, setToUser] = useState(MOCK_USERS[0]);
+  const [units, setUnits] = useState<UnitLite[]>([]);
+  const [users, setUsers] = useState<UserLite[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [toUnit, setToUnit] = useState('');
+  const [toUserId, setToUserId] = useState('');
   const [note, setNote] = useState('');
+
+  // Açılışta gerçek (tenant-scoped) birim + kullanıcıları çek — sahte demo veri YOK.
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    setLoading(true);
+    Promise.all([apiService.getUnits(), apiService.getUsers()])
+      .then(([u, us]) => {
+        if (!active) return;
+        const unitList = (u as UnitLite[]) || [];
+        const userList = (us as UserLite[]) || [];
+        setUnits(unitList);
+        setUsers(userList);
+        setToUnit((prev) => prev || unitList[0]?.id || '');
+      })
+      .catch(() => { if (active) { setUnits([]); setUsers([]); } })
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [isOpen]);
+
+  // Seçili birime göre kullanıcıları filtrele; seçili kullanıcı geçersizse ilkine düş.
+  const unitUsers = toUnit ? users.filter((u) => u.unitId === toUnit) : users;
+  useEffect(() => {
+    if (unitUsers.length && !unitUsers.some((u) => u.id === toUserId)) setToUserId(unitUsers[0].id);
+    if (!unitUsers.length) setToUserId('');
+  }, [toUnit, users]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!isOpen) return null;
 
+  const selectedUser = users.find((u) => u.id === toUserId);
+  const canConfirm = !!toUnit && !!selectedUser;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.95 }}
@@ -36,37 +68,54 @@ export const HandOffModal: React.FC<HandOffModalProps> = ({ isOpen, onClose, onC
         </div>
         <div className="p-8 space-y-6">
           <p className="text-sm text-slate-400">
-            <span className="font-bold text-white">{itemTitle}</span> projesini aşağıdaki birime ve personele aktarmak üzeresiniz.
+            <span className="font-bold text-white">{itemTitle}</span> kaydını aşağıdaki birime ve personele aktarmak üzeresiniz.
           </p>
-          <div className="space-y-4">
-            <select 
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary"
-              onChange={(e) => setToUnit(e.target.value)}
-              value={toUnit}
-            >
-              {MOCK_UNITS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <select 
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary"
-              onChange={(e) => setToUser(MOCK_USERS.find(u => u.id === e.target.value) || MOCK_USERS[0])}
-              value={toUser.id}
-            >
-              {MOCK_USERS.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-            </select>
-            <textarea 
-              rows={3}
-              placeholder="Aktarım notu..."
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary resize-none"
-              onChange={(e) => setNote(e.target.value)}
-              value={note}
-            />
-          </div>
+
+          {loading ? (
+            <div className="flex items-center gap-2 text-slate-400 text-sm py-6"><Loader2 size={16} className="animate-spin" /> Birim ve kullanıcılar yükleniyor…</div>
+          ) : units.length === 0 ? (
+            <div className="text-sm text-amber-300 py-6">Aktarılacak birim bulunamadı. Önce Ayarlar → Birimler'den birim tanımlayın.</div>
+          ) : (
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Hedef Birim</label>
+                <select
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary"
+                  onChange={(e) => setToUnit(e.target.value)}
+                  value={toUnit}
+                >
+                  {units.map((u) => <option key={u.id} value={u.id} className="text-slate-900">{u.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 mb-1">Hedef Personel</label>
+                <select
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary disabled:opacity-50"
+                  onChange={(e) => setToUserId(e.target.value)}
+                  value={toUserId}
+                  disabled={unitUsers.length === 0}
+                >
+                  {unitUsers.length === 0
+                    ? <option value="" className="text-slate-900">Bu birimde kullanıcı yok</option>
+                    : unitUsers.map((u) => <option key={u.id} value={u.id} className="text-slate-900">{u.name}</option>)}
+                </select>
+              </div>
+              <textarea
+                rows={3}
+                placeholder="Aktarım notu..."
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-2xl text-sm text-white outline-none focus:border-primary resize-none"
+                onChange={(e) => setNote(e.target.value)}
+                value={note}
+              />
+            </div>
+          )}
         </div>
         <div className="p-6 bg-white/5 border-t border-white/10 flex justify-end gap-3">
           <button onClick={onClose} className="px-6 py-2 text-sm font-bold text-slate-400 hover:text-white">İptal</button>
-          <button 
-            onClick={() => onConfirm({ toUnit, toUser, note })}
-            className="px-8 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg hover:bg-primary/90 transition-all flex items-center gap-2"
+          <button
+            onClick={() => selectedUser && onConfirm({ toUnit, toUser: { id: selectedUser.id, name: selectedUser.name }, note })}
+            disabled={!canConfirm}
+            className="px-8 py-2 bg-primary text-white rounded-xl text-sm font-bold shadow-lg hover:bg-primary/90 transition-all flex items-center gap-2 disabled:opacity-40"
           >
             Aktar <ArrowRight size={16} />
           </button>

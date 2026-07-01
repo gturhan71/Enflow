@@ -314,7 +314,7 @@ const NegotiationModule = ({
       });
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: chatOffer } : o));
       alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${chatOffer.toLocaleString()} olarak sisteme işlendi.`);
-      if (setActiveTab) setActiveTab('contracts');
+      if (setActiveTab) setActiveTab('contract-workflow');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Hata oluştu.');
     }
@@ -545,7 +545,7 @@ const NegotiationModule = ({
       });
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: auctionWinner.price } : o));
       alert(`Açık eksiltme zaferi tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${auctionWinner.price.toLocaleString()} olarak sisteme işlendi.`);
-      if (setActiveTab) setActiveTab('contracts');
+      if (setActiveTab) setActiveTab('contract-workflow');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Hata oluştu.');
     }
