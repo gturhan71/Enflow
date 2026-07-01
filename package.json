@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "clean": "rm -rf dist",
     "lint": "tsc --noEmit",
-    "audit:roles": "cd backend && pnpm audit:roles"
+    "audit:roles": "cd backend && pnpm audit:roles",
+    "check:no-mock": "node scripts/check-no-mock.mjs",
+    "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
+    "verify": "tsc --noEmit && (cd backend && pnpm exec tsc --noEmit) && node scripts/check-no-mock.mjs && node scripts/check-tenant-scope.mjs && vite build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

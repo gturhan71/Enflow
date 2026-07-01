@@ -250,6 +250,8 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
 // ── DELETE WORKFLOW ───────────────────────────────────────────────────────────
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
   const id = pid(req);
+  const wf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId: req.tenantId }, select: { id: true } });
+  if (!wf) return res.status(404).json({ error: 'Sözleşme akışı bulunamadı.' });
   await prisma.contractWorkflowDoc.deleteMany({ where: { workflowId: id } });
   await prisma.contractWorkflow.delete({ where: { id } });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'CONTRACT_WORKFLOW', entityId: id });
