@@ -898,6 +898,9 @@ export interface TenderAnalytics {
   overall: { winRate: number; wonValue: number; lostValue: number; activePipeline: number; avgBidValue: number; wonCount: number; lostCount: number };
 }
 
+export interface BomVarianceLine { name: string; quoted: number; actual: number; variance: number; variancePct: number }
+export interface BomVarianceReport { lines: BomVarianceLine[]; marginErosionPct: number; note: string }
+
 export interface UnitDefinition {
   key: string;
   label: string;

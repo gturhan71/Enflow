@@ -103,3 +103,51 @@ export async function computeTenderAnalytics(tenantId: string): Promise<TenderAn
     },
   };
 }
+
+// ── BoM Maliyet Varyansı · #7 ─────────────────────────────────────────────────
+// Teklif-anı BoM maliyeti (seçili BoMLineQuote ya da BoMItem.purchaseCost × adet) vs
+// gerçekleşen proje maliyeti (ProjectCostItem.actualAmount). Granülerlik OPPORTUNITY/
+// PROJE seviyesinde: ProjectCostItem satırları BoM lineKey'e bağlı olmadığından
+// (serbest-metin) satır-bazı fx/tedarikçi ayrımı yapılamaz → o alanlar future (bkz. NOT).
+export interface BomVarianceLine { name: string; quoted: number; actual: number; variance: number; variancePct: number }
+export interface BomVarianceReport { lines: BomVarianceLine[]; marginErosionPct: number; note: string }
+
+export async function computeBomVariance(tenantId: string): Promise<BomVarianceReport> {
+  const opps = await prisma.opportunity.findMany({ where: { tenantId }, select: { id: true, title: true } });
+  const oppIds = opps.map(o => o.id);
+  if (oppIds.length === 0) return { lines: [], marginErosionPct: 0, note: NOTE };
+
+  const [bomItems, quotes, projects] = await Promise.all([
+    prisma.boMItem.findMany({ where: { opportunityId: { in: oppIds } }, select: { opportunityId: true, lineKey: true, quantity: true, purchaseCost: true } }),
+    prisma.boMLineQuote.findMany({ where: { opportunityId: { in: oppIds }, isSelected: true }, select: { opportunityId: true, lineKey: true, unitPrice: true } }),
+    prisma.project.findMany({ where: { tenantId, opportunityId: { in: oppIds } }, select: { opportunityId: true, projectCostItems: { select: { actualAmount: true } } } }),
+  ]);
+
+  // opportunityId → seçili teklif birim fiyatı (lineKey bazında)
+  const selByOppLine = new Map<string, number>();
+  for (const q of quotes) selByOppLine.set(`${q.opportunityId}|${q.lineKey ?? ''}`, q.unitPrice);
+  // opportunityId → gerçekleşen toplam
+  const actualByOpp = new Map<string, number>();
+  for (const p of projects) if (p.opportunityId) actualByOpp.set(p.opportunityId, (p.projectCostItems ?? []).reduce((s, c) => s + (c.actualAmount || 0), 0));
+  // opportunityId → teklif (quoted) toplam
+  const quotedByOpp = new Map<string, number>();
+  for (const b of bomItems) {
+    const unit = selByOppLine.get(`${b.opportunityId}|${b.lineKey ?? ''}`) ?? b.purchaseCost;
+    quotedByOpp.set(b.opportunityId, (quotedByOpp.get(b.opportunityId) || 0) + unit * b.quantity);
+  }
+
+  const lines: BomVarianceLine[] = [];
+  let totalQuoted = 0, totalActual = 0;
+  for (const o of opps) {
+    const quoted = quotedByOpp.get(o.id) || 0;
+    const actual = actualByOpp.get(o.id) || 0;
+    if (quoted === 0 && actual === 0) continue;
+    const variance = actual - quoted;
+    lines.push({ name: o.title, quoted, actual, variance, variancePct: quoted > 0 ? variance / quoted : 0 });
+    totalQuoted += quoted; totalActual += actual;
+  }
+
+  lines.sort((a, b) => Math.abs(b.variance) - Math.abs(a.variance));
+  return { lines, marginErosionPct: totalQuoted > 0 ? (totalActual - totalQuoted) / totalQuoted : 0, note: NOTE };
+}
+const NOTE = 'Varyans proje/fırsat seviyesindedir; döviz/tedarikçi ayrımı satır-bazlı gerçekleşen maliyet (lineKey bağı) gerektirir — ileri faz.';

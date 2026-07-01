@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -24,6 +24,11 @@ router.get('/funnel', tenantMiddleware, asyncHandler(async (req: Request, res: R
 // Tender kazanma kırılımı (#4)
 router.get('/tender-analytics', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeTenderAnalytics(req.tenantId));
+}));
+
+// BoM maliyet varyansı (#7)
+router.get('/bom-variance', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeBomVariance(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)

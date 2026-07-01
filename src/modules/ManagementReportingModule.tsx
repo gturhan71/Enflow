@@ -11,7 +11,7 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -602,23 +602,57 @@ function TenderCard({ t }: { t: TenderAnalytics }) {
   );
 }
 
+function BomVarianceCard({ v }: { v: BomVarianceReport }) {
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2"><AlertTriangle size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">BoM Maliyet Varyansı</h4></div>
+        <div className="text-right">
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Margin Erozyonu</p>
+          <p className={`text-2xl font-black ${v.marginErosionPct > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{pct(v.marginErosionPct)}</p>
+        </div>
+      </div>
+      {v.lines.length === 0 ? (
+        <p className="text-sm text-slate-400 italic">Karşılaştırılacak teklif/gerçekleşen maliyet verisi yok.</p>
+      ) : (
+        <div className="space-y-1">
+          <div className="grid grid-cols-12 text-[9px] font-black uppercase tracking-widest text-slate-400 pb-1 border-b border-slate-100">
+            <span className="col-span-5">Fırsat</span><span className="col-span-2 text-right">Teklif</span><span className="col-span-2 text-right">Gerçekleşen</span><span className="col-span-3 text-right">Varyans</span>
+          </div>
+          {v.lines.slice(0, 5).map((l, i) => (
+            <div key={i} className="grid grid-cols-12 text-xs py-1 items-center">
+              <span className="col-span-5 font-bold text-slate-700 truncate">{l.name}</span>
+              <span className="col-span-2 text-right text-slate-500">{fmtTRY(l.quoted)}</span>
+              <span className="col-span-2 text-right text-slate-500">{fmtTRY(l.actual)}</span>
+              <span className={`col-span-3 text-right font-bold ${l.variance > 0 ? 'text-red-600' : 'text-emerald-600'}`}>{fmtTRY(l.variance)} ({pct(l.variancePct)})</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 italic">{v.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
+  const [variance, setVariance] = useState<BomVarianceReport | null>(null);
   const [err, setErr] = useState(false);
   useEffect(() => {
     let active = true;
-    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics()])
-      .then(([f, t]) => { if (active) { setFunnel(f); setTender(t); } })
+    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance()])
+      .then(([f, t, v]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!funnel || !tender) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!funnel || !tender || !variance) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <FunnelCard f={funnel} />
       <TenderCard t={tender} />
+      <BomVarianceCard v={variance} />
     </div>
   );
 }
