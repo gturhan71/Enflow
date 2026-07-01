@@ -913,6 +913,19 @@ export interface ForecastReport {
   byStage: { status: string; count: number; weighted: number }[];
 }
 
+export interface BidScoreLine {
+  id: string; name: string; authority: string; estimatedValue: number; currency: string;
+  deadline: string | null; daysLeft: number | null;
+  score: number; recommendation: 'BID' | 'REVIEW' | 'NO_BID';
+  factors: { authorityWinRate: number; deadline: number; readiness: number; valueFit: number };
+  authorityWinPct: number | null; readinessPct: number; triageTier: string | null;
+}
+export interface BidScorecard {
+  tenders: BidScoreLine[];
+  summary: { total: number; bid: number; review: number; noBid: number; avgScore: number };
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

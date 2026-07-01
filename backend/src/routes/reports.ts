@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -51,6 +51,11 @@ router.put('/sales-target', tenantMiddleware, requireRole(['GENERAL_MANAGER']), 
   ms.salesTarget = target;
   await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
   res.json({ target });
+}));
+
+// Bid / No-Bid skorkartı (#3) — karar-öncesi ihaleler
+router.get('/bid-scorecard', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeBidScorecard(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)

@@ -5,13 +5,13 @@ import {
 } from 'recharts';
 import {
   BarChart3, AlertTriangle, RefreshCw, TrendingUp, Clock, LayoutGrid, Building2,
-  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge,
+  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge, ClipboardCheck,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -724,28 +724,81 @@ function ForecastCard({ f, onSaved }: { f: ForecastReport; onSaved: () => void }
   );
 }
 
+const REC_STYLE: Record<string, { label: string; badge: string; bar: string }> = {
+  BID: { label: 'Katıl', badge: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-500' },
+  REVIEW: { label: 'İncele', badge: 'bg-amber-100 text-amber-700', bar: 'bg-amber-500' },
+  NO_BID: { label: 'Katılma', badge: 'bg-red-100 text-red-600', bar: 'bg-red-500' },
+};
+
+function BidScorecardCard({ s }: { s: BidScorecard }) {
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center gap-2"><ClipboardCheck size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Bid / No-Bid Skorkartı</h4></div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Karar-Öncesi</p><p className="text-2xl font-black text-slate-800">{s.summary.total}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Katıl</p><p className="text-2xl font-black text-emerald-600">{s.summary.bid}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">İncele</p><p className="text-2xl font-black text-amber-600">{s.summary.review}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ort. Skor</p><p className="text-2xl font-black text-primary">{s.summary.avgScore}</p></div>
+      </div>
+      {s.tenders.length === 0 ? (
+        <p className="text-[11px] text-slate-400 italic">Karar aşamasında (taslak/hazırlık) ihale yok.</p>
+      ) : (
+        <div className="space-y-2">
+          {s.tenders.map(t => {
+            const rec = REC_STYLE[t.recommendation];
+            return (
+              <div key={t.id} className="flex items-center gap-3 border-b border-slate-100 pb-2 last:border-0">
+                <div className="w-8 shrink-0 text-center"><span className="text-lg font-black text-slate-800">{t.score}</span></div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold text-slate-700 truncate">{t.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {t.authority}{t.authorityWinPct !== null && ` · geçmiş %${Math.round(t.authorityWinPct * 100)}`}
+                    {t.daysLeft !== null && ` · ${t.daysLeft}g kaldı`}
+                    {` · hazırlık %${Math.round(t.readinessPct * 100)}`}
+                    {t.triageTier && ` · İGPD ${t.triageTier}`}
+                  </p>
+                  <div className="flex gap-0.5 mt-1 h-1.5">
+                    <div className="bg-indigo-400 rounded-sm" style={{ width: `${t.factors.authorityWinRate}%` }} title="İdare geçmişi" />
+                    <div className="bg-sky-400 rounded-sm" style={{ width: `${t.factors.deadline}%` }} title="Süre" />
+                    <div className="bg-emerald-400 rounded-sm" style={{ width: `${t.factors.readiness}%` }} title="Hazırlık" />
+                    <div className="bg-amber-400 rounded-sm" style={{ width: `${t.factors.valueFit}%` }} title="Değer uyumu" />
+                  </div>
+                </div>
+                <span className={`shrink-0 text-[9px] font-black uppercase px-2 py-1 rounded ${rec.badge}`}>{rec.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <p className="text-[10px] text-slate-400 italic">{s.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
   const [conc, setConc] = useState<ConcentrationReport | null>(null);
   const [forecast, setForecast] = useState<ForecastReport | null>(null);
+  const [scorecard, setScorecard] = useState<BidScorecard | null>(null);
   const [err, setErr] = useState(false);
   const load = useCallback(() => {
     let active = true;
-    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast()])
-      .then(([f, t, v, c, fc]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); } })
+    Promise.all([apiService.getFunnel(), apiService.getTenderAnalytics(), apiService.getBomVariance(), apiService.getConcentration(), apiService.getForecast(), apiService.getBidScorecard()])
+      .then(([f, t, v, c, fc, sc]) => { if (active) { setFunnel(f); setTender(t); setVariance(v); setConc(c); setForecast(fc); setScorecard(sc); } })
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
   useEffect(() => load(), [load]);
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
-  if (!funnel || !tender || !variance || !conc || !forecast) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  if (!funnel || !tender || !variance || !conc || !forecast || !scorecard) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <ForecastCard f={forecast} onSaved={reloadForecast} />
       <FunnelCard f={funnel} />
+      <BidScorecardCard s={scorecard} />
       <TenderCard t={tender} />
       <ConcentrationCard c={conc} />
       <BomVarianceCard v={variance} />

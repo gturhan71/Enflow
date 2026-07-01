@@ -187,6 +187,104 @@ export async function computeForecast(tenantId: string): Promise<ForecastReport>
   return { rawPipeline, weightedPipeline, wonValue, target, coverage: target > 0 ? weightedPipeline / target : 0, byStage };
 }
 
+// ── Bid / No-Bid Skorkartı · #3 ──────────────────────────────────────────────
+// Karar-öncesi ihaleleri (DRAFT|PREPARING) deterministik puanlar; şema değişmez.
+// Faktörler: idare kazanma geçmişi · son teslim tarihine kalan · checklist hazırlığı ·
+// değer uyumu (kazanılan medyana göre) + bağlı fırsatın İGPD agentTriage kademesi.
+const DECISION_STATUSES = new Set(['DRAFT', 'PREPARING']);
+export interface BidScoreLine {
+  id: string; name: string; authority: string; estimatedValue: number; currency: string;
+  deadline: string | null; daysLeft: number | null;
+  score: number; recommendation: 'BID' | 'REVIEW' | 'NO_BID';
+  factors: { authorityWinRate: number; deadline: number; readiness: number; valueFit: number };
+  authorityWinPct: number | null; readinessPct: number; triageTier: string | null;
+}
+export interface BidScorecard {
+  tenders: BidScoreLine[];
+  summary: { total: number; bid: number; review: number; noBid: number; avgScore: number };
+  note: string;
+}
+
+function median(nums: number[]): number {
+  if (nums.length === 0) return 0;
+  const s = [...nums].sort((a, b) => a - b);
+  const m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+export async function computeBidScorecard(tenantId: string): Promise<BidScorecard> {
+  const tenders = await prisma.tender.findMany({ where: { tenantId }, include: { checklist: true } });
+
+  // İdare bazlı kazanma geçmişi (WON/LOST çözülmüş ihaleler)
+  const winByAuth: Record<string, { won: number; lost: number }> = {};
+  const wonValues: number[] = [];
+  for (const t of tenders) {
+    const auth = (t.authority || '—').trim() || '—';
+    if (t.status === 'WON') { (winByAuth[auth] ??= { won: 0, lost: 0 }).won += 1; if (t.estimatedValue > 0) wonValues.push(t.estimatedValue); }
+    else if (t.status === 'LOST') { (winByAuth[auth] ??= { won: 0, lost: 0 }).lost += 1; }
+  }
+  const medianWon = median(wonValues);
+
+  // Bağlı fırsatların İGPD triyaj kademesi
+  const oppIds = tenders.filter(t => t.opportunityId && DECISION_STATUSES.has(t.status)).map(t => t.opportunityId as string);
+  const triageByOpp: Record<string, string> = {};
+  if (oppIds.length) {
+    const opps = await prisma.opportunity.findMany({ where: { tenantId, id: { in: oppIds } }, select: { id: true, agentTriage: true } });
+    for (const o of opps) {
+      try { const tier = (JSON.parse(o.agentTriage || '{}') as { igpd?: { valueTier?: string } }).igpd?.valueTier; if (tier) triageByOpp[o.id] = tier; }
+      catch { /* yok say */ }
+    }
+  }
+
+  const now = Date.now();
+  const lines: BidScoreLine[] = [];
+  for (const t of tenders.filter(x => DECISION_STATUSES.has(x.status))) {
+    const auth = (t.authority || '—').trim() || '—';
+    const hist = winByAuth[auth];
+    const winPct = hist && (hist.won + hist.lost) > 0 ? hist.won / (hist.won + hist.lost) : null;
+    const fAuthority = Math.round(winPct === null ? 15 : winPct * 30); // 0–30
+
+    const daysLeft = t.submissionDeadline ? Math.ceil((new Date(t.submissionDeadline).getTime() - now) / 86400000) : null;
+    const fDeadline = daysLeft === null ? 12 : daysLeft >= 14 ? 25 : daysLeft >= 7 ? 18 : daysLeft >= 3 ? 10 : daysLeft >= 0 ? 3 : 0; // 0–25
+
+    const total = t.checklist.length;
+    const done = t.checklist.filter(c => c.status === 'DONE' || c.status === 'WAIVED').length;
+    const readinessPct = total > 0 ? done / total : 0;
+    const fReadiness = total > 0 ? Math.round(readinessPct * 20) : 8; // 0–20
+
+    let fValue: number; // 0–25
+    if (t.estimatedValue <= 0) fValue = 6;
+    else if (medianWon <= 0) fValue = 12;
+    else { const r = t.estimatedValue / medianWon; fValue = r >= 0.5 && r <= 2 ? 25 : r >= 0.25 && r <= 4 ? 15 : 8; }
+
+    const tier = t.opportunityId ? triageByOpp[t.opportunityId] ?? null : null;
+    const tierAdj = tier === 'HIGH' ? 5 : tier === 'LOW' ? -5 : 0;
+
+    const score = Math.max(0, Math.min(100, fAuthority + fDeadline + fReadiness + fValue + tierAdj));
+    const recommendation: BidScoreLine['recommendation'] = score >= 65 ? 'BID' : score >= 45 ? 'REVIEW' : 'NO_BID';
+
+    lines.push({
+      id: t.id, name: t.name, authority: auth, estimatedValue: t.estimatedValue, currency: t.currency,
+      deadline: t.submissionDeadline ? new Date(t.submissionDeadline).toISOString() : null, daysLeft,
+      score, recommendation,
+      factors: { authorityWinRate: fAuthority, deadline: fDeadline, readiness: fReadiness, valueFit: fValue },
+      authorityWinPct: winPct, readinessPct, triageTier: tier,
+    });
+  }
+  lines.sort((a, b) => b.score - a.score);
+
+  const bid = lines.filter(l => l.recommendation === 'BID').length;
+  const review = lines.filter(l => l.recommendation === 'REVIEW').length;
+  const noBid = lines.filter(l => l.recommendation === 'NO_BID').length;
+  const avgScore = lines.length ? Math.round(lines.reduce((s, l) => s + l.score, 0) / lines.length) : 0;
+
+  return {
+    tenders: lines,
+    summary: { total: lines.length, bid, review, noBid, avgScore },
+    note: 'Deterministik skor: idare kazanma geçmişi + son teslim tarihi + evrak hazırlığı + değer uyumu (kazanılan medyan) + İGPD triyaj kademesi. Karar-öncesi (DRAFT/PREPARING) ihaleler.',
+  };
+}
+
 // ── Müşteri & Kamu Konsantrasyonu · #12 ──────────────────────────────────────
 // Kazanılan (WON) gelir üzerinden müşteri yoğunlaşması (HHI + top-N) + kamu payı.
 // Kamu payı best-effort: müşteri adı/sektörü kamu terimleri içeriyor mu (heuristik, note).
