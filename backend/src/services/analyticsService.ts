@@ -285,6 +285,51 @@ export async function computeBidScorecard(tenantId: string): Promise<BidScorecar
   };
 }
 
+// ── Belge Portföyü · #11 ─────────────────────────────────────────────────────
+// Şirket Evrakları (CorporateDocument) envanteri: kategori dağılımı + geçerlilik
+// (süresi dolan/dolacak) + ihale checklist'lerinde yeniden-kullanım kaldıracı.
+const EXPIRING_WINDOW_DAYS = 90;
+export interface DocPortfolioLine {
+  id: string; name: string; category: string; expiryDate: string | null;
+  daysLeft: number | null; status: 'EXPIRED' | 'EXPIRING';
+}
+export interface DocumentPortfolio {
+  summary: { total: number; valid: number; expiringSoon: number; expired: number; noExpiry: number; reuseCount: number };
+  categories: { category: string; count: number }[];
+  attention: DocPortfolioLine[];
+  note: string;
+}
+
+export async function computeDocumentPortfolio(tenantId: string): Promise<DocumentPortfolio> {
+  const docs = await prisma.corporateDocument.findMany({ where: { tenantId } });
+  const reuseCount = await prisma.tenderChecklistItem.count({ where: { source: 'CORPORATE_DOC', tender: { tenantId } } });
+
+  const now = Date.now();
+  const soonCut = now + EXPIRING_WINDOW_DAYS * 86400000;
+  let valid = 0, expiringSoon = 0, expired = 0, noExpiry = 0;
+  const catMap: Record<string, number> = {};
+  const attention: DocPortfolioLine[] = [];
+
+  for (const d of docs) {
+    catMap[d.category || '—'] = (catMap[d.category || '—'] || 0) + 1;
+    if (!d.expiryDate) { noExpiry++; continue; }
+    const exp = new Date(d.expiryDate).getTime();
+    const daysLeft = Math.ceil((exp - now) / 86400000);
+    if (exp < now) { expired++; attention.push({ id: d.id, name: d.name, category: d.category || '—', expiryDate: new Date(d.expiryDate).toISOString(), daysLeft, status: 'EXPIRED' }); }
+    else if (exp <= soonCut) { expiringSoon++; attention.push({ id: d.id, name: d.name, category: d.category || '—', expiryDate: new Date(d.expiryDate).toISOString(), daysLeft, status: 'EXPIRING' }); }
+    else { valid++; }
+  }
+  attention.sort((a, b) => (a.daysLeft ?? 0) - (b.daysLeft ?? 0));
+  const categories = Object.entries(catMap).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
+
+  return {
+    summary: { total: docs.length, valid, expiringSoon, expired, noExpiry, reuseCount },
+    categories,
+    attention,
+    note: `Şirket Evrakları envanteri. Süresi ${EXPIRING_WINDOW_DAYS} gün içinde dolacak/dolmuş belgeler dikkat listesinde; yeniden-kullanım, ihale checklist'lerinde otomatik eşlenen evrak sayısıdır.`,
+  };
+}
+
 // ── Müşteri & Kamu Konsantrasyonu · #12 ──────────────────────────────────────
 // Kazanılan (WON) gelir üzerinden müşteri yoğunlaşması (HHI + top-N) + kamu payı.
 // Kamu payı best-effort: müşteri adı/sektörü kamu terimleri içeriyor mu (heuristik, note).

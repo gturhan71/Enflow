@@ -926,6 +926,17 @@ export interface BidScorecard {
   note: string;
 }
 
+export interface DocPortfolioLine {
+  id: string; name: string; category: string; expiryDate: string | null;
+  daysLeft: number | null; status: 'EXPIRED' | 'EXPIRING';
+}
+export interface DocumentPortfolio {
+  summary: { total: number; valid: number; expiringSoon: number; expired: number; noExpiry: number; reuseCount: number };
+  categories: { category: string; count: number }[];
+  attention: DocPortfolioLine[];
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

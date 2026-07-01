@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -56,6 +56,11 @@ router.put('/sales-target', tenantMiddleware, requireRole(['GENERAL_MANAGER']), 
 // Bid / No-Bid skorkartı (#3) — karar-öncesi ihaleler
 router.get('/bid-scorecard', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeBidScorecard(req.tenantId));
+}));
+
+// Belge portföyü (#11) — Şirket Evrakları envanteri + geçerlilik + yeniden-kullanım
+router.get('/document-portfolio', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeDocumentPortfolio(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)

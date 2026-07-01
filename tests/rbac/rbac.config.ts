@@ -362,6 +362,12 @@ export const isolationMatrix: IsolationCase[] = [
     path: "/api/reports/bid-scorecard",
     targetTenantId: "tenant-1",
   },
+  {
+    name: "Başka tenant belge portföyü okuma (IDOR)",
+    method: "GET",
+    path: "/api/reports/document-portfolio",
+    targetTenantId: "tenant-1",
+  },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------
