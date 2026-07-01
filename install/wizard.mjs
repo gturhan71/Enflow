@@ -198,8 +198,8 @@ ${C.b}Başlatma:${C.r}
   ${C.c}# Frontend — geliştirme (port ${frontendPort})${C.r}
   cd "${REPO}" && pnpm dev --port ${frontendPort}
 
-  ${C.c}# Frontend — üretim (derlenmiş dist'i sun)${C.r}
-  cd "${REPO}" && pnpm preview --port ${frontendPort} --host
+  ${C.c}# Üretim — backend derlenmiş dist'i TEK ORIGIN sunar (build + backend yeter):${C.r}
+  cd "${join(REPO, 'backend')}" && pnpm start   ${C.dim}# → http://localhost:${backendPort} (hem UI hem API)${C.r}
 
 ${C.b}İlk açılış:${C.r} tarayıcı → http://localhost:${frontendPort}
   ${C.dim}Veritabanı BOŞTUR → ekrana KURULUM SİHİRBAZI gelir:${C.r}

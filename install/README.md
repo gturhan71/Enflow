@@ -82,16 +82,15 @@ Bittiğinde başlatma komutlarını ekrana yazar.
 ## Başlatma
 
 ```bash
-# Backend (port 3002)
-cd backend && pnpm start
+# ── ÜRETİM (önerilen): `pnpm build` sonrası backend dist'i TEK ORIGIN sunar ──
+cd backend && pnpm start        # → http://localhost:3002 (hem UI hem API)
+#   Ayrı frontend süreci / preview / proxy GEREKMEZ.
 
-# Frontend — geliştirme (port 3000)
-pnpm dev --port 3000
-
-# Frontend — üretim (derlenmiş dist'i sun)
-pnpm preview --port 3000 --host
+# ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+cd backend && pnpm start        # backend (3002)
+pnpm dev --port 3000            # frontend (3000) — ayrı terminal  (ya da: run.bat / ./run.sh)
 ```
-Tarayıcı → `http://localhost:3000`
+Üretim → `http://localhost:3002` · Geliştirme → `http://localhost:3000`
 
 ---
 

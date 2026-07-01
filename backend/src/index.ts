@@ -48,6 +48,7 @@ const app = express();
 const port = 3002;
 
 import path from 'path';
+import fs from 'fs';
 
 app.use(express.json({ limit: '50mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -116,6 +117,22 @@ app.use('/api/legal', legalRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/plugins', pluginsRouter);
+
+// ── Üretim: derlenmiş frontend'i (dist) TEK-ORIGIN sun ────────────────────────
+// Böylece `pnpm build` sonrası backend hem API hem UI'yi 3002'den sunar; ayrı
+// vite-preview / proxy gerekmez → "stale dist / proxy" karışıklığı biter.
+// API/uploads/wiki route'larından SONRA; SPA fallback yalnız GET + /api dışı yollar.
+// dist yoksa (geliştirme) atlanır — dev'de `pnpm dev` (vite) ayrı sunar.
+const distDir = path.join(__dirname, '../../dist');
+if (fs.existsSync(distDir)) {
+  app.use(express.static(distDir));
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method !== 'GET') return next();
+    if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/wiki')) return next();
+    res.sendFile(path.join(distDir, 'index.html'));
+  });
+  console.log('[Enflow Backend] Üretim: dist tek-origin sunuluyor (SPA fallback aktif).');
+}
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
   console.error('[API Error Detail]', err);
