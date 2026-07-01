@@ -38,7 +38,9 @@ import {
   Opportunity,
   Customer,
   Proposal,
+  CustomerHealthReport,
 } from '../types';
+import { CustomerHealthCard } from '../components/HealthCards';
 import ProposalEditor from './ProposalEditor';
 import NegotiationModule from './NegotiationModule';
 import { HandOffModal } from '../components/HandOffModal';
@@ -89,6 +91,9 @@ const CRMModule = ({
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
   const [customerReportTarget, setCustomerReportTarget] = useState<Customer | null>(null);
+  const [customerHealth, setCustomerHealth] = useState<CustomerHealthReport | null>(null);
+
+  React.useEffect(() => { apiService.getCustomerHealth().then(setCustomerHealth).catch(() => {}); }, []);
 
   // Deep-link: bildirim/görev "Git" ile gelen fırsatı otomatik aç (teklif sekmesinde
   // teklif editörünü açar; diğer sekmelerde fırsatı seçili getirir).
@@ -847,6 +852,8 @@ const CRMModule = ({
           </PermissionGate>
         </div>
       </div>
+
+      {customerHealth && customerHealth.summary.total > 0 && <CustomerHealthCard c={customerHealth} className="" />}
 
       {customerSearch.filteredItems.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400">

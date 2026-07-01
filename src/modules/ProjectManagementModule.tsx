@@ -10,10 +10,11 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { ProjectHealthCard } from '../components/HealthCards';
 import {
   Project, ProjectMilestone, ProjectCostItem,
   ProjectType, ProjectStatus, MilestoneStatus, CostCategory,
-  User, Unit, Opportunity
+  User, Unit, Opportunity, ProjectHealthReport
 } from '../types';
 
 // ── Sabitler ──────────────────────────────────────────────────────────────────
@@ -902,6 +903,7 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [prefilledProject, setPrefilledProject] = useState<Partial<Project> & { opportunityId?: string } | undefined>(undefined);
+  const [projectHealth, setProjectHealth] = useState<ProjectHealthReport | null>(null);
 
   const loadProjects = useCallback(async () => {
     setLoading(true);
@@ -920,7 +922,7 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
     setWonOpportunities(data.filter(o => o.status === 'WON'));
   }, []);
 
-  useEffect(() => { loadProjects(); loadWonOpportunities(); }, []);
+  useEffect(() => { loadProjects(); loadWonOpportunities(); apiService.getProjectHealth().then(setProjectHealth).catch(() => {}); }, []);
 
   // Deep-link: bildirim/görev "Git" ile gelen projeyi otomatik aç.
   useEffect(() => {
@@ -1046,6 +1048,9 @@ const ProjectManagementModule: React.FC<ProjectManagementModuleProps> = ({ users
               </div>
             ))}
           </div>
+
+          {/* Proje sağlığı (analitikle ortak kart) */}
+          {projectHealth && projectHealth.summary.total > 0 && <ProjectHealthCard p={projectHealth} className="" />}
 
           {/* View toggle */}
           <div className="flex items-center justify-between">
