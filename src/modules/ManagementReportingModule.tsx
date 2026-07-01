@@ -11,8 +11,11 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport,
 } from '../types';
+
+const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
+const pct = (n: number) => `${Math.round((n || 0) * 100)}%`;
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
   DRAFT: { label: 'Taslak', cls: 'bg-slate-100 text-slate-600' },
@@ -535,6 +538,53 @@ function IncomingReportCard({ report, onReviewed }: { report: UnitReport; onRevi
 }
 
 // ── Ana modül ────────────────────────────────────────────────────────────────
+// ── Büyüme Analitiği (Faz 1) ────────────────────────────────────────────────
+function FunnelCard({ f }: { f: FunnelReport }) {
+  const max = Math.max(1, ...f.stages.map(s => s.count));
+  const topLoss = f.lossByReason[0];
+  return (
+    <div className="glass-card p-6 space-y-4">
+      <div className="flex items-center gap-2"><TrendingUp size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Dönüşüm Hunisi</h4></div>
+      <div className="space-y-2">
+        {f.stages.map((s, i) => (
+          <div key={s.status} className="flex items-center gap-3">
+            <div className="w-24 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right shrink-0">{s.name}</div>
+            <div className="flex-1 bg-slate-100 rounded-lg h-7 overflow-hidden relative">
+              <div className="bg-primary/80 h-full flex items-center px-2" style={{ width: `${Math.max(6, (s.count / max) * 100)}%` }}>
+                <span className="text-[11px] font-black text-white">{s.count}</span>
+              </div>
+            </div>
+            <div className="w-12 text-[10px] font-bold text-slate-400 shrink-0">
+              {s.conversionToNext !== null ? <span className={s.conversionToNext < 0.5 ? 'text-red-500' : 'text-emerald-600'}>↓{pct(s.conversionToNext)}</span> : ''}
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100">
+        <span className="text-slate-400 font-bold">Pipeline'a giren: <span className="text-slate-700">{f.entered}</span></span>
+        {topLoss && <span className="text-slate-400 font-bold">En sık kayıp: <span className="text-red-500">{topLoss.reason} ({topLoss.count})</span></span>}
+      </div>
+    </div>
+  );
+}
+
+function AnalyticsTab() {
+  const [funnel, setFunnel] = useState<FunnelReport | null>(null);
+  const [err, setErr] = useState(false);
+  useEffect(() => {
+    let active = true;
+    apiService.getFunnel().then(d => { if (active) setFunnel(d); }).catch(() => { if (active) setErr(true); });
+    return () => { active = false; };
+  }, []);
+  if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
+  if (!funnel) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
+      <FunnelCard f={funnel} />
+    </div>
+  );
+}
+
 export default function ManagementReportingModule() {
   const { currentUser } = useAuth();
   const isGM = currentUser.role === 'GENERAL_MANAGER';
@@ -542,7 +592,7 @@ export default function ManagementReportingModule() {
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-  const [tab, setTab] = useState<'overview' | 'unit' | 'my-reports' | 'incoming'>('overview');
+  const [tab, setTab] = useState<'overview' | 'analytics' | 'unit' | 'my-reports' | 'incoming'>('overview');
   const [start, setStart] = useState(monthStart);
   const [end, setEnd] = useState(monthEnd);
   const [overview, setOverview] = useState<ReportOverview | null>(null);
@@ -644,6 +694,9 @@ export default function ManagementReportingModule() {
         <button onClick={() => setTab('overview')} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition ${tab === 'overview' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'}`}>
           <LayoutGrid size={15} /> Genel Bakış
         </button>
+        <button onClick={() => setTab('analytics')} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition ${tab === 'analytics' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'}`}>
+          <TrendingUp size={15} /> Büyüme Analitiği
+        </button>
         <button onClick={() => setTab('unit')} className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition ${tab === 'unit' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'bg-white text-slate-500 hover:text-slate-900 border border-slate-100'}`}>
           <Building2 size={15} /> Birim Detayı
         </button>
@@ -657,6 +710,9 @@ export default function ManagementReportingModule() {
           </button>
         )}
       </div>
+
+      {/* Büyüme Analitiği */}
+      {tab === 'analytics' && <AnalyticsTab />}
 
       {/* Genel Bakış */}
       {tab === 'overview' && overview && (

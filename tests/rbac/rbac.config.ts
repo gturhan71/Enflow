@@ -326,6 +326,12 @@ export const isolationMatrix: IsolationCase[] = [
     path: "/api/finance/aging",
     targetTenantId: "tenant-1",
   },
+  {
+    name: "Başka tenant funnel okuma (IDOR)",
+    method: "GET",
+    path: "/api/reports/funnel",
+    targetTenantId: "tenant-1",
+  },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------

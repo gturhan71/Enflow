@@ -885,6 +885,12 @@ export interface AgingReport {
   byCurrency: Record<string, { totalReceivable: number; buckets: AgingBuckets }>;
 }
 
+export interface FunnelReport {
+  stages: { name: string; status: string; count: number; conversionToNext: number | null }[];
+  lossByReason: { reason: string; count: number; value: number }[];
+  entered: number;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

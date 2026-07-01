@@ -12,8 +12,14 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
+import { computeFunnel } from '../services/analyticsService';
 
 const router: Router = Router();
+
+// ── Büyüme Analitiği Faz 1: Funnel dönüşüm (#2) — salt-okunur, tenant-scoped ──
+router.get('/funnel', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeFunnel(req.tenantId));
+}));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)
 async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<string | null> {
