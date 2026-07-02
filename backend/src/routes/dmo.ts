@@ -151,14 +151,14 @@ router.delete('/rates/:id', tenantMiddleware, editRoles, asyncHandler(async (req
 // ── Siparişler ───────────────────────────────────────────────────────────────
 // Faz A: kalem satır toplamları + revenue/cost toplamı. Tam maliyetlendirme
 // (risturn/komisyon/alarm) Faz B'de computeOrderCosting ile bağlanacak.
-interface ItemInput { catalogItemId?: string; name?: string; qty?: number; unitPrice?: number; unitCost?: number; costCurrency?: string; vatRate?: number; }
-function normalizeItems(raw: unknown): { name: string; catalogItemId: string | null; qty: number; unitPrice: number; unitCost: number; costCurrency: string; vatRate: number; lineRevenue: number; lineCost: number }[] {
+interface ItemInput { catalogItemId?: string; name?: string; qty?: number; unitPrice?: number; sellCurrency?: string; unitCost?: number; costCurrency?: string; vatRate?: number; }
+function normalizeItems(raw: unknown): { name: string; catalogItemId: string | null; qty: number; unitPrice: number; sellCurrency: string; unitCost: number; costCurrency: string; vatRate: number; lineRevenue: number; lineCost: number }[] {
   const arr = Array.isArray(raw) ? (raw as ItemInput[]) : [];
   return arr.map(it => {
     const qty = num(it.qty, 1), unitPrice = num(it.unitPrice), unitCost = num(it.unitCost);
     return {
       name: String(it.name || ''), catalogItemId: it.catalogItemId ? String(it.catalogItemId) : null,
-      qty, unitPrice, unitCost, costCurrency: String(it.costCurrency || 'TRY'), vatRate: num(it.vatRate, 20),
+      qty, unitPrice, sellCurrency: String(it.sellCurrency || 'TRY'), unitCost, costCurrency: String(it.costCurrency || 'TRY'), vatRate: num(it.vatRate, 20),
       lineRevenue: qty * unitPrice, lineCost: qty * unitCost,
     };
   });

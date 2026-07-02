@@ -1146,7 +1146,7 @@ export interface DmoExchangeRate {
   source?: string | null; notes?: string | null;
 }
 export interface DmoOrderItem {
-  id?: string; catalogItemId?: string | null; name: string; qty: number; unitPrice: number;
+  id?: string; catalogItemId?: string | null; name: string; qty: number; unitPrice: number; sellCurrency: string;
   unitCost: number; costCurrency: string; vatRate: number; lineRevenue?: number; lineCost?: number;
 }
 export interface DmoOrder {

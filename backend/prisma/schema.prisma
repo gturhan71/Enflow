@@ -1317,7 +1317,8 @@ model DmoOrderItem {
   catalogItemId String?
   name          String
   qty           Float    @default(1)
-  unitPrice     Float    @default(0)  // DMO satış fiyatı (currency)
+  unitPrice     Float    @default(0)  // DMO satış fiyatı (sellCurrency)
+  sellCurrency  String   @default("TRY") // DMO satış para birimi (kalem bazlı; DMO kuru buna uygulanır)
   unitCost      Float    @default(0)  // kendi alış maliyeti (costCurrency)
   costCurrency  String   @default("TRY")
   vatRate       Float    @default(20)

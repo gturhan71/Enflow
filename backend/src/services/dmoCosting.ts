@@ -95,21 +95,21 @@ export interface CostingResult {
   costedAt: Date;
 }
 
+type RateInfo = { rate: number; validFrom: Date | null; validTo: Date | null };
 interface CostingInput {
-  currency: string;                 // sipariş satış para birimi (DMO kuru buna uygulanır)
-  items: { qty: number; unitPrice: number; unitCost: number; costCurrency: string }[];
+  items: { qty: number; unitPrice: number; sellCurrency: string; unitCost: number; costCurrency: string }[];
   commission: DmoCommission;
   params: DmoCostParams;
-  dmoRate: { rate: number; validFrom: Date | null; validTo: Date | null } | null;
+  dmoRates: Record<string, RateInfo | null>; // satış para birimi → DMO kuru (TRY dışı)
   periodTurnover: number;
 }
 
 export function computeOrderCosting(inp: CostingInput): CostingResult {
-  const { currency, items, commission, params, dmoRate, periodTurnover } = inp;
-  const sellFx = currency === 'TRY' ? 1 : (dmoRate?.rate ?? 1);
+  const { items, commission, params, dmoRates, periodTurnover } = inp;
 
   let revenueTotal = 0, costTotal = 0;
   for (const it of items) {
+    const sellFx = it.sellCurrency === 'TRY' ? 1 : (dmoRates[it.sellCurrency]?.rate ?? 1);
     revenueTotal += it.qty * it.unitPrice * sellFx;
     const costFx = it.costCurrency === 'TRY' ? 1 : (params.costFxRates[it.costCurrency] ?? 1);
     costTotal += it.qty * it.unitCost * costFx;
@@ -128,17 +128,24 @@ export function computeOrderCosting(inp: CostingInput): CostingResult {
   const netProfit = round2(grossProfit - risturnDeduction - commissionDeduction);
   const netMarginPct = revenueTotal > 0 ? netProfit / revenueTotal : 0;
 
+  // Kullanılan TRY-dışı satış para birimleri (kur snapshot + alarm için)
+  const foreign = [...new Set(items.map(i => i.sellCurrency).filter(c => c && c !== 'TRY'))];
   const alarms: string[] = [];
   if (netProfit < 0) alarms.push('Net kâr negatif — bu satış zarar ettiriyor.');
   else if (netMarginPct < params.minMarginPct) alarms.push(`Net marj %${Math.round(netMarginPct * 100)} < eşik %${Math.round(params.minMarginPct * 100)}.`);
-  if (currency !== 'TRY' && !dmoRate) alarms.push(`${currency} için DMO kuru tanımlı değil.`);
-  if (dmoRate?.validTo && dmoRate.validTo.getTime() < Date.now()) alarms.push('Kullanılan DMO kurunun geçerlilik süresi dolmuş — yeniden hesaplayın.');
+  for (const c of foreign) {
+    if (!dmoRates[c]) alarms.push(`${c} için DMO kuru tanımlı değil.`);
+    else if (dmoRates[c]!.validTo && dmoRates[c]!.validTo!.getTime() < Date.now()) alarms.push(`${c} DMO kurunun geçerlilik süresi dolmuş — yeniden hesaplayın.`);
+  }
+
+  // Snapshot: tek yabancı satış para birimi varsa onu; birden çoksa MIX
+  let dmoRateSnapshot: number | null = null, rateCurrency: string | null = null, rateValidFrom: Date | null = null, rateValidTo: Date | null = null;
+  if (foreign.length === 1) { const r = dmoRates[foreign[0]]; dmoRateSnapshot = r?.rate ?? null; rateCurrency = foreign[0]; rateValidFrom = r?.validFrom ?? null; rateValidTo = r?.validTo ?? null; }
+  else if (foreign.length > 1) { rateCurrency = 'MIX'; }
 
   return {
     revenueTotal, costTotal, grossProfit,
-    dmoRateSnapshot: currency === 'TRY' ? null : (dmoRate?.rate ?? null),
-    rateCurrency: currency === 'TRY' ? null : currency,
-    rateValidFrom: dmoRate?.validFrom ?? null, rateValidTo: dmoRate?.validTo ?? null,
+    dmoRateSnapshot, rateCurrency, rateValidFrom, rateValidTo,
     risturnRateApplied: risturnRate, risturnDeduction,
     commissionType: commission.type, commissionValue: commission.value, commissionBasis: commission.basis, commissionDeduction,
     netProfit, netMarginPct, isProfitable: netProfit >= 0 && netMarginPct >= params.minMarginPct,
@@ -152,17 +159,19 @@ export async function recomputeOrderCosting(tenantId: string, orderId: string): 
   const order = await prisma.dmoOrder.findFirst({ where: { id: orderId, tenantId }, include: { items: true } });
   if (!order) return null;
   const params = await getDmoParams(tenantId);
-  const dmoRate = await getActiveDmoRate(tenantId, order.currency);
   const periodTurnover = await getPeriodTurnover(tenantId, orderId);
+  // Kalemlerin TRY-dışı satış para birimleri için DMO kurları
+  const currencies = [...new Set(order.items.map(i => i.sellCurrency).filter(c => c && c !== 'TRY'))];
+  const dmoRates: Record<string, { rate: number; validFrom: Date | null; validTo: Date | null } | null> = {};
+  for (const c of currencies) dmoRates[c] = await getActiveDmoRate(tenantId, c);
   const commission: DmoCommission = {
     type: (order.commissionType as 'PERCENT' | 'FIXED') || params.defaultCommission.type,
     value: order.commissionValue ?? params.defaultCommission.value,
     basis: (order.commissionBasis as 'REVENUE' | 'PROFIT') || params.defaultCommission.basis,
   };
   const r = computeOrderCosting({
-    currency: order.currency,
-    items: order.items.map(i => ({ qty: i.qty, unitPrice: i.unitPrice, unitCost: i.unitCost, costCurrency: i.costCurrency })),
-    commission, params, dmoRate, periodTurnover,
+    items: order.items.map(i => ({ qty: i.qty, unitPrice: i.unitPrice, sellCurrency: i.sellCurrency, unitCost: i.unitCost, costCurrency: i.costCurrency })),
+    commission, params, dmoRates, periodTurnover,
   });
   await prisma.dmoOrder.update({
     where: { id: orderId },

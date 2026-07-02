@@ -103,7 +103,7 @@ export function DmoModule() {
       {tab === 'reconciliation' && <ReconciliationTab recon={recon} />}
 
       {selected && <OrderDrawer order={selected} canEdit={canEdit} onClose={() => setSelected(null)} onChanged={() => refreshOrder(selected.id)} />}
-      {form?.kind === 'order' && <OrderForm agreements={agreements} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
+      {form?.kind === 'order' && <OrderForm agreements={agreements} catalog={catalog} rates={rates} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {form?.kind === 'catalog' && <CatalogForm agreements={agreements} initial={form.data as DmoCatalogItem | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {form?.kind === 'agreement' && <AgreementForm initial={form.data as DmoFrameworkAgreement | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {form?.kind === 'rate' && <RateForm initial={form.data as DmoExchangeRate | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
@@ -198,7 +198,7 @@ function OrderDrawer({ order, canEdit, onClose, onChanged }: { order: DmoOrder; 
           {order.items.map((it, i) => (
             <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-slate-100 last:border-0">
               <span className="text-slate-600 truncate">{it.name} × {it.qty}</span>
-              <span className="text-slate-500">satış {it.unitPrice} {order.currency} · maliyet {it.unitCost} {it.costCurrency}</span>
+              <span className="text-slate-500">satış {it.unitPrice} {it.sellCurrency} · maliyet {it.unitCost} {it.costCurrency}</span>
             </div>
           ))}
         </div>
@@ -402,64 +402,74 @@ function RateForm({ initial, onClose, onSaved }: { initial?: DmoExchangeRate; on
   );
 }
 
-function OrderForm({ agreements, onClose, onSaved }: { agreements: DmoFrameworkAgreement[]; onClose: () => void; onSaved: () => void }) {
-  const [head, setHead] = useState({ orderNo: '', institutionName: '', currency: 'TRY', frameworkAgreementId: '' });
-  const [items, setItems] = useState<DmoOrderItem[]>([{ name: '', qty: 1, unitPrice: 0, unitCost: 0, costCurrency: 'TRY', vatRate: 20 }]);
+const emptyItem = (): DmoOrderItem => ({ catalogItemId: null, name: '', qty: 1, unitPrice: 0, sellCurrency: 'TRY', unitCost: 0, costCurrency: 'TRY', vatRate: 20 });
+
+function OrderForm({ agreements, catalog, rates, onClose, onSaved }: { agreements: DmoFrameworkAgreement[]; catalog: DmoCatalogItem[]; rates: DmoExchangeRate[]; onClose: () => void; onSaved: () => void }) {
+  const [head, setHead] = useState({ orderNo: '', institutionName: '', frameworkAgreementId: '' });
+  const [items, setItems] = useState<DmoOrderItem[]>([emptyItem()]);
   const setItem = (i: number, patch: Partial<DmoOrderItem>) => setItems(items.map((it, idx) => idx === i ? { ...it, ...patch } : it));
+  // Seçili çerçeve anlaşmanın ürünleri (yoksa tüm katalog)
+  const options = catalog.filter(c => !head.frameworkAgreementId || c.frameworkAgreementId === head.frameworkAgreementId);
+  const currencyOpts = [...new Set(['TRY', ...rates.map(r => r.currency)])];
+  const pickProduct = (i: number, catId: string) => {
+    const c = options.find(x => x.id === catId);
+    if (!c) { setItem(i, { catalogItemId: null, name: '' }); return; }
+    setItem(i, { catalogItemId: c.id, name: c.name, unitPrice: c.listPrice, sellCurrency: c.currency, unitCost: c.unitCost, costCurrency: c.costCurrency });
+  };
   const save = async () => {
-    await apiService.createDmoOrder({ ...head, frameworkAgreementId: head.frameworkAgreementId || null, items });
+    await apiService.createDmoOrder({ ...head, currency: items[0]?.sellCurrency || 'TRY', frameworkAgreementId: head.frameworkAgreementId || null, items });
     onSaved();
   };
-  const sellTotal = items.reduce((s, it) => s + it.qty * it.unitPrice, 0);
   const costTotal = items.reduce((s, it) => s + it.qty * it.unitCost, 0);
   const cell = 'w-full px-2 py-1.5 text-sm border border-slate-200 rounded-md focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none';
   const th = 'text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 pb-1';
+  const noAgreement = !head.frameworkAgreementId;
   return (
     <Modal title="Yeni Sipariş / Fırsat" onClose={onClose} size="4xl">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
         <Field label="Sipariş No"><input className={inp} value={head.orderNo} onChange={e => setHead({ ...head, orderNo: e.target.value })} /></Field>
         <Field label="Alıcı Kurum"><input className={inp} value={head.institutionName} onChange={e => setHead({ ...head, institutionName: e.target.value })} /></Field>
-        <Field label="Satış Para Birimi"><input className={inp} value={head.currency} onChange={e => setHead({ ...head, currency: e.target.value.toUpperCase() })} /></Field>
-        <Field label="Çerçeve Anlaşma"><select className={inp} value={head.frameworkAgreementId} onChange={e => setHead({ ...head, frameworkAgreementId: e.target.value })}><option value="">—</option>{agreements.map(a => <option key={a.id} value={a.id}>{a.agreementNo}</option>)}</select></Field>
+        <Field label="Çerçeve Anlaşma (ürünler buradan gelir)"><select className={inp} value={head.frameworkAgreementId} onChange={e => { setHead({ ...head, frameworkAgreementId: e.target.value }); setItems([emptyItem()]); }}><option value="">— Tüm katalog —</option>{agreements.map(a => <option key={a.id} value={a.id}>{a.agreementNo} · {a.title}</option>)}</select></Field>
       </div>
 
       <div>
-        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kalemler</span>
+        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Kalemler {head.frameworkAgreementId ? `(seçili anlaşma: ${options.length} ürün)` : '(tüm katalog)'}</span>
         <div className="mt-1 border border-slate-200 rounded-xl overflow-hidden">
-          {/* Başlık satırı (Excel benzeri) */}
           <div className="grid grid-cols-12 gap-1.5 bg-slate-50 px-3 pt-2 pb-1 border-b border-slate-200 items-end">
-            <div className={`${th} col-span-4`}>Ürün Adı</div>
+            <div className={`${th} col-span-4`}>Ürün (katalogdan)</div>
             <div className={`${th} col-span-1 text-right`}>Adet</div>
-            <div className={`${th} col-span-2 text-right`}>Birim Satış ({head.currency})</div>
+            <div className={`${th} col-span-2 text-right`}>Birim Satış</div>
+            <div className={`${th} col-span-1`}>Satış Dövizi</div>
             <div className={`${th} col-span-2 text-right`}>Birim Maliyet</div>
-            <div className={`${th} col-span-1`}>Mlyt Br.</div>
             <div className={`${th} col-span-1 text-right`}>Satır Satış</div>
             <div className={`${th} col-span-1`}></div>
           </div>
-          {/* Satırlar */}
           {items.map((it, i) => (
             <div key={i} className="grid grid-cols-12 gap-1.5 px-3 py-1.5 items-center border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
-              <input placeholder="ör. Dizüstü Bilgisayar" className={`${cell} col-span-4`} value={it.name} onChange={e => setItem(i, { name: e.target.value })} />
+              <select className={`${cell} col-span-4`} value={it.catalogItemId || ''} onChange={e => pickProduct(i, e.target.value)}>
+                <option value="">{options.length ? '— ürün seçin —' : '— katalog boş —'}</option>
+                {options.map(c => <option key={c.id} value={c.id}>{c.dmoCode} · {c.name}</option>)}
+              </select>
               <input type="number" className={`${cell} col-span-1 text-right`} value={it.qty} onChange={e => setItem(i, { qty: Number(e.target.value) })} />
               <input type="number" className={`${cell} col-span-2 text-right`} value={it.unitPrice} onChange={e => setItem(i, { unitPrice: Number(e.target.value) })} />
+              <select className={`${cell} col-span-1`} value={it.sellCurrency} onChange={e => setItem(i, { sellCurrency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select>
               <input type="number" className={`${cell} col-span-2 text-right`} value={it.unitCost} onChange={e => setItem(i, { unitCost: Number(e.target.value) })} />
-              <input className={`${cell} col-span-1 uppercase`} value={it.costCurrency} onChange={e => setItem(i, { costCurrency: e.target.value.toUpperCase() })} />
-              <div className="col-span-1 text-right text-xs font-bold text-slate-600 tabular-nums truncate">{fmt(it.qty * it.unitPrice, head.currency)}</div>
+              <div className="col-span-1 text-right text-xs font-bold text-slate-600 tabular-nums truncate">{fmt(it.qty * it.unitPrice, it.sellCurrency)}</div>
               <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="col-span-1 flex justify-center text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
             </div>
           ))}
-          {/* Toplam satırı */}
           <div className="grid grid-cols-12 gap-1.5 px-3 py-2 bg-slate-50 border-t border-slate-200 items-center">
-            <div className="col-span-5 font-black text-slate-500 uppercase text-[10px] tracking-widest">Toplam ({items.length} kalem)</div>
-            <div className="col-span-2 text-right text-[10px] text-slate-400">maliyet <b className="text-slate-600 text-xs block">{fmt(costTotal)}</b></div>
-            <div className="col-span-3 text-right text-[10px] text-slate-400">satış <b className="text-slate-800 text-sm block">{fmt(sellTotal, head.currency)}</b></div>
+            <div className="col-span-7 font-black text-slate-500 uppercase text-[10px] tracking-widest">Toplam ({items.length} kalem)</div>
+            <div className="col-span-3 text-right text-[10px] text-slate-400">maliyet (nominal) <b className="text-slate-600 text-xs block">{fmt(costTotal)}</b></div>
             <div className="col-span-2"></div>
           </div>
         </div>
-        <button onClick={() => setItems([...items, { name: '', qty: 1, unitPrice: 0, unitCost: 0, costCurrency: 'TRY', vatRate: 20 }])} className="mt-2 text-xs text-primary font-bold flex items-center gap-1"><Plus size={13} /> Satır ekle</button>
+        <button onClick={() => setItems([...items, emptyItem()])} className="mt-2 text-xs text-primary font-bold flex items-center gap-1"><Plus size={13} /> Satır ekle</button>
       </div>
 
-      <p className="text-[10px] text-slate-400 italic">Satış tutarı {head.currency} cinsinden girilir; kaydedince DMO kuru + maliyet piyasa kuru uygulanıp kârlılık hesaplanır, kârsızsa alarm üretilir.</p>
+      <p className="text-[10px] text-slate-400 italic">
+        Ürünler {noAgreement ? 'katalogdan' : 'seçili çerçeve anlaşmanın kataloğundan'} seçilir; birim satış/maliyet otomatik dolar (düzenlenebilir). Her kalemin satış dövizi ayrı olabilir (DMO fiyatı USD ise USD seç). Kaydedince DMO kuru + maliyet piyasa kuru uygulanıp kârlılık hesaplanır, kârsızsa alarm üretilir.
+      </p>
       <button onClick={save} className="btn-primary w-full py-2.5 rounded-xl text-sm font-bold">Oluştur & Maliyetlendir</button>
     </Modal>
   );
