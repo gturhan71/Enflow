@@ -83,3 +83,26 @@ export function convertMinor(minor: number, fxRate: number): number {
 export function presentBreakdown(b: MoneyBreakdown): { net: number; vat: number; gross: number; currency: Currency } {
   return { net: fromMinor(b.netMinor), vat: fromMinor(b.vatMinor), gross: fromMinor(b.grossMinor), currency: b.currency };
 }
+
+// ── İşletme Maliyeti (Overhead) — Katman 1 (şirket genel gider %) ─────────────
+export type OverheadMethod = 'PCT_OF_VALUE' | 'PCT_OF_DIRECT_COST' | 'POOL_RATE';
+
+/**
+ * Katman-1 şirket işletme maliyeti. Saf fonksiyon; taban çağıran tarafından seçilir
+ * (PCT_OF_VALUE→sözleşme değeri, PCT_OF_DIRECT_COST→direkt maliyet, POOL_RATE→dağıtım tabanı).
+ * PCT_*: rate yüzdedir (ör. 8 = %8). POOL_RATE: rate ondalık orandır (ör. 0.12).
+ */
+export function computeCompanyOverhead(base: number, method: OverheadMethod, rate: number): number {
+  const minor = toMinor(base || 0);
+  const factor = method === 'POOL_RATE' ? (rate || 0) : (rate || 0) / 100;
+  return fromMinor(roundMinor(minor * factor));
+}
+
+/** Proje marjları: katkı (direkt) ve tam-yüklü (net, overhead dahil). value 0 ise 0. */
+export function projectMargins(value: number, directCost: number, overhead: number): { contributionMargin: number; netMargin: number } {
+  if (!value || value <= 0) return { contributionMargin: 0, netMargin: 0 };
+  return {
+    contributionMargin: (value - directCost) / value,
+    netMargin: (value - directCost - overhead) / value,
+  };
+}

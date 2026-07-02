@@ -103,4 +103,62 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
   res.json({ message: 'Kullanıcılar başarıyla taşındı ve birim silindi.' });
 }));
 
+// ── Birim Bütçesi (UnitBudget) — Faz 1 (maliyet merkezi) ─────────────────────
+const BUDGET_ROLES = requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']);
+const bnum = (v: unknown, d = 0): number => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+
+router.get('/budgets', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const budgets = await prisma.unitBudget.findMany({ where: { tenantId: req.tenantId }, orderBy: { periodStart: 'desc' } });
+  res.json(budgets);
+}));
+
+router.get('/:id/budget', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const budgets = await prisma.unitBudget.findMany({ where: { tenantId: req.tenantId, unitId: String(req.params.id) }, orderBy: { periodStart: 'desc' } });
+  res.json(budgets);
+}));
+
+router.post('/:id/budget', tenantMiddleware, BUDGET_ROLES, asyncHandler(async (req: Request, res: Response) => {
+  const unitId = String(req.params.id);
+  const unit = await prisma.unit.findFirst({ where: { id: unitId, tenantId: req.tenantId } });
+  if (!unit) return res.status(404).json({ error: 'Birim bulunamadı.' });
+  const b = req.body as Record<string, unknown>;
+  const personnelBudget = bnum(b.personnelBudget), opexBudget = bnum(b.opexBudget);
+  const budget = await prisma.unitBudget.create({
+    data: {
+      tenantId: req.tenantId, unitId,
+      periodStart: new Date(String(b.periodStart)), periodEnd: new Date(String(b.periodEnd)),
+      personnelBudget, opexBudget, totalBudget: personnelBudget + opexBudget,
+      periodCost: bnum(b.periodCost), notes: b.notes ? String(b.notes) : null,
+    },
+  });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'UNIT_BUDGET', entityId: budget.id, details: { unitId, totalBudget: budget.totalBudget } });
+  res.json(budget);
+}));
+
+router.put('/budgets/:bid', tenantMiddleware, BUDGET_ROLES, asyncHandler(async (req: Request, res: Response) => {
+  const bid = String(req.params.bid);
+  const rec = await prisma.unitBudget.findFirst({ where: { id: bid, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Bütçe bulunamadı.' });
+  const b = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  for (const k of ['personnelBudget', 'opexBudget', 'periodCost']) if (b[k] !== undefined) data[k] = bnum(b[k]);
+  for (const k of ['periodStart', 'periodEnd']) if (b[k] !== undefined) data[k] = new Date(String(b[k]));
+  if (b.notes !== undefined) data.notes = b.notes === null ? null : String(b.notes);
+  const pb = data.personnelBudget !== undefined ? Number(data.personnelBudget) : rec.personnelBudget;
+  const ob = data.opexBudget !== undefined ? Number(data.opexBudget) : rec.opexBudget;
+  data.totalBudget = pb + ob;
+  const budget = await prisma.unitBudget.update({ where: { id: bid }, data });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'UNIT_BUDGET', entityId: bid });
+  res.json(budget);
+}));
+
+router.delete('/budgets/:bid', tenantMiddleware, BUDGET_ROLES, asyncHandler(async (req: Request, res: Response) => {
+  const bid = String(req.params.bid);
+  const rec = await prisma.unitBudget.findFirst({ where: { id: bid, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Bütçe bulunamadı.' });
+  await prisma.unitBudget.delete({ where: { id: bid } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'UNIT_BUDGET', entityId: bid });
+  res.json({ message: 'Bütçe silindi.' });
+}));
+
 export default router;

@@ -550,4 +550,55 @@ router.post('/calc', tenantMiddleware, asyncHandler(async (req: Request, res: Re
   res.json({ byCurrency, currencies: Object.keys(byCurrency) });
 }));
 
+// ── İşletme Maliyeti Havuzu (OperatingCostPool) — Faz 1 ──────────────────────
+const overheadRoles = requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']);
+const toNum = (v: unknown, d = 0): number => { const n = Number(v); return Number.isFinite(n) ? n : d; };
+
+router.get('/operating-cost-pool', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const pools = await prisma.operatingCostPool.findMany({ where: { tenantId: req.tenantId }, orderBy: { periodStart: 'desc' } });
+  res.json(pools);
+}));
+
+router.post('/operating-cost-pool', tenantMiddleware, overheadRoles, asyncHandler(async (req: Request, res: Response) => {
+  const b = req.body as Record<string, unknown>;
+  const personnelCost = toNum(b.personnelCost), otherOpex = toNum(b.otherOpex);
+  const pool = await prisma.operatingCostPool.create({
+    data: {
+      tenantId: req.tenantId,
+      periodStart: new Date(String(b.periodStart)), periodEnd: new Date(String(b.periodEnd)),
+      personnelCost, otherOpex, totalPool: personnelCost + otherOpex,
+      method: String(b.method || 'PCT_OF_VALUE'), rate: toNum(b.rate),
+      status: String(b.status || 'ACTIVE'), notes: b.notes ? String(b.notes) : null,
+    },
+  });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'OPERATING_COST_POOL', entityId: pool.id, details: { totalPool: pool.totalPool, method: pool.method, rate: pool.rate } });
+  res.json(pool);
+}));
+
+router.put('/operating-cost-pool/:id', tenantMiddleware, overheadRoles, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const rec = await prisma.operatingCostPool.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Havuz bulunamadı.' });
+  const b = req.body as Record<string, unknown>;
+  const data: Record<string, unknown> = {};
+  for (const k of ['method', 'status', 'notes']) if (b[k] !== undefined) data[k] = b[k] === null ? null : String(b[k]);
+  for (const k of ['personnelCost', 'otherOpex', 'rate']) if (b[k] !== undefined) data[k] = toNum(b[k]);
+  for (const k of ['periodStart', 'periodEnd']) if (b[k] !== undefined) data[k] = new Date(String(b[k]));
+  const pc = data.personnelCost !== undefined ? Number(data.personnelCost) : rec.personnelCost;
+  const oo = data.otherOpex !== undefined ? Number(data.otherOpex) : rec.otherOpex;
+  data.totalPool = pc + oo;
+  const pool = await prisma.operatingCostPool.update({ where: { id }, data });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'OPERATING_COST_POOL', entityId: id });
+  res.json(pool);
+}));
+
+router.delete('/operating-cost-pool/:id', tenantMiddleware, overheadRoles, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const rec = await prisma.operatingCostPool.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!rec) return res.status(404).json({ error: 'Havuz bulunamadı.' });
+  await prisma.operatingCostPool.delete({ where: { id } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'OPERATING_COST_POOL', entityId: id });
+  res.json({ message: 'Havuz silindi.' });
+}));
+
 export default router;

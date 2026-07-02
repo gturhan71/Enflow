@@ -3,9 +3,10 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
+import { computeProjectOverhead, applyProjectOverhead } from '../services/overheadService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
@@ -448,5 +449,21 @@ router.post(
   })
 );
 
+
+// ── İşletme Maliyeti (Overhead) — Faz 1 ──────────────────────────────────────
+router.get('/:id/overhead', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const r = await computeProjectOverhead(req.tenantId, String(req.params.id));
+  if (!r) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  res.json(r);
+}));
+
+// Yönetim insiyatifi: overhead uygula/kaldır (GM/FINANCE_MGR)
+router.post('/:id/overhead/apply', tenantMiddleware, requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']), asyncHandler(async (req: Request, res: Response) => {
+  const b = req.body as { apply?: boolean; rate?: number };
+  const r = await applyProjectOverhead(req.tenantId, String(req.params.id), !!b.apply, b.rate);
+  if (!r) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: b.apply ? 'OVERHEAD_APPLIED' : 'OVERHEAD_REMOVED', entityType: 'PROJECT', entityId: String(req.params.id), details: { overhead: r.totalOverhead, netMargin: r.netMargin } });
+  res.json(r);
+}));
 
 export default router;
