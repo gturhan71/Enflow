@@ -66,9 +66,10 @@
 </div>
 
 <script>
-  const PLUGINS = ['AGENT_TENDER','AGENT_PROJECT','AGENT_PRESALES','AGENT_PROCUREMENT','AGENT_FINANCE','AGENT_LEGAL','AGENT_CRM','AGENT_IGPD'];
+  const PLUGINS = ['AGENT_TENDER','AGENT_PROJECT','AGENT_PRESALES','AGENT_PROCUREMENT','AGENT_FINANCE','AGENT_LEGAL','AGENT_CRM','AGENT_IGPD','DMO_MODULE'];
+  const PLUGIN_LABELS = { DMO_MODULE: 'DMO Katalog & Kârlılık (modül)' };
   const $ = (id) => document.getElementById(id);
-  $('plugins').innerHTML = PLUGINS.map(p => `<label><input type="checkbox" value="${p}"/> ${p.replace('AGENT_','')}</label>`).join('');
+  $('plugins').innerHTML = PLUGINS.map(p => `<label><input type="checkbox" value="${p}"/> ${PLUGIN_LABELS[p] || p.replace('AGENT_','')}</label>`).join('');
 
   async function refreshKey(){
     const r = await fetch('/api/pubkey').then(x=>x.json());

@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole, requireEntitlement } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import {
   UNIT_DEFINITIONS,
@@ -78,8 +78,8 @@ router.get('/customer-health', tenantMiddleware, asyncHandler(async (req: Reques
   res.json(await computeCustomerHealth(req.tenantId));
 }));
 
-// DMO kanalı analitiği — büyüme analizine DMO operasyonu
-router.get('/dmo-analytics', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+// DMO kanalı analitiği — büyüme analizine DMO operasyonu (ayrı lisanslı)
+router.get('/dmo-analytics', tenantMiddleware, requireEntitlement('DMO_MODULE'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeDmoAnalytics(req.tenantId));
 }));
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Zap,
   ChevronRight,
@@ -12,6 +12,9 @@ import { cn } from '../lib/utils';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 import { NAV_ITEMS } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
+import { apiService } from '../services/apiService';
+
+interface EntitlementRow { plugin: { key: string }; active: boolean }
 
 const Sidebar = ({ 
   activeTab, 
@@ -31,6 +34,16 @@ const Sidebar = ({
   const { handleNavigate } = useUnsavedChanges();
   const { currentUser, hasPermission } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+  // Ayrı lisanslı modüller (PLUGIN_CATALOG) — aktif entitlement seti. Lisans = ticari hak,
+  // izinden bağımsız kapı (GM superuser bile lisanssız görmez).
+  const [entitled, setEntitled] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    let active = true;
+    apiService.getPluginEntitlements()
+      .then((rows: EntitlementRow[]) => { if (active) setEntitled(new Set((rows || []).filter(r => r.active).map(r => r.plugin.key))); })
+      .catch(() => {});
+    return () => { active = false; };
+  }, [currentUser?.id]);
 
   const toggleMenu = (id: string) => {
     setExpandedMenus(prev => 
@@ -39,6 +52,9 @@ const Sidebar = ({
   };
 
   const visibleNavItems = NAV_ITEMS.filter(item => {
+    // Ayrı lisanslı modül: entitlement yoksa gizle (izinden bağımsız kapı).
+    const ent = (item as { requiredEntitlement?: string }).requiredEntitlement;
+    if (ent && !entitled.has(ent)) return false;
     const hasBasePermission = hasPermission(item.requiredPermission);
     if (item.subItems) {
       const visibleSubItems = item.subItems.filter(sub => hasPermission(sub.requiredPermission));

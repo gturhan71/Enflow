@@ -17,7 +17,7 @@ import bomQuotesRouter from './routes/bomQuotes';
 import presalesRouter from './routes/presales';
 import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
-import { enforceReadOnlyRoles } from './middleware';
+import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
 import { startBackupScheduler } from './services/backupScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import projectsRouter from './routes/projects';
@@ -118,7 +118,7 @@ app.use('/api/legal', legalRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/plugins', pluginsRouter);
-app.use('/api/dmo', dmoRouter);
+app.use('/api/dmo', tenantMiddleware, requireEntitlement('DMO_MODULE'), dmoRouter); // ayrı lisanslı modül
 
 // ── Üretim: derlenmiş frontend'i (dist) TEK-ORIGIN sun ────────────────────────
 // Böylece `pnpm build` sonrası backend hem API hem UI'yi 3002'den sunar; ayrı

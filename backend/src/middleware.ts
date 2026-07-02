@@ -76,6 +76,17 @@ export const requireRole = (allowed: string[]) =>
     next();
   });
 
+// Eklenti/lisans koruması: modül ayrı lisanslıysa (PLUGIN_CATALOG) entitlement zorunlu.
+// Lisans yoksa 402 (Payment Required — upsell sinyali). Tek kaynak: isPluginEntitled.
+export const requireEntitlement = (pluginKey: string) =>
+  asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+    const { isPluginEntitled } = await import('./services/entitlementService');
+    if (!(await isPluginEntitled(req.tenantId, pluginKey))) {
+      return res.status(402).json({ error: `Bu modül için lisans (${pluginKey}) gerekli.`, plugin: pluginKey });
+    }
+    next();
+  });
+
 export const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 500): Promise<T> => {
   try {
     return await fn();

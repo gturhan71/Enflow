@@ -7,7 +7,7 @@
 // tanımlanabilir. Şu an yalnızca VIRTUAL_AGENT kategorisi var ama category
 // alanı ileride başka eklenti türlerine (entegrasyon, rapor paketi vb.) açık.
 
-export type PluginCategory = 'VIRTUAL_AGENT';
+export type PluginCategory = 'VIRTUAL_AGENT' | 'MODULE';
 export type AgentMode = 'ADVISORY' | 'AUTONOMOUS';
 
 export interface PluginDefinition {
@@ -137,6 +137,16 @@ export const PLUGIN_CATALOG: PluginDefinition[] = [
     allowedModes: ['ADVISORY', 'AUTONOMOUS'],
     entityType: 'PURCHASE_REQUEST',
     priceNote: 'Aylık eklenti',
+    status: 'AVAILABLE',
+  },
+  // ── Modül eklentileri (agent değil; tüm bir ekran modülünü lisanslar) ──
+  {
+    key: 'DMO_MODULE',
+    name: 'DMO Katalog & Kârlılık',
+    category: 'MODULE',
+    description:
+      'Devlet Malzeme Ofisi satıcı kanalı: katalog + çerçeve anlaşma + sipariş, DMO/piyasa kur açığı · risturn · komisyon maliyetlendirme motoru ve kârsız satış alarmı. Ayrı lisanslı modül.',
+    priceNote: 'Ayrı lisans',
     status: 'AVAILABLE',
   },
 ];
