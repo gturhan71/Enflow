@@ -73,6 +73,7 @@ class ApiService {
   async getBidScorecard(): Promise<import('../types').BidScorecard> { return apiClient.fetchWithAuth('/reports/bid-scorecard'); }
   async getDocumentPortfolio(): Promise<import('../types').DocumentPortfolio> { return apiClient.fetchWithAuth('/reports/document-portfolio'); }
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
+  async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
   async getProjectHealth(): Promise<import('../types').ProjectHealthReport> { return apiClient.fetchWithAuth('/reports/project-health'); }
   async getCustomerHealth(): Promise<import('../types').CustomerHealthReport> { return apiClient.fetchWithAuth('/reports/customer-health'); }
   // Finans — Vade & Finansman Etkisi

@@ -391,6 +391,7 @@ export const isolationMatrix: IsolationCase[] = [
   { name: "Başka tenant DMO kur okuma (IDOR)", method: "GET", path: "/api/dmo/rates", targetTenantId: "tenant-1" },
   { name: "Başka tenant DMO sipariş okuma (IDOR)", method: "GET", path: "/api/dmo/orders", targetTenantId: "tenant-1" },
   { name: "Başka tenant DMO alarm okuma (IDOR)", method: "GET", path: "/api/dmo/alarms", targetTenantId: "tenant-1" },
+  { name: "Başka tenant DMO analitik okuma (IDOR)", method: "GET", path: "/api/reports/dmo-analytics", targetTenantId: "tenant-1" },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------

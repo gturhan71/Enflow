@@ -614,3 +614,54 @@ export async function computeCustomerHealth(tenantId: string): Promise<CustomerH
     note: 'Müşteri sağlığı: Ödeme (35%, vadesi geçmiş alacak) · Kazanma (30%) · Aktivite (20%, son fırsat tazeliği) · Sadakat (15%, kayıp sıklığı). Fatura eşleşmesi müşteri adına göre. Deterministik.',
   };
 }
+
+// ── DMO Analitiği · büyüme analizine DMO kanalı ──────────────────────────────
+// DMO satıcı kanalının pipeline + gerçekleşen kârlılık + alarm özeti. Salt-okunur.
+const DMO_ACTIVE = ['CONFIRMED', 'IN_DELIVERY', 'DELIVERED', 'INVOICED', 'CLOSED'];
+export interface DmoAnalytics {
+  totalOrders: number;
+  byStatus: { status: string; count: number }[];
+  evaluationCount: number; evaluationValue: number;
+  activeRevenue: number; netProfit: number; avgNetMarginPct: number;
+  unprofitableCount: number; risturnAccrued: number; commissionTotal: number;
+  topInstitutions: { name: string; revenue: number; net: number }[];
+  note: string;
+}
+
+export async function computeDmoAnalytics(tenantId: string): Promise<DmoAnalytics> {
+  const orders = await prisma.dmoOrder.findMany({
+    where: { tenantId },
+    select: { status: true, institutionName: true, revenueTotal: true, netProfit: true, netMarginPct: true, risturnDeduction: true, commissionDeduction: true, isProfitable: true },
+  });
+
+  const statusMap: Record<string, number> = {};
+  for (const o of orders) statusMap[o.status] = (statusMap[o.status] || 0) + 1;
+  const byStatus = Object.entries(statusMap).map(([status, count]) => ({ status, count })).sort((a, b) => b.count - a.count);
+
+  const evalOrders = orders.filter(o => o.status === 'EVALUATION');
+  const active = orders.filter(o => DMO_ACTIVE.includes(o.status));
+  const activeRevenue = active.reduce((s, o) => s + (o.revenueTotal || 0), 0);
+  const netProfit = active.reduce((s, o) => s + (o.netProfit || 0), 0);
+  const avgNetMarginPct = active.length ? active.reduce((s, o) => s + (o.netMarginPct || 0), 0) / active.length : 0;
+  const unprofitableCount = orders.filter(o => !o.isProfitable && o.status !== 'REJECTED' && o.status !== 'CANCELLED').length;
+
+  const instMap: Record<string, { revenue: number; net: number }> = {};
+  for (const o of active) {
+    const k = o.institutionName || '—';
+    if (!instMap[k]) instMap[k] = { revenue: 0, net: 0 };
+    instMap[k].revenue += o.revenueTotal || 0; instMap[k].net += o.netProfit || 0;
+  }
+  const topInstitutions = Object.entries(instMap).map(([name, v]) => ({ name, ...v })).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
+  return {
+    totalOrders: orders.length,
+    byStatus,
+    evaluationCount: evalOrders.length, evaluationValue: evalOrders.reduce((s, o) => s + (o.revenueTotal || 0), 0),
+    activeRevenue, netProfit, avgNetMarginPct,
+    unprofitableCount,
+    risturnAccrued: active.reduce((s, o) => s + (o.risturnDeduction || 0), 0),
+    commissionTotal: active.reduce((s, o) => s + (o.commissionDeduction || 0), 0),
+    topInstitutions,
+    note: 'DMO kanalı: onaylanan+ siparişlerin gerçek cirosu/net kârı (risturn+komisyon sonrası), değerlendirmedeki fırsatlar ve kârsız sipariş uyarıları.',
+  };
+}

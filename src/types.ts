@@ -972,6 +972,16 @@ export interface CustomerHealthReport {
   note: string;
 }
 
+export interface DmoAnalytics {
+  totalOrders: number;
+  byStatus: { status: string; count: number }[];
+  evaluationCount: number; evaluationValue: number;
+  activeRevenue: number; netProfit: number; avgNetMarginPct: number;
+  unprofitableCount: number; risturnAccrued: number; commissionTotal: number;
+  topInstitutions: { name: string; revenue: number; net: number }[];
+  note: string;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

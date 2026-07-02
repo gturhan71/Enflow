@@ -5,14 +5,14 @@ import {
 } from 'recharts';
 import {
   BarChart3, AlertTriangle, RefreshCw, TrendingUp, Clock, LayoutGrid, Building2,
-  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge, ClipboardCheck, FileStack, HeartPulse,
+  FileText, Inbox, Plus, Send, Pencil, Trash2, Check, Undo2, X, Printer, Gauge, ClipboardCheck, FileStack, HeartPulse, Package,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { healthColor, healthBar, ProjectHealthCard, CustomerHealthCard } from '../components/HealthCards';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
 import type {
-  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport, CustomerHealthReport,
+  ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport, CustomerHealthReport, DmoAnalytics,
 } from '../types';
 
 const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
@@ -850,10 +850,51 @@ function BusinessHealthCard({ h }: { h: BusinessHealth }) {
   );
 }
 
+const DMO_STATUS_TR: Record<string, string> = { EVALUATION: 'Değerlendirme', CONFIRMED: 'Onaylı', IN_DELIVERY: 'Sevkiyat', DELIVERED: 'Teslim', INVOICED: 'Faturalı', CLOSED: 'Kapandı', REJECTED: 'Ret', CANCELLED: 'İptal' };
+
+function DmoAnalyticsCard({ d }: { d: DmoAnalytics }) {
+  return (
+    <div className="glass-card p-6 space-y-4 lg:col-span-2">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2"><Package size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">DMO Kanalı</h4></div>
+        {d.unprofitableCount > 0 && <span className="flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded"><AlertTriangle size={12} /> {d.unprofitableCount} kârsız</span>}
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Gerçek Ciro</p><p className="text-lg font-black text-slate-800">{fmtTRY(d.activeRevenue)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Net Kâr</p><p className={`text-lg font-black ${d.netProfit >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>{fmtTRY(d.netProfit)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Ort. Net Marj</p><p className="text-lg font-black text-primary">{pct(d.avgNetMarginPct)}</p></div>
+        <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Değerlendirmede</p><p className="text-lg font-black text-amber-600">{d.evaluationCount} · {fmtTRY(d.evaluationValue)}</p></div>
+      </div>
+      <div className="grid grid-cols-2 gap-4 pt-1">
+        <div>
+          <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">Durum Dağılımı</p>
+          <div className="flex flex-wrap gap-1">
+            {d.byStatus.map(s => <span key={s.status} className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold">{DMO_STATUS_TR[s.status] || s.status}: {s.count}</span>)}
+          </div>
+          <p className="text-[10px] text-slate-400 mt-2">Risturn: <b>{fmtTRY(d.risturnAccrued)}</b> · Komisyon: <b>{fmtTRY(d.commissionTotal)}</b></p>
+        </div>
+        {d.topInstitutions.length > 0 && (
+          <div>
+            <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 mb-1">En Büyük Kurumlar</p>
+            {d.topInstitutions.map((it, i) => (
+              <div key={i} className="flex items-center justify-between text-[11px] border-b border-slate-100 py-0.5 last:border-0">
+                <span className="font-bold text-slate-600 truncate mr-2">{it.name}</span>
+                <span className="shrink-0 text-slate-500">{fmtTRY(it.revenue)} · <span className={it.net >= 0 ? 'text-emerald-600' : 'text-red-600'}>{fmtTRY(it.net)}</span></span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <p className="text-[10px] text-slate-400 italic">{d.note}</p>
+    </div>
+  );
+}
+
 function AnalyticsTab() {
   const [health, setHealth] = useState<BusinessHealth | null>(null);
   const [projectHealth, setProjectHealth] = useState<ProjectHealthReport | null>(null);
   const [customerHealth, setCustomerHealth] = useState<CustomerHealthReport | null>(null);
+  const [dmo, setDmo] = useState<DmoAnalytics | null>(null);
   const [funnel, setFunnel] = useState<FunnelReport | null>(null);
   const [tender, setTender] = useState<TenderAnalytics | null>(null);
   const [variance, setVariance] = useState<BomVarianceReport | null>(null);
@@ -870,12 +911,14 @@ function AnalyticsTab() {
     return () => { active = false; };
   }, []);
   useEffect(() => load(), [load]);
+  useEffect(() => { apiService.getDmoAnalytics().then(setDmo).catch(() => {}); }, []); // DMO opsiyonel/ayrı lisans — bloklamaz
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
   if (!health || !projectHealth || !customerHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 animate-in fade-in duration-500">
       <BusinessHealthCard h={health} />
+      {dmo && dmo.totalOrders > 0 && <DmoAnalyticsCard d={dmo} />}
       <ProjectHealthCard p={projectHealth} />
       <CustomerHealthCard c={customerHealth} />
       <ForecastCard f={forecast} onSaved={reloadForecast} />

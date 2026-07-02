@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth, computeDmoAnalytics } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -76,6 +76,11 @@ router.get('/project-health', tenantMiddleware, asyncHandler(async (req: Request
 // Müşteri sağlık skoru (#14c) — ödeme/kazanma/aktivite/sadakat
 router.get('/customer-health', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeCustomerHealth(req.tenantId));
+}));
+
+// DMO kanalı analitiği — büyüme analizine DMO operasyonu
+router.get('/dmo-analytics', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeDmoAnalytics(req.tenantId));
 }));
 
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)
