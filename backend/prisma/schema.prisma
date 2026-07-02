@@ -47,6 +47,10 @@ model Tenant {
   unitReports        UnitReport[]
   pluginEntitlements PluginEntitlement[]
   agentRuns          AgentRun[]
+  dmoCatalogItems       DmoCatalogItem[]
+  dmoFrameworkAgreements DmoFrameworkAgreement[]
+  dmoExchangeRates      DmoExchangeRate[]
+  dmoOrders             DmoOrder[]
 }
 
 enum SubscriptionPlan {
@@ -888,6 +892,7 @@ model Invoice {
   projectId     String?
   contractId    String?
   purchaseRequestId String? // Satınalma faturasından türeyen finans faturası (idempotency + bağ)
+  dmoOrderId    String?   // DMO teslim siparişinden türeyen SALES fatura (idempotency + bağ)
   type          String    @default("SALES") // SALES | PURCHASE
   invoiceNo     String?
   amount        Float     @default(0)
@@ -1196,4 +1201,129 @@ model RestoreJob {
   completedAt       DateTime?
   @@index([tenantId, status])
   @@index([tenantId, backupId])
+}
+
+// ── DMO Katalog & Kârlılık Modülü ────────────────────────────────────────────
+// Devlet Malzeme Ofisi satıcı tarafı: katalog + çerçeve anlaşma + kur + sipariş
+// + her sipariş için maliyetlendirme/kârlılık snapshot'ı ve alarm.
+
+model DmoCatalogItem {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dmoCode       String   // DMO stok/malzeme kodu
+  name          String
+  brand         String?
+  model         String?
+  unit          String   @default("ADET")
+  listPrice     Float    @default(0)   // DMO katalog satış fiyatı (DMO kuru cinsinden, para birimi currency)
+  vatRate       Float    @default(20)
+  currency      String   @default("TRY")
+  unitCost      Float    @default(0)   // kendi alış maliyeti (costCurrency cinsinden)
+  costCurrency  String   @default("TRY")
+  category      String?
+  validFrom     DateTime?
+  validTo       DateTime?
+  status        String   @default("ACTIVE") // ACTIVE | PASSIVE | EXPIRED
+  frameworkAgreementId String?
+  frameworkAgreement   DmoFrameworkAgreement? @relation(fields: [frameworkAgreementId], references: [id], onDelete: SetNull)
+  docNumber     String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, status])
+}
+
+model DmoFrameworkAgreement {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agreementNo   String
+  title         String
+  validFrom     DateTime?
+  validTo       DateTime?
+  quotaTotal    Float?
+  quotaUsed     Float    @default(0)
+  status        String   @default("ACTIVE") // ACTIVE | EXPIRED | SUSPENDED | CANCELLED
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  catalogItems  DmoCatalogItem[]
+  orders        DmoOrder[]
+  @@index([tenantId, status])
+}
+
+model DmoExchangeRate {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  currency      String   // USD | EUR | ...
+  rate          Float    // 1 birim yabancı para = rate TRY (DMO'nun belirlediği)
+  validFrom     DateTime @default(now())
+  validTo       DateTime? // null = belirsiz / açık uçlu
+  source        String?
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([tenantId, currency])
+}
+
+model DmoOrder {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderNo       String
+  institutionName String  // alıcı kamu kurumu
+  orderDate     DateTime @default(now())
+  deliveryDeadline DateTime?
+  frameworkAgreementId String?
+  frameworkAgreement   DmoFrameworkAgreement? @relation(fields: [frameworkAgreementId], references: [id], onDelete: SetNull)
+  currency      String   @default("TRY")
+  status        String   @default("EVALUATION")
+  // EVALUATION | CONFIRMED | IN_DELIVERY | DELIVERED | INVOICED | CLOSED | REJECTED | CANCELLED
+  ownerId       String?
+  ownerName     String?
+  docNumber     String?
+  notes         String?
+  // ── Maliyetlendirme / kârlılık snapshot'ı (o anki koşullar) ──
+  revenueTotal      Float   @default(0)
+  costTotal         Float   @default(0)
+  dmoRateSnapshot   Float?  // kullanılan DMO kuru (ana yabancı para kalemi için, bilgi amaçlı)
+  rateCurrency      String?
+  rateValidFrom     DateTime?
+  rateValidTo       DateTime?
+  risturnRateApplied Float  @default(0)
+  risturnDeduction  Float   @default(0)
+  commissionType    String  @default("PERCENT") // PERCENT | FIXED
+  commissionValue   Float   @default(0)
+  commissionBasis   String  @default("REVENUE") // REVENUE | PROFIT
+  commissionDeduction Float @default(0)
+  grossProfit       Float   @default(0)
+  netProfit         Float   @default(0)
+  netMarginPct      Float   @default(0)
+  isProfitable      Boolean @default(true)
+  alarmReason       String?
+  costedAt          DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  items         DmoOrderItem[]
+  @@index([tenantId, status])
+}
+
+model DmoOrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         DmoOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId String?
+  name          String
+  qty           Float    @default(1)
+  unitPrice     Float    @default(0)  // DMO satış fiyatı (currency)
+  unitCost      Float    @default(0)  // kendi alış maliyeti (costCurrency)
+  costCurrency  String   @default("TRY")
+  vatRate       Float    @default(20)
+  lineRevenue   Float    @default(0)
+  lineCost      Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([orderId])
 }

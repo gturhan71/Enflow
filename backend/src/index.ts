@@ -41,6 +41,7 @@ import legalRouter from './routes/legal';
 import tendersRouter from './routes/tenders';
 import reportsRouter from './routes/reports';
 import pluginsRouter from './routes/plugins';
+import dmoRouter from './routes/dmo';
 
 dotenv.config();
 
@@ -117,6 +118,7 @@ app.use('/api/legal', legalRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/reports', reportsRouter);
 app.use('/api/plugins', pluginsRouter);
+app.use('/api/dmo', dmoRouter);
 
 // ── Üretim: derlenmiş frontend'i (dist) TEK-ORIGIN sun ────────────────────────
 // Böylece `pnpm build` sonrası backend hem API hem UI'yi 3002'den sunar; ayrı
