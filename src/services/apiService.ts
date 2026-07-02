@@ -74,6 +74,15 @@ class ApiService {
   async getDocumentPortfolio(): Promise<import('../types').DocumentPortfolio> { return apiClient.fetchWithAuth('/reports/document-portfolio'); }
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
+  // İşletme maliyeti (overhead) + birim bütçe
+  async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
+  async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }
+  async updateOperatingCostPool(id: string, d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth(`/finance/operating-cost-pool/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
+  async deleteOperatingCostPool(id: string) { return apiClient.fetchWithAuth(`/finance/operating-cost-pool/${id}`, { method: 'DELETE' }); }
+  async getProjectOverhead(id: string): Promise<import('../types').OverheadResult> { return apiClient.fetchWithAuth(`/projects/${id}/overhead`); }
+  async applyProjectOverhead(id: string, apply: boolean, rate?: number): Promise<import('../types').OverheadResult> { return apiClient.fetchWithAuth(`/projects/${id}/overhead/apply`, { method: 'POST', body: JSON.stringify({ apply, rate }) }); }
+  async getUnitBudgets(): Promise<import('../types').UnitBudget[]> { return apiClient.fetchWithAuth('/units/budgets'); }
+  async createUnitBudget(unitId: string, d: Partial<import('../types').UnitBudget>) { return apiClient.fetchWithAuth(`/units/${unitId}/budget`, { method: 'POST', body: JSON.stringify(d) }); }
   async getProjectHealth(): Promise<import('../types').ProjectHealthReport> { return apiClient.fetchWithAuth('/reports/project-health'); }
   async getCustomerHealth(): Promise<import('../types').CustomerHealthReport> { return apiClient.fetchWithAuth('/reports/customer-health'); }
   // Finans — Vade & Finansman Etkisi

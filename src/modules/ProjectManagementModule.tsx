@@ -411,6 +411,40 @@ function isHandoverComplete(docs: ProjectHandoverDoc[]): boolean {
   return docs.filter(d => d.isRequired).every(d => ['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status));
 }
 
+// ── İşletme Maliyeti (Overhead) Paneli — yönetim insiyatifi ──────────────────
+function OverheadPanel({ projectId, canEdit, onApplied }: { projectId: string; canEdit: boolean; onApplied: () => void }) {
+  const [ovh, setOvh] = useState<import('../types').OverheadResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => { apiService.getProjectOverhead(projectId).then(setOvh).catch(() => setOvh(null)); }, [projectId]);
+  useEffect(() => { load(); }, [load]);
+  if (!ovh) return null;
+  const toggle = async () => { setBusy(true); try { const r = await apiService.applyProjectOverhead(projectId, !ovh.applyOverhead); setOvh(r); onApplied(); } finally { setBusy(false); } };
+  const pctS = (n: number) => `%${(n * 100).toFixed(1)}`;
+  return (
+    <div className="bg-white/5 rounded-xl p-4 border border-white/10">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2"><DollarSign size={15} className="text-amber-400" /><p className="text-xs font-bold text-slate-200 uppercase tracking-wide">İşletme Maliyeti (Overhead)</p></div>
+        {canEdit ? (
+          <button onClick={toggle} disabled={busy || !ovh.hasPool} title={!ovh.hasPool ? 'Önce Finans → İşletme Maliyeti havuzu tanımlayın' : ''}
+            className={`text-[11px] font-black uppercase px-3 py-1.5 rounded-lg transition-colors ${ovh.applyOverhead ? 'bg-amber-500/20 text-amber-300' : 'bg-white/10 text-slate-400'} ${!ovh.hasPool ? 'opacity-40 cursor-not-allowed' : 'hover:bg-amber-500/30'}`}>
+            {ovh.applyOverhead ? '● Marja dahil' : '○ Marja dahil değil'}
+          </button>
+        ) : <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${ovh.applyOverhead ? 'bg-amber-500/20 text-amber-300' : 'bg-white/10 text-slate-400'}`}>{ovh.applyOverhead ? 'Dahil' : 'Hariç'}</span>}
+      </div>
+      {!ovh.hasPool ? (
+        <p className="text-[11px] text-slate-400 italic">Aktif işletme maliyeti havuzu yok — Finans → İşletme Maliyeti sekmesinden dönem havuzu tanımlayın.</p>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div><p className="text-[9px] uppercase tracking-widest text-slate-500">İşletme Maliyeti</p><p className="text-sm font-black text-amber-300">{fmt(ovh.totalOverhead)}</p></div>
+          <div><p className="text-[9px] uppercase tracking-widest text-slate-500">Direkt Maliyet</p><p className="text-sm font-black text-slate-200">{fmt(ovh.directCost)}</p></div>
+          <div><p className="text-[9px] uppercase tracking-widest text-slate-500">Katkı Marjı</p><p className="text-sm font-black text-slate-200">{pctS(ovh.contributionMargin)}</p></div>
+          <div><p className="text-[9px] uppercase tracking-widest text-slate-500">Tam-Yüklü Net Marj</p><p className={`text-sm font-black ${ovh.applyOverhead ? 'text-emerald-400' : 'text-amber-300'}`}>{pctS(ovh.netMargin)}</p></div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Proje Detay Çekmecesi ─────────────────────────────────────────────────────
 
 interface ProjectDetailProps {
@@ -715,6 +749,7 @@ const ProjectDetail: React.FC<ProjectDetailProps> = ({ project: initialProject, 
         {/* KARLILIK */}
         {tab === 'profitability' && (
           <div className="space-y-4">
+            <OverheadPanel projectId={project.id} canEdit={currentUserRole === 'GENERAL_MANAGER' || currentUserRole === 'FINANCE_MGR'} onApplied={onRefresh} />
             <div className="grid grid-cols-1 gap-3">
               {[
                 { label: 'Sözleşme Bedeli', value: fmt(project.totalValue, project.contractCurrency), note: 'Kazanılan teklif' },

@@ -982,6 +982,22 @@ export interface DmoAnalytics {
   note: string;
 }
 
+export interface OperatingCostPool {
+  id: string; periodStart: string; periodEnd: string;
+  personnelCost: number; otherOpex: number; totalPool: number;
+  method: 'PCT_OF_VALUE' | 'PCT_OF_DIRECT_COST' | 'POOL_RATE'; rate: number;
+  status: string; notes?: string | null;
+}
+export interface UnitBudget {
+  id: string; unitId: string; periodStart: string; periodEnd: string;
+  personnelBudget: number; opexBudget: number; totalBudget: number; periodCost: number; notes?: string | null;
+}
+export interface OverheadResult {
+  directCost: number; method: string | null; rate: number; base: number;
+  companyAmount: number; unitAmount: number; totalOverhead: number;
+  contributionMargin: number; netMargin: number; applyOverhead: boolean; hasPool: boolean;
+}
+
 export interface UnitDefinition {
   key: string;
   label: string;

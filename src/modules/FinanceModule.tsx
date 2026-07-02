@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   FileText, Wallet, ShieldCheck, ClipboardCheck, BarChart3, Plus, Trash2,
-  X, AlertTriangle, CheckCircle2, XCircle, Hash, CreditCard, CalendarClock,
+  X, AlertTriangle, CheckCircle2, XCircle, Hash, CreditCard, CalendarClock, Building2, Pencil,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
@@ -22,7 +22,7 @@ interface CostApproval {
   project?: { id: string; name: string; code?: string | null } | null;
 }
 
-type TabKey = 'invoices' | 'collection' | 'guarantees' | 'cost-approval' | 'financing' | 'summary';
+type TabKey = 'invoices' | 'collection' | 'guarantees' | 'cost-approval' | 'financing' | 'overhead' | 'summary';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'invoices', label: 'Faturalar', icon: <FileText size={16} /> },
@@ -30,6 +30,7 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'guarantees', label: 'Teminat Mektupları', icon: <ShieldCheck size={16} /> },
   { key: 'cost-approval', label: 'Maliyet Onayı', icon: <ClipboardCheck size={16} /> },
   { key: 'financing', label: 'Vade & Finansman', icon: <CalendarClock size={16} /> },
+  { key: 'overhead', label: 'İşletme Maliyeti', icon: <Building2 size={16} /> },
   { key: 'summary', label: 'Özet', icon: <BarChart3 size={16} /> },
 ];
 
@@ -125,6 +126,7 @@ const FinanceModule = () => {
           onDelete={async (id) => { await apiService.deleteGuarantee(id); load(); }} />
       )}
       {tab === 'financing' && <FinancingTab />}
+      {tab === 'overhead' && <OverheadPoolTab canEdit={currentUser?.role === 'GENERAL_MANAGER' || currentUser?.role === 'FINANCE_MGR'} />}
       {tab === 'cost-approval' && (
         <CostApprovalTab items={costApprovals}
           onDecide={async (id, decision) => {
@@ -356,6 +358,71 @@ const FulfillGuaranteeForm = ({ g, onClose, onSaved }: { g: GuaranteeLetter; onC
     </div>
   );
 };
+
+// ── İşletme Maliyeti Havuzu (overhead) ───────────────────────────────────────
+const OVH_METHOD_TR: Record<string, string> = { PCT_OF_VALUE: 'Sözleşme değerinin %’si', PCT_OF_DIRECT_COST: 'Direkt maliyetin %’si', POOL_RATE: 'Havuz oranı' };
+function OverheadPoolTab({ canEdit }: { canEdit: boolean }) {
+  const [pools, setPools] = useState<import('../types').OperatingCostPool[]>([]);
+  const [form, setForm] = useState<{ id?: string; periodStart: string; periodEnd: string; personnelCost: number; otherOpex: number; method: string; rate: number } | null>(null);
+  const load = useCallback(() => { apiService.getOperatingCostPools().then(setPools).catch(() => {}); }, []);
+  useEffect(() => { load(); }, [load]);
+  const blank = { periodStart: new Date(new Date().getFullYear(), 0, 1).toISOString().slice(0, 10), periodEnd: new Date(new Date().getFullYear(), 11, 31).toISOString().slice(0, 10), personnelCost: 0, otherOpex: 0, method: 'PCT_OF_VALUE', rate: 8 };
+  const save = async () => {
+    if (!form) return;
+    const d = { ...form, method: form.method as import('../types').OperatingCostPool['method'] };
+    if (form.id) await apiService.updateOperatingCostPool(form.id, d); else await apiService.createOperatingCostPool(d);
+    setForm(null); load();
+  };
+  return (
+    <div className="glass-card p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <div><h3 className="text-lg font-black text-slate-900">İşletme Maliyeti Havuzu</h3><p className="text-xs text-slate-400">Dönemsel genel gider (personel + opex) → projelere yönetim yüzdesiyle yansır</p></div>
+        {canEdit && <button onClick={() => setForm({ ...blank })} className="btn-primary px-4 py-2 text-sm rounded-xl flex items-center gap-2"><Plus size={16} /> Yeni Dönem</button>}
+      </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-[10px] uppercase tracking-widest text-slate-400"><tr>
+            <th className="text-left p-3">Dönem</th><th className="text-right p-3">Personel</th><th className="text-right p-3">Diğer Opex</th><th className="text-right p-3">Havuz</th><th className="p-3">Yöntem</th><th className="text-right p-3">Oran</th><th className="p-3">Durum</th>{canEdit && <th></th>}
+          </tr></thead>
+          <tbody>
+            {pools.map(p => (
+              <tr key={p.id} className="border-t border-slate-100">
+                <td className="p-3 text-xs">{fmtDate(p.periodStart)} – {fmtDate(p.periodEnd)}</td>
+                <td className="p-3 text-right">{fmt(p.personnelCost)}</td>
+                <td className="p-3 text-right">{fmt(p.otherOpex)}</td>
+                <td className="p-3 text-right font-bold">{fmt(p.totalPool)}</td>
+                <td className="p-3 text-center text-xs">{OVH_METHOD_TR[p.method] || p.method}</td>
+                <td className="p-3 text-right">{p.method === 'POOL_RATE' ? p.rate : `%${p.rate}`}</td>
+                <td className="p-3 text-center"><span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${p.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.status}</span></td>
+                {canEdit && <td className="p-3 text-right whitespace-nowrap"><button onClick={() => setForm({ id: p.id, periodStart: p.periodStart.slice(0, 10), periodEnd: p.periodEnd.slice(0, 10), personnelCost: p.personnelCost, otherOpex: p.otherOpex, method: p.method, rate: p.rate })} className="p-1 text-slate-400 hover:text-primary"><Pencil size={14} /></button><button onClick={async () => { await apiService.deleteOperatingCostPool(p.id); load(); }} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></td>}
+              </tr>
+            ))}
+            {pools.length === 0 && <tr><td colSpan={canEdit ? 8 : 7} className="p-6 text-center text-slate-400 italic">Havuz tanımlı değil. Proje overhead'i için önce dönem havuzu ekleyin.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="text-[10px] text-slate-400 italic">Overhead yalnız proje bazında yönetim açtığında (Proje Yönetimi → İşletme Maliyeti) net marja girer. Direkt marj değişmez.</p>
+
+      {form && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/40 p-4" onClick={() => setForm(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-6 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between"><h3 className="font-black text-slate-900">{form.id ? 'Havuz Düzenle' : 'Yeni İşletme Maliyeti Dönemi'}</h3><button onClick={() => setForm(null)}><X size={18} /></button></div>
+            <div className="grid grid-cols-2 gap-3">
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Dönem Başı</span><input type="date" className="input-glass w-full mt-1 text-sm" value={form.periodStart} onChange={e => setForm({ ...form, periodStart: e.target.value })} /></label>
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Dönem Sonu</span><input type="date" className="input-glass w-full mt-1 text-sm" value={form.periodEnd} onChange={e => setForm({ ...form, periodEnd: e.target.value })} /></label>
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Personel Gideri</span><input type="number" className="input-glass w-full mt-1 text-sm" value={form.personnelCost} onChange={e => setForm({ ...form, personnelCost: Number(e.target.value) })} /></label>
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Diğer Opex</span><input type="number" className="input-glass w-full mt-1 text-sm" value={form.otherOpex} onChange={e => setForm({ ...form, otherOpex: Number(e.target.value) })} /></label>
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Yöntem</span><select className="input-glass w-full mt-1 text-sm" value={form.method} onChange={e => setForm({ ...form, method: e.target.value })}>{Object.entries(OVH_METHOD_TR).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></label>
+              <label className="block"><span className="text-[10px] font-black uppercase text-slate-400">Oran ({form.method === 'POOL_RATE' ? 'ondalık' : '%'})</span><input type="number" className="input-glass w-full mt-1 text-sm" value={form.rate} onChange={e => setForm({ ...form, rate: Number(e.target.value) })} /></label>
+            </div>
+            <p className="text-[10px] text-slate-400">Toplam havuz: <b>{fmt(form.personnelCost + form.otherOpex)}</b></p>
+            <button onClick={save} className="btn-primary w-full py-2 rounded-xl text-sm">Kaydet</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // ── Vade & Finansman Etkisi (taksitli tahsilat) ──────────────────────────────────
 const FinancingTab = () => {

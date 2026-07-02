@@ -44,7 +44,7 @@ export async function computeProjectOverhead(tenantId: string, projectId: string
     directCost, method, rate, base,
     companyAmount, unitAmount, totalOverhead,
     contributionMargin: m.contributionMargin,
-    netMargin: project.applyOverhead ? m.netMargin : m.contributionMargin,
+    netMargin: m.netMargin,           // her zaman tam-yüklü (önizleme); uygulama durumu applyOverhead'te
     applyOverhead: project.applyOverhead, hasPool: !!pool,
   };
 }
