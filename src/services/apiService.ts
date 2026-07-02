@@ -651,6 +651,7 @@ class ApiService {
   async updateDmoOrder(id: string, d: Record<string, unknown>): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth(`/dmo/orders/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
   async deleteDmoOrder(id: string) { return apiClient.fetchWithAuth(`/dmo/orders/${id}`, { method: 'DELETE' }); }
   async recostDmoOrder(id: string): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth(`/dmo/orders/${id}/recost`, { method: 'POST' }); }
+  async advanceDmoOrderStatus(id: string, status: string): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth(`/dmo/orders/${id}/status`, { method: 'POST', body: JSON.stringify({ status }) }); }
 
   async getDmoAlarms(): Promise<import('../types').DmoOrder[]> { return apiClient.fetchWithAuth('/dmo/alarms'); }
   async getDmoSettings(): Promise<import('../types').DmoCostParams> { return apiClient.fetchWithAuth('/dmo/settings'); }

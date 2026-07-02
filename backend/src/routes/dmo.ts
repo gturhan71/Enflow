@@ -232,6 +232,56 @@ router.post('/orders/:id/recost', tenantMiddleware, editRoles, asyncHandler(asyn
   res.json(order);
 }));
 
+// Statü ilerlet — yan etkiler: CONFIRMED→kota+kârsız uyarı, DELIVERED→SALES Invoice
+const ALLOWED_STATUS = new Set(['EVALUATION', 'CONFIRMED', 'IN_DELIVERY', 'DELIVERED', 'INVOICED', 'CLOSED', 'REJECTED', 'CANCELLED']);
+router.post('/orders/:id/status', tenantMiddleware, editRoles, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const status = String((req.body as { status?: unknown }).status || '');
+  if (!ALLOWED_STATUS.has(status)) return res.status(400).json({ error: 'Geçersiz statü.' });
+  const prev = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!prev) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+
+  await prisma.dmoOrder.update({ where: { id }, data: { status } });
+  await recomputeOrderCosting(req.tenantId, id); // güncel kur/parametrelerle
+  const order = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId }, include: { items: true } });
+  if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+
+  // CONFIRMED'e ilk geçişte: çerçeve anlaşma kotası + kârsızsa uyarı
+  if (status === 'CONFIRMED' && prev.status !== 'CONFIRMED') {
+    if (order.frameworkAgreementId) {
+      await prisma.dmoFrameworkAgreement.updateMany({
+        where: { id: order.frameworkAgreementId, tenantId: req.tenantId },
+        data: { quotaUsed: { increment: order.revenueTotal } },
+      });
+    }
+    if (!order.isProfitable) {
+      await prisma.notification.create({
+        data: {
+          tenantId: req.tenantId, userId: order.ownerId || req.userId,
+          type: 'WARNING', title: 'Kârsız DMO siparişi onaylandı',
+          message: `${order.orderNo} (${order.institutionName}) — net ${Math.round(order.netProfit).toLocaleString('tr-TR')} ₺. ${order.alarmReason || ''}`,
+          relatedModule: 'dmo', relatedItemId: order.id,
+        },
+      });
+    }
+  }
+
+  // DELIVERED'e geçişte: SALES Invoice upsert (idempotent, dmoOrderId)
+  if (status === 'DELIVERED') {
+    const invData = {
+      type: 'SALES', amount: order.revenueTotal, currency: 'TRY',
+      customerName: order.institutionName, status: 'ISSUED',
+      issueDate: new Date(), notes: `DMO siparişinden: ${order.orderNo}`,
+    };
+    const existing = await prisma.invoice.findFirst({ where: { dmoOrderId: order.id, tenantId: req.tenantId } });
+    if (existing) await prisma.invoice.update({ where: { id: existing.id }, data: invData });
+    else await prisma.invoice.create({ data: { tenantId: req.tenantId, dmoOrderId: order.id, ...invData } });
+  }
+
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `STATUS_${status}`, entityType: 'DMO_ORDER', entityId: id, details: { from: prev.status, to: status, net: order.netProfit } });
+  res.json(order);
+}));
+
 // ── Maliyet parametreleri (moduleSettings.dmo) ───────────────────────────────
 router.get('/settings', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   res.json(await getDmoParams(req.tenantId));

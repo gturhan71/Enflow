@@ -146,7 +146,7 @@ function OrderDrawer({ order, canEdit, onClose, onChanged }: { order: DmoOrder; 
   const st = ORDER_STATUS[order.status] || { label: order.status, badge: 'bg-slate-100' };
   const next = NEXT_STATUS[order.status];
   const recost = async () => { setBusy(true); try { await apiService.recostDmoOrder(order.id); onChanged(); } finally { setBusy(false); } };
-  const advance = async (status: string) => { setBusy(true); try { await apiService.updateDmoOrder(order.id, { status }); onChanged(); } finally { setBusy(false); } };
+  const advance = async (status: string) => { setBusy(true); try { await apiService.advanceDmoOrderStatus(order.id, status); onChanged(); } finally { setBusy(false); } };
   const Row = ({ label, value, cls = '' }: { label: string; value: string; cls?: string }) => (
     <div className="flex items-center justify-between py-1.5 border-b border-slate-100 last:border-0">
       <span className="text-xs text-slate-500">{label}</span><span className={`text-sm font-bold ${cls}`}>{value}</span>

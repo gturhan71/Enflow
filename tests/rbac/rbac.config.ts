@@ -386,6 +386,11 @@ export const isolationMatrix: IsolationCase[] = [
     path: "/api/reports/customer-health",
     targetTenantId: "tenant-1",
   },
+  { name: "Başka tenant DMO katalog okuma (IDOR)", method: "GET", path: "/api/dmo/catalog", targetTenantId: "tenant-1" },
+  { name: "Başka tenant DMO anlaşma okuma (IDOR)", method: "GET", path: "/api/dmo/agreements", targetTenantId: "tenant-1" },
+  { name: "Başka tenant DMO kur okuma (IDOR)", method: "GET", path: "/api/dmo/rates", targetTenantId: "tenant-1" },
+  { name: "Başka tenant DMO sipariş okuma (IDOR)", method: "GET", path: "/api/dmo/orders", targetTenantId: "tenant-1" },
+  { name: "Başka tenant DMO alarm okuma (IDOR)", method: "GET", path: "/api/dmo/alarms", targetTenantId: "tenant-1" },
 ];
 
 // --- UI Erişim Matrisi ------------------------------------------------------
@@ -431,5 +436,11 @@ export const uiMatrix: UiCase[] = [
     name: "CRM menüsü",
     sidebarText: "CRM",
     expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", ...UCRM },
+  },
+  {
+    // DMO Kataloğu: yalnız DMO_VIEW izni olanlarda (v1'de yalnız GM superuser).
+    name: "DMO Kataloğu menüsü",
+    sidebarText: "DMO Kataloğu",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
   },
 ];
