@@ -104,7 +104,7 @@ export function DmoModule() {
 
       {selected && <OrderDrawer order={selected} canEdit={canEdit} onClose={() => setSelected(null)} onChanged={() => refreshOrder(selected.id)} />}
       {form?.kind === 'order' && <OrderForm agreements={agreements} catalog={catalog} rates={rates} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
-      {form?.kind === 'catalog' && <CatalogForm agreements={agreements} initial={form.data as DmoCatalogItem | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
+      {form?.kind === 'catalog' && <CatalogForm agreements={agreements} rates={rates} initial={form.data as DmoCatalogItem | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {form?.kind === 'agreement' && <AgreementForm initial={form.data as DmoFrameworkAgreement | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {form?.kind === 'rate' && <RateForm initial={form.data as DmoExchangeRate | undefined} onClose={() => setForm(null)} onSaved={() => { setForm(null); load(); }} />}
       {showParams && params && <ParamsModal params={params} onClose={() => setShowParams(false)} onSaved={p => { setParams(p); setShowParams(false); load(); }} />}
@@ -352,20 +352,23 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 );
 const inp = 'input-glass w-full mt-1 text-sm';
 
-function CatalogForm({ initial, agreements, onClose, onSaved }: { initial?: DmoCatalogItem; agreements: DmoFrameworkAgreement[]; onClose: () => void; onSaved: () => void }) {
+function CatalogForm({ initial, agreements, rates, onClose, onSaved }: { initial?: DmoCatalogItem; agreements: DmoFrameworkAgreement[]; rates: DmoExchangeRate[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({ dmoCode: initial?.dmoCode || '', name: initial?.name || '', unit: initial?.unit || 'ADET', listPrice: initial?.listPrice ?? 0, currency: initial?.currency || 'TRY', unitCost: initial?.unitCost ?? 0, costCurrency: initial?.costCurrency || 'TRY', category: initial?.category || '', frameworkAgreementId: initial?.frameworkAgreementId || '' });
+  // Satış (DMO kuru) + alış maliyeti için döviz seçenekleri: TRY + tanımlı DMO kurları
+  const currencyOpts = [...new Set(['TRY', ...rates.map(r => r.currency), f.currency, f.costCurrency])].filter(Boolean);
   const save = async () => { const d = { ...f, frameworkAgreementId: f.frameworkAgreementId || null }; if (initial) await apiService.updateDmoCatalog(initial.id, d); else await apiService.createDmoCatalog(d); onSaved(); };
   return (
     <Modal title={initial ? 'Katalog Kalemi Düzenle' : 'Yeni Katalog Kalemi'} onClose={onClose}>
       <Field label="DMO Kodu"><input className={inp} value={f.dmoCode} onChange={e => setF({ ...f, dmoCode: e.target.value })} /></Field>
       <Field label="Ad"><input className={inp} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Liste Fiyatı"><input type="number" className={inp} value={f.listPrice} onChange={e => setF({ ...f, listPrice: Number(e.target.value) })} /></Field>
-        <Field label="Satış Para Birimi"><input className={inp} value={f.currency} onChange={e => setF({ ...f, currency: e.target.value.toUpperCase() })} /></Field>
-        <Field label="Birim Maliyet"><input type="number" className={inp} value={f.unitCost} onChange={e => setF({ ...f, unitCost: Number(e.target.value) })} /></Field>
-        <Field label="Maliyet Para Birimi"><input className={inp} value={f.costCurrency} onChange={e => setF({ ...f, costCurrency: e.target.value.toUpperCase() })} /></Field>
+        <Field label="Satış Fiyatı (DMO)"><input type="number" className={inp} value={f.listPrice} onChange={e => setF({ ...f, listPrice: Number(e.target.value) })} /></Field>
+        <Field label="Satış Dövizi"><select className={inp} value={f.currency} onChange={e => setF({ ...f, currency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
+        <Field label="Alış Maliyeti"><input type="number" className={inp} value={f.unitCost} onChange={e => setF({ ...f, unitCost: Number(e.target.value) })} /></Field>
+        <Field label="Alış Dövizi"><select className={inp} value={f.costCurrency} onChange={e => setF({ ...f, costCurrency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
       </div>
       <Field label="Çerçeve Anlaşma"><select className={inp} value={f.frameworkAgreementId} onChange={e => setF({ ...f, frameworkAgreementId: e.target.value })}><option value="">—</option>{agreements.map(a => <option key={a.id} value={a.id}>{a.agreementNo}</option>)}</select></Field>
+      <p className="text-[10px] text-slate-400 italic">Döviz seçenekleri Döviz Kurları sekmesinden gelir; yeni bir para birimi için önce oradan DMO kurunu ekleyin.</p>
       <button onClick={save} className="btn-primary w-full py-2 rounded-xl text-sm">Kaydet</button>
     </Modal>
   );
@@ -438,26 +441,32 @@ function OrderForm({ agreements, catalog, rates, onClose, onSaved }: { agreement
           <div className="grid grid-cols-12 gap-1.5 bg-slate-50 px-3 pt-2 pb-1 border-b border-slate-200 items-end">
             <div className={`${th} col-span-4`}>Ürün (katalogdan)</div>
             <div className={`${th} col-span-1 text-right`}>Adet</div>
-            <div className={`${th} col-span-2 text-right`}>Birim Satış</div>
+            <div className={`${th} col-span-2 text-right`}>Birim Satış <span className="text-[8px] normal-case text-slate-400">(sabit)</span></div>
             <div className={`${th} col-span-1`}>Satış Dövizi</div>
-            <div className={`${th} col-span-2 text-right`}>Birim Maliyet</div>
+            <div className={`${th} col-span-2 text-right`}>Birim Maliyet <span className="text-[8px] normal-case text-slate-400">(değişken)</span></div>
             <div className={`${th} col-span-1 text-right`}>Satır Satış</div>
             <div className={`${th} col-span-1`}></div>
           </div>
-          {items.map((it, i) => (
+          {items.map((it, i) => {
+            const locked = !!it.catalogItemId; // katalog ürünü → satış fiyatı/dövizi çerçeve anlaşmayla SABİT
+            const lockedCell = 'w-full px-2 py-1.5 text-sm border border-slate-200 rounded-md bg-slate-100 text-slate-500 cursor-not-allowed';
+            return (
             <div key={i} className="grid grid-cols-12 gap-1.5 px-3 py-1.5 items-center border-b border-slate-100 last:border-0 hover:bg-slate-50/50">
               <select className={`${cell} col-span-4`} value={it.catalogItemId || ''} onChange={e => pickProduct(i, e.target.value)}>
                 <option value="">{options.length ? '— ürün seçin —' : '— katalog boş —'}</option>
                 {options.map(c => <option key={c.id} value={c.id}>{c.dmoCode} · {c.name}</option>)}
               </select>
               <input type="number" className={`${cell} col-span-1 text-right`} value={it.qty} onChange={e => setItem(i, { qty: Number(e.target.value) })} />
-              <input type="number" className={`${cell} col-span-2 text-right`} value={it.unitPrice} onChange={e => setItem(i, { unitPrice: Number(e.target.value) })} />
-              <select className={`${cell} col-span-1`} value={it.sellCurrency} onChange={e => setItem(i, { sellCurrency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select>
-              <input type="number" className={`${cell} col-span-2 text-right`} value={it.unitCost} onChange={e => setItem(i, { unitCost: Number(e.target.value) })} />
+              <input type="number" title={locked ? 'Satış fiyatı çerçeve anlaşmayla sabittir' : ''} disabled={locked} className={`${locked ? lockedCell : cell} col-span-2 text-right`} value={it.unitPrice} onChange={e => setItem(i, { unitPrice: Number(e.target.value) })} />
+              {locked
+                ? <div className="col-span-1 text-xs font-bold text-slate-500 text-center">{it.sellCurrency} <span className="text-[8px]">🔒</span></div>
+                : <select className={`${cell} col-span-1`} value={it.sellCurrency} onChange={e => setItem(i, { sellCurrency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select>}
+              <input type="number" title="Alış maliyeti değişkendir — sipariş anındaki güncel maliyeti girin" className={`${cell} col-span-2 text-right`} value={it.unitCost} onChange={e => setItem(i, { unitCost: Number(e.target.value) })} />
               <div className="col-span-1 text-right text-xs font-bold text-slate-600 tabular-nums truncate">{fmt(it.qty * it.unitPrice, it.sellCurrency)}</div>
               <button onClick={() => setItems(items.filter((_, idx) => idx !== i))} className="col-span-1 flex justify-center text-slate-400 hover:text-red-500"><Trash2 size={15} /></button>
             </div>
-          ))}
+            );
+          })}
           <div className="grid grid-cols-12 gap-1.5 px-3 py-2 bg-slate-50 border-t border-slate-200 items-center">
             <div className="col-span-7 font-black text-slate-500 uppercase text-[10px] tracking-widest">Toplam ({items.length} kalem)</div>
             <div className="col-span-3 text-right text-[10px] text-slate-400">maliyet (nominal) <b className="text-slate-600 text-xs block">{fmt(costTotal)}</b></div>
@@ -468,7 +477,7 @@ function OrderForm({ agreements, catalog, rates, onClose, onSaved }: { agreement
       </div>
 
       <p className="text-[10px] text-slate-400 italic">
-        Ürünler {noAgreement ? 'katalogdan' : 'seçili çerçeve anlaşmanın kataloğundan'} seçilir; birim satış/maliyet otomatik dolar (düzenlenebilir). Her kalemin satış dövizi ayrı olabilir (DMO fiyatı USD ise USD seç). Kaydedince DMO kuru + maliyet piyasa kuru uygulanıp kârlılık hesaplanır, kârsızsa alarm üretilir.
+        Ürünler {noAgreement ? 'katalogdan' : 'seçili çerçeve anlaşmanın kataloğundan'} seçilir. <b>Satış fiyatı ve dövizi çerçeve anlaşmayla sabittir</b> (katalogdan gelir, kilitli 🔒); değiştirmek için katalog kalemini düzenleyin. <b>Alış maliyeti değişkendir</b> — sipariş anındaki güncel maliyeti girin. Kaydedince DMO satış kuru + maliyet piyasa kuru uygulanıp kârlılık hesaplanır, kârsızsa alarm üretilir.
       </p>
       <button onClick={save} className="btn-primary w-full py-2.5 rounded-xl text-sm font-bold">Oluştur & Maliyetlendir</button>
     </Modal>
