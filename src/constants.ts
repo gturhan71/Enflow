@@ -113,6 +113,7 @@ export const NAV_ITEMS = [
   { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
   { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
+  { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },

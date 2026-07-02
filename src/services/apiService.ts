@@ -629,6 +629,33 @@ class ApiService {
     const qs = q.toString();
     return apiClient.fetchWithAuth(`/activity-logs${qs ? `?${qs}` : ''}`);
   }
+
+  // ── DMO Katalog & Kârlılık ──
+  async getDmoCatalog(): Promise<import('../types').DmoCatalogItem[]> { return apiClient.fetchWithAuth('/dmo/catalog'); }
+  async createDmoCatalog(d: Partial<import('../types').DmoCatalogItem>) { return apiClient.fetchWithAuth('/dmo/catalog', { method: 'POST', body: JSON.stringify(d) }); }
+  async updateDmoCatalog(id: string, d: Partial<import('../types').DmoCatalogItem>) { return apiClient.fetchWithAuth(`/dmo/catalog/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
+  async deleteDmoCatalog(id: string) { return apiClient.fetchWithAuth(`/dmo/catalog/${id}`, { method: 'DELETE' }); }
+
+  async getDmoAgreements(): Promise<import('../types').DmoFrameworkAgreement[]> { return apiClient.fetchWithAuth('/dmo/agreements'); }
+  async createDmoAgreement(d: Partial<import('../types').DmoFrameworkAgreement>) { return apiClient.fetchWithAuth('/dmo/agreements', { method: 'POST', body: JSON.stringify(d) }); }
+  async updateDmoAgreement(id: string, d: Partial<import('../types').DmoFrameworkAgreement>) { return apiClient.fetchWithAuth(`/dmo/agreements/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
+  async deleteDmoAgreement(id: string) { return apiClient.fetchWithAuth(`/dmo/agreements/${id}`, { method: 'DELETE' }); }
+
+  async getDmoRates(): Promise<import('../types').DmoExchangeRate[]> { return apiClient.fetchWithAuth('/dmo/rates'); }
+  async createDmoRate(d: Partial<import('../types').DmoExchangeRate>) { return apiClient.fetchWithAuth('/dmo/rates', { method: 'POST', body: JSON.stringify(d) }); }
+  async updateDmoRate(id: string, d: Partial<import('../types').DmoExchangeRate>) { return apiClient.fetchWithAuth(`/dmo/rates/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
+  async deleteDmoRate(id: string) { return apiClient.fetchWithAuth(`/dmo/rates/${id}`, { method: 'DELETE' }); }
+
+  async getDmoOrders(): Promise<import('../types').DmoOrder[]> { return apiClient.fetchWithAuth('/dmo/orders'); }
+  async createDmoOrder(d: Record<string, unknown>): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth('/dmo/orders', { method: 'POST', body: JSON.stringify(d) }); }
+  async updateDmoOrder(id: string, d: Record<string, unknown>): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth(`/dmo/orders/${id}`, { method: 'PUT', body: JSON.stringify(d) }); }
+  async deleteDmoOrder(id: string) { return apiClient.fetchWithAuth(`/dmo/orders/${id}`, { method: 'DELETE' }); }
+  async recostDmoOrder(id: string): Promise<import('../types').DmoOrder> { return apiClient.fetchWithAuth(`/dmo/orders/${id}/recost`, { method: 'POST' }); }
+
+  async getDmoAlarms(): Promise<import('../types').DmoOrder[]> { return apiClient.fetchWithAuth('/dmo/alarms'); }
+  async getDmoSettings(): Promise<import('../types').DmoCostParams> { return apiClient.fetchWithAuth('/dmo/settings'); }
+  async updateDmoSettings(d: Partial<import('../types').DmoCostParams>): Promise<import('../types').DmoCostParams> { return apiClient.fetchWithAuth('/dmo/settings', { method: 'PUT', body: JSON.stringify(d) }); }
+  async getDmoReconciliation(): Promise<import('../types').DmoReconciliation> { return apiClient.fetchWithAuth('/dmo/risturn-reconciliation'); }
 }
 
 export const apiService = new ApiService();
