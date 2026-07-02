@@ -2,9 +2,11 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { getDmoParams, setDmoParams, recomputeOrderCosting, effectiveRisturnRate, DmoCostParams } from '../services/dmoCosting';
 
 const router: Router = Router();
 const editRoles = requireRole(['GENERAL_MANAGER', 'SALES_MGR']);
+const paramRoles = requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']);
 
 const toDate = (v: unknown): Date | null => (v ? new Date(String(v)) : null);
 const num = (v: unknown, d = 0): number => { const n = Number(v); return Number.isFinite(n) ? n : d; };
@@ -176,9 +178,8 @@ router.get('/orders/:id', tenantMiddleware, asyncHandler(async (req: Request, re
 router.post('/orders', tenantMiddleware, editRoles, asyncHandler(async (req: Request, res: Response) => {
   const b = req.body as Record<string, unknown>;
   const items = normalizeItems(b.items);
-  const revenueTotal = items.reduce((s, i) => s + i.lineRevenue, 0);
-  const costTotal = items.reduce((s, i) => s + i.lineCost, 0);
-  const order = await prisma.dmoOrder.create({
+  const params = await getDmoParams(req.tenantId);
+  const created = await prisma.dmoOrder.create({
     data: {
       tenantId: req.tenantId,
       orderNo: String(b.orderNo || ''), institutionName: String(b.institutionName || ''),
@@ -187,12 +188,16 @@ router.post('/orders', tenantMiddleware, editRoles, asyncHandler(async (req: Req
       currency: String(b.currency || 'TRY'), status: String(b.status || 'EVALUATION'),
       ownerId: b.ownerId ? String(b.ownerId) : null, ownerName: b.ownerName ? String(b.ownerName) : null,
       notes: b.notes ? String(b.notes) : null,
-      revenueTotal, costTotal, grossProfit: revenueTotal - costTotal,
+      commissionType: b.commissionType ? String(b.commissionType) : params.defaultCommission.type,
+      commissionValue: b.commissionValue !== undefined ? num(b.commissionValue) : params.defaultCommission.value,
+      commissionBasis: b.commissionBasis ? String(b.commissionBasis) : params.defaultCommission.basis,
       items: { create: items },
     },
     include: { items: true },
   });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'DMO_ORDER', entityId: order.id, details: { orderNo: order.orderNo, institution: order.institutionName } });
+  await recomputeOrderCosting(req.tenantId, created.id);
+  const order = await prisma.dmoOrder.findFirst({ where: { id: created.id, tenantId: req.tenantId }, include: { items: true } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'DMO_ORDER', entityId: created.id, details: { orderNo: created.orderNo, institution: created.institutionName } });
   res.json(order);
 }));
 
@@ -202,20 +207,78 @@ router.put('/orders/:id', tenantMiddleware, editRoles, asyncHandler(async (req: 
   if (!rec) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
   const b = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
-  for (const k of ['orderNo', 'institutionName', 'currency', 'status', 'ownerId', 'ownerName', 'notes', 'frameworkAgreementId']) if (b[k] !== undefined) data[k] = b[k] === null ? null : String(b[k]);
+  for (const k of ['orderNo', 'institutionName', 'currency', 'status', 'ownerId', 'ownerName', 'notes', 'frameworkAgreementId', 'commissionType', 'commissionBasis']) if (b[k] !== undefined) data[k] = b[k] === null ? null : String(b[k]);
+  if (b.commissionValue !== undefined) data.commissionValue = num(b.commissionValue);
   for (const k of ['orderDate', 'deliveryDeadline']) if (b[k] !== undefined) data[k] = toDate(b[k]);
   // Kalemler verilmişse tümünü değiştir (replace)
   if (b.items !== undefined) {
-    const items = normalizeItems(b.items);
-    const revenueTotal = items.reduce((s, i) => s + i.lineRevenue, 0);
-    const costTotal = items.reduce((s, i) => s + i.lineCost, 0);
-    data.revenueTotal = revenueTotal; data.costTotal = costTotal; data.grossProfit = revenueTotal - costTotal;
     await prisma.dmoOrderItem.deleteMany({ where: { orderId: id } });
-    data.items = { create: items };
+    data.items = { create: normalizeItems(b.items) };
   }
-  const order = await prisma.dmoOrder.update({ where: { id }, data, include: { items: true } });
+  await prisma.dmoOrder.update({ where: { id }, data });
+  await recomputeOrderCosting(req.tenantId, id); // o anki koşullarla maliyetlendir
+  const order = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId }, include: { items: true } });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'DMO_ORDER', entityId: id });
   res.json(order);
+}));
+
+// Yeniden maliyetlendir (o anki kur + parametrelerle)
+router.post('/orders/:id/recost', tenantMiddleware, editRoles, asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const result = await recomputeOrderCosting(req.tenantId, id);
+  if (!result) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DMO_RECOST', entityType: 'DMO_ORDER', entityId: id, details: { netProfit: result.netProfit, isProfitable: result.isProfitable } });
+  const order = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId }, include: { items: true } });
+  res.json(order);
+}));
+
+// ── Maliyet parametreleri (moduleSettings.dmo) ───────────────────────────────
+router.get('/settings', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await getDmoParams(req.tenantId));
+}));
+
+router.put('/settings', tenantMiddleware, paramRoles, asyncHandler(async (req: Request, res: Response) => {
+  const next = await setDmoParams(req.tenantId, req.body as Partial<DmoCostParams>);
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DMO_SETTINGS_UPDATED', entityType: 'TENANT', entityId: req.tenantId });
+  res.json(next);
+}));
+
+// ── Kârlılık uyarıları (kârsız / eşik-altı siparişler) ───────────────────────
+router.get('/alarms', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const orders = await prisma.dmoOrder.findMany({
+    where: { tenantId: req.tenantId, isProfitable: false, status: { notIn: ['REJECTED', 'CANCELLED'] } },
+    orderBy: { netMarginPct: 'asc' },
+    include: { items: true },
+  });
+  res.json(orders);
+}));
+
+// ── Risturn dönem mutabakatı (tahakkuk vs gerçek) ────────────────────────────
+router.get('/risturn-reconciliation', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const now = new Date();
+  const start = req.query.start ? new Date(String(req.query.start)) : new Date(now.getFullYear(), 0, 1);
+  const end = req.query.end ? new Date(String(req.query.end)) : now;
+  const params = await getDmoParams(req.tenantId);
+  const orders = await prisma.dmoOrder.findMany({
+    where: {
+      tenantId: req.tenantId,
+      status: { in: ['CONFIRMED', 'IN_DELIVERY', 'DELIVERED', 'INVOICED', 'CLOSED'] },
+      orderDate: { gte: start, lte: end },
+    },
+    select: { revenueTotal: true, risturnDeduction: true },
+  });
+  const totalTurnover = orders.reduce((s, o) => s + (o.revenueTotal || 0), 0);
+  const accruedRisturn = orders.reduce((s, o) => s + (o.risturnDeduction || 0), 0);
+  const actualRate = effectiveRisturnRate(totalTurnover, params.risturnTiers);
+  const actualRisturn = totalTurnover * actualRate;
+  res.json({
+    periodStart: start.toISOString(), periodEnd: end.toISOString(),
+    orderCount: orders.length, totalTurnover,
+    actualRate, actualRisturn,
+    accruedRisturn, difference: actualRisturn - accruedRisturn,
+    tiers: params.risturnTiers,
+    note: 'Tahakkuk: siparişlere yansıyan risturn toplamı. Gerçek: dönem toplam cirosuna uygulanan efektif kademe. Fark, dönem sonu düzeltmesidir.',
+  });
 }));
 
 router.delete('/orders/:id', tenantMiddleware, editRoles, asyncHandler(async (req: Request, res: Response) => {
