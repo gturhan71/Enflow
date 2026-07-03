@@ -104,6 +104,7 @@ model Unit {
   users       User[]
   steps       WorkflowStep[]
   budgets     UnitBudget[]
+  projectParticipations ProjectUnitParticipation[]
 }
 
 model User {
@@ -314,6 +315,7 @@ model Project {
   milestones        ProjectMilestone[]
   projectCostItems  ProjectCostItem[]
   handoverDocs      ProjectHandoverDoc[]
+  unitParticipations ProjectUnitParticipation[]
 }
 
 model ProjectMilestone {
@@ -1373,4 +1375,19 @@ model UnitBudget {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   @@index([tenantId, unitId])
+}
+
+model ProjectUnitParticipation {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  coefficient Float    @default(0)   // 0..1 — birim dönem maliyetinin bu projeye yüklenen payı (Katman-2)
+  role        String?  // birimin projedeki rolü
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@unique([projectId, unitId])
+  @@index([projectId])
 }

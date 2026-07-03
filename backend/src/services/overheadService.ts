@@ -1,15 +1,26 @@
 import { prisma } from '../prismaClient';
-import { computeCompanyOverhead, projectMargins, OverheadMethod } from './financeEngine';
+import { computeCompanyOverhead, computeUnitParticipationLoad, projectMargins, OverheadMethod } from './financeEngine';
 
 // İşletme maliyeti (overhead) orkestrasyonu — Faz 1: Katman-1 (şirket genel gider %).
 // Katman-2 (birim iştirak katsayısı) Faz 2'de eklenecek (unitAmount şimdilik 0).
 
+export interface UnitLoadLine { unitId: string; unitName: string; coefficient: number; periodCost: number; amount: number; }
 export interface OverheadResult {
   directCost: number;
   method: OverheadMethod | null; rate: number; base: number;
   companyAmount: number; unitAmount: number; totalOverhead: number;
+  unitBreakdown: UnitLoadLine[];
   contributionMargin: number; netMargin: number;
   applyOverhead: boolean; hasPool: boolean;
+}
+
+/** Bir birimin cari dönem maliyeti (en yeni UnitBudget.periodCost). */
+async function unitPeriodCostMap(tenantId: string, unitIds: string[]): Promise<Record<string, number>> {
+  if (!unitIds.length) return {};
+  const budgets = await prisma.unitBudget.findMany({ where: { tenantId, unitId: { in: unitIds } }, orderBy: { periodStart: 'desc' } });
+  const map: Record<string, number> = {};
+  for (const b of budgets) if (map[b.unitId] === undefined) map[b.unitId] = b.periodCost || 0; // en yeni (desc) ilk
+  return map;
 }
 
 /** Projenin direkt (overhead-dışı, reddedilmemiş) maliyeti — TRY. */
@@ -36,13 +47,20 @@ export async function computeProjectOverhead(tenantId: string, projectId: string
   const rate = rateOverride != null ? rateOverride : (pool?.rate ?? 0);
   const base = method === 'PCT_OF_VALUE' ? value : directCost; // POOL_RATE & PCT_OF_DIRECT_COST → direkt maliyet tabanı
   const companyAmount = method ? computeCompanyOverhead(base, method, rate) : 0;
-  const unitAmount = 0; // Faz 2
+
+  // Katman 2 — birim iştirak katsayısı yükü
+  const parts = await prisma.projectUnitParticipation.findMany({ where: { projectId }, include: { unit: { select: { name: true } } } });
+  const periodCosts = await unitPeriodCostMap(tenantId, parts.map(p => p.unitId));
+  const load = computeUnitParticipationLoad(parts.map(p => ({ unitId: p.unitId, coefficient: p.coefficient })), periodCosts);
+  const unitBreakdown = load.breakdown.map(b => ({ ...b, unitName: parts.find(p => p.unitId === b.unitId)?.unit?.name || '—' }));
+  const unitAmount = load.total;
+
   const totalOverhead = companyAmount + unitAmount;
   const m = projectMargins(value, directCost, totalOverhead);
 
   return {
     directCost, method, rate, base,
-    companyAmount, unitAmount, totalOverhead,
+    companyAmount, unitAmount, totalOverhead, unitBreakdown,
     contributionMargin: m.contributionMargin,
     netMargin: m.netMargin,           // her zaman tam-yüklü (önizleme); uygulama durumu applyOverhead'te
     applyOverhead: project.applyOverhead, hasPool: !!pool,

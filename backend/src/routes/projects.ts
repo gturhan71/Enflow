@@ -450,6 +450,45 @@ router.post(
 );
 
 
+// ── Proje-Birim İştiraki (Katman-2 katsayısı) — Faz 2 ────────────────────────
+const partRoles = requireRole(['GENERAL_MANAGER', 'FINANCE_MGR']);
+async function ownsProjectP(req: Request): Promise<boolean> {
+  const p = await prisma.project.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId }, select: { id: true } });
+  return !!p;
+}
+
+router.get('/:id/participations', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProjectP(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  const parts = await prisma.projectUnitParticipation.findMany({ where: { projectId: String(req.params.id) }, include: { unit: { select: { name: true } } } });
+  res.json(parts);
+}));
+
+router.post('/:id/participations', tenantMiddleware, partRoles, asyncHandler(async (req: Request, res: Response) => {
+  const projectId = String(req.params.id);
+  if (!(await ownsProjectP(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  const b = req.body as { unitId?: string; coefficient?: number; role?: string; notes?: string };
+  if (!b.unitId) return res.status(400).json({ error: 'unitId gerekli.' });
+  const unit = await prisma.unit.findFirst({ where: { id: b.unitId, tenantId: req.tenantId } });
+  if (!unit) return res.status(404).json({ error: 'Birim bulunamadı.' });
+  const coefficient = Math.max(0, Math.min(1, Number(b.coefficient) || 0));
+  const part = await prisma.projectUnitParticipation.upsert({
+    where: { projectId_unitId: { projectId, unitId: b.unitId } },
+    update: { coefficient, role: b.role || null, notes: b.notes || null },
+    create: { projectId, unitId: b.unitId, coefficient, role: b.role || null, notes: b.notes || null },
+    include: { unit: { select: { name: true } } },
+  });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPSERT', entityType: 'PROJECT_UNIT_PARTICIPATION', entityId: part.id, details: { projectId, unitId: b.unitId, coefficient } });
+  res.json(part);
+}));
+
+router.delete('/:id/participations/:pid', tenantMiddleware, partRoles, asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProjectP(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  const del = await prisma.projectUnitParticipation.deleteMany({ where: { id: String(req.params.pid), projectId: String(req.params.id) } });
+  if (del.count === 0) return res.status(404).json({ error: 'İştirak bulunamadı.' });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'PROJECT_UNIT_PARTICIPATION', entityId: String(req.params.pid) });
+  res.json({ message: 'İştirak silindi.' });
+}));
+
 // ── İşletme Maliyeti (Overhead) — Faz 1 ──────────────────────────────────────
 router.get('/:id/overhead', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const r = await computeProjectOverhead(req.tenantId, String(req.params.id));

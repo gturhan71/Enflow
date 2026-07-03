@@ -83,6 +83,9 @@ class ApiService {
   async applyProjectOverhead(id: string, apply: boolean, rate?: number): Promise<import('../types').OverheadResult> { return apiClient.fetchWithAuth(`/projects/${id}/overhead/apply`, { method: 'POST', body: JSON.stringify({ apply, rate }) }); }
   async getUnitBudgets(): Promise<import('../types').UnitBudget[]> { return apiClient.fetchWithAuth('/units/budgets'); }
   async createUnitBudget(unitId: string, d: Partial<import('../types').UnitBudget>) { return apiClient.fetchWithAuth(`/units/${unitId}/budget`, { method: 'POST', body: JSON.stringify(d) }); }
+  async getProjectParticipations(id: string): Promise<import('../types').ProjectUnitParticipation[]> { return apiClient.fetchWithAuth(`/projects/${id}/participations`); }
+  async addProjectParticipation(id: string, d: { unitId: string; coefficient: number; role?: string }) { return apiClient.fetchWithAuth(`/projects/${id}/participations`, { method: 'POST', body: JSON.stringify(d) }); }
+  async deleteProjectParticipation(id: string, pid: string) { return apiClient.fetchWithAuth(`/projects/${id}/participations/${pid}`, { method: 'DELETE' }); }
   async getProjectHealth(): Promise<import('../types').ProjectHealthReport> { return apiClient.fetchWithAuth('/reports/project-health'); }
   async getCustomerHealth(): Promise<import('../types').CustomerHealthReport> { return apiClient.fetchWithAuth('/reports/customer-health'); }
   // Finans — Vade & Finansman Etkisi

@@ -992,10 +992,16 @@ export interface UnitBudget {
   id: string; unitId: string; periodStart: string; periodEnd: string;
   personnelBudget: number; opexBudget: number; totalBudget: number; periodCost: number; notes?: string | null;
 }
+export interface UnitLoadLine { unitId: string; unitName: string; coefficient: number; periodCost: number; amount: number; }
 export interface OverheadResult {
   directCost: number; method: string | null; rate: number; base: number;
   companyAmount: number; unitAmount: number; totalOverhead: number;
+  unitBreakdown: UnitLoadLine[];
   contributionMargin: number; netMargin: number; applyOverhead: boolean; hasPool: boolean;
+}
+export interface ProjectUnitParticipation {
+  id: string; projectId: string; unitId: string; coefficient: number;
+  role?: string | null; notes?: string | null; unit?: { name: string };
 }
 
 export interface UnitDefinition {

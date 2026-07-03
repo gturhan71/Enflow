@@ -98,6 +98,24 @@ export function computeCompanyOverhead(base: number, method: OverheadMethod, rat
   return fromMinor(roundMinor(minor * factor));
 }
 
+// ── Katman 2 — birim iştirak katsayısı yükü ──────────────────────────────────
+/**
+ * Projeye birim iştirak yükü. Her iştirak: birimin dönem maliyeti × katsayı (0..1).
+ * Katsayı [0,1]'e kırpılır (birim maliyetinin bu projeye yüklenen payı). Σ>0 kontrolü çağıranda.
+ */
+export function computeUnitParticipationLoad(
+  participations: { unitId: string; coefficient: number }[],
+  unitPeriodCosts: Record<string, number>,
+): { total: number; breakdown: { unitId: string; coefficient: number; periodCost: number; amount: number }[] } {
+  const breakdown = participations.map(p => {
+    const coefficient = Math.max(0, Math.min(1, p.coefficient || 0));
+    const periodCost = unitPeriodCosts[p.unitId] || 0;
+    return { unitId: p.unitId, coefficient, periodCost, amount: fromMinor(roundMinor(toMinor(periodCost) * coefficient)) };
+  });
+  const total = fromMinor(roundMinor(toMinor(breakdown.reduce((s, b) => s + b.amount, 0))));
+  return { total, breakdown };
+}
+
 /** Proje marjları: katkı (direkt) ve tam-yüklü (net, overhead dahil). value 0 ise 0. */
 export function projectMargins(value: number, directCost: number, overhead: number): { contributionMargin: number; netMargin: number } {
   if (!value || value <= 0) return { contributionMargin: 0, netMargin: 0 };
