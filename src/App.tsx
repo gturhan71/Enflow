@@ -429,19 +429,34 @@ const App = () => {
   // tarayıcıda kalmış ESKİ oturumu (DB sıfırlandıysa ölü tenant) temizle ve kurulum
   // sihirbazını göster — aksi halde ölü tenant ile "Tenant bulunamadı" alınır.
   useEffect(() => {
-    apiService.getSetupStatus()
-      .then((s) => {
-        if (!s.initialized && (localStorage.getItem('enflow_auth_token') || localStorage.getItem('enflow_active_tenant_id'))) {
-          const stale = localStorage.getItem('enflow_active_tenant_id');
-          if (stale) localStorage.removeItem(`enflow_current_user_${stale}`);
-          localStorage.removeItem('enflow_auth_token');
-          localStorage.removeItem('enflow_active_tenant_id');
-          setIsAuthenticated(false);
-          setActiveTenantId(null);
+    let cancelled = false;
+    // Backend soğuk başlangıcına DAYANIKLI: temiz kurulumda run.cjs backend'i (ts-node,
+    // ~birkaç sn) ve frontend'i (Vite, anında) aynı anda başlatır. İlk /api/setup/status
+    // çağrısı backend hazır değilken başarısız olursa ESKİDEN kurulu varsayılıp Login
+    // gösteriliyordu → boş DB'de Kurulum Sihirbazı hiç gelmiyordu. Artık backend yanıt
+    // verene kadar tekrar denenir (bu sırada "Yükleniyor…" ekranı kalır).
+    (async () => {
+      for (let attempt = 0; attempt < 40 && !cancelled; attempt++) {
+        try {
+          const s = await apiService.getSetupStatus();
+          if (cancelled) return;
+          if (!s.initialized && (localStorage.getItem('enflow_auth_token') || localStorage.getItem('enflow_active_tenant_id'))) {
+            const stale = localStorage.getItem('enflow_active_tenant_id');
+            if (stale) localStorage.removeItem(`enflow_current_user_${stale}`);
+            localStorage.removeItem('enflow_auth_token');
+            localStorage.removeItem('enflow_active_tenant_id');
+            setIsAuthenticated(false);
+            setActiveTenantId(null);
+          }
+          setInitialized(s.initialized);
+          return; // backend yanıt verdi → bitti
+        } catch {
+          await new Promise((r) => setTimeout(r, 1000)); // henüz hazır değil — 1 sn sonra tekrar dene
         }
-        setInitialized(s.initialized);
-      })
-      .catch(() => setInitialized(true)); // backend erişilemiyorsa kurulu varsay (login akışı)
+      }
+      if (!cancelled) setInitialized(true); // ~40 sn yanıt yok → kurulu varsay (kullanıcı yenileyebilir)
+    })();
+    return () => { cancelled = true; };
     // yalnız boot'ta bir kez
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
