@@ -86,6 +86,7 @@ class ApiService {
   async getProjectParticipations(id: string): Promise<import('../types').ProjectUnitParticipation[]> { return apiClient.fetchWithAuth(`/projects/${id}/participations`); }
   async addProjectParticipation(id: string, d: { unitId: string; coefficient: number; role?: string }) { return apiClient.fetchWithAuth(`/projects/${id}/participations`, { method: 'POST', body: JSON.stringify(d) }); }
   async deleteProjectParticipation(id: string, pid: string) { return apiClient.fetchWithAuth(`/projects/${id}/participations/${pid}`, { method: 'DELETE' }); }
+  async getUnitBudgetAbsorption(): Promise<import('../types').UnitAbsorptionReport> { return apiClient.fetchWithAuth('/reports/unit-budget-absorption'); }
   async getProjectHealth(): Promise<import('../types').ProjectHealthReport> { return apiClient.fetchWithAuth('/reports/project-health'); }
   async getCustomerHealth(): Promise<import('../types').CustomerHealthReport> { return apiClient.fetchWithAuth('/reports/customer-health'); }
   // Finans — Vade & Finansman Etkisi

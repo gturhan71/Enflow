@@ -1003,6 +1003,15 @@ export interface ProjectUnitParticipation {
   id: string; projectId: string; unitId: string; coefficient: number;
   role?: string | null; notes?: string | null; unit?: { name: string };
 }
+export interface UnitAbsorptionLine {
+  unitId: string; unitName: string; totalBudget: number; periodCost: number;
+  allocated: number; absorptionPct: number; projectCount: number; coeffSum: number; overAllocated: boolean;
+}
+export interface UnitAbsorptionReport {
+  units: UnitAbsorptionLine[];
+  summary: { totalBudget: number; totalAllocated: number; avgAbsorption: number; idleCost: number; overAllocatedCount: number };
+  note: string;
+}
 
 export interface UnitDefinition {
   key: string;

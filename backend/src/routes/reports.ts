@@ -83,6 +83,12 @@ router.get('/dmo-analytics', tenantMiddleware, requireEntitlement('DMO_MODULE'),
   res.json(await computeDmoAnalytics(req.tenantId));
 }));
 
+// Birim bütçe absorpsiyonu (overhead Faz 3) — bütçe vs iştirak dağıtımı
+router.get('/unit-budget-absorption', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { computeUnitBudgetAbsorption } = await import('../services/overheadService');
+  res.json(await computeUnitBudgetAbsorption(req.tenantId));
+}));
+
 // Opsiyonel docNumber üretimi (diğer route'larla aynı pattern)
 async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<string | null> {
   if (!categoryCode) return null;

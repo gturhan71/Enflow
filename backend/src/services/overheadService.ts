@@ -1,5 +1,6 @@
 import { prisma } from '../prismaClient';
 import { computeCompanyOverhead, computeUnitParticipationLoad, projectMargins, OverheadMethod } from './financeEngine';
+import { round2 } from './moneyRounding';
 
 // İşletme maliyeti (overhead) orkestrasyonu — Faz 1: Katman-1 (şirket genel gider %).
 // Katman-2 (birim iştirak katsayısı) Faz 2'de eklenecek (unitAmount şimdilik 0).
@@ -81,4 +82,63 @@ export async function applyProjectOverhead(tenantId: string, projectId: string, 
     },
   });
   return { ...r, applyOverhead: apply, netMargin: apply ? m.netMargin : m.contributionMargin };
+}
+
+// ── Birim Bütçe Absorpsiyonu (Faz 3) — yönetim görünürlüğü ───────────────────
+// Her birim: bütçe (planlanan) vs projelere dağıtılan (iştirak yükü) vs absorpsiyon%.
+// Düşük absorpsiyon = atıl maliyet (şirket yüklenir); yüksek = birim tam-yüklü.
+export interface UnitAbsorptionLine {
+  unitId: string; unitName: string; totalBudget: number; periodCost: number;
+  allocated: number; absorptionPct: number; projectCount: number;
+  coeffSum: number; overAllocated: boolean;
+}
+export interface UnitAbsorptionReport {
+  units: UnitAbsorptionLine[];
+  summary: { totalBudget: number; totalAllocated: number; avgAbsorption: number; idleCost: number; overAllocatedCount: number };
+  note: string;
+}
+
+export async function computeUnitBudgetAbsorption(tenantId: string): Promise<UnitAbsorptionReport> {
+  const budgets = await prisma.unitBudget.findMany({ where: { tenantId }, orderBy: { periodStart: 'desc' }, include: { unit: { select: { name: true } } } });
+  // her birim için en yeni bütçe
+  const latest = new Map<string, typeof budgets[number]>();
+  for (const b of budgets) if (!latest.has(b.unitId)) latest.set(b.unitId, b);
+
+  const unitIds = [...latest.keys()];
+  const parts = unitIds.length
+    ? await prisma.projectUnitParticipation.findMany({ where: { unitId: { in: unitIds }, project: { tenantId } } })
+    : [];
+  const byUnit = new Map<string, { coeffSum: number; projects: Set<string> }>();
+  for (const p of parts) {
+    const e = byUnit.get(p.unitId) || { coeffSum: 0, projects: new Set<string>() };
+    e.coeffSum += Math.max(0, Math.min(1, p.coefficient || 0));
+    e.projects.add(p.projectId);
+    byUnit.set(p.unitId, e);
+  }
+
+  const lines: UnitAbsorptionLine[] = [];
+  for (const [unitId, b] of latest) {
+    const agg = byUnit.get(unitId) || { coeffSum: 0, projects: new Set<string>() };
+    const allocated = round2((b.periodCost || 0) * agg.coeffSum);
+    lines.push({
+      unitId, unitName: b.unit?.name || '—',
+      totalBudget: b.totalBudget || 0, periodCost: b.periodCost || 0,
+      allocated, absorptionPct: b.totalBudget > 0 ? allocated / b.totalBudget : 0,
+      projectCount: agg.projects.size, coeffSum: round2(agg.coeffSum), overAllocated: agg.coeffSum > 1,
+    });
+  }
+  lines.sort((a, b) => a.absorptionPct - b.absorptionPct); // en düşük absorpsiyon (atıl) önce
+
+  const totalBudget = lines.reduce((s, l) => s + l.totalBudget, 0);
+  const totalAllocated = lines.reduce((s, l) => s + l.allocated, 0);
+  const idleCost = round2(lines.reduce((s, l) => s + Math.max(0, l.totalBudget - l.allocated), 0));
+  return {
+    units: lines,
+    summary: {
+      totalBudget, totalAllocated,
+      avgAbsorption: totalBudget > 0 ? totalAllocated / totalBudget : 0,
+      idleCost, overAllocatedCount: lines.filter(l => l.overAllocated).length,
+    },
+    note: 'Absorpsiyon = projelere dağıtılan birim yükü ÷ birim bütçesi. Düşük = atıl maliyet (şirket yüklenir); >%100 (katsayı toplamı >1) = aşırı-dağıtım uyarısı.',
+  };
 }
