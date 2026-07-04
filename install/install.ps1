@@ -89,6 +89,9 @@ if ((Test-Path (Join-Path $parent "package.json")) -and (Test-Path (Join-Path $p
 OK "Kaynak hazir: $RepoDir"
 
 # --- sihirbazi calistir ---
+# Not: PostgreSQL secilirse sihirbaz (wizard.mjs) sunucuyu winget ile saglar,
+# "enflow" DB + dbadmin rol/sifresini psql ile olusturur (mevcutsa mevcut kullanilir)
+# ve schema provider'ini "postgresql"e cevirip `prisma db push` ile semayi kurar.
 $wizardArgs = @("$RepoDir\install\wizard.mjs", "--repo", "$RepoDir")
 if ($Yes) { $wizardArgs += "--yes" }
 & node @wizardArgs

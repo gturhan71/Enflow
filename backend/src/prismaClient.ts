@@ -1,12 +1,19 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { PrismaPg } from '@prisma/adapter-pg';
 import dotenv from 'dotenv';
 import { roundMoneyData } from './services/moneyRounding';
 
 dotenv.config();
 
+// DB seçimi DATABASE_URL şemasından türetilir: postgres(ql):// → PostgreSQL (pg
+// adapter), aksi halde SQLite/libSQL (file:/libsql:). Tek kod tabanı iki veritabanını
+// destekler; kurulum sihirbazı .env + schema provider'ını buna göre yazar.
 const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
-const adapter = new PrismaLibSql({ url: connectionString });
+const isPostgres = /^postgres(ql)?:\/\//i.test(connectionString);
+const adapter = isPostgres
+  ? new PrismaPg({ connectionString })
+  : new PrismaLibSql({ url: connectionString });
 
 // Para temiz-yuvarlama: tüm yazımlarda para alanları 2 ondalığa (kuruş) yuvarlanır.
 // Tek noktadan global; hiçbir route'u değiştirmeden kirli-float depolamasını önler.

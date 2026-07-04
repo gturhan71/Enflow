@@ -57,6 +57,58 @@ function capture(cmd, cmdArgs) {
 }
 const secret = (n = 48) => randomBytes(n).toString('base64url');
 
+// ── PostgreSQL yardımcıları ──────────────────────────────────────────────────
+const commandExists = (cmd) => {
+  const r = spawnSync(isWin ? 'where' : 'which', [cmd], { encoding: 'utf-8', shell: isWin });
+  return r.status === 0;
+};
+// schema.prisma datasource provider'ını sqlite ↔ postgresql arasında çevir.
+function setSchemaProvider(prov) {
+  const schemaPath = join(REPO, 'backend', 'prisma', 'schema.prisma');
+  if (!existsSync(schemaPath)) return;
+  let s = readFileSync(schemaPath, 'utf-8');
+  const next = s.replace(/(datasource\s+db\s*\{[^}]*?provider\s*=\s*")(sqlite|postgresql)(")/s, `$1${prov}$3`);
+  if (next !== s && !DRY) writeFileSync(schemaPath, next);
+  log(`${C.dim}  schema.prisma datasource provider → ${prov}${C.r}`);
+}
+// psql ile bir SQL çalıştır (PGPASSWORD ile); status döner.
+function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {}) {
+  const a = ['-h', admin.host, '-p', String(admin.port), '-U', admin.user, '-d', db, '-v', 'ON_ERROR_STOP=1'];
+  if (command) a.push('-c', command); else a.push('-c', sqlOrDb);
+  const r = spawnSync('psql', a, { encoding: 'utf-8', env: { ...process.env, PGPASSWORD: admin.pass || '' }, shell: isWin });
+  return r;
+}
+const pgReachable = (admin) => psql(admin, 'SELECT 1;').status === 0;
+
+// PostgreSQL sunucusunu garanti et (yoksa Windows'ta winget ile kur).
+async function ensurePostgresServer(admin) {
+  if (commandExists('psql') && pgReachable(admin)) { ok('PostgreSQL erişilebilir (mevcut sunucu kullanılacak).'); return true; }
+  if (!isWin) { warn('PostgreSQL erişilemedi. Kurun (ör. `brew install postgresql` / `apt install postgresql`) ve tekrar çalıştırın.'); return false; }
+  if (DRY) { warn('[dry-run] winget PostgreSQL kurulumu atlandı.'); return false; }
+  head('PostgreSQL kurulumu (winget)');
+  if (!commandExists('winget')) { warn('winget yok. PostgreSQL\'i elle kurun: https://www.postgresql.org/download/windows/'); return false; }
+  run('winget', ['install', '-e', '--id', 'PostgreSQL.PostgreSQL', '--silent', '--accept-source-agreements', '--accept-package-agreements'], REPO);
+  // PATH tazele + biraz bekle (servis ayağa kalksın)
+  process.env.Path = (capture('powershell', ['-NoProfile', '-Command', '[Environment]::GetEnvironmentVariable("Path","Machine")+";"+[Environment]::GetEnvironmentVariable("Path","User")']) || process.env.Path);
+  for (let i = 0; i < 20 && !pgReachable(admin); i++) { await new Promise(r => setTimeout(r, 1500)); }
+  if (pgReachable(admin)) { ok('PostgreSQL kuruldu ve erişilebilir.'); return true; }
+  warn('PostgreSQL kuruldu ama erişilemedi (superuser şifresi/servis?). Bilgileri doğrulayıp tekrar deneyin.');
+  return false;
+}
+
+// enflow rolü (dbadmin) + veritabanını superuser ile oluştur (idempotent).
+function provisionPostgresDb(admin, { db, appUser, appPass }) {
+  const esc = (v) => String(v).replace(/'/g, "''");
+  // rol
+  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(appUser)}') THEN CREATE ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}'; END IF; END $$;` });
+  psql(admin, null, { command: `ALTER ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}';` });
+  // veritabanı (CREATE DATABASE transaction-dışı; var mı diye bak)
+  const exists = (psql(admin, null, { command: `SELECT 1 FROM pg_database WHERE datname='${esc(db)}';` }).stdout || '').includes('1');
+  if (!exists) psql(admin, null, { command: `CREATE DATABASE "${db}" OWNER "${appUser}";` });
+  const g = psql(admin, null, { command: `GRANT ALL PRIVILEGES ON DATABASE "${db}" TO "${appUser}";` });
+  return g.status === 0;
+}
+
 // ── 0) Başlık ────────────────────────────────────────────────────────────────
 log(`${C.b}${C.c}
   ███████╗███╗   ██╗███████╗██╗      ██████╗ ██╗    ██╗
@@ -106,10 +158,31 @@ async function main() {
     const host = await ask('Postgres host', 'localhost');
     const port = await ask('Postgres port', '5432');
     const db = await ask('Veritabanı adı', 'enflow');
-    const user = await ask('Kullanıcı', 'enflow');
-    const pass = await ask('Şifre', '');
-    dbUrl = `postgresql://${user}:${pass}@${host}:${port}/${db}?schema=public`;
-    warn('PostgreSQL seçildi — schema.prisma datasource provider\'ı "postgresql" olmalı (varsayılan SQLite). Detay: install/README.md.');
+    const appUser = await ask('Uygulama DB kullanıcısı (dbadmin)', 'enflow');
+    let appPass = await ask('Uygulama DB şifresi (boş = otomatik üret)', '');
+    if (!appPass) { appPass = secret(18); ok('Uygulama DB şifresi otomatik üretildi (özet sonunda gösterilecek).'); }
+
+    // Superuser (postgres) — sunucu kurulumu + rol/DB oluşturmak için. Zaten kuruluysa
+    // mevcut superuser bilgileri kullanılır; değilse winget ile kurulur.
+    const admin = {
+      host, port,
+      user: await ask('Postgres superuser (rol/DB oluşturmak için)', 'postgres'),
+      pass: await ask('Postgres superuser şifresi', 'postgres'),
+    };
+    const serverOk = await ensurePostgresServer(admin);
+    if (serverOk) {
+      const provisioned = DRY ? true : provisionPostgresDb(admin, { db, appUser, appPass });
+      if (provisioned) ok(`PostgreSQL hazır: rol "${appUser}" + veritabanı "${db}" (mevcutsa korunur).`);
+      else warn('DB/rol otomatik oluşturulamadı — superuser bilgilerini/erişimi kontrol edip elle oluşturun.');
+    } else {
+      warn('PostgreSQL sağlanamadı — .env yine de yazılır; sunucuyu hazırlayıp `pnpm prisma db push` çalıştırın.');
+    }
+    dbUrl = `postgresql://${appUser}:${appPass}@${host}:${port}/${db}?schema=public`;
+    setSchemaProvider('postgresql'); // Prisma provider'ını Postgres'e çevir
+    // Özette gösterilecek not
+    globalThis.__pgSummary = { host, port, db, appUser, appPass, superuser: admin.user };
+  } else {
+    setSchemaProvider('sqlite'); // SQLite yolunda provider'ı geri al (önceki PG denemesi kalmışsa)
   }
 
   const jwt = secret(48);
@@ -174,8 +247,15 @@ async function main() {
   }
 
   prismaRun(['generate']);
-  prismaRun(['migrate', 'deploy']);
-  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : 'Prisma client üretildi + migration\'lar uygulandı');
+  if (usePg) {
+    // PostgreSQL: mevcut migration'lar SQLite lehçesinde → şema modellerden `db push`
+    // ile kurulur (migration geçmişi yok). Postgres migration seti sonra üretilecek
+    // (bkz. install/POSTGRES_MIGRATION_PLAN.md).
+    prismaRun(['db', 'push', '--accept-data-loss']);
+  } else {
+    prismaRun(['migrate', 'deploy']);
+  }
+  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : (usePg ? 'Prisma client üretildi + şema Postgres\'e db push edildi' : 'Prisma client üretildi + migration\'lar uygulandı'));
 
   // NOT: Hiçbir kullanıcı/tenant tohumlanmaz. Veritabanı BOŞ kalmalı ki ilk açılışta
   // tarayıcıdaki Kurulum Sihirbazı şirket + ilk yönetici + lisansı tanımlasın.
@@ -207,6 +287,18 @@ ${C.b}İlk açılış:${C.r} tarayıcı → http://localhost:${frontendPort}
 ${C.dim}Ek kullanıcı (Yedek Yöneticisi vb.) · YZ entegrasyonu sonradan Ayarlar'dan eklenir.${C.r}
 ${C.dim}Sırlar backend/.env içinde (JWT_SECRET, PLUGIN_LICENSE_SECRET). Üretimde gizli tutun.${C.r}
 ${C.dim}(Kabuk: ${py})${C.r}`);
+
+  const pg = globalThis.__pgSummary;
+  if (pg) {
+    log(`
+${C.b}${C.y}PostgreSQL — DB erişim bilgileri (GÜVENLE SAKLAYIN):${C.r}
+  Sunucu    : ${pg.host}:${pg.port}
+  Veritabanı: ${pg.db}
+  DB kullanıcı (dbadmin): ${pg.appUser}
+  DB şifre  : ${C.b}${pg.appPass}${C.r}
+  ${C.dim}Bu bilgiler backend/.env → DATABASE_URL içinde de var. Şema "db push" ile kuruldu
+  (Postgres migration seti sonra: install/POSTGRES_MIGRATION_PLAN.md).${C.r}`);
+  }
 }
 
 main().then(() => { rl.close(); }).catch((e) => { rl.close(); err(e.message || String(e)); exit(1); });

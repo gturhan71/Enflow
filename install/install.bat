@@ -9,6 +9,11 @@ cd /d "%~dp0"
 echo.
 echo  ==== Enflow Kurulum (Windows) ====
 echo.
+echo  Not: Kurulum sihirbazinda "PostgreSQL kullanilsin mi?" secilirse ve sistemde
+echo       PostgreSQL yoksa winget ile otomatik kurulur; "enflow" veritabani + DB
+echo       kullanicisi (dbadmin) sifresiyle olusturulur (mevcutsa mevcut superuser
+echo       bilgileri kullanilir). Varsayilan secim SQLite'tir (harici DB gerekmez).
+echo.
 
 rem --- Yonetici hakki (bilgi; portatif mod admin gerektirmez) ---
 net session >nul 2>&1
