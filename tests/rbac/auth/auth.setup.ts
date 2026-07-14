@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { test as setup, type Page } from "@playwright/test";
-import { roles, crossTenantUser, ROLE_NAMES, baseURL, apiBaseURL } from "../rbac.config";
+import { roles, crossTenantUser, ROLE_NAMES, baseURL, apiBaseURL, testPassword } from "../rbac.config";
 import fs from "fs";
 import path from "path";
 
@@ -17,18 +17,18 @@ async function loginAndSave(
   saveName: string,
   page: Page
 ) {
-  // Backend'den token al (Enflow auth şifresiz mock-JWT)
+  // Backend'den token al (imzalı JWT — parola doğrulamalı).
   const loginRes = await page.evaluate(
-    async ({ email, apiUrl }: { email: string; apiUrl: string }) => {
+    async ({ email, password, apiUrl }: { email: string; password: string; apiUrl: string }) => {
       const res = await fetch(`${apiUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password }),
       });
       if (!res.ok) throw new Error(`Login HTTP ${res.status}`);
       return res.json() as Promise<{ user: Record<string, unknown>; token: string }>;
     },
-    { email, apiUrl: apiBaseURL }
+    { email, password: testPassword, apiUrl: apiBaseURL }
   );
 
   const token = loginRes.token;

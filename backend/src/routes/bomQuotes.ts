@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
@@ -11,7 +11,7 @@ const router: Router = Router();
 router.use(tenantMiddleware);
 
 const QUOTE_UPLOADS_ROOT = path.join(__dirname, '../../uploads/bom-quotes');
-const quoteUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 25 * 1024 * 1024 } });
+const quoteUpload = documentUpload(25);
 
 // Bir fırsatın tüm BoM teklifleri (lineKey ile gruplanır)
 router.get('/', asyncHandler(async (req: Request, res: Response) => {

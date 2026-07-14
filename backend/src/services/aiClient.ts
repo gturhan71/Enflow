@@ -49,6 +49,28 @@ function joinUrl(base: string, path: string): string {
 }
 
 /**
+ * SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut metadata / link-local
+ * adreslerine gidemez. (Yerel LLM — localhost/özel ağ — kasıtlı olarak serbesttir;
+ * CLAUDE.md'de Ollama/LM Studio desteklenir.) Uygun değilse hata fırlatır.
+ */
+export function assertSafeAiUrl(rawUrl: string): void {
+  let u: URL;
+  try {
+    u = new URL(rawUrl);
+  } catch {
+    throw new Error('Geçersiz YZ baseUrl.');
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+    throw new Error('YZ baseUrl yalnız http/https olabilir.');
+  }
+  const host = u.hostname.toLowerCase();
+  // Bulut sağlayıcı metadata uçları ve link-local aralığı (SSRF'de en riskli hedef).
+  if (host === '169.254.169.254' || host === 'metadata.google.internal' || host.startsWith('169.254.')) {
+    throw new Error('Bu ana bilgisayar adresine izin verilmiyor.');
+  }
+}
+
+/**
  * Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON yanıt bekler.
  * Yapılandırma yoksa veya hata olursa null döner (çağıran mock'a düşer).
  */
@@ -62,6 +84,7 @@ export async function chatJSON<T = Record<string, unknown>>(opts: {
   if (!cfg) return null;
 
   try {
+    assertSafeAiUrl(cfg.baseUrl);
     const messages: { role: string; content: string }[] = [];
     if (opts.system) messages.push({ role: 'system', content: opts.system });
     messages.push({ role: 'user', content: opts.user });

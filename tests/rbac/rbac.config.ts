@@ -116,6 +116,9 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
   backup_admin:    { email: "backup@t-ecosystem.com",         tenantId: "tenant-1" },
 };
 
+// Tüm test kullanıcıları için ortak parola (backfill/seed varsayılanı).
+export const testPassword = process.env.RBAC_PASSWORD ?? "123456";
+
 // Başka tenant'tan kullanıcı — izolasyon testleri için
 export const crossTenantUser = {
   email:    process.env.CROSS_EMAIL     ?? "ali.mal@enflow.com",
@@ -173,7 +176,7 @@ export const apiMatrix: ApiCase[] = [
     name: "Yeni kullanıcı oluştur",
     method: "POST",
     path: "/api/users",
-    body: { name: "RBAC Test", email: "rbac-test@example.com", role: "SALES_REP", permissions: [] },
+    body: { name: "RBAC Test", email: "rbac-test@example.com", role: "SALES_REP", permissions: [], password: "123456" },
     expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
   },
   {

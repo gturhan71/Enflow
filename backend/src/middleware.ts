@@ -1,39 +1,48 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prismaClient';
+import { verifyAuthToken } from './services/auth';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
+function bearerToken(req: Request): string | undefined {
+  const h = req.headers['authorization'] as string | undefined;
+  if (!h || !h.startsWith('Bearer ')) return undefined;
+  const t = h.slice(7).trim();
+  return t || undefined;
+}
+
+// Kimlik doğrulama + tenant izolasyonu. İmzalı JWT ZORUNLU.
+// Tenant kimliği yalnız TOKEN'dan (imzalı `tid`) türetilir — x-tenant-id header'ı
+// yalnızca doğrulama içindir; uyuşmazlık 403. Böylece header-spoofing ile
+// çapraz-tenant erişim (IDOR) kapatılır.
 export const tenantMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  const tenantId = req.headers['x-tenant-id'] as string;
-  if (!tenantId) return res.status(400).json({ error: 'x-tenant-id header zorunludur.' });
+  const token = bearerToken(req);
+  if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gerekli.' });
 
-  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { id: true } });
-  if (!tenant) return res.status(404).json({ error: 'Tenant bulunamadı.' });
+  const payload = verifyAuthToken(token);
+  if (!payload) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum.' });
 
-  // IDOR Koruması: token'dan kullanıcı kimliğini çöz, tenant eşleşmesini doğrula.
-  // Token format: base64(userId) — auth route tarafından üretilir.
-  const authHeader = req.headers['authorization'] as string | undefined;
-  const token = authHeader?.replace('Bearer ', '').trim();
-
-  if (token) {
-    try {
-      const userId = Buffer.from(token, 'base64').toString('utf-8');
-      // Çözülen string'in gerçek bir kullanıcı ID'si olup olmadığını kontrol et.
-      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, tenantId: true, role: true } });
-      if (user) {
-        if (user.tenantId !== tenantId) {
-          return res.status(403).json({ error: 'Bu tenant\'a erişim yetkiniz yok.' });
-        }
-        req.userId = user.id;
-        req.userRole = user.role;
-      }
-    } catch { /* geçersiz base64 — kimlik doğrulamasız devam */ }
+  // Kullanıcı hâlâ mevcut ve aktif mi? (token iptali/rol değişimi için canlı kontrol)
+  const user = await prisma.user.findUnique({
+    where: { id: payload.sub },
+    select: { id: true, tenantId: true, role: true, status: true },
+  });
+  if (!user || user.status !== 'ACTIVE' || user.tenantId !== payload.tid) {
+    return res.status(401).json({ error: 'Oturum geçersiz.' });
   }
 
-  req.tenantId = tenantId;
+  // İstemci x-tenant-id gönderdiyse token ile eşleşmeli (defans katmanı).
+  const headerTenant = req.headers['x-tenant-id'] as string | undefined;
+  if (headerTenant && headerTenant !== user.tenantId) {
+    return res.status(403).json({ error: 'Bu tenant\'a erişim yetkiniz yok.' });
+  }
+
+  req.userId = user.id;
+  req.userRole = user.role;
+  req.tenantId = user.tenantId; // yetkili kaynak: imzalı token → DB doğrulaması
   next();
 });
 
@@ -50,14 +59,11 @@ export const enforceReadOnlyRoles = asyncHandler(async (req: Request, res: Respo
   // Yedek/restore + oturum muaf
   if (p.startsWith('/api/backup') || p.startsWith('/backup') || p.startsWith('/api/auth') || p.startsWith('/auth')) return next();
 
-  const token = (req.headers['authorization'] as string | undefined)?.replace('Bearer ', '').trim();
+  const token = bearerToken(req);
   if (!token) return next();
-  let role: string | undefined;
-  try {
-    const userId = Buffer.from(token, 'base64').toString('utf-8');
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { role: true } });
-    role = user?.role;
-  } catch { /* geçersiz token — guard atlanır, ilgili route kendi auth'unu uygular */ }
+  // İmzalı JWT'den rolü al (payload). Geçersiz token → guard atlanır, ilgili
+  // route kendi auth'unu (tenantMiddleware) uygular.
+  const role = verifyAuthToken(token)?.role;
 
   if (role && READ_ONLY_ROLES.has(role)) {
     return res.status(403).json({ error: 'Salt-okunur rol: bu işlem için değişiklik yetkiniz yok (yalnız yedekleme).' });

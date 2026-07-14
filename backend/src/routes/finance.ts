@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
@@ -15,7 +15,7 @@ const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 const router: Router = Router();
 
 const GUARANTEE_UPLOADS_ROOT = path.join(__dirname, '../../uploads/guarantees');
-const guaranteeUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const guaranteeUpload = documentUpload(50);
 
 // Opsiyonel docNumber üretimi (CorporateGovernance pattern'i ile aynı).
 async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<string | null> {

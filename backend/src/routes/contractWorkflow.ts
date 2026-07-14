@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { analyzeSpec } from '../services/specAnalysis';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
@@ -38,11 +38,8 @@ function getUploadDir(folderName: string): string {
   return dir;
 }
 
-// Multer with dynamic destination per request (resolved after wf fetch)
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB
-});
+// Tür-doğrulamalı, bellek-tabanlı yükleme (paylaşımlı güvenli fabrika).
+const upload = documentUpload(50);
 
 // ── Nextcloud WebDAV helper ────────────────────────────────────────────────────
 
@@ -315,6 +312,13 @@ router.post(
 
     const wf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId: req.tenantId } });
     if (!wf) return res.status(404).json({ error: 'Workflow bulunamadı.' });
+
+    // IDOR koruması: docId gerçekten bu workflow'a + tenant'a ait mi?
+    const docOwned = await prisma.contractWorkflowDoc.findFirst({
+      where: { id: docId, workflowId: id, tenantId: req.tenantId },
+      select: { id: true },
+    });
+    if (!docOwned) return res.status(404).json({ error: 'Evrak bulunamadı.' });
 
     const folder = contractFolder(wf);
     const uploadDir = getUploadDir(folder);

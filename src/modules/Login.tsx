@@ -12,7 +12,7 @@ interface LoginProps {
 const Login = ({ onLogin }: LoginProps) => {
   const [view, setView] = useState<'LOGIN' | 'FORGOT_PASSWORD'>('LOGIN');
   const [email, setEmail] = useState('gokhan@t-ecosystem.com');
-  const [password, setPassword] = useState('admin');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -24,7 +24,7 @@ const Login = ({ onLogin }: LoginProps) => {
 
     try {
       if (view === 'LOGIN') {
-        const data = await apiService.login(email);
+        const data = await apiService.login(email, password);
         apiService.setAuth(data.user.tenantId, data.token);
         // Kimliği doğrulanan GERÇEK kullanıcıyı taşı — UI artık kendi rolüne göre açılır.
         onLogin(data.user.tenantId, data.token, data.user as EnflowUser);

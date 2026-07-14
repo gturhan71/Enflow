@@ -43,14 +43,18 @@ class ApiClient {
     return response;
   }
 
-  async login(email: string) {
+  async login(email: string, password: string) {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email })
+      body: JSON.stringify({ email, password })
     });
-    
-    if (!response.ok) throw new Error('Giriş başarısız.');
+
+    if (!response.ok) {
+      let msg = 'Giriş başarısız.';
+      try { msg = (await response.json()).error || msg; } catch { /* yut */ }
+      throw new Error(msg);
+    }
     return response.json();
   }
 

@@ -20,11 +20,11 @@ router.post('/init', asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.tenant.count();
   if (existing > 0) return res.status(403).json({ error: 'Sistem zaten kurulmuş. Kurulum tekrar çalıştırılamaz.' });
 
-  const { company, admin, license } = req.body as { company?: { name?: string }; admin?: { name?: string; email?: string }; license?: string };
+  const { company, admin, license } = req.body as { company?: { name?: string }; admin?: { name?: string; email?: string; password?: string }; license?: string };
   try {
     const result = await bootstrapTenant({
       companyName: company?.name || '',
-      admin: { name: admin?.name || '', email: admin?.email || '' },
+      admin: { name: admin?.name || '', email: admin?.email || '', password: admin?.password || '' },
       license: license || undefined,
     });
     res.json(result);

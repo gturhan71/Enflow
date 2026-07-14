@@ -1,33 +1,42 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler } from '../middleware';
+import { verifyPassword, signAuthToken } from '../services/auth';
 
 const router: Router = Router();
 
 router.post('/login', asyncHandler(async (req: Request, res: Response) => {
-  const { email } = req.body;
-  const user = await prisma.user.findUnique({ where: { email }, include: { tenant: true } });
-  if (!user) return res.status(401).json({ error: 'Geçersiz bilgiler.' });
-  // Token: base64(userId) — tenantMiddleware bu token'ı çözerek IDOR kontrolü yapar.
-  const token = Buffer.from(user.id).toString('base64');
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!email || !password) {
+    return res.status(400).json({ error: 'E-posta ve şifre zorunludur.' });
+  }
 
-  // `permissions` DB'de JSON string — currentUser.permissions her zaman dizi
-  // olmalı (hasPermission `.includes()` kullanıyor; string üzerinde bu bir
-  // substring araması olur, dizi üzerinde tam eşleşme — farklı semantikler).
+  const user = await prisma.user.findUnique({ where: { email }, include: { tenant: true } });
+  // Kullanıcı sayımı sızıntısını önle: yok/yanlış-şifre/pasif hepsi AYNI genel yanıtı döner.
+  const ok = user && user.status === 'ACTIVE' && (await verifyPassword(password, user.password));
+  if (!ok || !user) {
+    return res.status(401).json({ error: 'E-posta veya şifre hatalı.' });
+  }
+
+  // İmzalı JWT — payload'da parola/hassas veri YOK.
+  const token = signAuthToken({ sub: user.id, tid: user.tenantId, role: user.role });
+
+  // `permissions` DB'de JSON string — currentUser.permissions her zaman dizi olmalı.
   let permissions: string[] = [];
   try {
     const parsed = JSON.parse(user.permissions);
     if (Array.isArray(parsed)) permissions = parsed.filter((p): p is string => typeof p === 'string' && p.length > 3);
   } catch { /* boş dizi ile devam */ }
 
-  res.json({ user: { ...user, permissions }, token });
+  // Parola hash'ini ASLA yanıta koyma.
+  const { password: _pw, ...safeUser } = user;
+  res.json({ user: { ...safeUser, permissions }, token });
 }));
 
 router.post('/forgot-password', asyncHandler(async (req: Request, res: Response) => {
-  const { email } = req.body;
-  const user = await prisma.user.findUnique({ where: { email } });
-  if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
-  res.json({ message: 'Şifre sıfırlama bağlantısı gönderildi.' });
+  // Kullanıcı sayımı sızıntısını önle: e-posta var/yok fark etmeksizin aynı yanıt.
+  res.json({ message: 'Eğer bu e-posta kayıtlıysa, şifre sıfırlama bağlantısı gönderildi.' });
 }));
 
 export default router;

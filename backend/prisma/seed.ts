@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -92,6 +93,8 @@ async function main() {
     data: {
       name: 'Gökhan Turhan',
       email: 'gokhan@t-ecosystem.com',
+      // Dev/seed varsayılan parolası (üretimde değiştirin).
+      password: await bcrypt.hash(process.env.DEFAULT_SEED_PASSWORD || '123456', 10),
       role: 'GENERAL_MANAGER',
       permissions: JSON.stringify(['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_EDIT', 'PRESALES_VIEW', 'PRESALES_EDIT', 'SETTINGS_VIEW', 'ARCHIVE_VIEW', 'DOCUMENTS_VIEW']),
       tenantId: tenant.id,

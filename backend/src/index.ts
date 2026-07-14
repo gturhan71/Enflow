@@ -1,6 +1,8 @@
 /// <reference path="./types/express.d.ts" />
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 
 import logsRouter from './routes/logs';
@@ -51,15 +53,30 @@ const port = 3002;
 import path from 'path';
 import fs from 'fs';
 
-app.use(express.json({ limit: '50mb' }));
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+// Güvenlik başlıkları (clickjacking, MIME-sniff, referrer sızıntısı vb.).
+// SPA'yı bozmamak için CSP ve COEP kapalı (API + inline dist için).
+app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+
+// Gövde limiti makul düzeye çekildi (bellek tabanlı DoS azaltımı). Dosyalar
+// multer üzerinden ayrı akar; JSON gövdeler yalnız metin/veri taşır.
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
+
+// Yüklenen dosyalar tarayıcıda ÇALIŞTIRILMAZ: her zaman indirme olarak servis
+// edilir + nosniff → depolanmış XSS (yüklü .html/.svg) engellenir.
+app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+  setHeaders: (res) => {
+    res.setHeader('Content-Disposition', 'attachment');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+  },
+}));
 // Enflow-Wiki — walkthrough §27'den üretilen statik sayfa (GET /wiki)
 app.use('/wiki', express.static(path.join(__dirname, '../../wiki')));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173', 'http://localhost:5174'],
-  credentials: true
-}));
+
+// CORS izinli origin'ler env'den (CORS_ORIGINS, virgülle) — yoksa dev localhost.
+const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:5174')
+  .split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({ origin: corsOrigins, credentials: true }));
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -86,7 +103,18 @@ app.use(enforceReadOnlyRoles);
 
 app.use('/api/logs/notifications', logsRouter);
 app.use('/api/activity-logs', activityLogsRouter);
-app.use('/api/auth', authRouter);
+// Kimlik doğrulama uçlarında brute-force azaltımı: IP başına 15 dakikada N
+// BAŞARISIZ deneme (başarılı girişler sayılmaz → ofis NAT'ında paylaşımlı IP'den
+// meşru girişler engellenmez, yalnız brute-force sınırlanır). N env ile ayarlanır.
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: Number(process.env.AUTH_RATE_LIMIT_MAX) || 50,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: { error: 'Çok fazla başarısız deneme. Lütfen bir süre sonra tekrar deneyin.' },
+});
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/tenants', tenantsRouter);
 app.use('/api', subscriptionRouter);
 app.use('/api/units', unitsRouter);

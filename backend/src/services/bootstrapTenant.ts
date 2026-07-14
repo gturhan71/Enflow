@@ -3,6 +3,7 @@
 // kullanıcısı + abonelik (gerçek lisans ya da 30 günlük deneme).
 import { prisma } from '../prismaClient';
 import { verifyLicenseToken } from './licenseVerify';
+import { hashPassword, signAuthToken } from './auth';
 
 // Varsayılan birim seti (kurumsal süreç swimlane'leri — seed.ts ile aynı).
 // Kurulumda otomatik oluşturulur; sonradan "şablon yükle" ile de eklenir (units.ts).
@@ -34,7 +35,7 @@ const PLAN_MAP: Record<string, 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
 
 export interface BootstrapInput {
   companyName: string;
-  admin: { name: string; email: string };
+  admin: { name: string; email: string; password?: string };
   /** Opsiyonel imzalı lisans; verilmezse 30 günlük deneme açılır. */
   license?: string;
   /** seed.ts için sabit tenant id (kurulumda verilmez → cuid). */
@@ -51,8 +52,11 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
   const companyName = String(input.companyName || '').trim();
   const adminName = String(input.admin?.name || '').trim();
   const adminEmail = String(input.admin?.email || '').trim().toLowerCase();
+  const adminPassword = String(input.admin?.password || '');
   if (!companyName) throw Object.assign(new Error('Şirket adı zorunludur.'), { status: 400 });
   if (!adminName || !adminEmail) throw Object.assign(new Error('Yönetici adı ve e-postası zorunludur.'), { status: 400 });
+  if (adminPassword.length < 6) throw Object.assign(new Error('Yönetici şifresi en az 6 karakter olmalıdır.'), { status: 400 });
+  const adminPasswordHash = await hashPassword(adminPassword);
 
   // Lisans verildiyse ÖNCE doğrula (tenant henüz yok → tenant binding bootstrap sonrası kontrol edilir).
   let licensePayload: ReturnType<typeof verifyLicenseToken>['payload'] | null = null;
@@ -83,7 +87,7 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
     // İlk GM kullanıcısı (Üst Yönetim birimine bağlı)
     const admin = await tx.user.create({
       data: {
-        name: adminName, email: adminEmail, role: 'GENERAL_MANAGER', status: 'ACTIVE',
+        name: adminName, email: adminEmail, password: adminPasswordHash, role: 'GENERAL_MANAGER', status: 'ACTIVE',
         permissions: JSON.stringify(GM_PERMISSIONS), tenantId: tenant.id, unitId: unitIdByKey.top,
       },
     });
@@ -113,7 +117,7 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
     // (Pratikte vendor lisansı tenant id'sini bootstrap sonrası üretir; bu kontrol ileri güvenliktir.)
   }
 
-  const token = Buffer.from(result.admin.id).toString('base64');
+  const token = signAuthToken({ sub: result.admin.id, tid: result.tenant.id, role: result.admin.role });
   return {
     tenantId: result.tenant.id,
     token,

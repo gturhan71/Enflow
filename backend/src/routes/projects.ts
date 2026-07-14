@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../prismaClient';
@@ -321,7 +321,7 @@ const DEFAULT_HANDOVER_DOCS: { name: string; docType: string }[] = [
 ];
 
 const HANDOVER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/project-handovers');
-const handoverUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const handoverUpload = documentUpload(50);
 
 function handoverFolder(p: { code?: string | null; name: string }): string {
   return slugify(p.code || p.name);

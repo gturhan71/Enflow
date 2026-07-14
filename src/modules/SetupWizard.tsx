@@ -24,6 +24,7 @@ export const SetupWizard = ({ onComplete }: SetupWizardProps) => {
   const [company, setCompany] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [license, setLicense] = useState('');
   const [useTrial, setUseTrial] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,7 +36,7 @@ export const SetupWizard = ({ onComplete }: SetupWizardProps) => {
 
   const canNext = (): boolean => {
     if (step === 1) return company.trim().length > 1;
-    if (step === 2) return adminName.trim().length > 1 && /\S+@\S+\.\S+/.test(adminEmail);
+    if (step === 2) return adminName.trim().length > 1 && /\S+@\S+\.\S+/.test(adminEmail) && adminPassword.length >= 6;
     if (step === 3) return useTrial || license.trim().length > 10;
     return true;
   };
@@ -45,7 +46,7 @@ export const SetupWizard = ({ onComplete }: SetupWizardProps) => {
     try {
       const res = await apiService.runSetup({
         company: { name: company.trim() },
-        admin: { name: adminName.trim(), email: adminEmail.trim() },
+        admin: { name: adminName.trim(), email: adminEmail.trim(), password: adminPassword },
         license: useTrial ? undefined : license.trim(),
       });
       onComplete(res.tenantId, res.token, res.user as unknown as User);
@@ -115,7 +116,9 @@ export const SetupWizard = ({ onComplete }: SetupWizardProps) => {
               <label className="block text-xs font-bold text-slate-500 mb-1">Ad Soyad *</label>
               <input className="input-glass w-full mb-3" value={adminName} onChange={(e) => setAdminName(e.target.value)} placeholder="Örn. Ada Yönetici" autoFocus />
               <label className="block text-xs font-bold text-slate-500 mb-1">E-posta *</label>
-              <input className="input-glass w-full" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="ada@acme.com" />
+              <input className="input-glass w-full mb-3" type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} placeholder="ada@acme.com" />
+              <label className="block text-xs font-bold text-slate-500 mb-1">Şifre * (en az 6 karakter)</label>
+              <input className="input-glass w-full" type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} placeholder="••••••••" autoComplete="new-password" />
               <p className="text-xs text-slate-400 mt-2">Bu kullanıcı GENEL_MÜDÜR rolüyle açılır; diğer kullanıcıları sonra Ayarlar'dan ekler.</p>
             </div>
           )}

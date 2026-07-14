@@ -111,6 +111,7 @@ model User {
   id           String        @id @default(cuid())
   name         String
   email        String        @unique
+  password     String?
   role         String
   permissions  String
   status       String        @default("ACTIVE")

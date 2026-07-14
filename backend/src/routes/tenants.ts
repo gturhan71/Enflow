@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
-import { isAIConfigured } from '../services/aiClient';
+import { isAIConfigured, assertSafeAiUrl } from '../services/aiClient';
 import { verifyLicenseToken } from '../services/licenseVerify';
 
 const router: Router = Router();
@@ -14,9 +14,10 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
   res.json(tenant ? [tenant] : []);
 }));
 
-router.post('/', asyncHandler(async (req: Request, res: Response) => {
+// Yeni tenant oluşturma — yalnız kimliği doğrulanmış GM. (Eskiden auth'suz AÇIKtı.)
+router.post('/', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
   const { name } = req.body;
-  if (!name) return res.status(400).json({ error: 'Şirket adı zorunludur.' });
+  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Şirket adı zorunludur.' });
 
   const tenant = await prisma.$transaction(async (tx) => {
     const newTenant = await tx.tenant.create({ data: { name } });
@@ -30,8 +31,13 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
 // NOT: Bare `/:id` rotaları, `/module-settings` ve `/ai-settings` gibi sabit
 // segmentleri gölgelememesi için DOSYA SONUNA taşındı (specific-before-param).
 
-router.put('/:id/subscription', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenantId = req.params.id;
+router.put('/:id/subscription', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
+  // IDOR koruması: yalnız çağıranın KENDİ tenant'ı üzerinde işlem yapılır.
+  // URL parametresi yetkili kaynak DEĞİL — req.tenantId (imzalı token) kullanılır.
+  if (req.params.id && req.params.id !== req.tenantId) {
+    return res.status(403).json({ error: 'Yalnız kendi şirketinizin aboneliğini değiştirebilirsiniz.' });
+  }
+  const tenantId = req.tenantId;
   const { plan } = req.body;
 
   if (!['STARTER', 'PROFESSIONAL', 'ENTERPRISE'].includes(plan)) {
@@ -39,9 +45,9 @@ router.put('/:id/subscription', tenantMiddleware, asyncHandler(async (req: Reque
   }
 
   const subscription = await prisma.subscription.upsert({
-    where: { tenantId: tenantId as string },
+    where: { tenantId },
     update: { plan },
-    create: { tenantId: tenantId as string, plan }
+    create: { tenantId, plan }
   });
 
   res.json(subscription);
@@ -157,6 +163,9 @@ router.put('/ai-settings', tenantMiddleware, GM, asyncHandler(async (req: Reques
     // baseUrl boş → entegrasyonu tamamen kaldır (bağlantıyı kes; anahtar dahil sıfırla)
     ms.ai = { baseUrl: '', model: '', label: '', apiKey: '' };
   } else {
+    // SSRF azaltımı: kaydetmeden önce baseUrl'i doğrula.
+    try { assertSafeAiUrl(baseUrl!.trim()); }
+    catch (e) { return res.status(400).json({ error: (e as Error).message }); }
     ms.ai = {
       baseUrl: baseUrl!.trim(),
       model: (model || '').trim(),
@@ -211,10 +220,15 @@ router.put('/governance-settings', tenantMiddleware, GM, asyncHandler(async (req
 }));
 
 // ── Tenant adı güncelle (bare `/:id` — sabit segment rotalarından SONRA) ─────
-router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
+// Yalnız kimliği doğrulanmış GM ve YALNIZ kendi tenant'ı. (Eskiden auth'suz AÇIKtı.)
+router.put('/:id', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
+  if (req.params.id && req.params.id !== req.tenantId) {
+    return res.status(403).json({ error: 'Yalnız kendi şirketinizi düzenleyebilirsiniz.' });
+  }
   const { name } = req.body;
+  if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Şirket adı zorunludur.' });
   const tenant = await prisma.tenant.update({
-    where: { id: req.params.id as string },
+    where: { id: req.tenantId },
     data: { name }
   });
   res.json(tenant);

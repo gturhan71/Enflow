@@ -15,8 +15,8 @@ class ApiService {
     apiClient.setAuth(tenantId, token);
   }
 
-  async login(email: string) {
-    return apiClient.login(email);
+  async login(email: string, password: string) {
+    return apiClient.login(email, password);
   }
 
   async forgotPassword(email: string) {
@@ -29,7 +29,7 @@ class ApiService {
     if (!r.ok) throw new Error('Kurulum durumu alınamadı.');
     return r.json();
   }
-  async runSetup(payload: { company: { name: string }; admin: { name: string; email: string }; license?: string }): Promise<{ tenantId: string; token: string; user: { id: string; name: string; email: string; role: string; tenantId: string; unitId: string | null; permissions: string[] } }> {
+  async runSetup(payload: { company: { name: string }; admin: { name: string; email: string; password: string }; license?: string }): Promise<{ tenantId: string; token: string; user: { id: string; name: string; email: string; role: string; tenantId: string; unitId: string | null; permissions: string[] } }> {
     const r = await fetch('/api/setup/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
     const data = await r.json();
     if (!r.ok) throw new Error(data?.error || 'Kurulum başarısız.');

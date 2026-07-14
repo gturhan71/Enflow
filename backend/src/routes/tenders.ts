@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
@@ -13,7 +13,7 @@ import { sweepTenderReminders } from '../services/tenderReminders';
 const router: Router = Router();
 
 const TENDER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/tenders');
-const tenderUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const tenderUpload = documentUpload(50);
 
 // Standart ihale uygunluk/evrak listesi (özgün, üçüncü-taraf notasyonu yok)
 const DEFAULT_CHECKLIST: { name: string; isRequired: boolean }[] = [

@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
-import multer from 'multer';
+import { documentUpload } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
@@ -11,7 +11,7 @@ import { logActivity } from '../services/activityLog';
 const router: Router = Router();
 
 const LEGAL_UPLOADS_ROOT = path.join(__dirname, '../../uploads/legal');
-const legalUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const legalUpload = documentUpload(50);
 
 async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<string | null> {
   if (!categoryCode) return null;
