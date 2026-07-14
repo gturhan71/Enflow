@@ -68,7 +68,7 @@ PowerShell ile elle:
 
 1. **Önkoşul denetimi** — Node ≥ 20, git, pnpm (yoksa corepack ile kurar).
 2. **Yapılandırma** — backend/frontend portu, veritabanı (SQLite/PostgreSQL),
-   `JWT_SECRET` + `PLUGIN_LICENSE_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
+   `AUTH_JWT_SECRET` + `PLUGIN_LICENSE_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
 3. **Ortam dosyaları** — `backend/.env` yazılır.
 4. **Bağımlılıklar** — `pnpm install` (frontend + backend).
 5. **Veritabanı** — `prisma generate` + `prisma migrate deploy`; opsiyonel
@@ -135,7 +135,7 @@ yeniden `pnpm prisma migrate deploy` çalıştırın.
 
 ## Güvenlik
 
-- `JWT_SECRET` ve `PLUGIN_LICENSE_SECRET` üretimde **mutlaka** güçlü rastgele
+- `AUTH_JWT_SECRET` (≥16 karakter) ve `PLUGIN_LICENSE_SECRET` üretimde **mutlaka** güçlü rastgele
   olmalı — sihirbaz üretir; `.env` dosyasını gizli tutun, sürüm kontrolüne koymayın.
 - API anahtarları (YZ, S3, Nextcloud) yalnız sunucuda/`.env`'de tutulur; uygulama
   içi YZ entegrasyonu tenant-bazlı ve maskelidir.
