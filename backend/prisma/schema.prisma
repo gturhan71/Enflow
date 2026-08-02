@@ -15,6 +15,7 @@ model Tenant {
   subscription  Subscription?
   usageMetrics  UsageMetric[]
   customers     Customer[]
+  contacts      Contact[]
   opportunities Opportunity[]
   projects      Project[]
   units         Unit[]
@@ -159,6 +160,28 @@ model Customer {
   updatedAt         DateTime      @updatedAt
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   opportunities     Opportunity[]
+  contacts          Contact[]
+}
+
+// Kurumsal müşteride birden çok kişi (satınalma sorumlusu/teknik şartname yazarı/
+// muhasebe farklı kişiler olabilir — kamu idarelerinde sık). Customer.email/phone
+// dokunulmadı (genel/varsayılan iletişim); Contact bunun üstüne ek bir katman.
+model Contact {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  role       String   @default("OTHER") // PURCHASING|TECHNICAL|FINANCE|MANAGEMENT|OTHER
+  title      String?  // serbest unvan (ör. "Satınalma Müdürü")
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  @@index([tenantId, customerId])
 }
 
 model Opportunity {

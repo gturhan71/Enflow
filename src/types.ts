@@ -119,6 +119,28 @@ export interface Customer {
   tenantId: string;
   createdAt?: string;
   updatedAt?: string;
+  contacts?: Contact[];
+}
+
+// Kurumsal müşteride birden çok kişi (satınalma/teknik/muhasebe farklı kişiler
+// olabilir) — Customer.email/phone genel/varsayılan iletişim olarak kalır.
+export type ContactRole = 'PURCHASING' | 'TECHNICAL' | 'FINANCE' | 'MANAGEMENT' | 'OTHER';
+export const CONTACT_ROLE_LABEL: Record<ContactRole, string> = {
+  PURCHASING: 'Satınalma', TECHNICAL: 'Teknik', FINANCE: 'Muhasebe/Finans', MANAGEMENT: 'Yönetim', OTHER: 'Diğer',
+};
+export interface Contact {
+  id: string;
+  tenantId?: string;
+  customerId: string;
+  name: string;
+  role: ContactRole;
+  title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  isPrimary: boolean;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Unit {

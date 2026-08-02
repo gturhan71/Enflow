@@ -1,5 +1,5 @@
 import { apiClient } from './apiClient';
-import { Customer, Opportunity, BoMItem, CostItem, Proposal } from '../types';
+import { Customer, Opportunity, BoMItem, CostItem, Proposal, Contact } from '../types';
 
 export const crmService = {
   // --- CUSTOMERS ---
@@ -23,6 +23,31 @@ export const crmService = {
 
   async deleteCustomer(id: string) {
     return apiClient.fetchWithAuth(`/customers/${id}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // --- KİŞİLER (Contact) ---
+  async getContacts(customerId: string) {
+    return apiClient.fetchWithAuth(`/customers/${customerId}/contacts`);
+  },
+
+  async createContact(customerId: string, data: Partial<Contact>) {
+    return apiClient.fetchWithAuth(`/customers/${customerId}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async updateContact(customerId: string, contactId: string, data: Partial<Contact>) {
+    return apiClient.fetchWithAuth(`/customers/${customerId}/contacts/${contactId}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async deleteContact(customerId: string, contactId: string) {
+    return apiClient.fetchWithAuth(`/customers/${customerId}/contacts/${contactId}`, {
       method: 'DELETE'
     });
   },

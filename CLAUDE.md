@@ -367,8 +367,8 @@ backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRo
 src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
-src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/BackupModule.tsx ← services/apiService, types
+src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/Login.tsx ← constants, services/apiService, types
@@ -611,15 +611,15 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
-### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
-```
-TABLE new_PurchaseRequest
-```
-
 ### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
 ```
 TABLE new_User
 INDEX User_email_key ON User
+```
+
+### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
+```
+TABLE new_PurchaseRequest
 ```
 
 ### backend/src/middleware.ts
@@ -1153,6 +1153,19 @@ export UserManagement
 handler onSubmit
 ```
 
+### src/modules/BackupModule.tsx
+```
+hook useState
+hook useCallback
+hook useEffect
+export BackupModule
+handler onRun
+handler onVerify
+handler onRestore
+handler onChange
+handler onClick
+```
+
 ### src/modules/CRMModule.tsx
 ```
 hook useAuth
@@ -1170,19 +1183,6 @@ handler onSave
 handler onImported
 handler onConfirm
 handler onSubmit
-```
-
-### src/modules/BackupModule.tsx
-```
-hook useState
-hook useCallback
-hook useEffect
-export BackupModule
-handler onRun
-handler onVerify
-handler onRestore
-handler onChange
-handler onClick
 ```
 
 ### src/modules/ContractWorkflowModule.tsx

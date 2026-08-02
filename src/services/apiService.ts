@@ -5,7 +5,7 @@ import { taskService } from './taskService';
 import { documentService } from './documentService';
 import { settingsService } from './settingsService';
 import {
-  Customer, Opportunity, BoMItem, CostItem, Proposal,
+  Customer, Opportunity, BoMItem, CostItem, Proposal, Contact,
   Project, TodoTask, CorporateDocument, ArchiveItem, Contract,
   Unit, User, Notification, Workflow, ApprovalChain
 } from '../types';
@@ -41,6 +41,10 @@ class ApiService {
   async createCustomer(data: Partial<Customer>) { return crmService.createCustomer(data); }
   async updateCustomer(id: string, data: Partial<Customer>) { return crmService.updateCustomer(id, data); }
   async deleteCustomer(id: string) { return crmService.deleteCustomer(id); }
+  async getContacts(customerId: string) { return crmService.getContacts(customerId); }
+  async createContact(customerId: string, data: Partial<Contact>) { return crmService.createContact(customerId, data); }
+  async updateContact(customerId: string, contactId: string, data: Partial<Contact>) { return crmService.updateContact(customerId, contactId, data); }
+  async deleteContact(customerId: string, contactId: string) { return crmService.deleteContact(customerId, contactId); }
 
   // --- OPPORTUNITIES ---
   async getOpportunities() { return crmService.getOpportunities(); }
