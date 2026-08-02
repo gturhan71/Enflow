@@ -16,6 +16,7 @@ model Tenant {
   usageMetrics  UsageMetric[]
   customers     Customer[]
   contacts      Contact[]
+  serviceTickets ServiceTicket[]
   opportunities Opportunity[]
   projects      Project[]
   units         Unit[]
@@ -345,6 +346,37 @@ model Project {
   projectCostItems  ProjectCostItem[]
   handoverDocs      ProjectHandoverDoc[]
   unitParticipations ProjectUnitParticipation[]
+  serviceTickets    ServiceTicket[]
+}
+
+// B-22 — Garanti/Servis: ACCEPTANCE sonrası (WARRANTY döneminde) arıza bildirimi,
+// yedek parça talebi, servis SLA takibi. Önceden WARRANTY yalnız bir milestone
+// etiketiydi; gerçek talep bu modele düşer.
+model ServiceTicket {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  tenant              Tenant    @relation(fields: [tenantId], references: [id])
+  projectId           String
+  project             Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title               String
+  description         String?
+  category            String    @default("FAULT") // FAULT|SPARE_PART|MAINTENANCE|OTHER
+  priority            String    @default("NORMAL") // LOW|NORMAL|HIGH|URGENT
+  status              String    @default("OPEN")   // OPEN|IN_PROGRESS|WAITING_PART|RESOLVED|CLOSED
+  reportedAt          DateTime  @default(now())
+  reportedByContactId String?   // Customer.Contact — bildiren kişi (opsiyonel)
+  reportedByName      String?   // Contact yoksa serbest metin
+  assignedToUserId    String?
+  unitId              String?
+  slaHours            Int?      // hedef çözüm süresi (takvim-saati)
+  dueAt               DateTime? // slaHours verilmişse create'de otomatik hesaplanır
+  escalatedAt         DateTime? // SLA aşımı bildirimi bir kez gitti mi (idempotent)
+  resolvedAt          DateTime?
+  resolutionNotes     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  @@index([tenantId, status])
+  @@index([tenantId, projectId])
 }
 
 model ProjectMilestone {

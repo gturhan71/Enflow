@@ -379,6 +379,43 @@ export interface Project {
   updatedAt?: string;
 }
 
+// B-22 — Garanti/Servis: ACCEPTANCE sonrası arıza/yedek-parça/bakım talepleri + SLA.
+export type ServiceTicketCategory = 'FAULT' | 'SPARE_PART' | 'MAINTENANCE' | 'OTHER';
+export type ServiceTicketPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+export type ServiceTicketStatus = 'OPEN' | 'IN_PROGRESS' | 'WAITING_PART' | 'RESOLVED' | 'CLOSED';
+export const SERVICE_TICKET_CATEGORY_LABEL: Record<ServiceTicketCategory, string> = {
+  FAULT: 'Arıza', SPARE_PART: 'Yedek Parça', MAINTENANCE: 'Bakım', OTHER: 'Diğer',
+};
+export const SERVICE_TICKET_PRIORITY_LABEL: Record<ServiceTicketPriority, string> = {
+  LOW: 'Düşük', NORMAL: 'Normal', HIGH: 'Yüksek', URGENT: 'Acil',
+};
+export const SERVICE_TICKET_STATUS_LABEL: Record<ServiceTicketStatus, string> = {
+  OPEN: 'Açık', IN_PROGRESS: 'İşlemde', WAITING_PART: 'Parça Bekliyor', RESOLVED: 'Çözüldü', CLOSED: 'Kapandı',
+};
+export interface ServiceTicket {
+  id: string;
+  tenantId?: string;
+  projectId: string;
+  project?: { id: string; name: string; code?: string | null; customerName?: string | null };
+  title: string;
+  description?: string | null;
+  category: ServiceTicketCategory;
+  priority: ServiceTicketPriority;
+  status: ServiceTicketStatus;
+  reportedAt?: string;
+  reportedByContactId?: string | null;
+  reportedByName?: string | null;
+  assignedToUserId?: string | null;
+  unitId?: string | null;
+  slaHours?: number | null;
+  dueAt?: string | null;
+  escalatedAt?: string | null;
+  resolvedAt?: string | null;
+  resolutionNotes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Contract {
   id: string;
   title?: string;

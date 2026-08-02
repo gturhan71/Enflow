@@ -40,6 +40,7 @@ import ProcurementModule from './modules/ProcurementModule';
 import TodoModule from './modules/TodoModule';
 import SettingsModule from './modules/SettingsModule';
 import ProjectManagementModule from './modules/ProjectManagementModule';
+import ServiceTicketsModule from './modules/ServiceTicketsModule';
 import VisitPlanModule from './modules/VisitPlanModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
@@ -210,6 +211,7 @@ const TenantAppInner = ({
   const isPresalesActive = activeTab === 'presales';
   const isSettingsActive = activeTab.startsWith('settings-');
   const isProjectActive = activeTab === 'project-mgmt' || activeTab === 'procurement';
+  const isServiceTicketsActive = activeTab === 'service-tickets';
   const isVisitPlanActive = activeTab === 'visit-plan';
   const isTodoActive = activeTab === 'todo';
   const isDocsActive = activeTab === 'documents';
@@ -224,7 +226,7 @@ const TenantAppInner = ({
     enabled: isCrmActive || isVisitPlanActive
   });
   const { data: projectsData, isLoading: projectsLoading } = useProjects(tenantId, {
-    enabled: isDashboardActive || isProjectActive || isContractsActive || isTodoActive || isVisitPlanActive
+    enabled: isDashboardActive || isProjectActive || isContractsActive || isTodoActive || isVisitPlanActive || isServiceTicketsActive
   });
   const { data: contractsData, isLoading: contractsLoading } = useContracts(tenantId, {
     enabled: isDashboardActive || isContractsActive || isTodoActive
@@ -349,6 +351,7 @@ const TenantAppInner = ({
 
       case 'procurement': return <ProcurementModule projects={projects} units={units} initialItemId={navItemId} />;
       case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} initialItemId={navItemId} />;
+      case 'service-tickets': return <ServiceTicketsModule projects={projects} />;
       case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} opportunities={opportunities.map(o => ({ id: o.id, title: o.title }))} projects={projects.map(p => ({ id: p.id, name: p.name }))} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} onNavigate={navigate} />;
       case 'documents': return <DocumentsModule documents={documents} setDocuments={setDocuments} />;

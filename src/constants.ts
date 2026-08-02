@@ -29,7 +29,8 @@ import {
   Key,
   FlaskConical,
   ShieldCheck,
-  DatabaseBackup
+  DatabaseBackup,
+  Wrench
 } from 'lucide-react';
 
 import { 
@@ -112,6 +113,7 @@ export const NAV_ITEMS = [
   { id: 'contract-workflow', label: 'Sözleşme Yönetimi',  icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
   { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
+  { id: 'service-tickets',   label: 'Garanti & Servis',    icon: Wrench,        requiredPermission: 'SERVICE_TICKETS_VIEW' },
   { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
   { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW', requiredEntitlement: 'DMO_MODULE' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },

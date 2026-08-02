@@ -24,6 +24,7 @@ import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './mi
 import { startBackupScheduler } from './services/backupScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import projectsRouter from './routes/projects';
+import serviceTicketsRouter from './routes/serviceTickets';
 import tasksRouter from './routes/tasks';
 import contractsRouter from './routes/contracts';
 import archiveRouter from './routes/archive';
@@ -128,6 +129,7 @@ app.use('/api/presales', presalesRouter);
 app.use('/api/backup', backupRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/projects', projectsRouter);
+app.use('/api/service-tickets', serviceTicketsRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/archive', archiveRouter);

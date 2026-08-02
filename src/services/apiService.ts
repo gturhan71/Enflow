@@ -2,12 +2,13 @@ import { apiClient } from './apiClient';
 import { crmService } from './crmService';
 import { projectService } from './projectService';
 import { taskService } from './taskService';
+import { serviceTicketService } from './serviceTicketService';
 import { documentService } from './documentService';
 import { settingsService } from './settingsService';
 import {
   Customer, Opportunity, BoMItem, CostItem, Proposal, Contact,
   Project, TodoTask, CorporateDocument, ArchiveItem, Contract,
-  Unit, User, Notification, Workflow, ApprovalChain
+  Unit, User, Notification, Workflow, ApprovalChain, ServiceTicket
 } from '../types';
 
 class ApiService {
@@ -164,6 +165,11 @@ class ApiService {
   async createTask(data: Partial<TodoTask>) { return taskService.createTask(data); }
   async updateTask(id: string, data: Partial<TodoTask>) { return taskService.updateTask(id, data); }
   async deleteTask(id: string) { return taskService.deleteTask(id); }
+  async getServiceTickets(filters?: { status?: string; projectId?: string; priority?: string }) { return serviceTicketService.getServiceTickets(filters); }
+  async createServiceTicket(data: Partial<ServiceTicket>) { return serviceTicketService.createServiceTicket(data); }
+  async updateServiceTicket(id: string, data: Partial<ServiceTicket>) { return serviceTicketService.updateServiceTicket(id, data); }
+  async resolveServiceTicket(id: string, resolutionNotes?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes); }
+  async deleteServiceTicket(id: string) { return serviceTicketService.deleteServiceTicket(id); }
 
   // --- DOCUMENTS ---
   async getDocuments() { return documentService.getDocuments(); }

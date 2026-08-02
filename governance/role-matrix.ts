@@ -152,12 +152,13 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'PROJECT_MGR', unit: 'Proje', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: ['contractWorkflow'],
+    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['contractWorkflow', 'serviceTickets'],
     decisionRights: [
       { decision: 'Milestone ilerleme/onay yönetimi', via: 'endpoint:projects/:id/milestones' },
       { decision: 'Proje devir paketi (11 evrak) kontrolü', via: 'endpoint:projects/:id/handover-docs' },
       { decision: 'Proje maliyet kalemleri yönetimi', via: 'endpoint:projects/:id/costs' },
+      { decision: 'Garanti/servis talebi yönetimi (B-22)', via: 'endpoint:service-tickets' },
     ],
     tasks: [], approvalIn: [],
     agentSubstitute: { pluginKey: 'AGENT_PROJECT', modes: ['ADVISORY', 'AUTONOMOUS'] },
@@ -166,10 +167,14 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'OPERATIONS_MGR', unit: 'Operasyon', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'PROCUREMENT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: [], decisionRights: [], tasks: [], approvalIn: [],
-    reviewed: 'ACCEPTED',
-    notes: 'Operasyon yöneticisi — tanımlı rol ama sisteme özgü somut karar mekanizması (onay/endpoint kapısı) YOK. DB personeli/agent yok. İleride operasyon akışı tanımlanırsa doldurulacak (ACCEPTED).',
+    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'PROCUREMENT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['serviceTickets'],
+    decisionRights: [
+      { decision: 'Garanti/servis talebi yönetimi (B-22)', via: 'endpoint:service-tickets' },
+    ],
+    tasks: [], approvalIn: [],
+    reviewed: 'DONE',
+    notes: 'Operasyon yöneticisi — garanti/servis taleplerinin (ServiceTicket) birincil sahibi.',
   },
   {
     role: 'PROCUREMENT_MGR', unit: 'Satın Alma', kind: 'MANAGER', staffing: 'HUMAN',

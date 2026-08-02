@@ -373,8 +373,8 @@ src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiServi
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/SetupWizard.tsx ← services/apiService, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
+src/modules/SetupWizard.tsx ← services/apiService, types
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
@@ -391,8 +391,8 @@ backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService
 ## changes (last 10 commits — 1 second ago)
 ```
 src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
-src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
+src/services/apiClient.ts                     ~ApiClient
 backend/src/middleware.ts                     +bearerToken
 backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
@@ -620,6 +620,12 @@ INDEX User_email_key ON User
 ### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
 ```
 TABLE new_PurchaseRequest
+```
+
+### backend/prisma/migrations/20260802202515_contact_model/migration.sql
+```
+TABLE Contact
+INDEX Contact_tenantId_customerId_idx ON Contact
 ```
 
 ### backend/src/middleware.ts
@@ -1240,16 +1246,6 @@ handler onRefresh
 handler onSave
 ```
 
-### src/modules/SetupWizard.tsx
-```
-props SetupWizardProps
-hook useState
-hook useEffect
-export SetupWizard
-handler onChange
-handler onClick
-```
-
 ### src/modules/TodoModule.tsx
 ```
 hook useAuth
@@ -1261,18 +1257,19 @@ handler onClick
 handler onChange
 ```
 
-### src/services/apiClient.ts
+### src/modules/SetupWizard.tsx
 ```
-class ApiClient  :3-74
-setAuth  :7-10
-async fetchWithAuth  :12-44
-async login  :46-59
-async forgotPassword  :61-73
+props SetupWizardProps
+hook useState
+hook useEffect
+export SetupWizard
+handler onChange
+handler onClick
 ```
 
 ### src/services/apiService.ts
 ```
-class ApiService  :13-71
+class ApiService  :13-68
 setAuth  :14-16
 async login  :18-20
 async forgotPassword  :22-24
@@ -1281,6 +1278,15 @@ async runSetup  :32-32
 async getCustomers  :40-40
 async createCustomer  :41-41
 async updateCustomer  :42-42
+```
+
+### src/services/apiClient.ts
+```
+class ApiClient  :3-74
+setAuth  :7-10
+async fetchWithAuth  :12-44
+async login  :46-59
+async forgotPassword  :61-73
 ```
 
 ### src/types.ts
