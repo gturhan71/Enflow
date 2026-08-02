@@ -244,6 +244,11 @@ export interface CostConfig {
   globalMargin?: number;
 }
 
+// Yönetici-ayarlı marj eşiği (backend salesCosting.ts) — DMO'nun minMarginPct'i ile aynı desen.
+export interface SalesSettings {
+  marginFloorPct: number;
+}
+
 export type SubscriptionPlanType = 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE';
 
 export interface Subscription {

@@ -66,6 +66,26 @@ export const crmService = {
     });
   },
 
+  // Fiyatlama motoru backend'de (salesCosting.ts) — ham girdileri gönderir,
+  // sunucu hesaplayıp otoriter değerlerle kaydeder ve döner.
+  async saveCostAnalysis(opportunityId: string, data: { bomItems: unknown[]; costItems: unknown[]; costConfig: unknown }) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/cost-analysis`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getSalesSettings() {
+    return apiClient.fetchWithAuth('/sales-settings');
+  },
+
+  async updateSalesSettings(data: { marginFloorPct: number }) {
+    return apiClient.fetchWithAuth('/sales-settings', {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  },
+
   async requestProposalApproval(opportunityId: string, data: { note: string; managerId: string }) {
     return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/request-approval`, {
       method: 'POST',

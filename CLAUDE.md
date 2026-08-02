@@ -345,7 +345,6 @@ license-tool/server.mjs ← core
 src/contexts/AuthContext.tsx ← types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
-src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/lib/permissionTree.ts ← constants
 src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../lib/permissionTree, ../services/apiService
 upgrade-tool/cli.mjs ← core
@@ -361,19 +360,19 @@ src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudServic
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/components/HealthCards.tsx ← types
-src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
-backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/analyticsService.ts ← prismaClient
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
 src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
+src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
 src/modules/Login.tsx ← constants, services/apiService, types
-src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/SetupWizard.tsx ← services/apiService, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
@@ -381,30 +380,30 @@ backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/guaranteeReminders.ts ← prismaClient
-backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/slaEscalation.ts ← prismaClient
+backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
 src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
 src/modules/ManagementReportingModule.tsx     +UnitAbsorptionCard  ~DmoAnalyticsCard  ~AnalyticsTab
-src/modules/ProjectManagementModule.tsx       ~isHandoverComplete  ~OverheadPanel
-src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
+src/services/apiClient.ts                     ~ApiClient
 backend/src/middleware.ts                     +bearerToken
 backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
 backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
+backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
 backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
-backend/src/services/overheadService.ts       +unitPeriodCostMap  +computeUnitBudgetAbsorption  ~computeProjectOverhead  ~applyProjectOverhead
-backend/src/services/financeEngine.ts         +computeUnitParticipationLoad  ~computeCompanyOverhead  ~projectMargins
 backend/src/services/restoreService.ts        ~analyzeRestore
 backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
+backend/src/services/overheadService.ts       +computeUnitBudgetAbsorption  ~applyProjectOverhead
 backend/src/services/virtualAgentService.ts   +scoreQuotes
 backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
@@ -492,33 +491,6 @@ TABLE new_DmoOrderItem
 INDEX DmoOrderItem_orderId_idx ON DmoOrderItem
 ```
 
-### backend/src/services/dmoCosting.ts
-```
-export interface RisturnTier  :10-10
-thresholdMin: number  :10-10
-export interface DmoCommission  :11-11
-type: 'PERCENT' | 'FIXED'  :11-11
-export interface DmoCostParams  :12-17
-risturnTiers: RisturnTier[]  :13-13
-minMarginPct: number  :14-14
-defaultCommission: DmoCommission  :15-15
-costFxRates: Record<string, number>  :16-16
-export interface CostingResult  :89-96
-revenueTotal: number  :90-90
-dmoRateSnapshot: number | null  :91-91
-risturnRateApplied: number  :92-92
-commissionType: string  :93-93
-netProfit: number  :94-94
-costedAt: Date  :95-95
-export async function getDmoParams  :26-36
-export async function setDmoParams  :38-52
-export function effectiveRisturnRate  :55-60
-export async function getPeriodTurnover  :63-75
-export async function getActiveDmoRate  :78-78
-export function computeOrderCosting  :107-155
-export async function recomputeOrderCosting  :158-187
-```
-
 ### backend/src/services/analyticsService.ts
 ```
 export interface FunnelResult  :18-22
@@ -575,6 +547,41 @@ INDEX OperatingCostPool_tenantId_status_idx ON OperatingCostPool
 INDEX UnitBudget_tenantId_unitId_idx ON UnitBudget
 ```
 
+### backend/prisma/migrations/20260702172407_overhead_faz2/migration.sql
+```
+TABLE ProjectUnitParticipation
+INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
+INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
+```
+
+### backend/src/services/financeEngine.ts
+```
+export interface MoneyBreakdown  :13-18
+netMinor: number  :14-14
+vatMinor: number  :15-15
+grossMinor: number  :16-16
+currency: Currency  :17-17
+export interface LineInput  :20-26
+qty: number  :21-21
+unitPrice: number  :22-22
+vatRate?: number  :23-23
+currency?: Currency  :24-24
+discountPct?: number  :25-25
+export type Currency  :11-11
+export type OverheadMethod  :88-88
+export function toMinor  :29-31
+export function fromMinor  :33-35
+export function roundMinor  :37-39
+export function applyVat  :42-42
+export function lineBreakdown  :49-58
+export function sumByCurrency  :64-75
+export function convertMinor  :78-80
+export function presentBreakdown  :83-83
+export function computeCompanyOverhead  :95-99
+export function computeUnitParticipationLoad  :106-109
+export function projectMargins  :120-120
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
@@ -591,11 +598,9 @@ TABLE new_User
 INDEX User_email_key ON User
 ```
 
-### backend/prisma/migrations/20260702172407_overhead_faz2/migration.sql
+### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
 ```
-TABLE ProjectUnitParticipation
-INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
-INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
+TABLE new_PurchaseRequest
 ```
 
 ### backend/src/middleware.ts
@@ -655,9 +660,49 @@ subscription: { plan: string  :48-48
 export async function bootstrapTenant  :51-127
 ```
 
+### backend/src/services/dmoCosting.ts
+```
+export interface RisturnTier  :10-10
+thresholdMin: number  :10-10
+export interface DmoCommission  :11-11
+type: 'PERCENT' | 'FIXED'  :11-11
+export interface DmoCostParams  :12-18
+risturnTiers: RisturnTier[]  :13-13
+minMarginPct: number  :14-14
+defaultCommission: DmoCommission  :15-15
+costFxRates: Record<string, number>  :16-16
+costFxRatesUpdatedAt: string | null  :17-17
+export interface CostingResult  :100-107
+revenueTotal: number  :101-101
+dmoRateSnapshot: number | null  :102-102
+risturnRateApplied: number  :103-103
+commissionType: string  :104-104
+netProfit: number  :105-105
+costedAt: Date  :106-106
+export async function getDmoParams  :34-45
+export async function setDmoParams  :47-63
+export function effectiveRisturnRate  :66-71
+export async function getPeriodTurnover  :74-86
+export async function getActiveDmoRate  :89-89
+export function computeOrderCosting  :118-179
+export async function recomputeOrderCosting  :182-211
+```
+
 ### backend/src/services/guaranteeReminders.ts
 ```
 export async function sweepGuaranteeReminders  :19-59
+```
+
+### backend/src/services/restoreService.ts
+```
+export async function analyzeRestore  :59-63
+export async function applyLogicalRestore  :152-152
+export async function stageStateRestore  :207-207
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations  :13-64
 ```
 
 ### backend/src/services/overheadService.ts
@@ -683,46 +728,6 @@ export async function getActivePool  :35-37
 export async function computeProjectOverhead  :40-69
 export async function applyProjectOverhead  :72-85
 export async function computeUnitBudgetAbsorption  :101-144
-```
-
-### backend/src/services/financeEngine.ts
-```
-export interface MoneyBreakdown  :13-18
-netMinor: number  :14-14
-vatMinor: number  :15-15
-grossMinor: number  :16-16
-currency: Currency  :17-17
-export interface LineInput  :20-26
-qty: number  :21-21
-unitPrice: number  :22-22
-vatRate?: number  :23-23
-currency?: Currency  :24-24
-discountPct?: number  :25-25
-export type Currency  :11-11
-export type OverheadMethod  :88-88
-export function toMinor  :29-31
-export function fromMinor  :33-35
-export function roundMinor  :37-39
-export function applyVat  :42-42
-export function lineBreakdown  :49-58
-export function sumByCurrency  :64-75
-export function convertMinor  :78-80
-export function presentBreakdown  :83-83
-export function computeCompanyOverhead  :95-99
-export function computeUnitParticipationLoad  :106-109
-export function projectMargins  :120-120
-```
-
-### backend/src/services/restoreService.ts
-```
-export async function analyzeRestore  :59-63
-export async function applyLogicalRestore  :152-152
-export async function stageStateRestore  :207-207
-```
-
-### backend/src/services/slaEscalation.ts
-```
-export async function sweepSlaEscalations  :13-64
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -896,24 +901,6 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/ProcurementModule.tsx
-```
-props VendorFormProps
-props PRDetailDrawerProps
-props PRFormProps
-props ProcurementModuleProps
-hook useState
-hook useAuth
-hook useCallback
-hook useEffect
-export ProcurementModule
-handler onClick
-handler onChange
-handler onKeyDown
-handler onRefresh
-handler onSave
-```
-
 ### src/lib/permissionTree.ts
 ```
 export interface PermChild  :15-18
@@ -1041,25 +1028,6 @@ export ProjectHealthCard
 export CustomerHealthCard
 ```
 
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onClick
-handler onOpps
-handler onValue
-handler onChange
-handler onSave
-handler onImported
-handler onConfirm
-handler onSubmit
-```
-
 ### src/layout/Sidebar.tsx
 ```
 hook useUnsavedChanges
@@ -1115,6 +1083,30 @@ handler onClick
 handler onChange
 handler onBlur
 handler onClose
+```
+
+### src/modules/ProjectManagementModule.tsx
+```
+component OverheadPanel
+props OpportunityPickerProps
+props ProjectFormProps
+props CostFormProps
+props ProjectDetailProps
+props ProjectManagementModuleProps
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+hook useAuth
+export ProjectManagementModule
+handler onClick
+handler onChange
+handler onApplied
+handler onSave
+handler onOpportunities
+handler onRefresh
+handler onPrintReport
+handler onSelect
 ```
 
 ### src/App.tsx
@@ -1177,6 +1169,25 @@ handler onClick
 handler onBlur
 ```
 
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onClick
+handler onOpps
+handler onValue
+handler onChange
+handler onSave
+handler onImported
+handler onConfirm
+handler onSubmit
+```
+
 ### src/modules/ManagementReportingModule.tsx
 ```
 component MetricCard
@@ -1215,28 +1226,22 @@ handler onSubmit
 handler onChange
 ```
 
-### src/modules/ProjectManagementModule.tsx
+### src/modules/ProcurementModule.tsx
 ```
-component OverheadPanel
-props OpportunityPickerProps
-props ProjectFormProps
-props CostFormProps
-props ProjectDetailProps
-props ProjectManagementModuleProps
+props VendorFormProps
+props PRDetailDrawerProps
+props PRFormProps
+props ProcurementModuleProps
 hook useState
+hook useAuth
 hook useCallback
 hook useEffect
-hook useMemo
-hook useAuth
-export ProjectManagementModule
+export ProcurementModule
 handler onClick
 handler onChange
-handler onApplied
-handler onSave
-handler onOpportunities
+handler onKeyDown
 handler onRefresh
-handler onPrintReport
-handler onSelect
+handler onSave
 ```
 
 ### src/modules/SetupWizard.tsx
@@ -1260,15 +1265,6 @@ handler onClick
 handler onChange
 ```
 
-### src/services/apiClient.ts
-```
-class ApiClient  :3-74
-setAuth  :7-10
-async fetchWithAuth  :12-44
-async login  :46-59
-async forgotPassword  :61-73
-```
-
 ### src/services/apiService.ts
 ```
 class ApiService  :13-70
@@ -1280,6 +1276,15 @@ async runSetup  :32-32
 async getCustomers  :40-40
 async createCustomer  :41-41
 async updateCustomer  :42-42
+```
+
+### src/services/apiClient.ts
+```
+class ApiClient  :3-74
+setAuth  :7-10
+async fetchWithAuth  :12-44
+async login  :46-59
+async forgotPassword  :61-73
 ```
 
 ### src/types.ts

@@ -64,6 +64,34 @@ const CostAnalysisModule = ({
   const [method, setMethod] = useState<ProcurementMethod>('PRIVATE');
   const [methodCosts, setMethodCosts] = useState<MethodCostLine[]>([]);
 
+  // Yönetici-ayarlı marj eşiği (backend salesCosting.ts) — kaydedilen/onaylanan
+  // marj bu eşiğin altındaysa onaylayan görecek şekilde işaretlenir.
+  const [marginFloorPct, setMarginFloorPct] = useState<number | null>(null);
+  const [belowFloor, setBelowFloor] = useState(false);
+  const [floorEditValue, setFloorEditValue] = useState('');
+  const [savingFloor, setSavingFloor] = useState(false);
+  const isGM = currentUser?.role === 'GENERAL_MANAGER';
+
+  React.useEffect(() => {
+    apiService.getSalesSettings().then((s) => {
+      const val = (s as { marginFloorPct: number }).marginFloorPct;
+      setMarginFloorPct(val);
+      setFloorEditValue(String(val));
+    }).catch(() => {});
+  }, []);
+
+  const handleSaveFloor = async () => {
+    const val = parseFloat(floorEditValue);
+    if (!Number.isFinite(val)) return;
+    setSavingFloor(true);
+    try {
+      const s = await apiService.updateSalesSettings({ marginFloorPct: val }) as { marginFloorPct: number };
+      setMarginFloorPct(s.marginFloorPct);
+    } finally {
+      setSavingFloor(false);
+    }
+  };
+
   const selectedOpp = useMemo(() => opportunities.find(o => o.id === selectedOppId), [opportunities, selectedOppId]);
 
   React.useEffect(() => {
@@ -152,29 +180,26 @@ const CostAnalysisModule = ({
         targetMargin, procurementMethod: method,
         methodCostLines: methodCosts.map(l => ({ label: l.label, kind: l.kind, value: l.value, category: l.category })),
       };
-      // BoM kalemine satış fiyatı = forward maliyet / (1−m)
-      const bomWithPrices: BoMItem[] = localBomItems.map(item => {
-        const costInBase = toBase(item.purchaseCost, item.currency);
-        const unitSale = mFrac < 1 ? costInBase / (1 - mFrac) : costInBase;
-        return { ...item, unitSalePrice: Math.round(unitSale * 100) / 100, totalSalePrice: Math.round(unitSale * item.quantity * 100) / 100 };
-      });
-      // Operasyonel + usul masrafları → CostItem (usul masrafları auto:true, hesaplı tutar, base döviz)
-      const methodAsCostItems: Partial<CostItem>[] = methodCosts.map(l => ({
-        description: l.label + (l.kind === 'PERCENT' ? ` (%${l.value})` : ''),
-        category: l.category, amount: Math.round(methodLineAmount(l) * 100) / 100,
-        currency: baseCurrency, auto: true,
+      // Ham girdiler backend'e gider — fiyatlama (forward kur, marj, usul masrafı)
+      // artık sunucuda hesaplanır (salesCosting.ts); burada YENİDEN hesaplamıyoruz,
+      // yalnız canlı önizleme için üstteki useMemo'lar kullanılıyor.
+      const rawBomItems = localBomItems.map(item => ({
+        lineKey: item.lineKey, partNumber: item.partNumber, description: item.description,
+        quantity: item.quantity, purchaseCost: item.purchaseCost, currency: item.currency,
+        vendor: item.vendor, source: item.source,
       }));
-      const allCosts = [...costItems, ...methodAsCostItems];
+      const rawCostItems = costItems.map(i => ({ description: i.description, category: i.category, amount: i.amount, currency: i.currency }));
 
-      await Promise.allSettled([
-        apiService.saveCostItems(selectedOppId, allCosts as CostItem[]),
-        apiService.saveBoMItems(selectedOppId, bomWithPrices),
-        apiService.updateOpportunity(selectedOppId, { costConfig }),
-      ]);
-      // Maliyet analizi → Satış Müdürü onayına gönder + satış temsilcisine bilgilendirme
-      await apiService.submitCostApproval(selectedOppId);
+      const result = await apiService.saveCostAnalysis(selectedOppId, {
+        bomItems: rawBomItems, costItems: rawCostItems, costConfig,
+      }) as { bomItems: BoMItem[]; costItems: CostItem[]; marginPct: number; belowFloor: boolean; marginFloorPct: number };
+
+      setLocalBomItems(result.bomItems);
+      setCostItems(result.costItems.filter(c => !c.auto));
+      setBelowFloor(result.belowFloor);
+      setMarginFloorPct(result.marginFloorPct);
       setOpportunities(prev => prev.map(o => o.id === selectedOppId
-        ? { ...o, technicalStatus: 'PENDING_APPROVAL', costItems: allCosts as CostItem[], bomItems: bomWithPrices, costConfig } : o));
+        ? { ...o, technicalStatus: 'PENDING_APPROVAL', costItems: result.costItems, bomItems: result.bomItems, costConfig } : o));
       setSubmitted(true);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
@@ -466,6 +491,24 @@ const CostAnalysisModule = ({
                   Teklif = Toplam Maliyet ÷ (1 − marj): <span className="font-black text-slate-600">{fmt(grandCost)} ÷ {(1 - mFrac).toFixed(2)} = {fmt(offer)}</span>.
                   Marj = kâr/satış (tutarlı). Tüm maliyetler (malzeme + operasyonel + usul) tabana dahildir.
                 </p>
+                {marginFloorPct !== null && (
+                  <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between gap-3">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Marj Eşiği (Yönetici)</span>
+                    {isGM ? (
+                      <div className="flex items-center gap-2">
+                        <input type="number" value={floorEditValue} min={0} max={99} onChange={e => setFloorEditValue(e.target.value)}
+                          className="w-16 bg-white border border-slate-200 rounded-lg py-1 px-2 text-right text-xs font-black text-slate-700 outline-none focus:border-emerald-500" />
+                        <span className="text-xs font-black text-slate-400">%</span>
+                        <button onClick={handleSaveFloor} disabled={savingFloor || Number(floorEditValue) === marginFloorPct}
+                          className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-widest disabled:opacity-40">
+                          {savingFloor ? '...' : 'Kaydet'}
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-black text-slate-700">%{marginFloorPct}</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="glass-panel p-8 rounded-[40px] sticky top-8">
@@ -499,6 +542,14 @@ const CostAnalysisModule = ({
                     <span className={cn('text-5xl font-black italic tracking-tighter leading-none', marginPct >= 15 ? 'text-emerald-600' : marginPct >= 10 ? 'text-amber-600' : 'text-red-600')}>%{marginPct.toFixed(1)}</span>
                     <p className={cn('text-xs font-bold mt-1', profit >= 0 ? 'text-emerald-600' : 'text-red-600')}>{profit >= 0 ? `+ ${fmt(profit)} Net Kâr` : `- ${fmt(Math.abs(profit))} Zarar`}</p>
                   </div>
+                  {belowFloor && (
+                    <div className="p-4 rounded-2xl bg-red-500/10 border-2 border-red-500/30 flex items-start gap-3">
+                      <AlertCircle size={16} className="text-red-600 mt-0.5 shrink-0" />
+                      <p className="text-[11px] text-red-700 leading-relaxed font-bold">
+                        Son kaydedilen marj, yönetici eşiğinin (%{marginFloorPct}) altında — onaylayan Satış Müdürü bunu görecek.
+                      </p>
+                    </div>
+                  )}
                 </div>
                 <div className="mt-6 space-y-4">
                   {(() => {

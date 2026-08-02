@@ -4,6 +4,7 @@ import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middl
 import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '../services/approvalChainService';
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
+import { computeSalesCosting, getSalesMarginFloor, SalesBoMItemInput, SalesManualCostItemInput, SalesCostConfig } from '../services/salesCosting';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -314,6 +315,80 @@ router.post('/:id/costs', tenantMiddleware, asyncHandler(async (req: Request, re
     return created;
   });
   res.json(result);
+}));
+
+// ── Maliyet analizi — fiyatlama motoru artık backend'de (bkz. salesCosting.ts) ──
+// Önceden CostAnalysisModule.tsx unitSalePrice/marj/teklifi tarayıcıda hesaplayıp
+// 3 ayrı çağrıyla (bom/costs/costConfig) olduğu gibi kaydediyordu — backend hiç
+// doğrulamıyordu. Artık ham girdiler (BoM+manuel gider+costConfig parametreleri)
+// gönderilir, sunucu hesaplar ve KENDİ hesapladığı değerlerle kaydeder; yanıt
+// otoriter sayıları döner (agent/API tüketicisi de aynı sayıyı görür).
+router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.params.id as string;
+  const tenantId = req.tenantId;
+
+  const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+  if (!opp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
+
+  const bomItems = (req.body.bomItems || []) as SalesBoMItemInput[];
+  const manualCostItems = (req.body.costItems || []) as SalesManualCostItemInput[];
+  const costConfig = (req.body.costConfig || {}) as SalesCostConfig;
+
+  const marginFloorPct = await getSalesMarginFloor(tenantId);
+  const result = computeSalesCosting({ bomItems, manualCostItems, costConfig, marginFloorPct });
+
+  const bomResult = await prisma.$transaction(async (tx) => {
+    await tx.boMItem.deleteMany({ where: { opportunityId } });
+    const created = [];
+    for (const item of result.pricedBomItems) {
+      created.push(await tx.boMItem.create({
+        data: {
+          opportunityId,
+          lineKey: item.lineKey ? String(item.lineKey) : undefined,
+          partNumber: String(item.partNumber || 'N/A'),
+          description: String(item.description || ''),
+          quantity: item.quantity,
+          purchaseCost: item.purchaseCost,
+          marginPercentage: costConfig.targetMargin ?? 20,
+          unitSalePrice: item.unitSalePrice,
+          totalSalePrice: item.totalSalePrice,
+          ...(item.currency ? { currency: String(item.currency) } : {}),
+          ...(item.source ? { source: String(item.source) } : {}),
+          vendor: String(item.vendor || ''),
+        },
+      }));
+    }
+    return created;
+  });
+
+  await prisma.costItem.deleteMany({ where: { opportunityId, tenantId } });
+  const allCostItems = [
+    ...manualCostItems.map((i) => ({ description: i.description || '', category: i.category || 'OTHER', amount: Number(i.amount) || 0, currency: i.currency || costConfig.baseCurrency || 'TRY', auto: false })),
+    ...result.methodCostItems,
+  ];
+  for (const item of allCostItems) {
+    await prisma.costItem.create({ data: { opportunityId, tenantId, description: item.description, category: item.category, amount: item.amount, currency: item.currency, auto: item.auto } });
+  }
+
+  await prisma.opportunity.update({ where: { id: opportunityId }, data: { costConfig: JSON.stringify(costConfig), technicalStatus: 'PENDING_APPROVAL' } });
+
+  // Satış Müdürüne onay görevi + bildirim (submit-cost-approval ile aynı — tek çağrıda birleşti)
+  const salesMgr = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_MGR' } });
+  const salesUnit = salesMgr?.unitId || (await prisma.unit.findFirst({ where: { tenantId, name: { contains: 'Satış' } } }))?.id;
+  if (salesUnit) {
+    await prisma.todoTask.create({ data: {
+      title: `Maliyet analizi onayı: ${opp.title}`,
+      description: `Maliyet analizi tamamlandı, Satış Müdürü onayı bekleniyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ` (eşik %${result.marginFloorPct} ALTINDA)` : ''}.`,
+      unitId: salesUnit, assignedBy: opp.assignedToId, tenantId,
+      relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, priority: result.belowFloor ? 'URGENT' : 'HIGH', status: 'PENDING',
+    } }).catch(() => {});
+  }
+  await notify(tenantId, salesMgr?.id, 'Maliyet onayı bekliyor', `"${opp.title}" maliyet analizi onayınızı bekliyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ' — eşik altında!' : ''}`, result.belowFloor ? 'WARNING' : 'APPROVAL');
+  await notify(tenantId, opp.assignedToId, 'Maliyet analizi onaya gönderildi', `"${opp.title}" maliyet analiziniz Satış Müdürü onayına gönderildi.`, 'INFO');
+
+  await logActivity({ tenantId, userId: req.userId, action: 'SUBMIT_COST_APPROVAL', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, marginPct: result.marginPct, belowFloor: result.belowFloor } });
+
+  res.json({ ...result, bomItems: bomResult, costItems: allCostItems, technicalStatus: 'PENDING_APPROVAL' });
 }));
 
 router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

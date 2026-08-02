@@ -49,6 +49,9 @@ class ApiService {
   async deleteOpportunity(id: string) { return crmService.deleteOpportunity(id); }
   async saveBoMItems(oppId: string, items: BoMItem[], opts?: { handoff?: boolean }) { return crmService.saveBoMItems(oppId, items, opts); }
   async saveCostItems(oppId: string, items: CostItem[]) { return crmService.saveCostItems(oppId, items); }
+  async saveCostAnalysis(oppId: string, data: { bomItems: unknown[]; costItems: unknown[]; costConfig: unknown }) { return crmService.saveCostAnalysis(oppId, data); }
+  async getSalesSettings() { return crmService.getSalesSettings(); }
+  async updateSalesSettings(data: { marginFloorPct: number }) { return crmService.updateSalesSettings(data); }
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }
   async revertOpportunityApproval(oppId: string) { return crmService.revertOpportunityApproval(oppId); }
