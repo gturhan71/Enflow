@@ -219,7 +219,7 @@ const RestoreTab = ({ restores, busy, setBusy, flash, reload }: {
     <div className="space-y-4">
       {restores.length === 0 && <div className="glass-card p-8 rounded-2xl text-center text-slate-400">Henüz geri yükleme analizi yok. <b>Yedekler</b> sekmesinden bir yedeği "Geri Yükle" ile analiz edin.</div>}
       {restores.map(r => {
-        const diff = r.diffReport ? JSON.parse(r.diffReport) as { totalModelsWithDiff: number; scope: string; models: Record<string, { added: number; removed: number; changed: number }> } : null;
+        const diff = r.diffReport ? JSON.parse(r.diffReport) as { totalModelsWithDiff: number; scope: string; models: Record<string, { added: number; removed: number; changed: number }>; schemaModelsNotInBackup?: string[] } : null;
         return (
           <div key={r.id} className="glass-card p-5 rounded-2xl border border-slate-200/60">
             <div className="flex items-center justify-between flex-wrap gap-2">
@@ -238,6 +238,11 @@ const RestoreTab = ({ restores, busy, setBusy, flash, reload }: {
 
             {diff && (
               <div className="mt-4">
+                {!!diff.schemaModelsNotInBackup?.length && (
+                  <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                    ⚠ Bu yedek şu modelleri hiç içermiyor (yedek alındıktan sonra eklenmiş olabilir) — geri yüklemede DOKUNULMAZ, canlı veri korunur: <b>{diff.schemaModelsNotInBackup.join(', ')}</b>
+                  </div>
+                )}
                 <div className="text-sm text-slate-600 mb-2">Fark: <b>{diff.totalModelsWithDiff}</b> modelde değişiklik (kapsam: {diff.scope})</div>
                 {diff.totalModelsWithDiff === 0 ? (
                   <div className="text-sm text-emerald-600">Mevcut veri yedekle birebir aynı — geri yükleme gereksiz.</div>

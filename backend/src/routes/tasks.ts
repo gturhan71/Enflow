@@ -3,6 +3,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { computeSlaDueDate } from '../utils/businessDays';
 import { logActivity } from '../services/activityLog';
+import { sweepSlaEscalations } from '../services/slaEscalation';
 
 const router: Router = Router();
 
@@ -27,6 +28,7 @@ const targetTab = (actionKey?: string | null, relatedModule?: string | null): st
 // Atanmamış (legacy/null) görevler için birim fallback'i: kendi biriminin
 // atanmamış görevlerini de görür. GM gözetim için tüm görevleri görür.
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await sweepSlaEscalations(req.tenantId); // SLA aşımı eskalasyonu (non-throwing)
   const user = req.userId
     ? await prisma.user.findUnique({ where: { id: req.userId }, select: { role: true, unitId: true } })
     : null;

@@ -96,10 +96,24 @@ export async function analyzeRestore(
     }
   }
 
+  // B-24 — tutarlılık kontrolü: applyLogicalRestore payload.data'da bulunan TÜM
+  // modelleri tek transaction'da (FK deferred) sil+yeniden-yükler, yani ilişkili
+  // tablolar (ör. Invoice+Payment) her zaman birlikte ve atomik geri yüklenir —
+  // "yalnız Invoice'ı geri yükle" gibi seçmeli/kısmi bir mod YOK. Asıl risk bu
+  // değil, şema kayması: yedek alındıktan SONRA eklenmiş bir model varsa backup
+  // payload'ında hiç yer almaz → o modelin canlı verisi geri yüklemeden
+  // etkilenmez ve az önce geri yüklenen (farklı id'li) ilişkili kayıtlara sarkan
+  // referanslar tutarsız kalabilir. Bunu görünür kılıyoruz.
+  const backupModelNames = new Set(Object.keys(payload.data));
+  const schemaModelsNotInBackup = listModels()
+    .filter(m => !backupModelNames.has(m.name))
+    .map(m => m.name);
+
   const diffReport = {
     backupId, scope, analyzedAt: new Date().toISOString(),
     totalModelsWithDiff: Object.keys(diff).length,
     models: diff,
+    schemaModelsNotInBackup, // bu modeller geri yüklemede DOKUNULMAZ (yedek onları hiç içermiyor)
   };
 
   const job = await prisma.restoreJob.create({

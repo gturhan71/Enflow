@@ -98,6 +98,7 @@ const CHAIN_ENTITY_LABEL: Record<string, string> = {
   OPPORTUNITY: 'Fırsat/Teklif Onayı',
   PROPOSAL: 'Teklif Onayı',
   CONTRACT_WORKFLOW_SIGNING: 'Sözleşme İmza Onayı',
+  DMO_ORDER: 'DMO Sipariş Onayı (kârsız)',
 };
 
 

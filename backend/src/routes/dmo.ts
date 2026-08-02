@@ -3,6 +3,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { getDmoParams, setDmoParams, recomputeOrderCosting, effectiveRisturnRate, DmoCostParams } from '../services/dmoCosting';
+import { ensureApprovalChain } from '../services/approvalChainService';
 
 const router: Router = Router();
 const editRoles = requireRole(['GENERAL_MANAGER', 'SALES_MGR']);
@@ -258,13 +259,41 @@ router.post('/orders/:id/status', tenantMiddleware, editRoles, asyncHandler(asyn
     }
   }
 
+  const isConfirmTransition = status === 'CONFIRMED' && prev.status !== 'CONFIRMED';
+
+  // B-03 — kârsız sipariş CONFIRMED'e geçerken artık yalnız bildirimle yetinilmiyor:
+  // GM onayı olmadan geçiş veto edilir (onay zinciri tetiklenir, tekrar denenince geçer).
+  if (isConfirmTransition) {
+    const preview = await recomputeOrderCosting(req.tenantId, id);
+    if (preview && !preview.isProfitable) {
+      const approved = await prisma.approvalChain.findFirst({
+        where: { tenantId: req.tenantId, entityType: 'DMO_ORDER', entityId: id, status: 'COMPLETED' },
+      });
+      if (!approved) {
+        const chain = await ensureApprovalChain(req.tenantId, 'DMO_ORDER', id, ['GENERAL_MANAGER']);
+        const gms = await prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'GENERAL_MANAGER', status: 'ACTIVE' } });
+        for (const gm of gms) {
+          await prisma.notification.create({
+            data: {
+              tenantId: req.tenantId, userId: gm.id, type: 'WARNING',
+              title: 'Kârsız DMO siparişi — onayınız gerekiyor',
+              message: `${prev.orderNo} (${prev.institutionName}) — net ${Math.round(preview.netProfit).toLocaleString('tr-TR')} ₺. CONFIRMED için onayınız gerekiyor.`,
+              relatedModule: 'dmo', relatedItemId: id,
+            },
+          }).catch(() => {});
+        }
+        return res.status(202).json({ pendingApproval: true, chain, message: 'Kârsız sipariş — CONFIRMED için GM onayı bekleniyor (Bekleyen Onaylarım).' });
+      }
+    }
+  }
+
   await prisma.dmoOrder.update({ where: { id }, data: { status } });
   await recomputeOrderCosting(req.tenantId, id); // güncel kur/parametrelerle
   const order = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId }, include: { items: true } });
   if (!order) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
 
   // CONFIRMED'e ilk geçişte: çerçeve anlaşma kotası + kârsızsa uyarı
-  if (status === 'CONFIRMED' && prev.status !== 'CONFIRMED') {
+  if (isConfirmTransition) {
     if (order.frameworkAgreementId) {
       await prisma.dmoFrameworkAgreement.updateMany({
         where: { id: order.frameworkAgreementId, tenantId: req.tenantId },

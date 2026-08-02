@@ -176,10 +176,43 @@ const presalesHandler: AgentHandler = async (tenantId, entityId) => {
 };
 
 // ── Satınalma handler: PR doğrulaması + tekliflerden tedarikçi önerisi ─────────
+// B-11 — salt-fiyat karşılaştırması yerine ağırlıklı skor: fiyat %60, tedarikçi
+// puanı (Vendor.rating) %25, teslim süresi %15. ORANSAL (ratio) normalize edilir
+// (en iyi değere göre oran, 0..1, yüksek=iyi) — min-max KULLANILMAZ: yalnız 2
+// teklif olduğunda min-max her zaman ucuz olanı 1.0/pahalı olanı 0.0'a iter ve
+// fiyat farkı ne kadar küçük olursa olsun kalite/teslim süresini ezer. Oransal
+// yaklaşımda %2 daha pahalı bir teklif yalnızca ~0.02 puan kaybeder, böylece
+// belirgin kalite/teslim üstünlüğü küçük fiyat farkını gerçekten geçebilir.
+// rating/deliveryDays eksikse nötr (0.5) kabul edilir (cezalandırmaz).
+const QUOTE_SCORE_WEIGHTS = { price: 0.6, rating: 0.25, delivery: 0.15 };
+
+function scoreQuotes<T extends { totalAmount: number; totalAmountTRY: number | null; deliveryDays: number | null; vendor?: { rating: number | null } | null }>(
+  quotes: T[],
+): { quote: T; score: number }[] {
+  const prices = quotes.map((q) => q.totalAmountTRY ?? q.totalAmount);
+  const minPrice = Math.min(...prices);
+  const deliveries = quotes.map((q) => q.deliveryDays).filter((d): d is number => d != null && d > 0);
+  const minDelivery = deliveries.length ? Math.min(...deliveries) : 0;
+
+  return quotes.map((q) => {
+    const price = q.totalAmountTRY ?? q.totalAmount;
+    const priceScore = price > 0 ? Math.min(minPrice / price, 1) : 1;
+    const ratingScore = q.vendor?.rating != null ? Math.min(Math.max(q.vendor.rating, 0), 5) / 5 : 0.5;
+    const deliveryScore = q.deliveryDays != null && q.deliveryDays > 0 && minDelivery > 0
+      ? Math.min(minDelivery / q.deliveryDays, 1)
+      : 0.5;
+    const score =
+      priceScore * QUOTE_SCORE_WEIGHTS.price +
+      ratingScore * QUOTE_SCORE_WEIGHTS.rating +
+      deliveryScore * QUOTE_SCORE_WEIGHTS.delivery;
+    return { quote: q, score };
+  });
+}
+
 const procurementHandler: AgentHandler = async (tenantId, entityId) => {
   const pr = await prisma.purchaseRequest.findFirst({
     where: { id: entityId, tenantId },
-    include: { items: true, quotes: true },
+    include: { items: true, quotes: { include: { vendor: true } } },
   });
   if (!pr) return null;
 
@@ -190,19 +223,18 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
   if (noPrice.length > 0) issues.push(`${noPrice.length} kalemde tahmini birim fiyat yok`);
   if (pr.quotes.length === 0) issues.push('Hiç tedarikçi teklifi yok');
 
-  // Tedarikçi önerisi — en düşük toplam (TRY varsa onu, yoksa nominal)
-  let recommendation: { vendorName: string; amount: number; currency: string; deliveryDays: number | null } | null = null;
+  // Tedarikçi önerisi — ağırlıklı skor (fiyat + tedarikçi puanı + teslim süresi)
+  let recommendation: { vendorName: string; amount: number; currency: string; deliveryDays: number | null; score: number } | null = null;
   let best: (typeof pr.quotes)[number] | null = null;
   if (pr.quotes.length > 0) {
-    const sorted = [...pr.quotes].sort(
-      (a, b) => (a.totalAmountTRY ?? a.totalAmount) - (b.totalAmountTRY ?? b.totalAmount),
-    );
-    best = sorted[0];
+    const ranked = scoreQuotes(pr.quotes).sort((a, b) => b.score - a.score);
+    best = ranked[0].quote;
     recommendation = {
       vendorName: best.vendorName,
       amount: best.totalAmountTRY ?? best.totalAmount,
       currency: best.totalAmountTRY ? 'TRY' : best.currency,
       deliveryDays: best.deliveryDays ?? null,
+      score: Math.round(ranked[0].score * 100) / 100,
     };
   }
   const alreadySelected = pr.quotes.some((q) => q.isSelected);
@@ -219,7 +251,7 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
 
   const valid = issues.length === 0;
   const recText = recommendation
-    ? ` Önerilen tedarikçi: ${recommendation.vendorName} (${recommendation.amount.toLocaleString('tr-TR')} ${recommendation.currency}${recommendation.deliveryDays ? `, ${recommendation.deliveryDays} gün teslim` : ''}).`
+    ? ` Önerilen tedarikçi (fiyat+puan+teslim skoru ${recommendation.score}): ${recommendation.vendorName} (${recommendation.amount.toLocaleString('tr-TR')} ${recommendation.currency}${recommendation.deliveryDays ? `, ${recommendation.deliveryDays} gün teslim` : ''}).`
     : '';
   const rationale = valid
     ? `Satınalma talebi doğrulandı: ${pr.items.length} kalem, ${pr.quotes.length} teklif.${recText} ${neededNote}${alreadySelected ? ' Tedarikçi zaten seçili.' : ' Tedarikçi seçimi onayınızı bekliyor.'}`
@@ -235,6 +267,7 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
       issues,
       recommendedVendor: recommendation?.vendorName ?? null,
       recommendedAmount: recommendation?.amount ?? null,
+      recommendedScore: recommendation?.score ?? null,
       alreadySelected,
       neededRisk,
       neededNote,
@@ -247,7 +280,7 @@ const procurementHandler: AgentHandler = async (tenantId, entityId) => {
       valid && recommendation && best && !alreadySelected
         ? {
             kind: 'SELECT_CHEAPEST_QUOTE',
-            summary: `En ucuz teklif seçildi: ${recommendation.vendorName} (${recommendation.amount.toLocaleString('tr-TR')} ${recommendation.currency})`,
+            summary: `En iyi skorlu teklif seçildi (fiyat+puan+teslim, skor ${recommendation.score}): ${recommendation.vendorName} (${recommendation.amount.toLocaleString('tr-TR')} ${recommendation.currency})`,
             reversible: true, // deselect-all → select; idempotent ve geri-alınabilir
             execute: async () => {
               await prisma.purchaseQuote.updateMany({

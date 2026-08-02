@@ -412,6 +412,7 @@ model TodoTask {
   relatedModule String?  // PROJECT, OPPORTUNITY, CONTRACT, PROCUREMENT, GENERAL
   relatedItemId String?
   agentRunId    String?  // bu görevi üreten sanal agent çalıştırması (köken etiketi)
+  escalatedAt   DateTime? // SLA aşımı bir üst role bildirildi mi (B-16, idempotent tekil eskalasyon)
   tenantId      String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -997,6 +998,7 @@ model GuaranteeLetter {
   requestNote   String? // talep notu
   sampleText    String? // idari şartnameden örnek teminat metni
   sampleFileUrl String? // yüklü örnek teminat dosyası
+  remindersSent String? // JSON dizi — gönderilen sona-erme hatırlatmaları ['30d','15d','7d'] (B-07)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   @@index([tenantId, status])

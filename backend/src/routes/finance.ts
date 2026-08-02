@@ -9,6 +9,7 @@ import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
 import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
 import { sumByCurrency, presentBreakdown, LineInput } from '../services/financeEngine';
+import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -137,23 +138,55 @@ router.post('/invoices/:id/payments', tenantMiddleware, asyncHandler(async (req:
   const id = String(req.params.id);
   const record = await prisma.invoice.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Fatura bulunamadı.' });
-  const { amount, currency, paidAt, method, reference, notes } = req.body;
+  const { amount, currency, paidAt, method, reference, notes, allowOverpayment } = req.body;
   if (amount == null) return res.status(400).json({ error: 'Ödeme tutarı zorunlu.' });
+  const amt = Number(amount) || 0;
+
+  // B-05 — fatura tutarını aşan tahsilat sessizce kaybolmasın: üst sınır kontrolü.
+  // Gerçekten fazla ödeme yapıldıysa (çift transfer, kur farkı vb.) kayıt yine de
+  // alınır (para kaybolmaz) ama `allowOverpayment` açıkça onaylanmalı ve Finans'a
+  // "Alacak/İade" takibi için otomatik bildirim üretilir.
+  const existingPayments = await prisma.payment.findMany({ where: { invoiceId: id } });
+  const paidSoFar = existingPayments.reduce((s, p) => s + p.amount, 0);
+  const remaining = record.amount - paidSoFar;
+  const overpay = amt - remaining;
+  if (overpay > 0.01 && !allowOverpayment) {
+    return res.status(400).json({
+      error: `Ödeme tutarı (${amt.toLocaleString('tr-TR')}) kalan bakiyeyi (${Math.max(remaining, 0).toLocaleString('tr-TR')}) aşıyor. Fazla ödeme gerçekten alındıysa allowOverpayment:true ile tekrar gönderin.`,
+      remaining: Math.max(remaining, 0),
+    });
+  }
+
   const payment = await prisma.payment.create({
     data: {
       tenantId: req.tenantId,
       invoiceId: id,
-      amount: Number(amount) || 0,
+      amount: amt,
       currency: currency || record.currency,
       paidAt: paidAt ? new Date(paidAt) : new Date(),
       method: method || null,
       reference: reference || null,
-      notes: notes || null,
+      notes: overpay > 0.01 ? `${notes || ''} [Fazla ödeme: +${overpay.toLocaleString('tr-TR')} ${currency || record.currency} — Alacak/İade takibi gerekir]`.trim() : (notes || null),
     },
   });
+
+  if (overpay > 0.01) {
+    const financeUsers = await prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'FINANCE_MGR', status: 'ACTIVE' } });
+    for (const u of financeUsers) {
+      await prisma.notification.create({
+        data: {
+          tenantId: req.tenantId, userId: u.id, type: 'WARNING',
+          title: 'Fazla ödeme — Alacak/İade takibi gerekiyor',
+          message: `${record.invoiceNo || record.id} faturasına ${overpay.toLocaleString('tr-TR')} ${currency || record.currency} fazla ödeme kaydedildi.`,
+          relatedModule: 'finance', relatedItemId: id,
+        },
+      }).catch(() => {});
+    }
+  }
+
   await recalcInvoice(id);
   const invoice = await prisma.invoice.findUnique({ where: { id }, include: { payments: true } });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'PAYMENT', entityType: 'INVOICE', entityId: id, details: { amount: payment.amount, paidTotal: invoice?.paidAmount, status: invoice?.status } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'PAYMENT', entityType: 'INVOICE', entityId: id, details: { amount: payment.amount, paidTotal: invoice?.paidAmount, status: invoice?.status, overpay: overpay > 0.01 ? overpay : undefined } });
   res.json({ payment, invoice });
 }));
 
@@ -169,6 +202,7 @@ router.delete('/payments/:id', tenantMiddleware, asyncHandler(async (req: Reques
 // ── 3) Teminat Mektupları ──────────────────────────────────────────────────────
 
 router.get('/guarantees', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await sweepGuaranteeReminders(req.tenantId); // sona erme hatırlatmaları (non-throwing)
   const { status, type, projectId, tenderId } = req.query as
     { status?: string; type?: string; projectId?: string; tenderId?: string };
   const where: Record<string, unknown> = { tenantId: req.tenantId };

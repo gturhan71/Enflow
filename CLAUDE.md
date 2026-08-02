@@ -334,14 +334,12 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 src/modules/BackupModule.tsx ← services/apiService, types
 backend/src/services/governance.ts ← prismaClient
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/moneyRounding.ts ← financeEngine
 backend/src/services/licenseVerify.ts ← config/licensePublicKey
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog, licenseVerify
@@ -352,7 +350,6 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, types
 src/lib/permissionTree.ts ← constants
 src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../lib/permissionTree, ../services/apiService
 upgrade-tool/cli.mjs ← core
@@ -374,6 +371,8 @@ backend/src/services/analyticsService.ts ← prismaClient
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
@@ -382,12 +381,14 @@ src/modules/SetupWizard.tsx ← services/apiService, types
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
 backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
 ```
 
 ## changes (last 10 commits — 1 second ago)
 ```
+src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
 src/modules/FinanceModule.tsx                 +OverheadPoolTab
 src/modules/ManagementReportingModule.tsx     +UnitAbsorptionCard  ~DmoAnalyticsCard  ~AnalyticsTab
 src/modules/ProjectManagementModule.tsx       +OverheadPanel  ~isHandoverComplete
@@ -395,20 +396,15 @@ src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
 backend/src/middleware.ts                     +bearerToken
 backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
+backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
 backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/financeEngine.ts         +computeCompanyOverhead  +computeUnitParticipationLoad  +projectMargins  ~convertMinor
-backend/src/services/overheadService.ts       +unitPeriodCostMap  +directCostOf  +getActivePool  +computeProjectOverhead
+backend/src/services/financeEngine.ts         +computeUnitParticipationLoad  ~computeCompanyOverhead  ~projectMargins
+backend/src/services/overheadService.ts       +unitPeriodCostMap  +computeUnitBudgetAbsorption  ~computeProjectOverhead  ~applyProjectOverhead
 backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
 
 ## backend
-
-### backend/src/services/backupVerifyService.ts
-```
-export async function verifyBackup  :46-46
-export async function drainVerifyQueue  :125-136
-```
 
 ### backend/src/services/backupService.ts
 ```
@@ -460,14 +456,6 @@ export async function resolveApproverRoles  :37-46
 export async function isSoDEnabled  :48-54
 export async function resolveEntityCreator  :57-73
 export async function sodViolation  :79-92
-```
-
-### backend/src/services/approvalChainService.ts
-```
-export async function ensureApprovalChain  :22-51
-export async function completeApprovalChain  :59-81
-export async function autoSkipOrphanStages  :91-201
-export async function resetApprovalChain  :204-217
 ```
 
 ### backend/src/services/moneyRounding.ts
@@ -608,16 +596,6 @@ export function getPlugin  :154-156
 export function getAgentPluginForRole  :160-164
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
-### backend/pnpm-lock.yaml
-```
-keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
 ### backend/prisma/migrations/20260702170248_overhead_faz1/migration.sql
 ```
 TABLE OperatingCostPool
@@ -628,11 +606,27 @@ INDEX OperatingCostPool_tenantId_status_idx ON OperatingCostPool
 INDEX UnitBudget_tenantId_unitId_idx ON UnitBudget
 ```
 
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/pnpm-lock.yaml
+```
+keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
 ### backend/prisma/migrations/20260702172407_overhead_faz2/migration.sql
 ```
 TABLE ProjectUnitParticipation
 INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
 INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
+```
+
+### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
+```
+TABLE new_User
+INDEX User_email_key ON User
 ```
 
 ### backend/src/middleware.ts
@@ -653,6 +647,16 @@ export async function getTenantAIConfig  :21-41
 export async function isAIConfigured  :43-45
 export function assertSafeAiUrl  :56-71
 export async function chatJSON  :77-126
+```
+
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain  :22-51
+export async function completeApprovalChain  :59-81
+export async function autoSkipOrphanStages  :91-201
+export async function getDelegatedRoles  :209-221
+export async function resolveEffectiveApprover  :224-230
+export async function resetApprovalChain  :233-246
 ```
 
 ### backend/src/services/auth.ts
@@ -933,22 +937,6 @@ handler onRefresh
 handler onSave
 ```
 
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-component LegalView
-component LegalCaseForm
-props Props
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onChange
-handler onClick
-handler onBlur
-```
-
 ### src/lib/permissionTree.ts
 ```
 export interface PermChild  :15-18
@@ -1154,6 +1142,31 @@ handler onNavigate
 handler onLogout
 handler onComplete
 handler onLogin
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+export UserManagement
+handler onSubmit
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+component LegalView
+component LegalCaseForm
+props Props
+hook useAuth
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onChange
+handler onClick
+handler onBlur
 ```
 
 ### src/modules/FinanceModule.tsx
