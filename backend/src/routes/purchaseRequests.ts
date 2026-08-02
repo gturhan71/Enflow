@@ -241,6 +241,33 @@ router.post('/:id/reject', asyncHandler(async (req: Request, res: Response) => {
   res.json(updated);
 }));
 
+// B-04 — reddedilen talebi revize edip yeniden onaya sunma: yeni kayıt açmaya
+// gerek kalmaz, BoM/Proje bağlantısı (sourceBomId/projectId) ve tüm geçmiş
+// (ActivityLog aynı entityId altında) korunur. Onay alanları sıfırlanır —
+// süreç baştan (PENDING_UNIT) işler.
+router.post('/:id/resubmit', asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const pr = await prisma.purchaseRequest.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!pr) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
+  if (pr.status !== 'REJECTED') return res.status(409).json({ error: 'Yalnız reddedilmiş talepler yeniden gönderilebilir.' });
+
+  const { notes } = req.body as { notes?: string };
+  const updated = await prisma.purchaseRequest.update({
+    where: { id },
+    data: {
+      status: 'DRAFT',
+      rejectedBy: null,
+      rejectionNote: null,
+      approvedByUnit: null, approvedByProcurement: null, approvedByGM: null,
+      resubmitCount: { increment: 1 },
+      ...(notes !== undefined && { notes }),
+    },
+    include: { items: true, quotes: true, deliveries: true },
+  });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'RESUBMIT', entityType: 'PURCHASE_REQUEST', entityId: id, details: { previousRejectionNote: pr.rejectionNote, resubmitCount: updated.resubmitCount } });
+  res.json(updated);
+}));
+
 // ── ITEMS ─────────────────────────────────────────────────────────────────
 router.post('/:id/items', asyncHandler(async (req: Request, res: Response) => {
   const { name, description, quantity, unit, estimatedUnitPrice, currency } = req.body;
@@ -327,12 +354,17 @@ router.post('/:id/quotes/:qid/select', asyncHandler(async (req: Request, res: Re
 }));
 
 // ── DELIVERY ──────────────────────────────────────────────────────────────
+// B-13 — PR üst statüsü tek bir teslimat kaydının kendi `status`'una göre değil,
+// TÜM teslimatların kümülatif teslim-alınan miktarına göre ilerler (çoklu kısmi
+// teslimat toplamı sipariş miktarına ulaşınca INVOICED'a geçer; ulaşmazsa
+// IN_DELIVERY'de kalır — son kayıt kendi başına 'RECEIVED' dese bile).
 router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) => {
+  const prId = String(req.params.id);
   const { deliveredAt, receivedBy, quantityOrdered, quantityReceived, quantityDamaged, status, notes } = req.body;
 
   const delivery = await prisma.deliveryRecord.create({
     data: {
-      purchaseRequestId: String(req.params.id),
+      purchaseRequestId: prId,
       deliveredAt: deliveredAt ? new Date(deliveredAt) : new Date(),
       receivedBy: receivedBy || null,
       quantityOrdered: quantityOrdered ? Number(quantityOrdered) : null,
@@ -343,19 +375,35 @@ router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) =>
     },
   });
 
-  // Tam teslimatsa durumu INVOICED'a ilerlet
-  if (status === 'RECEIVED') {
+  const pr = await prisma.purchaseRequest.findFirst({ where: { id: prId, tenantId: req.tenantId }, include: { items: true, deliveries: true } });
+  if (pr) {
+    const totalOrdered = pr.items.reduce((s, i) => s + (i.quantity || 0), 0);
+    const cumulativeReceived = pr.deliveries.reduce((s, d) => s + (d.quantityReceived || 0), 0);
+    const fullyReceived = totalOrdered > 0 && cumulativeReceived >= totalOrdered;
     await prisma.purchaseRequest.update({
-      where: { id: String(req.params.id) },
-      data: { status: 'INVOICED' },
+      where: { id: prId },
+      // totalOrdered bilinmiyorsa (eski/eksik veri) geriye dönük uyumluluk için kaydın kendi statüsüne güven.
+      data: { status: totalOrdered > 0 ? (fullyReceived ? 'INVOICED' : 'IN_DELIVERY') : (status === 'RECEIVED' ? 'INVOICED' : 'IN_DELIVERY') },
     });
-  } else {
-    await prisma.purchaseRequest.update({
-      where: { id: String(req.params.id) },
-      data: { status: 'IN_DELIVERY' },
-    });
+
+    // B-13 — hasar/iade alt-akışı: hasarlı teslimat, kümülatif ilerlemeyi bloklamaz
+    // (hasarsız kısım yine sayılır) ama Satınalma birimine ayrı bir takip görevi açar.
+    if ((status === 'DAMAGED' || (quantityDamaged && Number(quantityDamaged) > 0))) {
+      const procurementUnit = await prisma.unit.findFirst({ where: { tenantId: req.tenantId, name: { contains: 'Satın Alma' } } });
+      await prisma.todoTask.create({
+        data: {
+          title: `Hasarlı teslimat — iade/tekrar sipariş: ${pr.title}`,
+          description: `Teslimat kaydında hasar bildirildi (${quantityDamaged ? Number(quantityDamaged).toLocaleString('tr-TR') : '?'} adet). Tedarikçiyle iade/tekrar sipariş süreci başlatılmalı.`,
+          unitId: procurementUnit?.id || pr.unitId || 'system',
+          assignedBy: req.userId || 'system',
+          tenantId: req.tenantId,
+          relatedModule: 'PROCUREMENT', relatedItemId: prId, priority: 'HIGH', status: 'PENDING',
+        },
+      }).catch(() => {});
+    }
   }
 
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELIVERY_RECORD', entityType: 'PURCHASE_REQUEST', entityId: prId, details: { status: delivery.status, quantityReceived: delivery.quantityReceived, quantityDamaged: delivery.quantityDamaged } });
   res.status(201).json(delivery);
 }));
 

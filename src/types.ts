@@ -470,6 +470,7 @@ export interface Proposal {
   customerId?: string;
   createdById?: string;
   status: 'DRAFT' | 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED' | 'ACCEPTED' | 'SENT';
+  rejectionReason?: string | null;
   version?: number;
   openForNegotiation?: boolean;
   content?: string | Record<string, unknown>;

@@ -206,6 +206,14 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
     } finally { setLoading(false); setShowReject(false); }
   };
 
+  const handleResubmit = async () => {
+    setLoading(true);
+    try {
+      await apiService.resubmitPurchaseRequest(pr.id);
+      onRefresh();
+    } finally { setLoading(false); }
+  };
+
   const handleAddQuote = async () => {
     setLoading(true);
     try {
@@ -602,9 +610,20 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
       </div>
 
       {/* Footer: Approval */}
-      {(canApprove() || pr.status === 'DRAFT') && (
+      {(canApprove() || pr.status === 'DRAFT' || pr.status === 'REJECTED') && (
         <div className="p-4 border-t border-white/10 shrink-0 space-y-3">
-          {showReject ? (
+          {pr.status === 'REJECTED' ? (
+            <div className="space-y-2">
+              {pr.rejectionNote && (
+                <p className="text-xs text-red-400">Red gerekçesi: {pr.rejectionNote}</p>
+              )}
+              <button onClick={handleResubmit} disabled={loading}
+                className="w-full py-2 btn-primary text-sm rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
+                {loading ? <RefreshCw size={14} className="animate-spin" /> : null}
+                Revize Et &amp; Yeniden Gönder
+              </button>
+            </div>
+          ) : showReject ? (
             <div className="space-y-2">
               <textarea value={rejNote} onChange={e => setRejNote(e.target.value)} rows={2}
                 placeholder="Red gerekçesi…"
@@ -619,7 +638,7 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
             </div>
           ) : (
             <div className="flex gap-2">
-              {pr.status !== 'REJECTED' && pr.status !== 'CLOSED' && (
+              {pr.status !== 'CLOSED' && (
                 <button onClick={() => setShowReject(true)}
                   className="flex-1 py-2 border border-red-500/50 text-red-400 text-sm font-semibold rounded-xl hover:bg-red-900/20 transition-colors">
                   Reddet

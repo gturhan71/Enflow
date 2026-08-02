@@ -35,6 +35,9 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
   if (!title || !customerId) {
     return res.status(400).json({ error: 'Başlık ve Müşteri seçimi zorunludur.' });
   }
+  if (status !== undefined && !OPPORTUNITY_STATUSES.has(status)) {
+    return res.status(400).json({ error: `Geçersiz status: '${status}'. İzinli değerler: ${[...OPPORTUNITY_STATUSES].join(', ')}` });
+  }
 
   const firstUser = await prisma.user.findFirst({ where: { tenantId } });
   if (!firstUser) return res.status(400).json({ error: 'Sistemde kayıtlı kullanıcı bulunamadı.' });
@@ -91,10 +94,18 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
   res.json(opp);
 }));
 
+// B-17 — status serbest string (enum değil, DB kısıtı yok); frontend'in kendi
+// tipiyle (types.ts Opportunity.status) birebir aynı izinli-değer listesi.
+const OPPORTUNITY_STATUSES = new Set(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST', 'WITHDRAWN']);
+
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { title, value, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
+
+  if (status !== undefined && !OPPORTUNITY_STATUSES.has(status)) {
+    return res.status(400).json({ error: `Geçersiz status: '${status}'. İzinli değerler: ${[...OPPORTUNITY_STATUSES].join(', ')}` });
+  }
 
   const oldOpp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
   if (!oldOpp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });

@@ -334,11 +334,8 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
-backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
-src/modules/BackupModule.tsx ← services/apiService, types
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/moneyRounding.ts ← financeEngine
 backend/src/services/licenseVerify.ts ← config/licensePublicKey
@@ -346,7 +343,6 @@ backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog, lice
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 license-tool/server.mjs ← core
 src/contexts/AuthContext.tsx ← types
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
@@ -370,28 +366,33 @@ backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/analyticsService.ts ← prismaClient
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
+src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
 src/modules/SetupWizard.tsx ← services/apiService, types
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
 backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+backend/src/services/guaranteeReminders.ts ← prismaClient
 backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
+backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
+backend/src/services/slaEscalation.ts ← prismaClient
+backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
-## changes (last 10 commits — 1 second ago)
+## changes (last 10 commits — 0 seconds ago)
 ```
 src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
-src/modules/FinanceModule.tsx                 +OverheadPoolTab
 src/modules/ManagementReportingModule.tsx     +UnitAbsorptionCard  ~DmoAnalyticsCard  ~AnalyticsTab
-src/modules/ProjectManagementModule.tsx       +OverheadPanel  ~isHandoverComplete
+src/modules/ProjectManagementModule.tsx       ~isHandoverComplete  ~OverheadPanel
 src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
 backend/src/middleware.ts                     +bearerToken
@@ -399,52 +400,20 @@ backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJ
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
 backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/financeEngine.ts         +computeUnitParticipationLoad  ~computeCompanyOverhead  ~projectMargins
+backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
 backend/src/services/overheadService.ts       +unitPeriodCostMap  +computeUnitBudgetAbsorption  ~computeProjectOverhead  ~applyProjectOverhead
+backend/src/services/financeEngine.ts         +computeUnitParticipationLoad  ~computeCompanyOverhead  ~projectMargins
+backend/src/services/restoreService.ts        ~analyzeRestore
+backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
+backend/src/services/virtualAgentService.ts   +scoreQuotes
 backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
 
 ## backend
 
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :27-31
-name: string  :28-28
-delegateKey: string  :29-29
-hasTenantId: boolean  :30-30
-export interface BackupModuleSettings  :98-107
-enabled?: boolean  :99-99
-intervalHours?: number  :100-100
-scope?: BackupScope  :101-101
-kind?: BackupKind  :102-102
-targetType?: TargetType  :103-103
-location?: string  :104-104
-nextcloud?: { url?: string  :105-105
-s3?: { endpoint?: string  :106-106
-export interface RunBackupOpts  :109-119
-tenantId: string  :110-110
-scope: BackupScope  :111-111
-kind: BackupKind  :112-112
-targetType: TargetType  :113-113
-location?: string | null  :114-114
-trigger?: 'MANUAL' | 'SCHEDULED'  :115-115
-startedById?: string  :116-116
-startedByName?: string  :117-117
-export type BackupScope  :17-17
-export type BackupKind  :18-18
-export type TargetType  :19-19
-```
-
 ### backend/src/services/backupScheduler.ts
 ```
 export function startBackupScheduler  :53-57
-```
-
-### backend/src/services/restoreService.ts
-```
-export async function analyzeRestore  :59-63
-export async function applyLogicalRestore  :138-138
-export async function stageStateRestore  :193-193
 ```
 
 ### backend/src/services/governance.ts
@@ -616,17 +585,17 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
+### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
+```
+TABLE new_User
+INDEX User_email_key ON User
+```
+
 ### backend/prisma/migrations/20260702172407_overhead_faz2/migration.sql
 ```
 TABLE ProjectUnitParticipation
 INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
 INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
-```
-
-### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
-```
-TABLE new_User
-INDEX User_email_key ON User
 ```
 
 ### backend/src/middleware.ts
@@ -686,6 +655,36 @@ subscription: { plan: string  :48-48
 export async function bootstrapTenant  :51-127
 ```
 
+### backend/src/services/guaranteeReminders.ts
+```
+export async function sweepGuaranteeReminders  :19-59
+```
+
+### backend/src/services/overheadService.ts
+```
+export interface UnitLoadLine  :8-8
+unitId: string  :8-8
+export interface OverheadResult  :9-16
+directCost: number  :10-10
+method: OverheadMethod | null  :11-11
+companyAmount: number  :12-12
+unitBreakdown: UnitLoadLine[]  :13-13
+contributionMargin: number  :14-14
+applyOverhead: boolean  :15-15
+export interface UnitAbsorptionLine  :90-94
+unitId: string  :91-91
+allocated: number  :92-92
+coeffSum: number  :93-93
+export interface UnitAbsorptionReport  :95-99
+units: UnitAbsorptionLine[]  :96-96
+summary: { totalBudget: number  :97-97
+note: string  :98-98
+export async function getActivePool  :35-37
+export async function computeProjectOverhead  :40-69
+export async function applyProjectOverhead  :72-85
+export async function computeUnitBudgetAbsorption  :101-144
+```
+
 ### backend/src/services/financeEngine.ts
 ```
 export interface MoneyBreakdown  :13-18
@@ -714,29 +713,31 @@ export function computeUnitParticipationLoad  :106-109
 export function projectMargins  :120-120
 ```
 
-### backend/src/services/overheadService.ts
+### backend/src/services/restoreService.ts
 ```
-export interface UnitLoadLine  :8-8
-unitId: string  :8-8
-export interface OverheadResult  :9-16
-directCost: number  :10-10
-method: OverheadMethod | null  :11-11
-companyAmount: number  :12-12
-unitBreakdown: UnitLoadLine[]  :13-13
-contributionMargin: number  :14-14
-applyOverhead: boolean  :15-15
-export interface UnitAbsorptionLine  :90-94
-unitId: string  :91-91
-allocated: number  :92-92
-coeffSum: number  :93-93
-export interface UnitAbsorptionReport  :95-99
-units: UnitAbsorptionLine[]  :96-96
-summary: { totalBudget: number  :97-97
-note: string  :98-98
-export async function getActivePool  :35-37
-export async function computeProjectOverhead  :40-69
-export async function applyProjectOverhead  :72-85
-export async function computeUnitBudgetAbsorption  :101-144
+export async function analyzeRestore  :59-63
+export async function applyLogicalRestore  :152-152
+export async function stageStateRestore  :207-207
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations  :13-64
+```
+
+### backend/src/services/virtualAgentService.ts
+```
+export interface AgentOutput  :13-25
+rationale: string  :14-14
+output: Record<string, unknown>  :15-15
+taskTitle: string  :17-17
+autonomousAction?: { kind: string  :19-20
+summary: string  :21-21
+reversible: boolean  :22-22
+execute:  :23-23
+export function hasHandler  :505-507
+export async function runAgent  :513-518
+export async function ratifyAgentRun  :626-632
 ```
 
 ### backend/src/utils/secureUpload.ts
@@ -846,19 +847,6 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/BackupModule.tsx
-```
-hook useState
-hook useCallback
-hook useEffect
-export BackupModule
-handler onRun
-handler onVerify
-handler onRestore
-handler onChange
-handler onClick
-```
-
 ### src/modules/VirtualAgentsTestModule.tsx
 ```
 hook useAuth
@@ -879,17 +867,6 @@ hook useState
 hook useEffect
 hook useContext
 export AuthProvider
-```
-
-### src/modules/TodoModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export TodoModule
-handler onClick
-handler onChange
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -1122,6 +1099,24 @@ handler onClose
 handler onChange
 ```
 
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
+```
+
 ### src/App.tsx
 ```
 hook useState
@@ -1152,6 +1147,19 @@ export UserManagement
 handler onSubmit
 ```
 
+### src/modules/BackupModule.tsx
+```
+hook useState
+hook useCallback
+hook useEffect
+export BackupModule
+handler onRun
+handler onVerify
+handler onRestore
+handler onChange
+handler onClick
+```
+
 ### src/modules/ContractWorkflowModule.tsx
 ```
 component ContractWorkflowModule
@@ -1167,33 +1175,6 @@ export ContractWorkflowModule
 handler onChange
 handler onClick
 handler onBlur
-```
-
-### src/modules/FinanceModule.tsx
-```
-component OverheadPoolTab
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
-```
-
-### src/modules/Login.tsx
-```
-props LoginProps
-hook useState
-export Login
-handler onSubmit
-handler onChange
 ```
 
 ### src/modules/ManagementReportingModule.tsx
@@ -1223,6 +1204,15 @@ hook useCallback
 handler onClick
 handler onChange
 handler onSaved
+```
+
+### src/modules/Login.tsx
+```
+props LoginProps
+hook useState
+export Login
+handler onSubmit
+handler onChange
 ```
 
 ### src/modules/ProjectManagementModule.tsx
@@ -1257,6 +1247,17 @@ hook useEffect
 export SetupWizard
 handler onChange
 handler onClick
+```
+
+### src/modules/TodoModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export TodoModule
+handler onClick
+handler onChange
 ```
 
 ### src/services/apiClient.ts

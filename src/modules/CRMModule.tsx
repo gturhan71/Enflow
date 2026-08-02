@@ -252,8 +252,10 @@ const CRMModule = ({
     try {
       const { opp, proposal } = lostReasonModal;
       if (proposal) {
-        await apiService.updateProposal(proposal.id, { status: 'REJECTED' });
-        setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED' } : p));
+        // B-21 — kayıp nedeni artık Opportunity.lostReason'a ek olarak Proposal.rejectionReason'a
+        // da yazılır; "neden kaybettik" analizi teklif kaydının kendisinden de yapılabilir.
+        await apiService.updateProposal(proposal.id, { status: 'REJECTED', rejectionReason: reason });
+        setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'REJECTED', rejectionReason: reason } : p));
       }
       await apiService.updateOpportunity(opp.id, { status: 'LOST', lostReason: reason });
       setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, status: 'LOST', lostReason: reason } : o));

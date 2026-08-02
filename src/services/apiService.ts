@@ -303,6 +303,9 @@ class ApiService {
   async rejectPurchaseRequest(id: string, data: { rejectionNote: string }) {
     return apiClient.fetchWithAuth(`/purchase-requests/${id}/reject`, { method: 'POST', body: JSON.stringify(data) });
   }
+  async resubmitPurchaseRequest(id: string, data?: { notes?: string }) {
+    return apiClient.fetchWithAuth(`/purchase-requests/${id}/resubmit`, { method: 'POST', body: JSON.stringify(data || {}) });
+  }
   async addPurchaseQuote(id: string, data: Record<string, unknown>) {
     return apiClient.fetchWithAuth(`/purchase-requests/${id}/quotes`, { method: 'POST', body: JSON.stringify(data) });
   }

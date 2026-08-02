@@ -202,6 +202,7 @@ model Proposal {
   content       String      // JSON string with items, terms, description, total
   version       Int         @default(1)
   status        String      @default("DRAFT") // DRAFT, SENT, EXPIRED, REJECTED, ACCEPTED
+  rejectionReason String?   // B-21 — REJECTED olunca gerekçe (Opportunity.lostReason ile aynı kategori listesi)
   tenantId      String
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -617,6 +618,7 @@ model PurchaseRequest {
   approvedByGM    String?
   rejectedBy      String?
   rejectionNote   String?
+  resubmitCount   Int      @default(0) // B-04 — REJECTED→DRAFT (resubmit) kaç kez yapıldı; kayıt/bağlantı (BoM/Proje) korunur
   notes           String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
@@ -1013,7 +1015,7 @@ model Tender {
   ikn                 String?   // İhale Kayıt Numarası (manuel, EKAP yer tutucu)
   authority           String?   // idare adı
   method              String    @default("OPEN") // OPEN|RESTRICTED|NEGOTIATED|DIRECT
-  status              String    @default("DRAFT") // DRAFT|PREPARING|SUBMITTED|EVALUATING|WON|LOST|CANCELLED
+  status              String    @default("DRAFT") // DRAFT|PREPARING|SUBMITTED|EVALUATING|WON|LOST|CANCELLED|WITHDRAWN (B-10 — bilinçli iştirak etmeme, CANCELLED'dan ayrı, KPI-nötr)
   submissionDeadline  DateTime?
   estimatedValue      Float     @default(0)
   currency            String    @default("TRY")

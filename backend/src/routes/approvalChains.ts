@@ -116,6 +116,18 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   // kalmazsa zincir COMPLETED olur (SKIPPED aşamalar bloklamaz).
   const updated = await autoSkipOrphanStages(req.tenantId, id);
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STAGE_APPROVE', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, role: stage.role, chainStatus: updated?.status } });
+
+  // B-09 — legacy tek-tıkla onay (Opportunity.technicalStatus) ile aşama-bazlı
+  // swimlane iki bağımsız kayıt tutuyordu (legacy→chain zaten bağlıydı, chain→legacy
+  // eksikti). Swimlane burada COMPLETED olduğunda legacy alanı da senkronize edilir —
+  // hangi ekrandan onaylanırsa onaylansın iki mekanizma birbirinden sapmaz.
+  if (updated?.status === 'COMPLETED' && chain.entityType === 'OPPORTUNITY') {
+    await prisma.opportunity.updateMany({
+      where: { id: chain.entityId, technicalStatus: { not: 'APPROVED' } },
+      data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' },
+    });
+  }
+
   res.json(updated);
 }));
 

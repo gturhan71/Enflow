@@ -14,13 +14,21 @@ export interface DmoCostParams {
   minMarginPct: number;              // alarm eşiği (0..1)
   defaultCommission: DmoCommission;
   costFxRates: Record<string, number>; // alış maliyeti para birimi → TRY (piyasa)
+  costFxRatesUpdatedAt: string | null; // B-06 — piyasa kuru en son ne zaman girildi (ISO)
 }
+
+// B-06 — piyasa kuru (costFxRates) bu süreden eskiyse "bayat" sayılır ve alarm üretir.
+// DMO kuru (DmoExchangeRate) zaten kendi validFrom/validTo'suyla geçerlilik kontrollü;
+// piyasa kuru simetrik biçimde yalnız güncellik zaman damgasıyla kontrol edilir
+// (ayrı bir geçerlilik-aralığı tablosu yerine — tek bir sabit config değeri olduğundan).
+export const COST_FX_STALE_DAYS = 7;
 
 export const DEFAULT_DMO_PARAMS: DmoCostParams = {
   risturnTiers: [{ thresholdMin: 0, rate: 0 }],
   minMarginPct: 0.05,
   defaultCommission: { type: 'PERCENT', value: 0, basis: 'REVENUE' },
   costFxRates: { TRY: 1 },
+  costFxRatesUpdatedAt: null,
 };
 
 export async function getDmoParams(tenantId: string): Promise<DmoCostParams> {
@@ -32,6 +40,7 @@ export async function getDmoParams(tenantId: string): Promise<DmoCostParams> {
     minMarginPct: typeof dmo.minMarginPct === 'number' ? dmo.minMarginPct : DEFAULT_DMO_PARAMS.minMarginPct,
     defaultCommission: dmo.defaultCommission || DEFAULT_DMO_PARAMS.defaultCommission,
     costFxRates: { TRY: 1, ...(dmo.costFxRates || {}) },
+    costFxRatesUpdatedAt: typeof dmo.costFxRatesUpdatedAt === 'string' ? dmo.costFxRatesUpdatedAt : null,
   };
 }
 
@@ -42,6 +51,8 @@ export async function setDmoParams(tenantId: string, patch: Partial<DmoCostParam
     minMarginPct: patch.minMarginPct ?? current.minMarginPct,
     defaultCommission: patch.defaultCommission ?? current.defaultCommission,
     costFxRates: { TRY: 1, ...current.costFxRates, ...(patch.costFxRates || {}) },
+    // Piyasa kuru gerçekten değiştiyse (patch.costFxRates verildiyse) "güncellendi" damgası yenilenir.
+    costFxRatesUpdatedAt: patch.costFxRates ? new Date().toISOString() : current.costFxRatesUpdatedAt,
   };
   const t = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { moduleSettings: true } });
   let ms: Record<string, unknown> = {};
@@ -108,11 +119,13 @@ export function computeOrderCosting(inp: CostingInput): CostingResult {
   const { items, commission, params, dmoRates, periodTurnover } = inp;
 
   let revenueTotal = 0, costTotal = 0;
+  const foreignCost = new Set<string>();
   for (const it of items) {
     const sellFx = it.sellCurrency === 'TRY' ? 1 : (dmoRates[it.sellCurrency]?.rate ?? 1);
     revenueTotal += it.qty * it.unitPrice * sellFx;
     const costFx = it.costCurrency === 'TRY' ? 1 : (params.costFxRates[it.costCurrency] ?? 1);
     costTotal += it.qty * it.unitCost * costFx;
+    if (it.costCurrency && it.costCurrency !== 'TRY') foreignCost.add(it.costCurrency);
   }
   revenueTotal = round2(revenueTotal); costTotal = round2(costTotal);
   const grossProfit = round2(revenueTotal - costTotal);
@@ -136,6 +149,17 @@ export function computeOrderCosting(inp: CostingInput): CostingResult {
   for (const c of foreign) {
     if (!dmoRates[c]) alarms.push(`${c} için DMO kuru tanımlı değil.`);
     else if (dmoRates[c]!.validTo && dmoRates[c]!.validTo!.getTime() < Date.now()) alarms.push(`${c} DMO kurunun geçerlilik süresi dolmuş — yeniden hesaplayın.`);
+  }
+  // B-06 — piyasa kuru (maliyet) güncellik kontrolü: DMO kuruyla simetrik.
+  if (foreignCost.size > 0) {
+    if (!params.costFxRatesUpdatedAt) {
+      alarms.push('Piyasa kuru (maliyet) hiç güncellenmemiş — Ayarlar\'dan girin.');
+    } else {
+      const ageDays = (Date.now() - new Date(params.costFxRatesUpdatedAt).getTime()) / 86_400_000;
+      if (ageDays > COST_FX_STALE_DAYS) {
+        alarms.push(`Piyasa kuru ${Math.floor(ageDays)} gündür güncellenmemiş (>${COST_FX_STALE_DAYS} gün) — bayat olabilir.`);
+      }
+    }
   }
 
   // Snapshot: tek yabancı satış para birimi varsa onu; birden çoksa MIX

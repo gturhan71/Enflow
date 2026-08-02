@@ -57,7 +57,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { content, status } = req.body;
+  const { content, status, rejectionReason } = req.body;
   const tenantId = req.tenantId;
   const id = req.params.id as string;
 
@@ -67,6 +67,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const data: Record<string, unknown> = {};
   if (content) data.content = typeof content === 'string' ? content : JSON.stringify(content);
   if (status) data.status = status;
+  if (rejectionReason !== undefined) data.rejectionReason = rejectionReason || null;
 
   const proposal = await prisma.proposal.update({
     where: { id },
