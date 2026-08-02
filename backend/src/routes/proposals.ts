@@ -52,8 +52,37 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     });
   }
 
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROPOSAL', entityId: proposal.id, details: { opportunityId: proposal.opportunityId, version: proposal.version } });
-  res.json(proposal);
+  // Kredi limiti — pipeline maruziyeti (schema değişikliği gerektirmeyen aşama; gerçek
+  // açık-fatura tutarı Invoice.customerId eklenene kadar ayrı bir fazda). Müşterinin
+  // WON/LOST/WITHDRAWN olmayan tüm fırsatlarının toplamı creditLimit'i aşıyorsa
+  // hazırlayana (yanıtta) ve GM/Satış Müdürü'ne (bildirim) bildirilir — önceden
+  // Customer.creditLimit hiçbir karar anında okunmuyordu.
+  let creditWarning: { exposure: number; creditLimit: number; currency: string } | null = null;
+  const customer = proposal.opportunity?.customer;
+  if (customer && customer.creditLimit > 0) {
+    const openOpps = await prisma.opportunity.findMany({
+      where: { tenantId, customerId: customer.id, status: { notIn: ['WON', 'LOST', 'WITHDRAWN'] } },
+      select: { value: true },
+    });
+    const exposure = openOpps.reduce((s, o) => s + (o.value || 0), 0);
+    if (exposure > customer.creditLimit) {
+      creditWarning = { exposure, creditLimit: customer.creditLimit, currency: customer.currency };
+      const targets = await prisma.user.findMany({ where: { tenantId, role: { in: ['SALES_MGR', 'GENERAL_MANAGER'] }, status: 'ACTIVE' } });
+      for (const u of targets) {
+        await prisma.notification.create({
+          data: {
+            tenantId, userId: u.id, type: 'WARNING',
+            title: 'Kredi limiti aşıldı',
+            message: `${customer.name} — açık fırsat toplamı ${exposure.toLocaleString('tr-TR')} ${customer.currency}, kredi limitini (${customer.creditLimit.toLocaleString('tr-TR')} ${customer.currency}) aşıyor.`,
+            relatedModule: 'crm-opportunities', relatedItemId: opportunityId,
+          },
+        }).catch(() => {});
+      }
+    }
+  }
+
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROPOSAL', entityId: proposal.id, details: { opportunityId: proposal.opportunityId, version: proposal.version, creditWarning: creditWarning ? true : undefined } });
+  res.json({ ...proposal, creditWarning });
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

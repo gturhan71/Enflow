@@ -145,7 +145,11 @@ const CRMModule = ({
         customerId: selectedOpp.customerId,
         createdById: currentUser?.id
       });
-      setProposals(prev => [...(prev || []), saved]);
+      const { creditWarning, ...savedProposal } = saved as Proposal & { creditWarning?: { exposure: number; creditLimit: number; currency: string } | null };
+      setProposals(prev => [...(prev || []), savedProposal]);
+      if (creditWarning) {
+        alert(`⚠ Kredi limiti uyarısı: ${selectedOpp.customer?.name || 'Müşteri'} için açık fırsat toplamı ${creditWarning.exposure.toLocaleString('tr-TR')} ${creditWarning.currency}, kredi limitini (${creditWarning.creditLimit.toLocaleString('tr-TR')} ${creditWarning.currency}) aşıyor. GM ve Satış Müdürü bilgilendirildi.`);
+      }
 
       // Determine target status based on proposal content
       let targetStatus: Opportunity['status'] = 'PROPOSAL';
