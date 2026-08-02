@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { UserPlus, Building2, Trash2, Loader2 } from 'lucide-react';
+import { UserPlus, Building2, Trash2, Loader2, UserCog, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Unit, Tenant } from '../../types';
 import { ROLE_LABELS } from '../../constants';
@@ -24,6 +24,8 @@ export const UserManagement = ({
 }: UserManagementProps) => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [delegateTarget, setDelegateTarget] = useState<User | null>(null);
+  const [delegateSaving, setDelegateSaving] = useState(false);
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +68,28 @@ export const UserManagement = ({
     }
   };
 
+  // B-08 — vekalet: rol sahibi kullanıcı izinli/ulaşılamaz olduğunda onay yetkisini
+  // devrettiği kişi. Boş seçim vekaleti kaldırır.
+  const handleSaveDelegate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!delegateTarget) return;
+    const formData = new FormData(e.target as HTMLFormElement);
+    const delegateToUserId = (formData.get('delegateToUserId') as string) || null;
+    const delegateUntilRaw = formData.get('delegateUntil') as string;
+    const delegateUntil = delegateToUserId && delegateUntilRaw ? delegateUntilRaw : null;
+
+    setDelegateSaving(true);
+    try {
+      const updated = await apiService.updateUser(delegateTarget.id, { delegateToUserId, delegateUntil });
+      setUsers(prev => prev.map(u => u.id === delegateTarget.id ? { ...u, ...updated } : u));
+      setDelegateTarget(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Vekalet kaydedilemedi.');
+    } finally {
+      setDelegateSaving(false);
+    }
+  };
+
   const handleDeleteUser = async (id: string) => {
     if (id === currentUser?.id) {
       alert('Kendinizi silemezsiniz reiz.');
@@ -102,6 +126,7 @@ export const UserManagement = ({
               <th className="px-6 py-4 font-bold text-slate-400 uppercase text-[10px]">İsim / E-posta</th>
               <th className="px-6 py-4 font-bold text-slate-400 uppercase text-[10px]">Rol / Şirket</th>
               <th className="px-6 py-4 font-bold text-slate-400 uppercase text-[10px]">Birim</th>
+              <th className="px-6 py-4 font-bold text-slate-400 uppercase text-[10px]">Vekil</th>
               <th className="px-6 py-4 font-bold text-slate-400 uppercase text-[10px] text-right">İşlem</th>
             </tr>
           </thead>
@@ -127,9 +152,26 @@ export const UserManagement = ({
                 <td className="px-6 py-4 text-slate-600">
                   {units && units.length > 0 ? (units.find(u => u.id === user.unitId)?.name || '-') : '-'}
                 </td>
+                <td className="px-6 py-4 text-slate-600 text-xs">
+                  {user.delegateToUserId ? (
+                    <div className="flex flex-col">
+                      <span className="font-bold text-slate-700">{users.find(u => u.id === user.delegateToUserId)?.name || '?'}</span>
+                      {user.delegateUntil && (
+                        <span className="text-[10px] text-slate-400">{new Date(user.delegateUntil).toLocaleDateString('tr-TR')} tarihine kadar</span>
+                      )}
+                    </div>
+                  ) : '-'}
+                </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
-                  <button 
-                    onClick={() => handleDeleteUser(user.id)} 
+                  <button
+                    onClick={() => setDelegateTarget(user)}
+                    title="Vekil Ata"
+                    className="p-2 text-slate-400 hover:text-primary"
+                  >
+                    <UserCog size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteUser(user.id)}
                     className="p-2 text-slate-400 hover:text-red-600"
                   >
                     <Trash2 size={16} />
@@ -224,6 +266,62 @@ export const UserManagement = ({
                     className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
                   >
                     {loading ? <Loader2 size={16} className="animate-spin" /> : 'Kaydet ve Ata'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Vekil Ata Modal (B-08) */}
+      <AnimatePresence>
+        {delegateTarget && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden bg-white p-8"
+            >
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xl font-bold text-slate-900">Vekil Ata</h4>
+                <button onClick={() => setDelegateTarget(null)} className="p-1 text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              </div>
+              <p className="text-xs text-slate-400 mb-6">
+                <span className="font-bold text-slate-600">{delegateTarget.name}</span> ({ROLE_LABELS[delegateTarget.role] || delegateTarget.role}) izinli/ulaşılamaz olduğunda,
+                onay bekleyen işlerini seçtiğiniz kişi görüp onaylayabilir.
+              </p>
+              <form onSubmit={handleSaveDelegate} className="space-y-4">
+                <select
+                  name="delegateToUserId"
+                  defaultValue={delegateTarget.delegateToUserId || ''}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                >
+                  <option value="">Vekalet yok</option>
+                  {users.filter(u => u.id !== delegateTarget.id).map(u => (
+                    <option key={u.id} value={u.id}>{u.name} — {ROLE_LABELS[u.role] || u.role}</option>
+                  ))}
+                </select>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Bitiş Tarihi (opsiyonel — boşsa süresiz)</label>
+                  <input
+                    name="delegateUntil"
+                    type="date"
+                    defaultValue={delegateTarget.delegateUntil ? delegateTarget.delegateUntil.slice(0, 10) : ''}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setDelegateTarget(null)} className="px-6 py-2 text-sm font-bold text-slate-500">
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={delegateSaving}
+                    className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+                  >
+                    {delegateSaving ? <Loader2 size={16} className="animate-spin" /> : 'Kaydet'}
                   </button>
                 </div>
               </form>

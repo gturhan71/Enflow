@@ -49,14 +49,17 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
 }));
 
 router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, role, unitId, permissions, status, password } = req.body;
+  const { name, email, role, unitId, permissions, status, password, delegateToUserId, delegateUntil } = req.body;
   const tenantId = req.tenantId;
   const id = req.params.id as string;
 
   const record = await prisma.user.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
+  // B-08 — vekalet: null gönderilirse vekalet kaldırılır (Prisma'da undefined = "değiştirme").
   const data: Record<string, unknown> = { name, email, role, unitId, status };
+  if (delegateToUserId !== undefined) data.delegateToUserId = delegateToUserId || null;
+  if (delegateUntil !== undefined) data.delegateUntil = delegateUntil ? new Date(delegateUntil) : null;
   if (permissions) {
     data.permissions = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
   }

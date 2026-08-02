@@ -47,6 +47,8 @@ export interface User {
   unitId?: string;
   status: 'ACTIVE' | 'INACTIVE';
   tenantId?: string;
+  delegateToUserId?: string | null;
+  delegateUntil?: string | null;
 }
 
 export interface Permission {

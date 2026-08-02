@@ -1195,7 +1195,7 @@ No any              → TypeScript strict mode
 lucide-react chunk  → vite manualChunks'ta react kontrolünden ÖNCE gelmeli
 GET /summary/all    → /:id route'undan ÖNCE tanımlanmalı (route conflict)
 opportunityId POST  → Backend fırsatı çekip eksik alanları otomatik tamamlar
-PLUGIN_LICENSE_SECRET → Sanal agent lisans imzası; canlıda mutlaka değiştir
+Agent lisans imzası     → Ed25519 (vendor private key); PLUGIN_LICENSE_SECRET kaldırıldı, bkz. docs/LICENSING_ARCHITECTURE.md
 ```
 
 ---
@@ -1331,7 +1331,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 3. **Onayla & Devral** ile gerçek kişi işi üstlenir (ratifikasyon) veya **Reddet**.
 4. Her çalıştırma `AGENT:<key>` köken etiketiyle damgalanır; rozet tıklanınca gerekçe + çıktı detayı açılır.
 
-> ⚠️ **Production:** `PLUGIN_LICENSE_SECRET` ortam değişkeni canlıya çıkışta mutlaka değiştirilmelidir.
+> ℹ️ Lisanslama Ed25519'a geçti (`PLUGIN_LICENSE_SECRET` kaldırıldı) — bkz. `docs/LICENSING_ARCHITECTURE.md`.
 
 ---
 

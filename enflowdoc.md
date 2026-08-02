@@ -517,7 +517,7 @@ Boş birim koltuğunu dolduran sanal agent altyapısı — **ticari sürüm dı�
 
 Backend `/api/plugins` (catalog/entitlements/activate/generate-key/run/runs/ratify; lisans yoksa **402 upsell sinyali**).
 
-> ⚠️ **Production:** `PLUGIN_LICENSE_SECRET` ortam değişkeni canlıya çıkışta mutlaka değiştirilmelidir.
+> ℹ️ Lisanslama Ed25519'a geçti (`PLUGIN_LICENSE_SECRET` kaldırıldı) — bkz. `docs/LICENSING_ARCHITECTURE.md`.
 
 ---
 

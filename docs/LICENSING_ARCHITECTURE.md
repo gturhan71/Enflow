@@ -78,7 +78,7 @@ tamper→RED(imza) · sahte anahtar→RED(forge) · süresi dolmuş→RED.
   `settings-license-generate` nav + App `license-gen` tab kaldırıldı. ProvisionWizard (tenant provizyon) korundu.
   Doğrulama: eski base64→RED · yeni Ed25519→KABUL (plan PROFESSIONAL) · tenant-2→403. tsc 0.
 - [ ] **RBAC:** `rbac.config.ts`'te `/plugins/generate-key` beklentisi güncellenir (artık 410); `settings-license-generate` (abonelik üretimi) Faz 2'de kalkar. (RBAC süiti kullanıcı isteyince.)
-- [ ] **Üretim:** `licensePublicKey.ts` vendor'un gerçek public key'iyle değiştirilir; `PLUGIN_LICENSE_SECRET` env'den çıkarılır (artık kullanılmıyor).
+- [x] **Üretim (Faz 10.1, B-23):** `PLUGIN_LICENSE_SECRET` üretimi/env'i kurulum sihirbazından (`install/wizard.mjs`, `install/.env.example`) kaldırıldı — artık hiç üretilmiyor/yazılmıyor. `licensePublicKey.ts` hâlâ PoC public key'i kullanıyor; vendor'un gerçek public key'iyle değiştirilmesi ayrı bir operasyonel adım.
 - [ ] Mevcut müşterilere yeni imzalı lisansların yeniden düzenlenmesi (operasyonel).
 
 ## Güvenlik notları

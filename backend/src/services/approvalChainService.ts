@@ -200,6 +200,35 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
   });
 }
 
+/**
+ * B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegateToUserId ile)
+ * kendi rolündeki onayları vekiline devreder. `delegateUntil` null ise süresiz,
+ * doluysa yalnız o tarihe kadar aktif.
+ * Bir kullanıcının "vekaleten" onaylayabileceği roller (kendisine vekalet verilmiş roller).
+ */
+export async function getDelegatedRoles(tenantId: string, userId: string): Promise<string[]> {
+  const now = new Date();
+  const delegators = await prisma.user.findMany({
+    where: {
+      tenantId,
+      delegateToUserId: userId,
+      OR: [{ delegateUntil: null }, { delegateUntil: { gte: now } }],
+    },
+    select: { role: true },
+    distinct: ['role'],
+  });
+  return delegators.map(d => d.role);
+}
+
+/** Bir kullanıcı bir role ait onayı yapabilir mi? (kendi rolü ya da aktif vekalet). */
+export async function resolveEffectiveApprover(tenantId: string, role: string, userId: string): Promise<boolean> {
+  const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
+  if (!user) return false;
+  if (user.role === role) return true;
+  const delegatedRoles = await getDelegatedRoles(tenantId, userId);
+  return delegatedRoles.includes(role);
+}
+
 /** Onay geri çekildiğinde (revert-approval) en güncel zinciri PENDING'e döndürür. */
 export async function resetApprovalChain(tenantId: string, entityType: string, entityId: string) {
   const chain = await prisma.approvalChain.findFirst({

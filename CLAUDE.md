@@ -284,7 +284,7 @@ Tümü `tenantMiddleware` izolasyonlu; path'ler `/api` ön-ekli. Frontend `apiCl
 
 ## Sanal Agentlar (özet)
 
-Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtualAgentService.HANDLERS`. Çıktı → handoff TodoTask (`assignedBy=AGENT:<key>`) + AgentRun (ADVISORY→PENDING_RATIFICATION / AUTONOMOUS→auto-RATIFIED). **8 agent:** Tender (checklist/deadline) · Project (devir/milestone) · Presales (BoM tutarlılık) · Procurement (en ucuz teklif/deadline) · **Finance (ADVISORY-only)** · **Legal (ADVISORY-only)** · CRM (fırsat hijyeni) · İGPD (BD/beklenen değer). Lisans kapısı `entitlementService`; orphan-stage otonom dalı `getAgentPluginForRole`. ⚠️ Canlıda `PLUGIN_LICENSE_SECRET` değiştirilmeli.
+Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtualAgentService.HANDLERS`. Çıktı → handoff TodoTask (`assignedBy=AGENT:<key>`) + AgentRun (ADVISORY→PENDING_RATIFICATION / AUTONOMOUS→auto-RATIFIED). **8 agent:** Tender (checklist/deadline) · Project (devir/milestone) · Presales (BoM tutarlılık) · Procurement (en ucuz teklif/deadline) · **Finance (ADVISORY-only)** · **Legal (ADVISORY-only)** · CRM (fırsat hijyeni) · İGPD (BD/beklenen değer). Lisans kapısı `entitlementService`; orphan-stage otonom dalı `getAgentPluginForRole`. Lisanslar artık Ed25519 (vendor private key, tenant yalnız public key ile doğrular) — `PLUGIN_LICENSE_SECRET` kaldırıldı, bkz. `docs/LICENSING_ARCHITECTURE.md`.
 
 ## Faz Geçmişi (özet)
 
@@ -334,18 +334,8 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
-backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
-src/modules/Dashboard.tsx ← types, constants, lib/utils, contexts/AuthContext, services/apiService
-backend/src/services/aiClient.ts ← prismaClient
-backend/src/services/specAnalysis.ts ← aiClient
-src/contexts/AIGateContext.tsx ← services/apiService
-src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, contexts/AIGateContext, types
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, types
-backend/src/services/backupTargets.ts ← utils/fileUpload
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/backupService.ts ← prismaClient, backupTargets
-backend/src/middleware.ts ← prismaClient
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
@@ -357,158 +347,67 @@ backend/src/services/licenseVerify.ts ← config/licensePublicKey
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog, licenseVerify
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 license-tool/server.mjs ← core
-src/modules/Login.tsx ← constants, services/apiService, types
 src/contexts/AuthContext.tsx ← types
-src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
-src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../lib/permissionTree, ../services/apiService
-src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, constants, types
-src/lib/permissionTree.ts ← constants
-src/modules/CRMModule.tsx ← lib/utils, types, ProposalEditor, NegotiationModule, components/HandOffModal
-src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, types
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
-src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
-src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
-src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/modules/SetupWizard.tsx ← services/apiService, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify
-backend/src/services/updateNotifier.ts ← prismaClient
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, types
+src/lib/permissionTree.ts ← constants
+src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../constants, ../lib/permissionTree, ../services/apiService
 upgrade-tool/cli.mjs ← core
 upgrade-tool/server.mjs ← core
+backend/src/services/updateNotifier.ts ← prismaClient
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
+src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
+src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
+src/components/HandOffModal.tsx ← services/apiService
+src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
+src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
+src/components/HealthCards.tsx ← types
+src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
+backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
+backend/src/services/analyticsService.ts ← prismaClient
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
+src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
+src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/Login.tsx ← constants, services/apiService, types
+src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
+src/modules/SetupWizard.tsx ← services/apiService, types
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
+backend/src/middleware.ts ← prismaClient, services/auth
+backend/src/services/aiClient.ts ← prismaClient
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
 ```
 
-## changes (last 10 commits — 0 seconds ago)
+## changes (last 10 commits — 1 second ago)
 ```
-src/lib/permissionTree.ts                     +buildPermissionGroups
-src/modules/ContractWorkflowModule.tsx        +ContractWorkflowModule  ~ContractWorkflowModule  ~bestProposalPrice
+src/modules/FinanceModule.tsx                 +OverheadPoolTab
+src/modules/ManagementReportingModule.tsx     +UnitAbsorptionCard  ~DmoAnalyticsCard  ~AnalyticsTab
+src/modules/ProjectManagementModule.tsx       +OverheadPanel  ~isHandoverComplete
+src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
-backend/src/services/bootstrapTenant.ts       +bootstrapTenant
-backend/src/services/updateNotifier.ts        +enflowHome  +readUpdateStatus  +readMarker  +writeMarker
-upgrade-tool/cli.mjs                          +main
-upgrade-tool/core.mjs                         +git  +gitSafe  +resolveHome  +parseSemver
-upgrade-tool/server.mjs                       +loadConfig  +saveConfig  +inMaintenanceWindow  +performUpgrade
-upgrade-tool/public/index.html                +renderStatus  +renderSettings  +refresh
+backend/src/middleware.ts                     +bearerToken
+backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
+backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
+backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
+backend/src/services/financeEngine.ts         +computeCompanyOverhead  +computeUnitParticipationLoad  +projectMargins  ~convertMinor
+backend/src/services/overheadService.ts       +unitPeriodCostMap  +directCostOf  +getActivePool  +computeProjectOverhead
+backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
 
 ## backend
-
-### backend/prisma/migrations/20260625151516_faz_guarantee_request/migration.sql
-```
-TABLE new_GuaranteeLetter
-INDEX GuaranteeLetter_tenantId_status_idx ON GuaranteeLetter
-```
-
-### backend/prisma/migrations/20260625152913_faz_payment_terms/migration.sql
-```
-TABLE CollectionInstallment
-INDEX CollectionInstallment_tenantId_opportunityId_idx ON CollectionInstallment
-```
-
-### backend/src/services/financingEffect.ts
-```
-export interface CashEvent  :7-13
-kind: 'PAYMENT' | 'COLLECTION'  :8-8
-label: string  :9-9
-date: string  :10-10
-amount: number  :11-11
-currency: string  :12-12
-export interface FinancingResultLine  :15-17
-effect: number  :16-16
-export interface FinancingResult  :19-24
-closingDate: string  :20-20
-byCurrency: Record<string, { cost: number  :21-21
-events: FinancingResultLine[]  :22-22
-cashFlowGap: { currency: string  :23-23
-export function computeFinancingEffect  :32-64
-export function paymentDate  :67-70
-```
-
-### backend/src/services/dashboardService.ts
-```
-export async function computeDashboard  :12-77
-```
-
-### backend/src/services/aiClient.ts
-```
-export interface TenantAIConfig  :13-18
-baseUrl: string  :14-14
-apiKey: string  :15-15
-model: string  :16-16
-label?: string  :17-17
-export async function getTenantAIConfig  :21-41
-export async function isAIConfigured  :43-45
-export async function chatJSON  :55-103
-```
-
-### backend/src/services/specAnalysis.ts
-```
-export interface AnalyzedDoc  :11-18
-name: string  :12-12
-docType: string  :13-13
-description: string  :14-14
-deadline_priority: string  :15-15
-estimated_days: number  :16-16
-notes: string  :17-17
-export interface SpecAnalysis  :20-33
-documents: AnalyzedDoc[]  :21-21
-tasks?: { order: number  :22-22
-key_clauses?: { clause: string  :23-23
-contract_summary?: { project_name?: string  :24-25
-tender_no?: string  :26-26
-type?: string  :27-27
-tax_obligations?: string[]  :28-28
-key_deadlines?: string[]  :29-29
-export function mockDocuments  :64-75
-export async function analyzeSpec  :105-108
-```
-
-### backend/prisma/migrations/20260627122732_faz_backup/migration.sql
-```
-TABLE BackupJob
-TABLE RestoreJob
-INDEX BackupJob_tenantId_status_idx ON BackupJob
-INDEX BackupJob_tenantId_startedAt_idx ON BackupJob
-INDEX RestoreJob_tenantId_status_idx ON RestoreJob
-INDEX RestoreJob_tenantId_backupId_idx ON RestoreJob
-```
-
-### backend/src/services/backupTargets.ts
-```
-export interface BackupTarget  :11-17
-put  :13-13
-get  :15-15
-list  :16-16
-export class LocalTarget  :27-47
-constructor  :29-31
-async put  :32-38
-async get  :39-42
-async list  :43-46
-export class NextcloudTarget  :50-64
-constructor  :51-51
-async put  :52-57
-async get  :58-60
-async list  :61-63
-export class S3Target  :68-109
-constructor  :69-71
-async put  :91-97
-async get  :98-103
-async list  :104-108
-export function ensureDir  :22-24
-```
 
 ### backend/src/services/backupVerifyService.ts
 ```
 export async function verifyBackup  :46-46
 export async function drainVerifyQueue  :125-136
-```
-
-### backend/pnpm-lock.yaml
-```
-keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
 ### backend/src/services/backupService.ts
@@ -538,12 +437,6 @@ startedByName?: string  :117-117
 export type BackupScope  :17-17
 export type BackupKind  :18-18
 export type TargetType  :19-19
-```
-
-### backend/src/middleware.ts
-```
-export const asyncHandler  :5-7
-export const requireRole  :69-77
 ```
 
 ### backend/src/services/backupScheduler.ts
@@ -577,30 +470,6 @@ export async function autoSkipOrphanStages  :91-201
 export async function resetApprovalChain  :204-217
 ```
 
-### backend/src/services/financeEngine.ts
-```
-export interface MoneyBreakdown  :13-18
-netMinor: number  :14-14
-vatMinor: number  :15-15
-grossMinor: number  :16-16
-currency: Currency  :17-17
-export interface LineInput  :20-26
-qty: number  :21-21
-unitPrice: number  :22-22
-vatRate?: number  :23-23
-currency?: Currency  :24-24
-discountPct?: number  :25-25
-export type Currency  :11-11
-export function toMinor  :29-31
-export function fromMinor  :33-35
-export function roundMinor  :37-39
-export function applyVat  :42-42
-export function lineBreakdown  :49-58
-export function sumByCurrency  :64-75
-export function convertMinor  :78-80
-export function presentBreakdown  :83-83
-```
-
 ### backend/src/services/moneyRounding.ts
 ```
 export function roundMoneyData  :48-56
@@ -630,26 +499,6 @@ export async function activatePluginLicense  :53-57
 export async function updateEntitlement  :93-97
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
-### backend/src/services/bootstrapTenant.ts
-```
-export interface BootstrapInput  :33-40
-companyName: string  :34-34
-admin: { name: string  :35-35
-license?: string  :37-37
-tenantId?: string  :39-39
-export interface BootstrapResult  :41-46
-tenantId: string  :42-42
-token: string  :43-43
-user: { id: string  :44-44
-subscription: { plan: string  :45-45
-export async function bootstrapTenant  :48-121
-```
-
 ### backend/src/services/updateNotifier.ts
 ```
 export interface UpdateStatus  :11-26
@@ -664,6 +513,231 @@ ref?: string | null  :20-20
 export function enflowHome  :29-31
 export function readUpdateStatus  :33-39
 export function startUpdateNotifier  :110-114
+```
+
+### backend/prisma/migrations/20260702095851_dmo_module/migration.sql
+```
+TABLE DmoCatalogItem
+TABLE DmoFrameworkAgreement
+TABLE DmoExchangeRate
+TABLE DmoOrder
+TABLE DmoOrderItem
+INDEX DmoCatalogItem_tenantId_status_idx ON DmoCatalogItem
+INDEX DmoFrameworkAgreement_tenantId_status_idx ON DmoFrameworkAgreement
+INDEX DmoExchangeRate_tenantId_currency_idx ON DmoExchangeRate
+INDEX DmoOrder_tenantId_status_idx ON DmoOrder
+INDEX DmoOrderItem_orderId_idx ON DmoOrderItem
+```
+
+### backend/prisma/migrations/20260702142626_dmo_item_sell_currency/migration.sql
+```
+TABLE new_DmoOrderItem
+INDEX DmoOrderItem_orderId_idx ON DmoOrderItem
+```
+
+### backend/src/services/dmoCosting.ts
+```
+export interface RisturnTier  :10-10
+thresholdMin: number  :10-10
+export interface DmoCommission  :11-11
+type: 'PERCENT' | 'FIXED'  :11-11
+export interface DmoCostParams  :12-17
+risturnTiers: RisturnTier[]  :13-13
+minMarginPct: number  :14-14
+defaultCommission: DmoCommission  :15-15
+costFxRates: Record<string, number>  :16-16
+export interface CostingResult  :89-96
+revenueTotal: number  :90-90
+dmoRateSnapshot: number | null  :91-91
+risturnRateApplied: number  :92-92
+commissionType: string  :93-93
+netProfit: number  :94-94
+costedAt: Date  :95-95
+export async function getDmoParams  :26-36
+export async function setDmoParams  :38-52
+export function effectiveRisturnRate  :55-60
+export async function getPeriodTurnover  :63-75
+export async function getActiveDmoRate  :78-78
+export function computeOrderCosting  :107-155
+export async function recomputeOrderCosting  :158-187
+```
+
+### backend/src/services/analyticsService.ts
+```
+export interface FunnelResult  :18-22
+stages: { name: string  :19-19
+lossByReason: { reason: string  :20-20
+entered: number  :21-21
+export interface TenderGroup  :58-58
+key: string  :58-58
+export interface TenderAnalytics  :59-63
+byAuthority: TenderGroup[]  :60-60
+byMethod: TenderGroup[]  :61-61
+overall: { winRate: number  :62-62
+export interface BomVarianceLine  :112-112
+name: string  :112-112
+export interface BomVarianceReport  :113-113
+lines: BomVarianceLine[]  :113-113
+export interface ForecastReport  :159-163
+rawPipeline: number  :160-160
+target: number  :161-161
+byStage: { status: string  :162-162
+export interface BidScoreLine  :195-201
+id: string  :196-196
+deadline: string | null  :197-197
+score: number  :198-198
+factors: { authorityWinRate: number  :199-199
+authorityWinPct: number | null  :200-200
+export interface BidScorecard  :202-206
+```
+
+### backend/src/services/pluginCatalog.ts
+```
+export interface PluginDefinition  :13-27
+key: string  :14-14
+name: string  :15-15
+category: PluginCategory  :16-16
+description: string  :17-17
+unitKey?: string  :19-19
+role?: string  :20-20
+defaultMode?: AgentMode  :21-21
+allowedModes?: AgentMode[]  :22-22
+export type PluginCategory  :10-10
+export type AgentMode  :11-11
+export function getPlugin  :154-156
+export function getAgentPluginForRole  :160-164
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/pnpm-lock.yaml
+```
+keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
+### backend/prisma/migrations/20260702170248_overhead_faz1/migration.sql
+```
+TABLE OperatingCostPool
+TABLE UnitBudget
+TABLE new_Project
+INDEX Project_opportunityId_key ON Project
+INDEX OperatingCostPool_tenantId_status_idx ON OperatingCostPool
+INDEX UnitBudget_tenantId_unitId_idx ON UnitBudget
+```
+
+### backend/prisma/migrations/20260702172407_overhead_faz2/migration.sql
+```
+TABLE ProjectUnitParticipation
+INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
+INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
+```
+
+### backend/src/middleware.ts
+```
+export const asyncHandler  :6-8
+export const requireRole  :75-83
+export const requireEntitlement  :87-94
+```
+
+### backend/src/services/aiClient.ts
+```
+export interface TenantAIConfig  :13-18
+baseUrl: string  :14-14
+apiKey: string  :15-15
+model: string  :16-16
+label?: string  :17-17
+export async function getTenantAIConfig  :21-41
+export async function isAIConfigured  :43-45
+export function assertSafeAiUrl  :56-71
+export async function chatJSON  :77-126
+```
+
+### backend/src/services/auth.ts
+```
+export interface AuthTokenPayload  :25-29
+sub: string  :26-26
+tid: string  :27-27
+role: string  :28-28
+export async function hashPassword  :31-33
+export async function verifyPassword  :35-42
+export function signAuthToken  :44-47
+export function verifyAuthToken  :49-59
+```
+
+### backend/src/services/bootstrapTenant.ts
+```
+export interface BootstrapInput  :36-43
+companyName: string  :37-37
+admin: { name: string  :38-38
+license?: string  :40-40
+tenantId?: string  :42-42
+export interface BootstrapResult  :44-49
+tenantId: string  :45-45
+token: string  :46-46
+user: { id: string  :47-47
+subscription: { plan: string  :48-48
+export async function bootstrapTenant  :51-127
+```
+
+### backend/src/services/financeEngine.ts
+```
+export interface MoneyBreakdown  :13-18
+netMinor: number  :14-14
+vatMinor: number  :15-15
+grossMinor: number  :16-16
+currency: Currency  :17-17
+export interface LineInput  :20-26
+qty: number  :21-21
+unitPrice: number  :22-22
+vatRate?: number  :23-23
+currency?: Currency  :24-24
+discountPct?: number  :25-25
+export type Currency  :11-11
+export type OverheadMethod  :88-88
+export function toMinor  :29-31
+export function fromMinor  :33-35
+export function roundMinor  :37-39
+export function applyVat  :42-42
+export function lineBreakdown  :49-58
+export function sumByCurrency  :64-75
+export function convertMinor  :78-80
+export function presentBreakdown  :83-83
+export function computeCompanyOverhead  :95-99
+export function computeUnitParticipationLoad  :106-109
+export function projectMargins  :120-120
+```
+
+### backend/src/services/overheadService.ts
+```
+export interface UnitLoadLine  :8-8
+unitId: string  :8-8
+export interface OverheadResult  :9-16
+directCost: number  :10-10
+method: OverheadMethod | null  :11-11
+companyAmount: number  :12-12
+unitBreakdown: UnitLoadLine[]  :13-13
+contributionMargin: number  :14-14
+applyOverhead: boolean  :15-15
+export interface UnitAbsorptionLine  :90-94
+unitId: string  :91-91
+allocated: number  :92-92
+coeffSum: number  :93-93
+export interface UnitAbsorptionReport  :95-99
+units: UnitAbsorptionLine[]  :96-96
+summary: { totalBudget: number  :97-97
+note: string  :98-98
+export async function getActivePool  :35-37
+export async function computeProjectOverhead  :40-69
+export async function applyProjectOverhead  :72-85
+export async function computeUnitBudgetAbsorption  :101-144
+```
+
+### backend/src/utils/secureUpload.ts
+```
+export function documentUpload  :47-53
 ```
 
 ## governance
@@ -722,6 +796,21 @@ export function issue  :38-42
 export function publicFromPrivate  :45-47
 ```
 
+### license-tool/README.md
+```
+h1 Enflow Lisans Üreteci (Vendor — yerel web GUI)
+h2 Çalıştır
+h2 Güvenlik
+h2 Dosyalar
+code-fence bash
+code-fence plain
+```
+
+### license-tool/server.mjs
+```
+function ensurePublic  :12-16
+```
+
 ### license-tool/public/index.html
 ```
 title: Enflow Lisans Üreteci (Vendor)
@@ -740,100 +829,7 @@ button#copyBtn
 p#payloadInfo
 ```
 
-### license-tool/README.md
-```
-h1 Enflow Lisans Üreteci (Vendor — yerel web GUI)
-h2 Çalıştır
-h2 Güvenlik
-h2 Dosyalar
-code-fence bash
-code-fence plain
-```
-
-### license-tool/server.mjs
-```
-function ensurePublic  :12-16
-```
-
 ## src
-
-### src/modules/FinanceModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
-```
-
-### src/modules/Dashboard.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export Dashboard
-handler onClick
-handler onOpps
-handler onValue
-handler onCount
-```
-
-### src/contexts/AIGateContext.tsx
-```
-hook useState
-hook useCallback
-hook useContext
-export AIGateProvider
-handler onClick
-```
-
-### src/modules/SpecAnalysis.tsx
-```
-props SpecAnalysisProps
-hook useAIGate
-hook useState
-export SpecAnalysis
-handler onChange
-handler onClick
-```
-
-### src/modules/SalesSupport.tsx
-```
-component TenderList
-component TenderCalendar
-component ChecklistTab
-component GuaranteesTab
-component EkapTab
-component SubmittedTenders
-component TenderSelectorEmpty
-component Modal
-component TenderForm
-props SalesSupportProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-hook useAIGate
-export SalesSupport
-handler onSelect
-handler onChanged
-handler onWithdraw
-handler onSelectTender
-handler onChange
-handler onClick
-handler onKeyDown
-handler onClose
-```
 
 ### src/components/settings/TenantSettings.tsx
 ```
@@ -873,6 +869,311 @@ handler onDisable
 handler onRatify
 ```
 
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
+```
+
+### src/modules/TodoModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export TodoModule
+handler onClick
+handler onChange
+```
+
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useEffect
+hook useBoM
+hook useCallback
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+handler onSelected
+```
+
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
+### src/modules/ProcurementModule.tsx
+```
+props VendorFormProps
+props PRDetailDrawerProps
+props PRFormProps
+props ProcurementModuleProps
+hook useState
+hook useAuth
+hook useCallback
+hook useEffect
+export ProcurementModule
+handler onClick
+handler onChange
+handler onKeyDown
+handler onRefresh
+handler onSave
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+component LegalView
+component LegalCaseForm
+props Props
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onChange
+handler onClick
+handler onBlur
+```
+
+### src/lib/permissionTree.ts
+```
+export interface PermChild  :15-18
+permission: string  :16-16
+label: string  :17-17
+export interface PermGroup  :19-25
+id: string  :20-20
+label: string  :21-21
+icon: React.ComponentType<{ size?: number  :22-22
+permission: string  :23-23
+children: PermChild[]  :24-24
+export function buildPermissionGroups  :38-54
+```
+
+### src/components/settings/PermissionSettings.tsx
+```
+props PermissionSettingsProps
+hook useState
+export PermissionSettings
+handler onClick
+handler onChange
+```
+
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
+### src/components/settings/SubscriptionSettings.tsx
+```
+props SubscriptionSettingsProps
+export SubscriptionSettings
+handler onChange
+```
+
+### src/components/settings/UnitManagement.tsx
+```
+props UnitManagementProps
+hook useState
+export UnitManagement
+handler onClick
+handler onSubmit
+handler onChange
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
+### src/components/HandOffModal.tsx
+```
+props HandOffModalProps
+hook useState
+hook useEffect
+export HandOffModal
+handler onClick
+handler onChange
+```
+
+### src/modules/NegotiationModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+hook useRef
+export NegotiationModule
+handler onDeal
+handler onChange
+handler onClick
+handler onSubmit
+```
+
+### src/modules/IntegrationWizard.tsx
+```
+hook useState
+export IntegrationWizard
+handler onClick
+handler onChange
+```
+
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useMemo
+hook useEffect
+export WorkflowBuilder
+handler onChange
+handler onClick
+```
+
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
+handler onChange
+handler onClick
+```
+
+### src/components/HealthCards.tsx
+```
+component ProjectHealthCard
+component CustomerHealthCard
+export ProjectHealthCard
+export CustomerHealthCard
+```
+
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onClick
+handler onOpps
+handler onValue
+handler onChange
+handler onSave
+handler onImported
+handler onConfirm
+handler onSubmit
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+```
+
+### src/modules/DmoModule.tsx
+```
+component DmoModule
+component OrdersTab
+component OrderDrawer
+component CatalogTab
+component AgreementsTab
+component RatesTab
+component ReconciliationTab
+component Modal
+component CatalogForm
+component AgreementForm
+component RateForm
+component OrderForm
+component ParamsModal
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export DmoModule
+handler onClick
+handler onSelect
+handler onEdit
+handler onDelete
+handler onSaved
+handler onClose
+handler onChange
+```
+
+### src/App.tsx
+```
+hook useState
+hook useRef
+hook useEffect
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useContracts
+hook useTasks
+hook useUnits
+hook useUsers
+hook useDocuments
+hook useProposals
+export App
+handler onApproveProposal
+handler onNavigate
+handler onLogout
+handler onComplete
+handler onLogin
+```
+
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
+```
+
 ### src/modules/Login.tsx
 ```
 props LoginProps
@@ -882,12 +1183,89 @@ handler onSubmit
 handler onChange
 ```
 
-### src/contexts/AuthContext.tsx
+### src/modules/ManagementReportingModule.tsx
 ```
+component MetricCard
+component ChartBlock
+component BottleneckPanel
+component ConsolidationView
+component ReportForm
+component IncomingReportCard
+component FunnelCard
+component TenderCard
+component BomVarianceCard
+component ConcentrationCard
+component ForecastCard
+component BidScorecardCard
+component DocPortfolioCard
+component BusinessHealthCard
+component DmoAnalyticsCard
+component UnitAbsorptionCard
+component AnalyticsTab
+component ManagementReportingModule
+hook useAuth
 hook useState
 hook useEffect
-hook useContext
-export AuthProvider
+hook useCallback
+handler onClick
+handler onChange
+handler onSaved
+```
+
+### src/modules/ProjectManagementModule.tsx
+```
+component OverheadPanel
+props OpportunityPickerProps
+props ProjectFormProps
+props CostFormProps
+props ProjectDetailProps
+props ProjectManagementModuleProps
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+hook useAuth
+export ProjectManagementModule
+handler onClick
+handler onChange
+handler onApplied
+handler onSave
+handler onOpportunities
+handler onRefresh
+handler onPrintReport
+handler onSelect
+```
+
+### src/modules/SetupWizard.tsx
+```
+props SetupWizardProps
+hook useState
+hook useEffect
+export SetupWizard
+handler onChange
+handler onClick
+```
+
+### src/services/apiClient.ts
+```
+class ApiClient  :3-74
+setAuth  :7-10
+async fetchWithAuth  :12-44
+async login  :46-59
+async forgotPassword  :61-73
+```
+
+### src/services/apiService.ts
+```
+class ApiService  :13-70
+setAuth  :14-16
+async login  :18-20
+async forgotPassword  :22-24
+async getSetupStatus  :27-27
+async runSetup  :32-32
+async getCustomers  :40-40
+async createCustomer  :41-41
+async updateCustomer  :42-42
 ```
 
 ### src/types.ts
@@ -919,255 +1297,7 @@ steps: WorkflowStep[]  :30-30
 stages: ApprovalStage[]  :31-31
 ```
 
-### src/App.tsx
-```
-hook useState
-hook useRef
-hook useEffect
-hook useOpportunities
-hook useCustomers
-hook useProjects
-hook useContracts
-hook useTasks
-hook useUnits
-hook useUsers
-hook useDocuments
-hook useProposals
-export App
-handler onApproveProposal
-handler onNavigate
-handler onLogout
-handler onComplete
-handler onLogin
-```
-
-### src/components/settings/PermissionSettings.tsx
-```
-props PermissionSettingsProps
-hook useState
-export PermissionSettings
-handler onClick
-handler onChange
-```
-
-### src/components/settings/SubscriptionSettings.tsx
-```
-props SubscriptionSettingsProps
-export SubscriptionSettings
-handler onChange
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
-```
-
-### src/lib/permissionTree.ts
-```
-export interface PermChild  :15-18
-permission: string  :16-16
-label: string  :17-17
-export interface PermGroup  :19-25
-id: string  :20-20
-label: string  :21-21
-icon: React.ComponentType<{ size?: number  :22-22
-permission: string  :23-23
-children: PermChild[]  :24-24
-export function buildPermissionGroups  :38-54
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onClick
-handler onOpps
-handler onValue
-handler onChange
-handler onSave
-handler onImported
-handler onConfirm
-handler onSubmit
-```
-
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-component LegalView
-component LegalCaseForm
-props Props
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onChange
-handler onClick
-handler onBlur
-```
-
-### src/modules/CostAnalysisModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
-### src/modules/NegotiationModule.tsx
-```
-hook useAuth
-hook useState
-hook useMemo
-hook useEffect
-hook useRef
-export NegotiationModule
-handler onDeal
-handler onChange
-handler onClick
-handler onSubmit
-```
-
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useEffect
-hook useBoM
-hook useCallback
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
-handler onSelected
-```
-
-### src/modules/ProcurementModule.tsx
-```
-props VendorFormProps
-props PRDetailDrawerProps
-props PRFormProps
-props ProcurementModuleProps
-hook useState
-hook useAuth
-hook useCallback
-hook useEffect
-export ProcurementModule
-handler onClick
-handler onChange
-handler onKeyDown
-handler onRefresh
-handler onSave
-```
-
-### src/modules/ProjectManagementModule.tsx
-```
-props OpportunityPickerProps
-props ProjectFormProps
-props CostFormProps
-props ProjectDetailProps
-props ProjectManagementModuleProps
-hook useState
-hook useEffect
-hook useMemo
-hook useAuth
-hook useCallback
-export ProjectManagementModule
-handler onClick
-handler onChange
-handler onSave
-handler onOpportunities
-handler onRefresh
-handler onPrintReport
-handler onSelect
-```
-
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
-```
-
-### src/modules/SetupWizard.tsx
-```
-props SetupWizardProps
-hook useState
-hook useEffect
-export SetupWizard
-handler onChange
-handler onClick
-```
-
-### src/modules/TodoModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export TodoModule
-handler onClick
-handler onChange
-```
-
-### src/services/apiService.ts
-```
-class ApiService  :13-70
-setAuth  :14-16
-async login  :18-20
-async forgotPassword  :22-24
-async getSetupStatus  :27-27
-async runSetup  :32-32
-async getCustomers  :40-40
-async createCustomer  :41-41
-async updateCustomer  :42-42
-```
-
 ## upgrade-tool
-
-### upgrade-tool/README.md
-```
-h1 Enflow Upgrade Tool
-h2 İlke
-h2 Sürüm kaynağı (kanal)
-h2 Çalıştırma
-h3 CLI (cron / otomasyon)
-h3 Web GUI (operatör)
-h2 Güvenlik
-h2 Üretilen dosyalar (commit edilmez)
-code-fence bash
-code-fence plain
-code-fence cron
-```
-
-### upgrade-tool/cli.mjs
-```
-async function main  :14-47
-```
 
 ### upgrade-tool/core.mjs
 ```
@@ -1189,6 +1319,11 @@ function dbProvider  :149-159
 function backupDb  :161-175
 function restoreDb  :176-181
 function run  :183-192
+```
+
+### upgrade-tool/cli.mjs
+```
+async function main  :14-47
 ```
 
 ### upgrade-tool/server.mjs
@@ -1221,4 +1356,19 @@ input#restartCommand
 button#btnSave
 span#saved
 pre#log
+```
+
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
 ```

@@ -93,6 +93,26 @@ async function uploadToNextcloud(
 
 const pid = (req: Request) => String(req.params.id);
 
+// ── Durum makinesi (B-01) ────────────────────────────────────────────────────
+const STATUS_TRANSITIONS: Record<string, string[]> = {
+  DRAFT: ['ANALYSIS_DONE', 'CANCELLED'],
+  ANALYSIS_DONE: ['PREPARATION', 'CANCELLED'],
+  PREPARATION: ['READY_TO_SIGN', 'CANCELLED'],
+  READY_TO_SIGN: ['PENDING_SIGNATURE_APPROVAL', 'CANCELLED'],
+  PENDING_SIGNATURE_APPROVAL: ['SIGNED', 'PREPARATION', 'CANCELLED'],
+  SIGNED: ['TRANSFERRED', 'TERMINATED'],
+  TRANSFERRED: [],
+  CANCELLED: [],
+  TERMINATED: [],
+};
+
+// Yalnız hassas geçişler için rol kısıtlaması; tanımsız geçişler route-seviyesi 7-rol kapısına tabi.
+const TRANSITION_ROLES: Record<string, string[]> = {
+  SIGNED: ['GENERAL_MANAGER', 'KSU_MGR'],
+  CANCELLED: ['GENERAL_MANAGER', 'KSU_MGR', 'LEGAL_MGR'],
+  TERMINATED: ['GENERAL_MANAGER', 'KSU_MGR', 'LEGAL_MGR'],
+};
+
 // ── LIST ─────────────────────────────────────────────────────────────────────
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const workflows = await prisma.contractWorkflow.findMany({
@@ -141,7 +161,27 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
-  const { contractText, specText, status, signedDate, deadline, contractValue, notes, title, tenderName, tenderNo, projectName } = req.body;
+  const { contractText, specText, status, signedDate, deadline, contractValue, notes, title, tenderName, tenderNo, projectName, cancelReason } = req.body;
+
+  if (status !== undefined) {
+    const current = await prisma.contractWorkflow.findFirst({ where: { id: pid(req), tenantId: req.tenantId } });
+    if (!current) return res.status(404).json({ error: 'Not found' });
+    if (status !== current.status) {
+      const allowed = STATUS_TRANSITIONS[current.status] || [];
+      if (!allowed.includes(status)) {
+        return res.status(409).json({ error: `${current.status} → ${status} geçişine izin verilmiyor.` });
+      }
+      const rolesForTransition = TRANSITION_ROLES[status];
+      if (rolesForTransition && !rolesForTransition.includes(req.userRole || '')) {
+        return res.status(403).json({ error: 'Bu durum geçişi için yetkiniz yok.' });
+      }
+      if ((status === 'CANCELLED' || status === 'TERMINATED') && !String(cancelReason || '').trim()) {
+        return res.status(400).json({ error: 'İptal/fesih gerekçesi zorunludur.' });
+      }
+    }
+  }
+
+  const isTerminalExit = status === 'CANCELLED' || status === 'TERMINATED';
   const wf = await prisma.contractWorkflow.update({
     where: { id: pid(req) },
     data: {
@@ -156,6 +196,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       ...(tenderName !== undefined && { tenderName }),
       ...(tenderNo !== undefined && { tenderNo }),
       ...(projectName !== undefined && { projectName }),
+      ...(isTerminalExit && { cancelReason, cancelledAt: new Date(), cancelledById: req.userId }),
       updatedAt: new Date(),
     },
     include: { documents: { orderBy: { sortOrder: 'asc' } } },
@@ -168,7 +209,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     await completeApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id, req.userId, 'Sözleşme imzalandı.');
   }
 
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { title: wf.title, status: wf.status } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { title: wf.title, status: wf.status, ...(isTerminalExit && { cancelReason }) } });
   res.json(wf);
 }));
 

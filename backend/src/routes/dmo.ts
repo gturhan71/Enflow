@@ -233,13 +233,30 @@ router.post('/orders/:id/recost', tenantMiddleware, editRoles, asyncHandler(asyn
 }));
 
 // Statü ilerlet — yan etkiler: CONFIRMED→kota+kârsız uyarı, DELIVERED→SALES Invoice
-const ALLOWED_STATUS = new Set(['EVALUATION', 'CONFIRMED', 'IN_DELIVERY', 'DELIVERED', 'INVOICED', 'CLOSED', 'REJECTED', 'CANCELLED']);
+// B-02 — durum geçiş matrisi: yalnız izinli önceki→sonraki çiftlerine izin ver (ara adım atlanamaz).
+const DMO_TRANSITIONS: Record<string, string[]> = {
+  EVALUATION: ['CONFIRMED', 'REJECTED', 'CANCELLED'],
+  CONFIRMED: ['IN_DELIVERY', 'CANCELLED', 'REJECTED'],
+  IN_DELIVERY: ['DELIVERED', 'CANCELLED'],
+  DELIVERED: ['INVOICED'],
+  INVOICED: ['CLOSED'],
+  CLOSED: [],
+  REJECTED: [],
+  CANCELLED: [],
+};
+// Kota bu aşamalardan birine ulaşıldığında artırılmış olur (bkz. CONFIRMED bloğu) — decrement simetrisi için.
+const QUOTA_CONSUMED_STATUSES = ['CONFIRMED', 'IN_DELIVERY', 'DELIVERED', 'INVOICED'];
 router.post('/orders/:id/status', tenantMiddleware, editRoles, asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const status = String((req.body as { status?: unknown }).status || '');
-  if (!ALLOWED_STATUS.has(status)) return res.status(400).json({ error: 'Geçersiz statü.' });
   const prev = await prisma.dmoOrder.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!prev) return res.status(404).json({ error: 'Sipariş bulunamadı.' });
+  if (status !== prev.status) {
+    const allowed = DMO_TRANSITIONS[prev.status] || [];
+    if (!allowed.includes(status)) {
+      return res.status(409).json({ error: `${prev.status} → ${status} geçişine izin verilmiyor.` });
+    }
+  }
 
   await prisma.dmoOrder.update({ where: { id }, data: { status } });
   await recomputeOrderCosting(req.tenantId, id); // güncel kur/parametrelerle
@@ -262,6 +279,16 @@ router.post('/orders/:id/status', tenantMiddleware, editRoles, asyncHandler(asyn
           message: `${order.orderNo} (${order.institutionName}) — net ${Math.round(order.netProfit).toLocaleString('tr-TR')} ₺. ${order.alarmReason || ''}`,
           relatedModule: 'dmo', relatedItemId: order.id,
         },
+      });
+    }
+  }
+
+  // B-20 — CANCELLED/REJECTED'e geçişte, kota daha önce tüketilmişse (CONFIRMED'den sonra) simetrik decrement.
+  if ((status === 'CANCELLED' || status === 'REJECTED') && QUOTA_CONSUMED_STATUSES.includes(prev.status)) {
+    if (order.frameworkAgreementId) {
+      await prisma.dmoFrameworkAgreement.updateMany({
+        where: { id: order.frameworkAgreementId, tenantId: req.tenantId },
+        data: { quotaUsed: { decrement: order.revenueTotal } },
       });
     }
   }

@@ -186,8 +186,7 @@ async function main() {
   }
 
   const jwt = secret(48);
-  const pluginSecret = secret(48);
-  ok('AUTH_JWT_SECRET ve PLUGIN_LICENSE_SECRET güvenli rastgele üretildi');
+  ok('AUTH_JWT_SECRET güvenli rastgele üretildi');
 
   const aiBase = await ask('YZ Base URL (ops. — boş geç, uygulamadan da girilebilir)', '');
   const aiKey = aiBase ? await ask('YZ API Key (ops.)', '') : '';
@@ -201,7 +200,6 @@ async function main() {
     // Kimlik doğrulama JWT imza anahtarı — backend (services/auth.ts) bunu okur;
     // üretimde (NODE_ENV=production) ZORUNLUdur, yoksa backend açılışta durur.
     `AUTH_JWT_SECRET=${jwt}`,
-    `PLUGIN_LICENSE_SECRET=${pluginSecret}`,
     `NODE_ENV=production`,
   ];
   if (aiBase) { envLines.push(`AI_BASE_URL=${aiBase}`, `AI_API_KEY=${aiKey}`, `AI_MODEL=${aiModel}`); }
@@ -287,7 +285,7 @@ ${C.b}İlk açılış:${C.r} tarayıcı → http://localhost:${frontendPort}
   ${C.dim}Veritabanı BOŞTUR → ekrana KURULUM SİHİRBAZI gelir:${C.r}
   ${C.dim}şirket + ilk yönetici (GM) + lisans (yoksa 30 günlük deneme). Tamamlanınca otomatik giriş.${C.r}
 ${C.dim}Ek kullanıcı (Yedek Yöneticisi vb.) · YZ entegrasyonu sonradan Ayarlar'dan eklenir.${C.r}
-${C.dim}Sırlar backend/.env içinde (AUTH_JWT_SECRET, PLUGIN_LICENSE_SECRET). Üretimde gizli tutun.${C.r}
+${C.dim}Sırlar backend/.env içinde (AUTH_JWT_SECRET). Üretimde gizli tutun.${C.r}
 ${C.dim}(Kabuk: ${py})${C.r}`);
 
   const pg = globalThis.__pgSummary;

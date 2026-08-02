@@ -117,6 +117,8 @@ model User {
   status       String        @default("ACTIVE")
   tenantId     String
   unitId       String?
+  delegateToUserId String?   // onay vekaleti — bu kullanıcı izinliyken yerine onay verebilecek kişi
+  delegateUntil    DateTime? // null = süresiz vekalet
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   createdOpps  Opportunity[] @relation("CreatedBy")
@@ -124,6 +126,8 @@ model User {
   managedUnits Unit[]        @relation("UnitManager")
   unit         Unit?         @relation(fields: [unitId], references: [id])
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  delegateTo   User?         @relation("UserDelegate", fields: [delegateToUserId], references: [id], onDelete: SetNull)
+  delegatedFrom User[]       @relation("UserDelegate")
 }
 
 model Customer {
@@ -517,10 +521,13 @@ model ContractWorkflow {
   specText        String?
   aiAnalysis      String?               // JSON
   status          String                @default("DRAFT")
-  // DRAFT | ANALYSIS_DONE | PREPARATION | READY_TO_SIGN | SIGNED | TRANSFERRED
+  // DRAFT | ANALYSIS_DONE | PREPARATION | READY_TO_SIGN | PENDING_SIGNATURE_APPROVAL | SIGNED | TRANSFERRED | CANCELLED | TERMINATED
   signedDate      DateTime?
   deadline        DateTime?
   notes           String?
+  cancelReason    String?               // CANCELLED/TERMINATED geçişinde zorunlu gerekçe
+  cancelledAt     DateTime?
+  cancelledById   String?
   projectId       String?               // /transfer ile oluşturulan Project (idempotency + bağ)
   procurementRequestId String?          // /handoff-procurement ile oluşturulan PurchaseRequest (idempotency + bağ)
   tenantId        String

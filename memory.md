@@ -17,7 +17,7 @@
 - [ ] **Faz 7.4** — UnitReport PDF/yazdırma + dönem karşılaştırma
 - [ ] **Faz 8.x** — kalan handler'lar (CRM/Hukuk)
 
-> ⚠️ **Production:** `PLUGIN_LICENSE_SECRET` ortam değişkeni canlıya çıkışta mutlaka değiştirilmeli.
+> ℹ️ Lisanslama Ed25519'a geçti (`PLUGIN_LICENSE_SECRET` kaldırıldı) — bkz. `docs/LICENSING_ARCHITECTURE.md`.
 > RBAC regresyon süiti her faz sonunda **69/69** geçti.
 
 ---

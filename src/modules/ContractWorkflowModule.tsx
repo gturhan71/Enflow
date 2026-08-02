@@ -11,6 +11,7 @@ import {
 import { apiClient } from '../services/apiClient';
 import { apiService } from '../services/apiService';
 import { useAIGate } from '../contexts/AIGateContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Opportunity, Proposal, LegalCase, LegalRequest } from '../types';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -45,6 +46,8 @@ interface ContractWorkflow {
   signedDate?: string | null;
   deadline?: string | null;
   notes?: string | null;
+  cancelReason?: string | null;
+  cancelledAt?: string | null;
   projectId?: string | null;
   procurementRequestId?: string | null;
   documents: ContractWorkflowDoc[];
@@ -108,6 +111,11 @@ const WORKFLOW_STATUS_STEPS = [
   { key: 'TRANSFERRED',                label: 'Aktarıldı' },
 ];
 
+// B-01 — durum makinesi terminal çıkışları (adım çubuğunda gösterilmez, ayrı banner ile gösterilir)
+const TERMINAL_STATUS_LABELS: Record<string, string> = { CANCELLED: 'İptal Edildi', TERMINATED: 'Feshedildi' };
+// B-14 — bu geçişleri yalnız bu roller yapabilir (backend TRANSITION_ROLES ile birebir)
+const CANCEL_TERMINATE_ROLES = ['GENERAL_MANAGER', 'KSU_MGR', 'LEGAL_MGR'];
+
 // ── API helpers ────────────────────────────────────────────────────────────────
 
 const BASE = '/contract-workflows';
@@ -134,6 +142,7 @@ function bestProposalPrice(opportunityId: string, proposals: Proposal[]): number
 }
 
 export function ContractWorkflowModule({ opportunities = [], proposals = [], initialItemId }: Props) {
+  const { currentUser } = useAuth();
   const [mode, setMode] = useState<'contracts' | 'legal'>('contracts');
   const [tab, setTab] = useState<TabId>('context');
   const [workflows, setWorkflows] = useState<ContractWorkflow[]>([]);
@@ -144,6 +153,9 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
   const [transferProject, setTransferProject] = useState<{ code?: string; name?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [cancelModalTarget, setCancelModalTarget] = useState<'CANCELLED' | 'TERMINATED' | null>(null);
+  const [cancelReasonInput, setCancelReasonInput] = useState('');
+  const [cancelling, setCancelling] = useState(false);
 
   // Form states
   const [form, setForm] = useState({ title: '', opportunityId: '', contractValue: '', deadline: '', notes: '', tenderName: '', tenderNo: '' });
@@ -447,6 +459,25 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
     } catch (e) { notify((e as Error).message, true); }
   };
 
+  const handleCancelTerminate = async () => {
+    if (!selected || !cancelModalTarget) return;
+    if (!cancelReasonInput.trim()) { notify('İptal/fesih gerekçesi zorunludur.', true); return; }
+    setCancelling(true);
+    try {
+      const wf = await apiFetch(`${BASE}/${selected.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: cancelModalTarget, cancelReason: cancelReasonInput.trim() }),
+      });
+      selectWorkflow(wf);
+      setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
+      notify(cancelModalTarget === 'CANCELLED' ? 'Sözleşme süreci iptal edildi.' : 'Sözleşme feshedildi.', true);
+      setCancelModalTarget(null);
+      setCancelReasonInput('');
+    } catch (e) { notify((e as Error).message, true); }
+    finally { setCancelling(false); }
+  };
+
   // ── Transfer Tab ──────────────────────────────────────────────────────────────
 
   const handleTransfer = async () => {
@@ -604,7 +635,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                 <div className="text-sm font-medium text-slate-200 truncate">{wf.title}</div>
                 <div className="flex items-center gap-2 mt-1">
                   <span className={`text-xs px-1.5 py-0.5 rounded border ${DOC_STATUS_STYLES[wf.status] || 'bg-slate-500/20 text-slate-400 border-slate-500/30'}`}>
-                    {WORKFLOW_STATUS_STEPS.find(s => s.key === wf.status)?.label || wf.status}
+                    {WORKFLOW_STATUS_STEPS.find(s => s.key === wf.status)?.label || TERMINAL_STATUS_LABELS[wf.status] || wf.status}
                   </span>
                   <span className="text-xs text-slate-500">{wf.documents.length} belge</span>
                 </div>
@@ -664,6 +695,16 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                     )}
                   </div>
                 </div>
+                {/* İptal / Fesih (B-01+B-14) */}
+                {currentUser && CANCEL_TERMINATE_ROLES.includes(currentUser.role) &&
+                  !['TRANSFERRED', 'CANCELLED', 'TERMINATED'].includes(selected.status) && (
+                  <button
+                    onClick={() => setCancelModalTarget(selected.status === 'SIGNED' ? 'TERMINATED' : 'CANCELLED')}
+                    className="text-xs px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors flex items-center gap-1.5 flex-shrink-0"
+                  >
+                    <XCircle className="w-3.5 h-3.5" /> {selected.status === 'SIGNED' ? 'Feshet' : 'İptal Et'}
+                  </button>
+                )}
                 {/* Status progress */}
                 <div className="hidden lg:flex items-center gap-1">
                   {WORKFLOW_STATUS_STEPS.map((step, i) => {
@@ -1265,6 +1306,24 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                         </div>
                       )}
 
+                      {/* CANCELLED/TERMINATED banner (B-01) */}
+                      {(selected.status === 'CANCELLED' || selected.status === 'TERMINATED') && (
+                        <div className="flex items-start gap-3 p-4 rounded-xl border border-red-500/30 bg-red-500/10">
+                          <XCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-red-300">
+                              {selected.status === 'CANCELLED' ? 'Süreç İptal Edildi' : 'Sözleşme Feshedildi'}
+                            </p>
+                            {selected.cancelledAt && (
+                              <p className="text-xs text-slate-400 mt-0.5">{new Date(selected.cancelledAt).toLocaleDateString('tr-TR')}</p>
+                            )}
+                            {selected.cancelReason && (
+                              <p className="text-xs text-slate-300 mt-1.5">Gerekçe: {selected.cancelReason}</p>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
                       {/* STEP 4 — signed/transferred */}
                       {(selected.status === 'SIGNED' || selected.status === 'TRANSFERRED') && (
                         <div className="flex items-center gap-3 p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10">
@@ -1393,6 +1452,54 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
       </div>
       </div>
       )}
+
+      {/* İptal/Fesih gerekçe modalı (B-01) */}
+      <AnimatePresence>
+        {cancelModalTarget && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+            onClick={() => { if (!cancelling) { setCancelModalTarget(null); setCancelReasonInput(''); } }}
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              onClick={e => e.stopPropagation()}
+              className="glass-card w-full max-w-md p-5 space-y-4"
+            >
+              <h3 className="text-sm font-semibold text-red-300 flex items-center gap-2">
+                <XCircle className="w-4 h-4" />
+                {cancelModalTarget === 'CANCELLED' ? 'Süreci İptal Et' : 'Sözleşmeyi Feshet'}
+              </h3>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Gerekçe (zorunlu)</label>
+                <textarea
+                  className="input-glass w-full min-h-[90px]"
+                  value={cancelReasonInput}
+                  onChange={e => setCancelReasonInput(e.target.value)}
+                  placeholder="İptal/fesih gerekçesini yazın..."
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => { setCancelModalTarget(null); setCancelReasonInput(''); }}
+                  disabled={cancelling}
+                  className="btn-secondary flex-1"
+                >
+                  Vazgeç
+                </button>
+                <button
+                  onClick={handleCancelTerminate}
+                  disabled={cancelling || !cancelReasonInput.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30 text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                  Onayla
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
