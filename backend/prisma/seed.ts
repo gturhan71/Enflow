@@ -50,7 +50,7 @@ async function main() {
 
   const igpdUnit = await prisma.unit.create({
     data: {
-      name: 'İGPD — İş Geliştirme & Pazarlama Direktörlüğü',
+      name: 'İGPD — İş Geliştirme Direktörlüğü',
       tenantId: tenant.id,
       description: 'Fırsat programı yönetimi, ziyaret planı ve onay takibi.',
     },
@@ -82,7 +82,7 @@ async function main() {
 
   const isabUnit = await prisma.unit.create({
     data: {
-      name: 'İSAB — İhale Satın Alma Birimi',
+      name: 'İSAB — İhale Birimi',
       tenantId: tenant.id,
       description: 'İhale takip ve EKAP süreçleri.',
     },

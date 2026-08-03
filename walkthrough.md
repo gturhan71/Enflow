@@ -82,10 +82,10 @@ Enflow, B2B teknoloji şirketleri için tasarlanmış **çok kiracılı (multi-t
 | `AUDITOR` | Denetçi | Salt okunur erişim |
 | `ADMIN` | Sistem Yöneticisi | Tüm ayarlar |
 | `LEGAL_MGR` | Hukuk Müdürü / Şirket Avukatı | Hukuk görünümü, vaka takibi |
-| `IGPD_MGR` | İş Geliştirme & Pazarlama Müdürü | Onay zinciri aşaması |
+| `IGPD_MGR` | İş Geliştirme Müdürü | Onay zinciri aşaması |
 | `KGD_MGR` | Kalite Güvence Müdürü | Onay zinciri aşaması |
 | `KSU_MGR` | Kontrat & Sözleşme Müdürü | Onay zinciri aşaması |
-| `ISAB_MGR` | İhale Satın Alma Müdürü | İhale/İSAB modülü |
+| `ISAB_MGR` | İhale Birimi Müdürü | İhale/İSAB modülü |
 
 > **Kurumsal onay swimlane rolleri** (FINANCE_MGR, İGPD, KGD, KSU, İSAB) `ApprovalChain` onay aşamalarında kullanılır. Her birim yöneticisi "Bekleyen Onaylarım" sekmesinde kendi sırası gelmiş onayları görür (bkz. § 25). İzinler kullanıcının `permissions` JSON'undan verilir; GM tüm modülleri görür (superuser).
 
@@ -1408,7 +1408,7 @@ Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:
 
 ### 27.5 Roller & birimler
 
-GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
+GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
 
 > **Görev Ayrılığı (SoD):** Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. **Onay matrisi (DoA):** tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). **Optimistic locking:** eşzamanlı onay/red yarışı 409 ile engellenir.
 

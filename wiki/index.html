@@ -119,7 +119,7 @@
 
 <section id="s27-5">
   <h2><span class="n">5</span>Roller &amp; birimler</h2>
-  <p>GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme &amp; Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat &amp; Sözleşme), ISAB_MGR (İhale Satın Alma) + <b>BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)</b>. Toplam <b>20 rol</b>. İzinler kullanıcının <code>permissions</code> JSON'undan gelir; GM her şeyi görür.</p>
+  <p>GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat &amp; Sözleşme), ISAB_MGR (İhale Birimi) + <b>BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)</b>. Toplam <b>20 rol</b>. İzinler kullanıcının <code>permissions</code> JSON'undan gelir; GM her şeyi görür.</p>
 <div class="note"><b>Görev Ayrılığı (SoD):</b> Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. <b>Onay matrisi (DoA):</b> tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). <b>Optimistic locking:</b> eşzamanlı onay/red yarışı 409 ile engellenir.</div>
 </section>
 

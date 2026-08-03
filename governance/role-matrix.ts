@@ -235,7 +235,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     tasks: [], approvalIn: ['OPPORTUNITY', 'PROPOSAL'],
     agentSubstitute: { pluginKey: 'AGENT_IGPD', modes: ['ADVISORY', 'AUTONOMOUS'] },
     reviewed: 'DONE',
-    notes: 'İş Geliştirme & Pazarlama yöneticisi — swimlane İGPD onayı + BD triyajı (deterministik agent annotation). DB personeli yok; İGPD agent doldurur.',
+    notes: 'İş Geliştirme yöneticisi — swimlane İGPD onayı + BD triyajı (deterministik agent annotation). DB personeli yok; İGPD agent doldurur.',
   },
   {
     role: 'KGD_MGR', unit: 'Kalite Güvence', kind: 'MANAGER', staffing: 'HUMAN',
@@ -263,7 +263,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Kontrat & Sözleşme yöneticisi — 3 onay zincirinde (sözleşme imzanın 1. aşaması). ✅ Artık gerçek personel atandı (sozlesme.uzmani@enflow.com) → imza/onay aşamaları auto-skip OLMUYOR (eski risk çözüldü).',
   },
   {
-    role: 'ISAB_MGR', unit: 'İhale Satın Alma', kind: 'MANAGER', staffing: 'HUMAN',
+    role: 'ISAB_MGR', unit: 'İhale Birimi', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['DASHBOARD_VIEW', 'SALES_SUPPORT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
     endpointDomains: [], // tenders route'u rol kapısı yok (frontend SALES_SUPPORT_VIEW)
     decisionRights: [
@@ -273,7 +273,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     tasks: [], approvalIn: [],
     agentSubstitute: { pluginKey: 'AGENT_TENDER', modes: ['ADVISORY', 'AUTONOMOUS'] },
     reviewed: 'DONE',
-    notes: 'İhale Satın Alma birim yöneticisi — Tender/checklist/teminat + WON→Sözleşme (T3). DB personeli yok; Tender agent doldurur (checklist/deadline).',
+    notes: 'İhale Birimi yöneticisi — Tender/checklist/teminat + WON→Sözleşme (T3). DB personeli yok; Tender agent doldurur (checklist/deadline).',
   },
   {
     role: 'LEGAL_MGR', unit: 'Hukuk', kind: 'MANAGER', staffing: 'HUMAN',

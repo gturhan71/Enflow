@@ -58,7 +58,7 @@ export const HELP_ARTICLES: HelpArticle[] = [
   {
     moduleId: 'sales-support',
     summary: 'Kamu ihalelerinde şartname analizi, uygunluk kontrol listesi ve teminat takibi.',
-    audience: 'Satış Destek ve İSAB (İhale Satın Alma Birimi) ekibi.',
+    audience: 'Satış Destek ve İSAB (İhale Birimi) ekibi.',
     sections: [
       { heading: 'Ne işe yarar', body: 'Bir ihale dosyası açtığınızda idari şartname otomatik olarak analiz edilir ve size gerekli evrakların bir kontrol listesi (checklist) hâlinde çıkarılır; her evrağın durumu (bekliyor/yüklendi/onaylandı) takip edilir. Geçici teminat mektubu bilgisi de burada tutulur.' },
       { heading: 'Nasıl kullanılır', body: '1) "Yeni İhale" ile İKN (İhale Kayıt Numarası) ve temel bilgileri girin. 2) Şartname dosyasını yükleyip analiz ettirin — sistem otomatik bir evrak listesi oluşturur. 3) Her evrağı hazırladıkça sırayla yükleyin; termine yaklaşan ihaleler için zaman-duyarlı hatırlatmalar Dashboard\'da görünür. 4) İhale kazanılırsa (WON) durumunu güncelleyin — bu, Sözleşme Yönetimi\'nde otomatik bir kayıt açar.' },

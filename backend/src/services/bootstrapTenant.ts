@@ -11,11 +11,11 @@ export const DEFAULT_UNITS: { key: string; name: string; description: string }[]
   { key: 'sales', name: 'Satış & Pazarlama', description: 'Müşteri ilişkileri ve yeni fırsat yönetimi.' },
   { key: 'technical', name: 'Teknik Çözümler & Presales', description: 'Dizayn, BoM ve teknik şartname analizi.' },
   { key: 'finance', name: 'Finans', description: 'Maliyet ve finansman değerlendirmesi.' },
-  { key: 'igpd', name: 'İGPD — İş Geliştirme & Pazarlama Direktörlüğü', description: 'Fırsat programı yönetimi, ziyaret planı ve onay takibi.' },
+  { key: 'igpd', name: 'İGPD — İş Geliştirme Direktörlüğü', description: 'Fırsat programı yönetimi, ziyaret planı ve onay takibi.' },
   { key: 'top', name: 'Üst Yönetim (GMÜ)', description: 'Genel müdür üst yönetim onay aşaması.' },
   { key: 'ksu', name: 'KSU — Kontrat & Sözleşme Uzmanlığı', description: 'Sözleşme evrak kontrolü ve imza süreci doğrulaması.' },
   { key: 'kgd', name: 'KGD — Kalite Güvence Direktörlüğü', description: 'Öğrenilmiş dersler, risk/fırsat ve kurumsal metrik raporlaması.' },
-  { key: 'isab', name: 'İSAB — İhale Satın Alma Birimi', description: 'İhale takip ve EKAP süreçleri.' },
+  { key: 'isab', name: 'İSAB — İhale Birimi', description: 'İhale takip ve EKAP süreçleri.' },
 ];
 
 // İlk GM kullanıcısı için geniş görünüm izinleri (GM zaten superuser; tutarlılık için).

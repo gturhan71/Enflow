@@ -628,10 +628,10 @@ Dashboard Header'da kırmızı bayraklı uyarı ikonu + bildirim paneli.
 | `AUDITOR` | Denetçi |
 | `ADMIN` | Sistem Yöneticisi |
 | `LEGAL_MGR` | Hukuk Müdürü / Şirket Avukatı |
-| `IGPD_MGR` | İş Geliştirme & Pazarlama Müdürü |
+| `IGPD_MGR` | İş Geliştirme Müdürü |
 | `KGD_MGR` | Kalite Güvence Müdürü |
 | `KSU_MGR` | Kontrat & Sözleşme Müdürü |
-| `ISAB_MGR` | İhale Satın Alma Müdürü |
+| `ISAB_MGR` | İhale Birimi Müdürü |
 
 > Kurumsal onay swimlane rolleri (FINANCE_MGR, İGPD, KGD, KSU, İSAB) `ApprovalChain` aşamalarında kullanılır; karşılık gelen `Unit` kayıtları tenant'a eklenir. İzin kullanıcı `permissions` JSON'undan verilir (kod-seviyesi rol→izin haritası yok); GM superuser tüm modülleri görür.
 

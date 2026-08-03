@@ -6,7 +6,7 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 **Hedef kullanıcı rolleri:** GENERAL_MANAGER, SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL, PROJECT_MANAGER, ADMIN
 
-**Kurumsal onay swimlane rolleri (2026-06-16 eklendi):** FINANCE_MGR, IGPD_MGR (İş Geliştirme & Pazarlama), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Satın Alma), LEGAL_MGR (Hukuk) — `src/constants.ts` ROLE_LABELS'ta tanımlı; karşılık gelen `Unit` kayıtları tenant-1'e eklendi.
+**Kurumsal onay swimlane rolleri (2026-06-16 eklendi):** FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi), LEGAL_MGR (Hukuk) — `src/constants.ts` ROLE_LABELS'ta tanımlı; karşılık gelen `Unit` kayıtları tenant-1'e eklendi.
 
 ## Sistem Durumu & Uçtan Uca Akış (Güncel — 2026-06-20)
 
@@ -349,7 +349,6 @@ backend/src/services/updateNotifier.ts ← prismaClient
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/components/HandOffModal.tsx ← services/apiService
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/utils
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
@@ -368,12 +367,14 @@ src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/SetupWizard.tsx ← services/apiService, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/Dashboard.tsx ← types, constants, lib/utils, contexts/AuthContext, services/apiService
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/HelpModule.tsx ← constants, contexts/AuthContext, services/apiService, content/helpArticles, lib/utils
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
@@ -396,8 +397,8 @@ src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule
 src/services/apiService.ts                    ~ApiService
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
 backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
-backend/src/services/financeEngine.ts         +computeFxGainLoss  ~presentBreakdown
 backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
+backend/src/services/financeEngine.ts         +computeFxGainLoss  ~presentBreakdown
 backend/src/services/restoreService.ts        ~analyzeRestore
 backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
 backend/src/services/serviceTicketReminders.ts +sweepServiceTicketSla
@@ -685,6 +686,11 @@ export function computeOrderCosting  :118-179
 export async function recomputeOrderCosting  :182-211
 ```
 
+### backend/src/services/guaranteeReminders.ts
+```
+export async function sweepGuaranteeReminders  :19-59
+```
+
 ### backend/src/services/financeEngine.ts
 ```
 export interface MoneyBreakdown  :13-18
@@ -712,11 +718,6 @@ export function computeFxGainLoss  :89-91
 export function computeCompanyOverhead  :101-105
 export function computeUnitParticipationLoad  :112-115
 export function projectMargins  :126-126
-```
-
-### backend/src/services/guaranteeReminders.ts
-```
-export async function sweepGuaranteeReminders  :19-59
 ```
 
 ### backend/src/services/restoreService.ts
@@ -808,14 +809,6 @@ export type AgentMode  :14-14
 ```
 
 ## license-tool
-
-### license-tool/core.mjs
-```
-export function keygen  :13-19
-export function makePayload  :22-35
-export function issue  :38-42
-export function publicFromPrivate  :45-47
-```
 
 ### license-tool/README.md
 ```
@@ -942,18 +935,6 @@ export UnitManagement
 handler onClick
 handler onSubmit
 handler onChange
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useEffect
-export Header
-handler onAccess
-handler onClick
 ```
 
 ### src/components/HandOffModal.tsx
@@ -1167,6 +1148,31 @@ export UserManagement
 handler onSubmit
 ```
 
+### src/content/helpArticles.ts
+```
+export interface HelpArticleSection  :8-11
+heading: string  :9-9
+body: string  :10-10
+export interface HelpArticle  :13-18
+moduleId: string  :14-14
+summary: string  :15-15
+audience: string  :16-16
+sections: HelpArticleSection[]  :17-17
+export const getHelpArticle  :186-186
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
 ### src/modules/BackupModule.tsx
 ```
 hook useState
@@ -1256,6 +1262,16 @@ handler onClick
 handler onChange
 handler onBlur
 handler onClose
+```
+
+### src/modules/HelpModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export HelpModule
+handler onChange
 ```
 
 ### src/modules/ProcurementModule.tsx
