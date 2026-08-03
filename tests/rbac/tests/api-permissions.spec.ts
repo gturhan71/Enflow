@@ -11,7 +11,7 @@
 // ============================================================================
 
 import { test, expect, request, APIRequestContext } from "@playwright/test";
-import { apiMatrix, ROLE_NAMES, apiBaseURL, RoleName } from "../rbac.config";
+import { apiMatrix, ROLE_NAMES, apiBaseURL, RoleName, roles, testPassword } from "../rbac.config";
 import fs from "fs";
 import path from "path";
 
@@ -71,3 +71,29 @@ for (const role of ROLE_NAMES) {
     }
   });
 }
+
+// ============================================================================
+// Regresyon: /auth/login yanıtı tenant.moduleSettings'i (YZ/entegrasyon API
+// anahtarları/şifreleri) ASLA sızdırmamalı — rol farketmez, herkes tenant'ın
+// aynı satırını görür. backend/src/routes/auth.ts'te bir gün tekrar
+// `include: { tenant: true }` sonucu ham geçilirse burada kırmızı yanar.
+// ============================================================================
+test.describe("API güvenliği — /auth/login sızıntı testi", () => {
+  test("login yanıtında tenant.moduleSettings / apiKey dönmemeli", async () => {
+    const api = await request.newContext({ baseURL: apiBaseURL });
+    const res = await api.fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      data: JSON.stringify({ email: roles.general_manager.email, password: testPassword }),
+    });
+    expect(res.status(), "GM login başarısız olmamalı").toBe(200);
+
+    const body = await res.json();
+    expect(body.user?.tenant?.moduleSettings, "🔴 SIZINTI: tenant.moduleSettings login yanıtında döndü").toBeUndefined();
+
+    const raw = JSON.stringify(body);
+    expect(raw.toLowerCase(), "🔴 SIZINTI: login yanıtında 'apikey' geçiyor").not.toContain("apikey");
+
+    await api.dispose();
+  });
+});

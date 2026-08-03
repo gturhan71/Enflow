@@ -29,9 +29,12 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
     if (Array.isArray(parsed)) permissions = parsed.filter((p): p is string => typeof p === 'string' && p.length > 3);
   } catch { /* boş dizi ile devam */ }
 
-  // Parola hash'ini ASLA yanıta koyma.
-  const { password: _pw, ...safeUser } = user;
-  res.json({ user: { ...safeUser, permissions }, token });
+  // Parola hash'ini ASLA yanıta koyma. `tenant.moduleSettings` da YZ/entegrasyon
+  // API anahtarları/şifreleri içerir (bkz. tenants.ts ai-settings maskeleme kuralı) —
+  // frontend bu alanı hiç kullanmıyor, login yanıtında sızdırılmasına gerek yok.
+  const { password: _pw, tenant, ...safeUser } = user;
+  const { moduleSettings: _ms, ...safeTenant } = tenant;
+  res.json({ user: { ...safeUser, tenant: safeTenant, permissions }, token });
 }));
 
 router.post('/forgot-password', asyncHandler(async (req: Request, res: Response) => {
