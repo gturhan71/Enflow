@@ -4,7 +4,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import dotenv from 'dotenv';
 import { roundMoneyData } from './services/moneyRounding';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // DB seçimi DATABASE_URL şemasından türetilir: postgres(ql):// → PostgreSQL (pg
 // adapter), aksi halde SQLite/libSQL (file:/libsql:). Tek kod tabanı iki veritabanını

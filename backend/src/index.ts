@@ -47,7 +47,7 @@ import reportsRouter from './routes/reports';
 import pluginsRouter from './routes/plugins';
 import dmoRouter from './routes/dmo';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const app = express();
 const port = 3002;

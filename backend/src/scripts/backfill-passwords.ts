@@ -9,7 +9,7 @@ import { PrismaLibSql } from '@prisma/adapter-libsql';
 import bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const DEFAULT_PASSWORD = process.env.DEFAULT_SEED_PASSWORD || '123456';
 const adapter = new PrismaLibSql({ url: process.env.DATABASE_URL || 'file:./dev.db' });
