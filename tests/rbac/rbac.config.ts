@@ -450,4 +450,89 @@ export const uiMatrix: UiCase[] = [
     sidebarText: "DMO Kataloğu",
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
   },
+
+  // ── Modül boyutu — kalan NAV_ITEMS üst-seviye modülleri (2026-08-03) ────────
+  // Yukarıdaki 5 kayıt yalnızca spot-check'ti (5/19 modül). Buradaki 15 kayıt,
+  // NAV_ITEMS'teki geri kalan tüm üst-seviye modülleri kapsar — artık modül
+  // boyutu da tam (19/19). Her `expect` DB'deki gerçek test kullanıcısı
+  // `permissions` alanından üretildi (src/contexts/AuthContext.hasPermission
+  // ile BİREBİR aynı mantık: GENERAL_MANAGER superuser, diğerleri liste
+  // üyeliği) — elle tahmin değil. Yeni bir NAV_ITEMS modülü eklendiğinde
+  // buraya da bir kayıt eklenmeli (aksi halde o modül RBAC UI testinde kör
+  // nokta kalır).
+  {
+    name: "Dashboard menüsü",
+    sidebarText: "Dashboard",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "visible", presales_mgr: "visible", technical_spec: "visible", operations_mgr: "visible", hr_mgr: "visible", auditor: "visible", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Ziyaret Planı menüsü",
+    sidebarText: "Ziyaret Planı",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Satış Destek menüsü",
+    sidebarText: "Satış Destek",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "visible", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Sözleşme Yönetimi menüsü",
+    sidebarText: "Sözleşme Yönetimi",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Proje Yönetimi menüsü",
+    sidebarText: "Proje Yönetimi",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Satın Alma menüsü",
+    sidebarText: "Satın Alma",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "visible", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Garanti & Servis menüsü",
+    sidebarText: "Garanti & Servis",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden" },
+  },
+  {
+    name: "Finans menüsü",
+    sidebarText: "Finans",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Görevler & Takip menüsü",
+    sidebarText: "Görevler & Takip",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "hidden", presales_mgr: "visible", technical_spec: "visible", operations_mgr: "visible", hr_mgr: "visible", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Yönetim Raporları menüsü",
+    sidebarText: "Yönetim Raporları",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Genel Hususlar menüsü",
+    sidebarText: "Genel Hususlar",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Şirket Evrakları menüsü",
+    sidebarText: "Şirket Evrakları",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "hidden", presales_mgr: "visible", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "visible", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
+  },
+  {
+    name: "Fiziksel Arşiv menüsü",
+    sidebarText: "Fiziksel Arşiv",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "visible", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Yedekleme menüsü",
+    sidebarText: "Yedekleme",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
+    name: "Yardım menüsü",
+    sidebarText: "Yardım",
+    expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "visible", presales_mgr: "visible", technical_spec: "visible", operations_mgr: "visible", hr_mgr: "visible", auditor: "visible", kgd_mgr: "visible", backup_admin: "visible" },
+  },
 ];

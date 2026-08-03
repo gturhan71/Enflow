@@ -78,10 +78,13 @@ const Sidebar = ({
         )}
       </AnimatePresence>
 
-      <div className={cn(
-        "fixed lg:sticky top-0 left-0 h-screen bg-white/20 backdrop-blur-3xl border-r border-white/20 flex flex-col z-[100] transition-transform duration-500 w-72 lg:translate-x-0 overflow-hidden",
-        isOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
+      <div
+        data-testid="sidebar"
+        className={cn(
+          "fixed lg:sticky top-0 left-0 h-screen bg-white/20 backdrop-blur-3xl border-r border-white/20 flex flex-col z-[100] transition-transform duration-500 w-72 lg:translate-x-0 overflow-hidden",
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
       <div className="pt-[calc(3rem+env(safe-area-inset-top))] p-8 flex items-center gap-4 border-b border-white/10 group cursor-pointer">
         <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/20 group-hover:scale-110 transition-all duration-500 overflow-hidden">
           {companyLogo ? (

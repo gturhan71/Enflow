@@ -34,7 +34,13 @@ for (const role of ROLE_NAMES) {
         // Sidebar'ın yüklenmesini bekle (en az bir menü öğesi görünür olmalı)
         await page.waitForTimeout(1500);
 
-        const element = page.getByText(c.sidebarText, { exact: false }).first();
+        // Aramayı sidebar'a (Sidebar.tsx kök `data-testid="sidebar"`) daralt —
+        // sayfa genelinde arama, kısa/ortak alt-string'lerin Dashboard
+        // içeriğiyle yanlışlıkla eşleşmesine yol açabilir (ör. "Finans" →
+        // "Finansman / Nakit Akış" widget başlığı). Test Ortamı bölümü
+        // (Güvenlik Testi/Sanal Agentlar/Denetim İzi) <nav>'ın DIŞINDA ama
+        // aynı sidebar kökünün içinde olduğu için testid gerekti.
+        const element = page.getByTestId("sidebar").getByText(c.sidebarText, { exact: false }).first();
         const isVisible = await element.isVisible().catch(() => false);
 
         if (expected === "visible") {
