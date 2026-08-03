@@ -82,9 +82,11 @@ export const MOCK_TENANTS: Tenant[] = [
 ];
 
 export const NAV_ITEMS = [
-  // ── İş akışı sırasına göre düzenlenmiş ──────────────────────────────────
+  // ── İş akışı sırasına göre düzenlenmiş: Ziyaret → CRM(Fırsat) → Presales
+  // (BoM/Maliyet) → [İhale/İSAB] → Sözleşme(imza) → Proje → Satınalma →
+  // Garanti/Servis → Finans. Ardından paralel kanal (DMO), çalışma araçları
+  // (Görevler), raporlama/yönetişim katmanı, en sonda sistem/ayarlar.
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },
-  { id: 'management-reports', label: 'Yönetim Raporları', icon: BarChart3, requiredPermission: 'MANAGEMENT_REPORTS_VIEW' },
   { id: 'visit-plan', label: 'Ziyaret Planı', icon: Calendar, requiredPermission: 'VISIT_PLAN_VIEW' },
   {
     id: 'crm',
@@ -93,10 +95,10 @@ export const NAV_ITEMS = [
     requiredPermission: 'CRM_VIEW',
     subItems: [
       { id: 'crm-dashboard',    label: 'Genel Bakış',        requiredPermission: 'CRM_VIEW' },
+      { id: 'crm-customers',    label: 'Müşteriler',         requiredPermission: 'CRM_CUSTOMERS_VIEW' },
       { id: 'crm-opportunities', label: 'Fırsatlar',        requiredPermission: 'CRM_OPPS_VIEW' },
       { id: 'crm-cost',         label: 'Maliyet Analizi',    requiredPermission: 'COST_ANALYSIS_VIEW' },
       { id: 'crm-proposals',    label: 'Teklifler',          requiredPermission: 'CRM_PROPOSALS_VIEW' },
-      { id: 'crm-customers',    label: 'Müşteriler',         requiredPermission: 'CRM_CUSTOMERS_VIEW' },
       { id: 'crm-negotiation',  label: 'Canlı Pazarlıklar',  requiredPermission: 'CRM_OPPS_VIEW' },
     ],
   },
@@ -111,15 +113,18 @@ export const NAV_ITEMS = [
   },
   { id: 'sales-support',     label: 'Satış Destek',       icon: FileCheck,    requiredPermission: 'SALES_SUPPORT_VIEW' },
   { id: 'contract-workflow', label: 'Sözleşme Yönetimi',  icon: FileSignature, requiredPermission: 'CONTRACTS_VIEW' },
-  { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
+  { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'service-tickets',   label: 'Garanti & Servis',    icon: Wrench,        requiredPermission: 'SERVICE_TICKETS_VIEW' },
   { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
   { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW', requiredEntitlement: 'DMO_MODULE' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
+  // ── Raporlama & yönetişim (akış adımı değil, destek katmanı) ─────────────
+  { id: 'management-reports', label: 'Yönetim Raporları', icon: BarChart3, requiredPermission: 'MANAGEMENT_REPORTS_VIEW' },
+  { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },
-  { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
+  // ── Sistem ────────────────────────────────────────────────────────────
   { id: 'backup',            label: 'Yedekleme',           icon: DatabaseBackup, requiredPermission: 'BACKUP_VIEW' },
   {
     id: 'settings',
