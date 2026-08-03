@@ -258,7 +258,11 @@ const Header = ({
           </AnimatePresence>
         </div>
         
-        <button className="hidden sm:flex p-3 bg-white/30 dark:bg-slate-800/30 border border-white/40 dark:border-white/10 rounded-[20px] text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-white/60 transition-all backdrop-blur-md active:scale-90">
+        <button
+          aria-label="Yardım"
+          onClick={() => { if (onNavigate) onNavigate('help', activeTab); else setActiveTab?.('help'); }}
+          className="hidden sm:flex p-3 bg-white/30 dark:bg-slate-800/30 border border-white/40 dark:border-white/10 rounded-[20px] text-slate-500 dark:text-slate-400 hover:text-primary hover:bg-white/60 transition-all backdrop-blur-md active:scale-90"
+        >
           <HelpCircle size={18} />
         </button>
 

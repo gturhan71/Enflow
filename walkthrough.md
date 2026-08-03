@@ -1339,7 +1339,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 > 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
 >
-> Ölçek (2026-06-27): **56 veri modeli · 30+ ekran modülü · 34 API alanı · 24 servis · 8 sanal agent · 20 rol · 7 katman.** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi.)
+> Ölçek (2026-08-03): **67 veri modeli · 33 ekran modülü · 38 API alanı · 35 servis · 8 sanal agent · 20 rol · 8 katman (0–7).** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi + DMO Kataloğu + Garanti & Servis + işletme maliyeti dağıtımı + satış fiyatlandırma motoru + uygulama-içi Yardım modülü.)
 
 ### 27.1 Enflow nedir? (tek paragraf)
 
@@ -1372,10 +1372,14 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
 [Satınalma]       Talep → tedarikçi teklifi → PO → teslimat → fatura (9 statü)
      │
      ▼
-[Finans]          Faturalama, tahsilat (kısmi), teminat mektupları, maliyet onayı
+[Garanti & Servis] Teslim sonrası servis talebi/arıza kaydı → çözüm → kapanış
+     │
+     ▼
+[Finans]          Faturalama, tahsilat (kısmi), teminat mektupları, maliyet onayı,
+                  kur farkı (FX) mahsubu
 ```
 
-Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGPD→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller).
+Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGPD→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller). Ayrıca ana hatla **paralel/opsiyonel bir kanal**: **DMO Kataloğu** — devlet malzeme ofisi tipi sipariş/kârlılık akışı, kendi kur+risturn+komisyon maliyetlendirme motoruyla ana CRM→Sözleşme hattından bağımsız çalışır.
 
 > ⚙️ **Not (akış olgunluğu):** Birimler-arası geçiş halkaları **otomatik**tir (Faz 9): İhale WON→Sözleşme (T3) · Sözleşme SIGNED→Proje (T4) · Proje→Satınalma maliyet kalemi (T5) · Satınalma faturası→Finans (T6) · WON Fırsat→Proje (T1). Para tutarları kuruş hassasiyetinde yuvarlanır (`financeEngine`); döviz toplamları daima ayrı (sessiz tek-toplam yok).
 
@@ -1386,11 +1390,11 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **0 · Platform/SaaS** | Tenant, Subscription, UsageMetric → SubscriptionModule / LicenseTypes / LicenseGenerator / ProvisionWizard → `/tenants` |
 | **1 · Kimlik & Yetki (RBAC)** | User, Unit → UserManagement / UnitManagement / PermissionSettings → `/auth`, `/users`, `/units` |
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
-| **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter · LegalCase → ilgili modüller → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal` |
+| **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Contact/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter/FxAdjustment · LegalCase · ServiceTicket → ilgili modüller (+ Garanti & Servis) → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal`,`/service-tickets` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
 | **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/tenants/ai-settings` |
 | **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
-| **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt) → `/tenants/governance-settings`, `/finance/calc` |
+| **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt + kur farkı) → `/tenants/governance-settings`, `/finance/calc`. **İşletme maliyeti:** OperatingCostPool/UnitBudget/ProjectUnitParticipation → `overheadService` (şirket% + birim katsayı 2-katmanlı dağıtım, tam-yüklü net marj) → proje detayında Overhead paneli. **DMO Kataloğu (paralel kanal):** DmoCatalogItem/DmoFrameworkAgreement/DmoExchangeRate/DmoOrder/DmoOrderItem → `dmoCosting` (kur açığı+risturn+komisyon) → DmoModule → `/dmo`. **Uygulama-içi Yardım:** statik makale seti (`src/content/helpArticles.ts`) → HelpModule (Header'daki Yardım ikonu) → rol-duyarlı, bağlamsal kullanım kılavuzu; harici genel-tanıtım için bu wiki'ye link verir. |
 
 ### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"
 
@@ -1420,9 +1424,11 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) → Satışa devir | Presales / Teknik |
 | Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İSAB |
 | Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir | KSU + Yönetim |
+| Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı | Proje |
 | Satın Alma | BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura) | Satın Alma |
-| Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık; 11 zorunlu devir evrakı | Proje |
-| Finans | Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi | Finans |
+| Garanti & Servis | Teslim-sonrası servis/arıza talebi kaydı → çözüm → kapanış; projeyle ilişkili | Proje / Teknik Servis |
+| Finans | Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi; kur farkı mahsubu | Finans |
+| DMO Kataloğu | Devlet malzeme ofisi tipi sipariş + kur/risturn/komisyon kârlılık motoru (paralel kanal) | Satış / Finans (lisanslı) |
 | Görevler & Takip | Birimler-arası görev havuzu + "Bekleyen Onaylarım"; iş-günü SLA | Tüm birimler |
 | Yönetim Raporları | Birim metrik + darboğaz + dönem raporu (escalation) + yazdırma | GM + Müdürler |
 | Genel Hususlar | Dersler/risk/KPI/dış doküman + doküman kodlama | Kalite / Yönetim |
@@ -1430,6 +1436,7 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Fiziksel Arşiv | Kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik | İdari |
 | Yedekleme | Sistem yedeği (LOCAL/Nextcloud/S3) → doğrulama → fark-analizli restore → zamanlama | Backup Admin |
 | Şirket Ayarları | Birim/kullanıcı, RBAC, YZ & entegrasyonlar, abonelik, lisans, sanal-agent | ADMIN / GM |
+| Yardım | Uygulama-içi, bağlamsal kullanım kılavuzu — her modül için "nasıl kullanılır" | Herkes |
 
 ### 27.7 Wiki kılavuzluk notu
 

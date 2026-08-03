@@ -45,6 +45,7 @@ import VisitPlanModule from './modules/VisitPlanModule';
 import CRMModule from './modules/CRMModule';
 import CostAnalysisModule from './modules/CostAnalysisModule';
 import BackupModule from './modules/BackupModule';
+import HelpModule from './modules/HelpModule';
 import ArchiveModule from './modules/ArchiveModule';
 import SubscriptionModule from './modules/SubscriptionModule';
 import ContractWorkflowModule from './modules/ContractWorkflowModule';
@@ -364,6 +365,7 @@ const TenantAppInner = ({
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
       case 'virtual-agents-test': return <VirtualAgentsTestModule />;
       case 'activity-log': return <ActivityLogModule />;
+      case 'help': return <HelpModule contextModuleId={navItemId} />;
 
       // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
       case 'subscription': return <SubscriptionModule />;

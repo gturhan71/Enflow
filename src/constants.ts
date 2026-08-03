@@ -30,7 +30,8 @@ import {
   FlaskConical,
   ShieldCheck,
   DatabaseBackup,
-  Wrench
+  Wrench,
+  HelpCircle
 } from 'lucide-react';
 
 import { 
@@ -143,6 +144,7 @@ export const NAV_ITEMS = [
       { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
     ],
   },
+  { id: 'help', label: 'Yardım', icon: HelpCircle, requiredPermission: 'DASHBOARD_VIEW' },
 ];
 
 // Test Ortamı'ndan ana sidebar'a tanıtılabilecek modüller

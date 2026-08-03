@@ -24,7 +24,7 @@ Otomatik geçiş halkaları (Faz 9): **İhale WON→Sözleşme** (T3) · **Sözl
 
 **8 sanal agent (hepsi AVAILABLE):** Tender · Project · Presales · Procurement · Finance · Legal · CRM · İGPD — para (Finance) ve hukuk (Legal) **ADVISORY-only** (asla otonom). Köken etiketi `AGENT:<pluginKey>`.
 
-> 📚 **Sistemi sıfırdan anlamak / tek-kaynak akış referansı:** `walkthrough.md §27` (Bileşen Envanteri & Uçtan Uca Akış — gelecek enflow-wiki kaynağı). Bu CLAUDE.md mimari/karar referansı; §27 anlatısal akış kaynağı.
+> 📚 **Sistemi sıfırdan anlamak / tek-kaynak akış referansı:** `walkthrough.md §27` (Bileşen Envanteri & Uçtan Uca Akış — canlı **enflow-wiki** kaynağı, bkz. `wiki/index.html` / `/wiki`). Bu CLAUDE.md mimari/karar referansı; §27 anlatısal akış kaynağı. Ekran-bazlı kullanım kılavuzu için uygulama-içi **Yardım modülü** (`src/content/helpArticles.ts`).
 
 ## Tech Stack
 
@@ -316,7 +316,8 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 **Kalan / gelecek iyileştirmeler (zemin):**
 
-- [ ] **Enflow-Wiki** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. Kaynağı hazır: `walkthrough.md §27` (Bileşen Envanteri & Uçtan Uca Akış). *Planlı bir sonraki iş.* (memory: [[enflow-wiki-plan]])
+- [x] **Enflow-Wiki — CANLI** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. `wiki/build.mjs` (bağımlılıksız üretici) `walkthrough.md §27`'den `wiki/index.html` üretir; GitHub Pages'e otomatik deploy edilir (`.github/workflows/wiki-pages.yml`) ve backend `GET /wiki` ile de sunulur (açılışta best-effort yeniden üretim). Akış değişince önce §27 güncellenir, sonra `node wiki/build.mjs` çalıştırılır.
+- [x] **Uygulama-içi Yardım modülü** (2026-08-03) — `HelpModule.tsx`, `Header`'daki (önceden ölü) Yardım ikonuyla açılır; içerik `src/content/helpArticles.ts`'te NAV_ITEMS'teki her modül için son-kullanıcı diliyle yazılmış "ne işe yarar / nasıl kullanılır" makaleleri. Rol-duyarlı (kullanıcı yalnız kendi sidebar'ında gördüğü modüllerin makalelerini görür), bağlamsal açılır (o an bulunulan sekmenin makalesiyle açılır). Backend değişikliği yok. Wiki'ye link verir — iki katman birbirini tekrar etmez: Wiki = "Enflow nedir / uçtan uca akış" (dışa dönük genel tanıtım), Yardım = "bu ekranı nasıl kullanırım" (içe dönük, oturum-içi).
 - [x] **ActivityLog kapsamı — TAM** (2026-06-20) — merkezi `logActivity` helper (`backend/src/services/activityLog.ts`, non-throwing, actorType HUMAN|AGENT) + `GET /api/activity-logs?entityType=&entityId=&action=&limit=` (`activityLogs.ts`); **19 router**a denetim-izi (CREATE/UPDATE/DELETE + statü geçişleri): tüm süreç zinciri + admin (users/units) + approvalChains + corporateGovernance/visits/workflows. **Denetim İzi UI** (`ActivityLogModule.tsx`, GM-only Test Ortamı, `activity-log` sekmesi) — filtreli liste, agent köken etiketi (`agentProvenance`).
 - [x] **ContractWorkflow tam modüle terfi** (2026-06-20) — `ContractWorkflowTest`→`ContractWorkflowModule` rename; backend rol kapısı GM-only'den 7 yönetici role genişledi (GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL+FINANCE+İGPD; PRESALES/SALES_REP RBAC gereği deny); latent bug fix (gerçek `contract-workflow` sekmesinde opportunities/proposals yüklenmiyordu).
 - [x] **Agent otonomi genişlemesi — Faz 9 (recommend→act)** (2026-06-20) — Bugüne dek AUTONOMOUS mod yalnız auto-ratify ediyordu (etki-alanı mutasyonu yapmıyordu); artık döngü kapalı. Generic `autonomousAction` altyapısı: `AgentOutput` opsiyonel `{ kind, summary, reversible, execute }` döner; `runAgent` (`backend/src/services/virtualAgentService.ts`) bunu **yalnız** mod AUTONOMOUS + eklenti AUTONOMOUS'a izinli (`plugin.allowedModes`) + eylem `reversible` ise çalıştırır. İlk somut eylem **Procurement → en ucuz teklifi otomatik seç** (`SELECT_CHEAPEST_QUOTE`; deselect-all→select, idempotent/geri-alınabilir; sadece valid+öneri-var+seçilmemişse). Eylem `AgentRun.actionTaken`'a (migration `faz9_autonomous_action`) + ayrı `AGENT_ACTION` ActivityLog'a (actorType=AGENT, agentRunId) yazılır; handoff görevi "✅ … yapıldı, incele" olur. **Güvenlik:** ADVISORY modda eylem ASLA çalışmaz; `AGENT_FINANCE`/`AGENT_LEGAL` `allowedModes:['ADVISORY']` → AUTONOMOUS'a hiç geçemez (ikinci kemer `allowedAuto` guard). Frontend: `AgentRun.actionTaken` tipi + RunCard emerald rozeti + AgentTag drill-down satırı. Diğer handler'lar (tender/project/presales/igpd/crm) `autonomousAction` tanımlamaz → davranışları değişmez. `autoSkipOrphanStages` orphan-stage otonom dalı ayrı path, dokunulmadı.
@@ -358,28 +359,29 @@ src/components/HealthCards.tsx ← types
 backend/src/services/analyticsService.ts ← prismaClient
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
 backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
 src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
+backend/src/middleware.ts ← prismaClient, services/auth
+backend/src/services/aiClient.ts ← prismaClient
+src/modules/Login.tsx ← constants, services/apiService, types
+src/modules/SetupWizard.tsx ← services/apiService, types
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
 src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
-src/modules/Login.tsx ← constants, services/apiService, types
+src/modules/Dashboard.tsx ← types, constants, lib/utils, contexts/AuthContext, services/apiService
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/SetupWizard.tsx ← services/apiService, types
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
-backend/src/middleware.ts ← prismaClient, services/auth
-backend/src/services/aiClient.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/guaranteeReminders.ts ← prismaClient
 backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
+backend/src/services/guaranteeReminders.ts ← prismaClient
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/slaEscalation.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient
@@ -391,21 +393,16 @@ backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService
 ```
 src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
 src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule
-src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
-backend/src/middleware.ts                     +bearerToken
-backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
-backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
-backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
 backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
+backend/src/services/financeEngine.ts         +computeFxGainLoss  ~presentBreakdown
+backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
 backend/src/services/restoreService.ts        ~analyzeRestore
 backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
 backend/src/services/serviceTicketReminders.ts +sweepServiceTicketSla
 backend/src/services/salesCosting.ts          +monthsUntil  +forwardRate  +computeForwardRates  +computeSalesCosting
 backend/src/services/virtualAgentService.ts   +scoreQuotes
-backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
 
 ## backend
@@ -532,34 +529,6 @@ INDEX ProjectUnitParticipation_projectId_idx ON ProjectUnitParticipation
 INDEX ProjectUnitParticipation_projectId_unitId_key ON ProjectUnitParticipation
 ```
 
-### backend/src/services/financeEngine.ts
-```
-export interface MoneyBreakdown  :13-18
-netMinor: number  :14-14
-vatMinor: number  :15-15
-grossMinor: number  :16-16
-currency: Currency  :17-17
-export interface LineInput  :20-26
-qty: number  :21-21
-unitPrice: number  :22-22
-vatRate?: number  :23-23
-currency?: Currency  :24-24
-discountPct?: number  :25-25
-export type Currency  :11-11
-export type OverheadMethod  :88-88
-export function toMinor  :29-31
-export function fromMinor  :33-35
-export function roundMinor  :37-39
-export function applyVat  :42-42
-export function lineBreakdown  :49-58
-export function sumByCurrency  :64-75
-export function convertMinor  :78-80
-export function presentBreakdown  :83-83
-export function computeCompanyOverhead  :95-99
-export function computeUnitParticipationLoad  :106-109
-export function projectMargins  :120-120
-```
-
 ### backend/src/services/overheadService.ts
 ```
 export interface UnitLoadLine  :8-8
@@ -585,14 +554,51 @@ export async function applyProjectOverhead  :72-85
 export async function computeUnitBudgetAbsorption  :101-144
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
+### backend/src/middleware.ts
+```
+export const asyncHandler  :6-8
+export const requireRole  :75-83
+export const requireEntitlement  :87-94
+```
+
+### backend/src/utils/secureUpload.ts
+```
+export function documentUpload  :47-53
+```
+
+### backend/src/services/aiClient.ts
+```
+export interface TenantAIConfig  :13-18
+baseUrl: string  :14-14
+apiKey: string  :15-15
+model: string  :16-16
+label?: string  :17-17
+export async function getTenantAIConfig  :21-41
+export async function isAIConfigured  :43-45
+export function assertSafeAiUrl  :56-71
+export async function chatJSON  :77-126
+```
+
+### backend/src/services/auth.ts
+```
+export interface AuthTokenPayload  :25-29
+sub: string  :26-26
+tid: string  :27-27
+role: string  :28-28
+export async function hashPassword  :31-33
+export async function verifyPassword  :35-42
+export function signAuthToken  :44-47
+export function verifyAuthToken  :49-59
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
 ```
 
 ### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
@@ -619,24 +625,11 @@ TABLE Contact
 INDEX Contact_tenantId_customerId_idx ON Contact
 ```
 
-### backend/src/middleware.ts
+### backend/prisma/migrations/20260802205629_fx_adjustment_model/migration.sql
 ```
-export const asyncHandler  :6-8
-export const requireRole  :75-83
-export const requireEntitlement  :87-94
-```
-
-### backend/src/services/aiClient.ts
-```
-export interface TenantAIConfig  :13-18
-baseUrl: string  :14-14
-apiKey: string  :15-15
-model: string  :16-16
-label?: string  :17-17
-export async function getTenantAIConfig  :21-41
-export async function isAIConfigured  :43-45
-export function assertSafeAiUrl  :56-71
-export async function chatJSON  :77-126
+TABLE FxAdjustment
+INDEX FxAdjustment_paymentId_key ON FxAdjustment
+INDEX FxAdjustment_tenantId_invoiceId_idx ON FxAdjustment
 ```
 
 ### backend/src/services/approvalChainService.ts
@@ -647,18 +640,6 @@ export async function autoSkipOrphanStages  :91-201
 export async function getDelegatedRoles  :209-221
 export async function resolveEffectiveApprover  :224-230
 export async function resetApprovalChain  :233-246
-```
-
-### backend/src/services/auth.ts
-```
-export interface AuthTokenPayload  :25-29
-sub: string  :26-26
-tid: string  :27-27
-role: string  :28-28
-export async function hashPassword  :31-33
-export async function verifyPassword  :35-42
-export function signAuthToken  :44-47
-export function verifyAuthToken  :49-59
 ```
 
 ### backend/src/services/bootstrapTenant.ts
@@ -674,11 +655,6 @@ token: string  :46-46
 user: { id: string  :47-47
 subscription: { plan: string  :48-48
 export async function bootstrapTenant  :51-127
-```
-
-### backend/src/services/guaranteeReminders.ts
-```
-export async function sweepGuaranteeReminders  :19-59
 ```
 
 ### backend/src/services/dmoCosting.ts
@@ -707,6 +683,40 @@ export async function getPeriodTurnover  :74-86
 export async function getActiveDmoRate  :89-89
 export function computeOrderCosting  :118-179
 export async function recomputeOrderCosting  :182-211
+```
+
+### backend/src/services/financeEngine.ts
+```
+export interface MoneyBreakdown  :13-18
+netMinor: number  :14-14
+vatMinor: number  :15-15
+grossMinor: number  :16-16
+currency: Currency  :17-17
+export interface LineInput  :20-26
+qty: number  :21-21
+unitPrice: number  :22-22
+vatRate?: number  :23-23
+currency?: Currency  :24-24
+discountPct?: number  :25-25
+export type Currency  :11-11
+export type OverheadMethod  :94-94
+export function toMinor  :29-31
+export function fromMinor  :33-35
+export function roundMinor  :37-39
+export function applyVat  :42-42
+export function lineBreakdown  :49-58
+export function sumByCurrency  :64-75
+export function convertMinor  :78-80
+export function presentBreakdown  :83-83
+export function computeFxGainLoss  :89-91
+export function computeCompanyOverhead  :101-105
+export function computeUnitParticipationLoad  :112-115
+export function projectMargins  :126-126
+```
+
+### backend/src/services/guaranteeReminders.ts
+```
+export async function sweepGuaranteeReminders  :19-59
 ```
 
 ### backend/src/services/restoreService.ts
@@ -770,11 +780,6 @@ export async function runAgent  :513-518
 export async function ratifyAgentRun  :626-632
 ```
 
-### backend/src/utils/secureUpload.ts
-```
-export function documentUpload  :47-53
-```
-
 ## governance
 
 ### governance/role-matrix.ts
@@ -800,25 +805,6 @@ export type RoleKind  :11-11
 export type Staffing  :12-12
 export type RACI  :13-13
 export type AgentMode  :14-14
-```
-
-## license-poc
-
-### license-poc/lib.mjs
-```
-export function makePayload  :14-27
-export function issue  :30-35
-export function verifyToken  :41-56
-```
-
-### license-poc/README.md
-```
-h1 Enflow Lisans PoC (Ed25519, tenant-bağlı, yalnız-doğrula)
-h2 Çalıştır
-h2 Dosyalar
-h2 İlke
-code-fence bash
-code-fence plain
 ```
 
 ## license-tool
@@ -1070,24 +1056,6 @@ handler onClose
 handler onChange
 ```
 
-### src/modules/FinanceModule.tsx
-```
-component OverheadPoolTab
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
-```
-
 ### src/modules/ProjectManagementModule.tsx
 ```
 component OverheadPanel
@@ -1139,6 +1107,34 @@ hook useCallback
 handler onClick
 handler onChange
 handler onSaved
+```
+
+### src/services/apiClient.ts
+```
+class ApiClient  :3-74
+setAuth  :7-10
+async fetchWithAuth  :12-44
+async login  :46-59
+async forgotPassword  :61-73
+```
+
+### src/modules/Login.tsx
+```
+props LoginProps
+hook useState
+export Login
+handler onSubmit
+handler onChange
+```
+
+### src/modules/SetupWizard.tsx
+```
+props SetupWizardProps
+hook useState
+hook useEffect
+export SetupWizard
+handler onChange
+handler onClick
 ```
 
 ### src/App.tsx
@@ -1231,13 +1227,35 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/Login.tsx
+### src/modules/Dashboard.tsx
 ```
-props LoginProps
+hook useAuth
 hook useState
-export Login
-handler onSubmit
+hook useEffect
+hook useMemo
+export Dashboard
+handler onClick
+handler onOpps
+handler onValue
+handler onCount
+```
+
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
 handler onChange
+handler onBlur
+handler onClose
 ```
 
 ### src/modules/ProcurementModule.tsx
@@ -1256,16 +1274,6 @@ handler onChange
 handler onKeyDown
 handler onRefresh
 handler onSave
-```
-
-### src/modules/SetupWizard.tsx
-```
-props SetupWizardProps
-hook useState
-hook useEffect
-export SetupWizard
-handler onChange
-handler onClick
 ```
 
 ### src/modules/ServiceTicketsModule.tsx
@@ -1290,15 +1298,6 @@ hook useEffect
 export TodoModule
 handler onClick
 handler onChange
-```
-
-### src/services/apiClient.ts
-```
-class ApiClient  :3-74
-setAuth  :7-10
-async fetchWithAuth  :12-44
-async login  :46-59
-async forgotPassword  :61-73
 ```
 
 ### src/services/apiService.ts
