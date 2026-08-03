@@ -76,7 +76,6 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
   const [loading, setLoading] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [ekapPrefix, setEkapPrefix] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -138,7 +137,7 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
       {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
       {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} />}
-      {tab === 'ekap' && <EkapTab prefix={ekapPrefix} setPrefix={setEkapPrefix} />}
+      {tab === 'ekap' && <EkapTab />}
 
       <AnimatePresence>
         {withdrawTarget && (
@@ -573,22 +572,25 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
   );
 }
 
-// ── EKAP iskeleti ────────────────────────────────────────────────────────────────
-function EkapTab({ prefix, setPrefix }: { prefix: string; setPrefix: (v: string) => void }) {
+// ── EKAP ─────────────────────────────────────────────────────────────────────────
+// Bilinçli tasarım kararı: bu platform kamu ihale kurumu (EKAP) sistemiyle canlı
+// entegre değil ve şu an için böyle bir entegrasyon planlanmıyor — bu sekme bunu
+// açıkça belirtir. İKN ve diğer ihale bilgileri "Yeni İhale" formunda elle girilir.
+function EkapTab() {
   return (
     <div className="glass-card p-8 max-w-2xl space-y-4">
       <div className="flex items-center gap-3">
         <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><Landmark size={24} /></div>
         <div>
           <h4 className="font-black text-slate-900">EKAP — Kamu İhale Platformu</h4>
-          <p className="text-xs text-slate-500">Manuel İKN takibi için yer tutucu. Gerçek EKAP web servisi bağlantısı henüz yok.</p>
+          <p className="text-xs text-slate-500">Bu platform şu an EKAP ile canlı/otomatik bir bağlantı kurmuyor.</p>
         </div>
       </div>
-      <div className="space-y-1">
-        <label className="text-xs font-semibold text-slate-600">Varsayılan İKN Öneki (opsiyonel)</label>
-        <input className="input-glass w-full text-sm" placeholder="örn. 2026/" value={prefix} onChange={e => setPrefix(e.target.value)} />
-        <p className="text-[11px] text-slate-400 italic">İKN değerleri ihale kayıtlarında manuel tutulur; bu alan ileride otomatik senkronizasyon için zemindir (kalıcılık yok).</p>
-      </div>
+      <p className="text-sm text-slate-600 leading-relaxed">
+        İKN (İhale Kayıt Numarası) ve diğer ihale bilgileri, İhale Listesi'ndeki
+        <b> "Yeni İhale"</b> formunda elle girilir. EKAP web servisiyle otomatik
+        senkronizasyon şu an desteklenmiyor.
+      </p>
     </div>
   );
 }
