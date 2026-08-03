@@ -55,7 +55,19 @@ router.post('/run', tenantMiddleware, GM, asyncHandler(async (_req: Request, res
 router.delete('/cleanup', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const tid = req.tenantId;
 
-  const [users, opportunities, contractWorkflows, units] = await Promise.all([
+  // Sipariş kalemleri (DmoOrderItem), DmoOrder silinince onCascade ile gitmiyorsa
+  // önce onları temizle (FK hatasını önlemek için orders'tan önce silinir).
+  const dmoOrderIds = (
+    await prisma.dmoOrder.findMany({
+      where: { tenantId: tid, orderNo: { startsWith: 'RBAC-TEST' } },
+      select: { id: true },
+    })
+  ).map((o) => o.id);
+
+  const [
+    users, opportunities, contractWorkflows, units,
+    dmoOrderItems, dmoOrders, dmoAgreements, dmoCatalogItems,
+  ] = await Promise.all([
     prisma.user.deleteMany({
       where: { tenantId: tid, email: { contains: 'rbac-test' } },
     }),
@@ -68,6 +80,19 @@ router.delete('/cleanup', tenantMiddleware, GM, asyncHandler(async (req: Request
     prisma.unit.deleteMany({
       where: { tenantId: tid, name: { startsWith: 'RBAC Test' } },
     }),
+    // 2026-08-03 eklendi — DMO Birimi RBAC senaryoları için:
+    prisma.dmoOrderItem.deleteMany({
+      where: { orderId: { in: dmoOrderIds } },
+    }),
+    prisma.dmoOrder.deleteMany({
+      where: { tenantId: tid, orderNo: { startsWith: 'RBAC-TEST' } },
+    }),
+    prisma.dmoFrameworkAgreement.deleteMany({
+      where: { tenantId: tid, agreementNo: { startsWith: 'RBAC-TEST' } },
+    }),
+    prisma.dmoCatalogItem.deleteMany({
+      where: { tenantId: tid, dmoCode: { startsWith: 'RBAC-TEST' } },
+    }),
   ]);
 
   res.json({
@@ -76,6 +101,10 @@ router.delete('/cleanup', tenantMiddleware, GM, asyncHandler(async (req: Request
       opportunities: opportunities.count,
       contractWorkflows: contractWorkflows.count,
       units: units.count,
+      dmoOrderItems: dmoOrderItems.count,
+      dmoOrders: dmoOrders.count,
+      dmoAgreements: dmoAgreements.count,
+      dmoCatalogItems: dmoCatalogItems.count,
     },
   });
 }));

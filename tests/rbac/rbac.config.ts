@@ -156,6 +156,19 @@ const NA = { sales_mgr: "allow", sales_support: "allow", finance_mgr: "allow", i
 // contract-workflows 7-rol gate: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL_MGR+FINANCE_MGR+IGPD_MGR (backup_admin yok → deny)
 const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "allow", ksu_mgr: "allow", project_mgr: "allow", legal_mgr: "allow", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
 
+// --- DMO Birimi (2026-08-03 eklendi) -----------------------------------------
+// Kod incelemesi (backend/src/routes/dmo.ts): DMO_MGR diye ayrı bir rol YOK.
+// GET /catalog,/agreements,/rates,/orders,/alarms → yalnız tenantMiddleware (gate yok) → NA ile aynı.
+// editRoles  = requireRole(['GENERAL_MANAGER','SALES_MGR'])   → catalog/agreements/rates/orders yazma
+// paramRoles = requireRole(['GENERAL_MANAGER','FINANCE_MGR']) → /settings (kur/ristürn parametreleri)
+// ⚠️ Tutarsızlık: governance/role-matrix.ts SALES_MGR.modules listesinde DMO_VIEW YOK
+// (bkz. mevcut "DMO Kataloğu menüsü" UI testi → sales_mgr: hidden). Yani SALES_MGR menüyü
+// göremiyor ama backend'e doğrudan istek atarsa yazabiliyor → frontend/backend izin driftı.
+// Karar verilmeli: (a) DMO_VIEW SALES_MGR'a eklenip menü açılsın, ya da (b) editRoles'tan
+// SALES_MGR çıkarılıp yalnız GM kalsın. Bu matris şu anki (b öncesi) gerçek davranışı test eder.
+const NDMO_EDIT  = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
+const NDMO_PARAM = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
+
 export interface ApiCase {
   name: string;
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -264,10 +277,15 @@ export const apiMatrix: ApiCase[] = [
 
   // --- Arşiv ---
   {
+    // 2026-08-03 (Faz: 8-madde düzeltme, madde 8) — backend gevşetildi: archive.ts artık
+    // yalnız tenantMiddleware (documents.ts'in aynı deseni), requireRole(['GENERAL_MANAGER'])
+    // kaldırıldı. Kullanıcı kararı: "Backend'i gevşet, izin gerçekten çalışsın" — gerçek
+    // yetkilendirme frontend'in ARCHIVE_VIEW izni + PermissionGate'te. Bu yüzden artık
+    // gate'siz GET (tenantMiddleware) → tüm roller allow (NA deseni), ND DEĞİL.
     name: "Arşiv listesi",
     method: "GET",
     path: "/api/archive",
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
 
   // --- Yedekleme (BACKUP_ADMIN + GM kapısı) ---
@@ -276,6 +294,64 @@ export const apiMatrix: ApiCase[] = [
     method: "GET",
     path: "/api/backup/jobs",
     expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, backup_admin: "allow" },
+  },
+
+  // --- DMO Kataloğu (ayrı lisanslı modül — 2026-08-03 eklendi) ---
+  // GET'ler gate'siz (tenantMiddleware) → NA. Yazma → editRoles/paramRoles (yukarı bkz.).
+  {
+    name: "DMO katalog listesi",
+    method: "GET",
+    path: "/api/dmo/catalog",
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
+  },
+  {
+    // Şema zorunlu alanları: dmoCode + name (backend/prisma/schema.prisma DmoCatalogItem).
+    name: "DMO katalog kalemi oluştur",
+    method: "POST",
+    path: "/api/dmo/catalog",
+    body: { dmoCode: "RBAC-TEST-001", name: "RBAC Test DMO Ürün" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NDMO_EDIT },
+  },
+  {
+    // Şema zorunlu alanları: agreementNo + title (DmoFrameworkAgreement).
+    name: "DMO çerçeve anlaşma oluştur",
+    method: "POST",
+    path: "/api/dmo/agreements",
+    body: { agreementNo: "RBAC-TEST-AGR-001", title: "RBAC Test Anlaşma" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NDMO_EDIT },
+  },
+  {
+    // dmo.ts POST /orders: orderNo + institutionName zorunlu; kalemler normalizeItems(b.items)
+    // ile işleniyor — top-level catalogItemId/quantity DEĞİL, items[] dizisi bekleniyor.
+    name: "DMO sipariş oluştur",
+    method: "POST",
+    path: "/api/dmo/orders",
+    body: {
+      orderNo: "RBAC-TEST-ORD-001",
+      institutionName: "RBAC Test Kurumu",
+      items: [{ name: "RBAC Test Kalem", qty: 1, unitPrice: 100, unitCost: 50 }],
+    },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NDMO_EDIT },
+  },
+  {
+    name: "DMO sipariş sil",
+    method: "DELETE",
+    path: `/api/dmo/orders/${T1_IDS.dummyUserId}`,
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NDMO_EDIT },
+  },
+  {
+    // setDmoParams(Partial<DmoCostParams>) → gerçek alan minMarginPct (risturnRate YOK).
+    name: "DMO ayarları güncelle (kâr eşiği)",
+    method: "PUT",
+    path: "/api/dmo/settings",
+    body: { minMarginPct: 0.1 },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...NDMO_PARAM },
+  },
+  {
+    name: "DMO kârsız satış alarmları",
+    method: "GET",
+    path: "/api/dmo/alarms",
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
 ];
 
