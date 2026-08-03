@@ -32,6 +32,7 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
     expiryDate: '',
     tags: []
   });
+  const [newDocFile, setNewDocFile] = useState<File | null>(null);
 
   const filteredDocs = useMemo(() => {
     return documents.filter(doc => {
@@ -51,13 +52,26 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
         ...newDoc,
         tags: newDoc.tags?.join(', ')
       });
+      let fileUrl = saved.fileUrl;
+      if (newDocFile) {
+        const fd = new FormData(); fd.append('file', newDocFile);
+        const tid = localStorage.getItem('enflow_active_tenant_id') || '';
+        const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+        const res = await fetch(`/api/documents/${saved.id}/upload`, {
+          method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
+        });
+        const data = await res.json();
+        if (res.ok) fileUrl = data.doc?.fileUrl;
+      }
       const docWithTagsArray = {
         ...saved,
+        fileUrl,
         tags: saved.tags ? saved.tags.split(',').map((t: string) => t.trim()) : []
       };
       setDocuments(prev => [docWithTagsArray, ...prev]);
       setShowNewDocModal(false);
       setNewDoc({ name: '', category: 'LEGAL', expiryDate: '', tags: [] });
+      setNewDocFile(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Belge kaydedilemedi.');
     } finally {
@@ -148,10 +162,15 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
                   <FileText size={24} />
                 </div>
                 <div className="flex items-center gap-2">
-                  <button className="p-2 hover:bg-white/60 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90">
+                  <button
+                    onClick={() => doc.fileUrl && window.open(doc.fileUrl, '_blank')}
+                    disabled={!doc.fileUrl}
+                    title={doc.fileUrl ? 'İndir' : 'Dosya eklenmemiş'}
+                    className="p-2 hover:bg-white/60 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400"
+                  >
                     <Download size={16} />
                   </button>
-                  <button 
+                  <button
                     onClick={() => handleDeleteDoc(doc.id)}
                     className="p-2 hover:bg-red-50 rounded-xl text-slate-400 hover:text-red-600 transition-all active:scale-90"
                   >
@@ -245,12 +264,22 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
 
                 <div className="space-y-2">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Etiketler (Virgülle ayırın)</label>
-                  <input 
-                    type="text" 
-                    placeholder="Yasal, 2026, Sertifika..." 
+                  <input
+                    type="text"
+                    placeholder="Yasal, 2026, Sertifika..."
                     onChange={e => setNewDoc({...newDoc, tags: e.target.value.split(',').map(t => t.trim())})}
-                    className="w-full px-6 py-4 bg-white/40 border border-white/40 rounded-2xl outline-none" 
+                    className="w-full px-6 py-4 bg-white/40 border border-white/40 rounded-2xl outline-none"
                   />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Dosya (opsiyonel)</label>
+                  <input
+                    type="file"
+                    onChange={e => setNewDocFile(e.target.files?.[0] || null)}
+                    className="w-full px-6 py-4 bg-white/40 border border-white/40 rounded-2xl outline-none text-sm file:mr-4 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-primary file:text-white file:text-xs file:font-black file:uppercase"
+                  />
+                  <p className="text-[10px] text-slate-400 ml-4">Dosya eklemezseniz belge kaydı yalnız meta bilgiyle oluşturulur, sonradan indirilecek dosya olmaz.</p>
                 </div>
 
                 <div className="flex justify-end gap-3 pt-4">
