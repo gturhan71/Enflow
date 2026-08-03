@@ -586,20 +586,29 @@ export async function computeCustomerHealth(tenantId: string): Promise<CustomerH
   const [customers, opps, invoices] = await Promise.all([
     prisma.customer.findMany({ where: { tenantId }, select: { id: true, name: true } }),
     prisma.opportunity.findMany({ where: { tenantId }, select: { customerId: true, value: true, status: true, updatedAt: true } }),
-    prisma.invoice.findMany({ where: { tenantId, type: 'SALES' }, select: { customerName: true, amount: true, paidAmount: true, status: true, dueDate: true } }),
+    prisma.invoice.findMany({ where: { tenantId, type: 'SALES' }, select: { customerId: true, customerName: true, amount: true, paidAmount: true, status: true, dueDate: true } }),
   ]);
 
   const now = Date.now();
   const oppsByCust = new Map<string, typeof opps>();
   for (const o of opps) { const a = oppsByCust.get(o.customerId) || []; a.push(o); oppsByCust.set(o.customerId, a); }
 
-  // Fatura → müşteri adı eşleşmesi (Invoice'ta customerId FK yok)
+  // Fatura → müşteri eşleşmesi: customerId varsa doğrudan id ile (kesin),
+  // yoksa (eski kayıtlar) serbest-metin isim eşleştirmeye düşer (geriye dönük).
+  const recById = new Map<string, { overdue: number; open: number }>();
   const recByName = new Map<string, { overdue: number; open: number }>();
   for (const inv of invoices) {
-    const name = (inv.customerName || '').trim();
-    if (!name) continue;
     const rem = inv.amount - inv.paidAmount;
     if (inv.status === 'DRAFT' || inv.status === 'CANCELLED' || inv.status === 'PAID' || rem <= 0) continue;
+    if (inv.customerId) {
+      const cur = recById.get(inv.customerId) || { overdue: 0, open: 0 };
+      cur.open += rem;
+      if (inv.dueDate && inv.dueDate.getTime() < now) cur.overdue += rem;
+      recById.set(inv.customerId, cur);
+      continue;
+    }
+    const name = (inv.customerName || '').trim();
+    if (!name) continue;
     const cur = recByName.get(name) || { overdue: 0, open: 0 };
     cur.open += rem;
     if (inv.dueDate && inv.dueDate.getTime() < now) cur.overdue += rem;
@@ -609,7 +618,7 @@ export async function computeCustomerHealth(tenantId: string): Promise<CustomerH
   const lines: CustomerHealthLine[] = [];
   for (const c of customers) {
     const co = oppsByCust.get(c.id) || [];
-    const rec = recByName.get(c.name.trim());
+    const rec = recById.get(c.id) || recByName.get(c.name.trim());
     if (co.length === 0 && !rec) continue; // aktivitesi olmayan müşteriyi atla
 
     const won = co.filter(o => o.status === 'WON');

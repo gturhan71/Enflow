@@ -63,11 +63,21 @@ router.get('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res:
 router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const {
     type, invoiceNo, amount, currency, issueDate, dueDate, status,
-    projectId, contractId, milestoneId, customerName, vendorName,
+    projectId, contractId, milestoneId, customerId, customerName, vendorName,
     notes, createdById, categoryCode, issueRateToTRY,
   } = req.body;
   if (amount == null) return res.status(400).json({ error: 'Fatura tutarı zorunlu.' });
   const docNumber = await maybeDocNumber(req.tenantId, categoryCode);
+
+  // customerId verildiyse müşteri adını oradan doğrula/doldur (elle girilen
+  // ismin üzerine yazmaz, yalnız boşsa doldurur) — bkz. computeCustomerHealth.
+  let resolvedCustomerName = customerName || null;
+  if (customerId) {
+    const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId: req.tenantId }, select: { name: true } });
+    if (!customer) return res.status(404).json({ error: 'Müşteri bulunamadı.' });
+    if (!resolvedCustomerName) resolvedCustomerName = customer.name;
+  }
+
   const item = await prisma.invoice.create({
     data: {
       tenantId: req.tenantId,
@@ -81,7 +91,8 @@ router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res
       projectId: projectId || null,
       contractId: contractId || null,
       milestoneId: milestoneId || null,
-      customerName: customerName || null,
+      customerId: customerId || null,
+      customerName: resolvedCustomerName,
       vendorName: vendorName || null,
       notes: notes || null,
       createdById: createdById || null,

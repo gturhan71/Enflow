@@ -781,6 +781,7 @@ export interface Invoice {
   contractId?: string | null;
   purchaseRequestId?: string | null;
   milestoneId?: string | null;
+  customerId?: string | null;
   customerName?: string | null;
   vendorName?: string | null;
   docNumber?: string | null;

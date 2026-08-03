@@ -680,7 +680,10 @@ const InvoiceForm = ({ userId, onClose, onSaved }: { userId?: string; onClose: (
   const [f, setF] = useState<Record<string, string>>({ type: 'SALES', status: 'ISSUED', currency: 'TRY' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
   const set = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
+
+  useEffect(() => { apiService.getCustomers().then((c) => setCustomers(c as { id: string; name: string }[])).catch(() => {}); }, []);
 
   const save = async () => {
     setSaving(true); setErr(null);
@@ -704,6 +707,23 @@ const InvoiceForm = ({ userId, onClose, onSaved }: { userId?: string; onClose: (
       </div>
       {f.currency && f.currency !== 'TRY' && (
         <Input label={`Kesim Kuru (1 ${f.currency} = ? TRY)`} v={f.issueRateToTRY} on={(v) => set('issueRateToTRY', v)} type="number" placeholder="B-18 — döviz kur farkı hesabı için" />
+      )}
+      {f.type === 'SALES' && customers.length > 0 && (
+        <div className="space-y-1">
+          <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Kayıtlı Müşteriden Seç (opsiyonel)</label>
+          <select
+            className="input-glass w-full"
+            value={f.customerId || ''}
+            onChange={(e) => {
+              const c = customers.find((c) => c.id === e.target.value);
+              set('customerId', e.target.value);
+              if (c) set('customerName', c.name);
+            }}
+          >
+            <option value="">— Listeden seç veya aşağıya elle yaz —</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
       )}
       <Input label={f.type === 'SALES' ? 'Müşteri' : 'Tedarikçi'} v={f.type === 'SALES' ? f.customerName : f.vendorName}
         on={(v) => set(f.type === 'SALES' ? 'customerName' : 'vendorName', v)} />

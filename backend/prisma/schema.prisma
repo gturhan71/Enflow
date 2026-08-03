@@ -163,6 +163,7 @@ model Customer {
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
   opportunities     Opportunity[]
   contacts          Contact[]
+  invoices          Invoice[]
 }
 
 // Kurumsal müşteride birden çok kişi (satınalma sorumlusu/teknik şartname yazarı/
@@ -982,6 +983,8 @@ model Invoice {
   paidAmount    Float     @default(0)
   paidAt        DateTime?
   milestoneId   String?
+  customerId    String?   // B-xx — Müşteri Sağlık Skoru'nda isim-eşleştirme yerine doğrudan FK (opsiyonel, geriye dönük)
+  customer      Customer? @relation(fields: [customerId], references: [id])
   customerName  String?
   vendorName    String?
   docNumber     String?
