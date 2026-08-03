@@ -702,6 +702,9 @@ const InvoiceForm = ({ userId, onClose, onSaved }: { userId?: string; onClose: (
         <Input label="Tutar" v={f.amount} on={(v) => set('amount', v)} type="number" />
         <Select label="Para Birimi" v={f.currency} on={(v) => set('currency', v)} opts={['TRY', 'USD', 'EUR']} />
       </div>
+      {f.currency && f.currency !== 'TRY' && (
+        <Input label={`Kesim Kuru (1 ${f.currency} = ? TRY)`} v={f.issueRateToTRY} on={(v) => set('issueRateToTRY', v)} type="number" placeholder="B-18 — döviz kur farkı hesabı için" />
+      )}
       <Input label={f.type === 'SALES' ? 'Müşteri' : 'Tedarikçi'} v={f.type === 'SALES' ? f.customerName : f.vendorName}
         on={(v) => set(f.type === 'SALES' ? 'customerName' : 'vendorName', v)} />
       <div className="grid grid-cols-2 gap-3">
@@ -765,7 +768,11 @@ const PaymentForm = ({ invoice, onClose, onSaved }: { invoice: Invoice; onClose:
     setSaving(true); setErr(null);
     try {
       if (!f.amount) throw new Error('Tutar zorunlu.');
-      await apiService.addInvoicePayment(invoice.id, { ...f, amount: Number(f.amount) });
+      const result = await apiService.addInvoicePayment(invoice.id, { ...f, amount: Number(f.amount) }) as { fxAdjustment?: { gainLossTRY: number } | null };
+      if (result?.fxAdjustment) {
+        const g = result.fxAdjustment.gainLossTRY;
+        alert(`${g >= 0 ? 'Kur kazancı' : 'Kur zararı'}: ${fmt(Math.abs(g), 'TRY')}`);
+      }
       onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : 'Kaydetme hatası.'); setSaving(false); }
   };
@@ -777,6 +784,9 @@ const PaymentForm = ({ invoice, onClose, onSaved }: { invoice: Invoice; onClose:
         <p className="text-xs text-slate-600">Kalan bakiye: <b>{fmt(remaining, invoice.currency)}</b></p>
       </div>
       <Input label="Tahsilat Tutarı" v={f.amount} on={(v) => set('amount', v)} type="number" />
+      {invoice.currency !== 'TRY' && invoice.issueRateToTRY != null && (
+        <Input label={`Tahsilat Kuru (1 ${invoice.currency} = ? TRY — kesim kuru: ${invoice.issueRateToTRY})`} v={f.fxRate} on={(v) => set('fxRate', v)} type="number" placeholder="B-18 — kur farkı hesabı için" />
+      )}
       <Select label="Yöntem" v={f.method} on={(v) => set('method', v)} opts={['BANK_TRANSFER', 'CHEQUE', 'CASH', 'OTHER']} />
       <Input label="Tarih (boşsa bugün)" v={f.paidAt} on={(v) => set('paidAt', v)} type="date" />
       <Input label="Referans" v={f.reference} on={(v) => set('reference', v)} />

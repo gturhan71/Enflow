@@ -84,6 +84,12 @@ export function presentBreakdown(b: MoneyBreakdown): { net: number; vat: number;
   return { net: fromMinor(b.netMinor), vat: fromMinor(b.vatMinor), gross: fromMinor(b.grossMinor), currency: b.currency };
 }
 
+// B-18 — Döviz kur farkı: kesim kuru ile tahsilat kuru farkı × yabancı-para tutarı.
+// Pozitif = kur kazancı (tahsilat kuru daha yüksek), negatif = kur zararı.
+export function computeFxGainLoss(amountFx: number, issueRate: number, paymentRate: number): number {
+  return fromMinor(roundMinor(toMinor(amountFx) * (paymentRate - issueRate)));
+}
+
 // ── İşletme Maliyeti (Overhead) — Katman 1 (şirket genel gider %) ─────────────
 export type OverheadMethod = 'PCT_OF_VALUE' | 'PCT_OF_DIRECT_COST' | 'POOL_RATE';
 

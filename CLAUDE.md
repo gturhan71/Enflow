@@ -334,9 +334,6 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
-backend/src/services/governance.ts ← prismaClient
-backend/src/services/moneyRounding.ts ← financeEngine
 backend/src/services/licenseVerify.ts ← config/licensePublicKey
 backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog, licenseVerify
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
@@ -373,17 +370,19 @@ src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiServi
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 src/modules/SetupWizard.tsx ← services/apiService, types
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, documentService
+src/modules/ServiceTicketsModule.tsx ← services/apiService, types
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/guaranteeReminders.ts ← prismaClient
+backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/slaEscalation.ts ← prismaClient
+backend/src/services/serviceTicketReminders.ts ← prismaClient
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
@@ -391,40 +390,25 @@ backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService
 ## changes (last 10 commits — 1 second ago)
 ```
 src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
-src/services/apiService.ts                    ~ApiService
+src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule
 src/services/apiClient.ts                     ~ApiClient
+src/services/apiService.ts                    ~ApiService
 backend/src/middleware.ts                     +bearerToken
 backend/src/services/aiClient.ts              +assertSafeAiUrl  ~joinUrl  ~chatJSON
 backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
 backend/src/services/auth.ts                  +jwtSecret  +hashPassword  +verifyPassword  +signAuthToken
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
 backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
+backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
 backend/src/services/restoreService.ts        ~analyzeRestore
 backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
+backend/src/services/serviceTicketReminders.ts +sweepServiceTicketSla
 backend/src/services/salesCosting.ts          +monthsUntil  +forwardRate  +computeForwardRates  +computeSalesCosting
 backend/src/services/virtualAgentService.ts   +scoreQuotes
 backend/src/utils/secureUpload.ts             +fileFilter  +documentUpload
 ```
 
 ## backend
-
-### backend/src/services/governance.ts
-```
-export interface ApprovalTier  :13-13
-maxAmount: number  :13-13
-export async function getApprovalMatrix  :22-32
-export async function resolveApproverRoles  :37-46
-export async function isSoDEnabled  :48-54
-export async function resolveEntityCreator  :57-73
-export async function sodViolation  :79-92
-```
-
-### backend/src/services/moneyRounding.ts
-```
-export function roundMoneyData  :48-56
-export const round2  :33-45
-```
 
 ### backend/src/services/licenseVerify.ts
 ```
@@ -611,15 +595,22 @@ key provider
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
+### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
+```
+TABLE new_PurchaseRequest
+```
+
 ### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
 ```
 TABLE new_User
 INDEX User_email_key ON User
 ```
 
-### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
+### backend/prisma/migrations/20260802204241_service_ticket_model/migration.sql
 ```
-TABLE new_PurchaseRequest
+TABLE ServiceTicket
+INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
+INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
 ```
 
 ### backend/prisma/migrations/20260802202515_contact_model/migration.sql
@@ -685,6 +676,11 @@ subscription: { plan: string  :48-48
 export async function bootstrapTenant  :51-127
 ```
 
+### backend/src/services/guaranteeReminders.ts
+```
+export async function sweepGuaranteeReminders  :19-59
+```
+
 ### backend/src/services/dmoCosting.ts
 ```
 export interface RisturnTier  :10-10
@@ -713,11 +709,6 @@ export function computeOrderCosting  :118-179
 export async function recomputeOrderCosting  :182-211
 ```
 
-### backend/src/services/guaranteeReminders.ts
-```
-export async function sweepGuaranteeReminders  :19-59
-```
-
 ### backend/src/services/restoreService.ts
 ```
 export async function analyzeRestore  :59-63
@@ -728,6 +719,11 @@ export async function stageStateRestore  :207-207
 ### backend/src/services/slaEscalation.ts
 ```
 export async function sweepSlaEscalations  :13-64
+```
+
+### backend/src/services/serviceTicketReminders.ts
+```
+export async function sweepServiceTicketSla  :12-54
 ```
 
 ### backend/src/services/salesCosting.ts
@@ -777,6 +773,33 @@ export async function ratifyAgentRun  :626-632
 ### backend/src/utils/secureUpload.ts
 ```
 export function documentUpload  :47-53
+```
+
+## governance
+
+### governance/role-matrix.ts
+```
+export interface DecisionRight  :16-20
+decision: string  :17-17
+via: string  :18-18
+threshold?: string  :19-19
+export interface RoleTask  :22-26
+task: string  :23-23
+raci: RACI  :24-24
+via: string  :25-25
+export interface RoleSpec  :28-41
+role: string  :29-29
+unit: string  :30-30
+kind: RoleKind  :31-31
+staffing: Staffing  :32-32
+modules: string[]  :33-33
+endpointDomains: string[]  :34-34
+decisionRights: DecisionRight[]  :35-35
+tasks: RoleTask[]  :36-36
+export type RoleKind  :11-11
+export type Staffing  :12-12
+export type RACI  :13-13
+export type AgentMode  :14-14
 ```
 
 ## license-poc
@@ -842,17 +865,6 @@ p#payloadInfo
 ```
 
 ## src
-
-### src/components/settings/TenantSettings.tsx
-```
-props TenantSettingsProps
-hook useState
-hook useEffect
-hook useCallback
-export TenantSettings
-handler onChange
-handler onClick
-```
 
 ### src/modules/VirtualAgentsTestModule.tsx
 ```
@@ -1246,6 +1258,29 @@ handler onRefresh
 handler onSave
 ```
 
+### src/modules/SetupWizard.tsx
+```
+props SetupWizardProps
+hook useState
+hook useEffect
+export SetupWizard
+handler onChange
+handler onClick
+```
+
+### src/modules/ServiceTicketsModule.tsx
+```
+component ServiceTicketsModule
+props Props
+hook useState
+hook useCallback
+hook useEffect
+export ServiceTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
 ### src/modules/TodoModule.tsx
 ```
 hook useAuth
@@ -1257,29 +1292,6 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/SetupWizard.tsx
-```
-props SetupWizardProps
-hook useState
-hook useEffect
-export SetupWizard
-handler onChange
-handler onClick
-```
-
-### src/services/apiService.ts
-```
-class ApiService  :13-68
-setAuth  :14-16
-async login  :18-20
-async forgotPassword  :22-24
-async getSetupStatus  :27-27
-async runSetup  :32-32
-async getCustomers  :40-40
-async createCustomer  :41-41
-async updateCustomer  :42-42
-```
-
 ### src/services/apiClient.ts
 ```
 class ApiClient  :3-74
@@ -1287,6 +1299,19 @@ setAuth  :7-10
 async fetchWithAuth  :12-44
 async login  :46-59
 async forgotPassword  :61-73
+```
+
+### src/services/apiService.ts
+```
+class ApiService  :14-69
+setAuth  :15-17
+async login  :19-21
+async forgotPassword  :23-25
+async getSetupStatus  :28-28
+async runSetup  :33-33
+async getCustomers  :41-41
+async createCustomer  :42-42
+async updateCustomer  :43-43
 ```
 
 ### src/types.ts

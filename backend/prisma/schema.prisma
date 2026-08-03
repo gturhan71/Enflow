@@ -17,6 +17,7 @@ model Tenant {
   customers     Customer[]
   contacts      Contact[]
   serviceTickets ServiceTicket[]
+  fxAdjustments FxAdjustment[]
   opportunities Opportunity[]
   projects      Project[]
   units         Unit[]
@@ -983,9 +984,11 @@ model Invoice {
   docNumber     String?
   notes         String?
   createdById   String?
+  issueRateToTRY Float?   // B-18 — kesim anındaki TRY kuru (yabancı para birimli faturada)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
   payments      Payment[]
+  fxAdjustments FxAdjustment[]
   @@index([tenantId, status])
 }
 
@@ -1001,8 +1004,30 @@ model Payment {
   method      String?  // BANK_TRANSFER | CHEQUE | CASH | OTHER
   reference   String?
   notes       String?
+  fxAdjustment FxAdjustment?
   createdAt   DateTime @default(now())
   @@index([tenantId])
+}
+
+// B-18 — Döviz kur farkı: yabancı para birimli faturada kesim kuru ile tahsilat
+// (ödeme) kurunun farkı gerçek TRY kâr/zararı olarak ayrı kalem halinde kaydedilir.
+// Kurlar (issueRate/paymentRate) bu kod tabanının genel deseniyle (DMO/CostAnalysis)
+// tutarlı biçimde kullanıcı tarafından girilir — canlı kur API'si yok.
+model FxAdjustment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  paymentId   String   @unique
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  currency    String   // yabancı para birimi (Invoice.currency)
+  amountFx    Float    // ödeme tutarı (yabancı para)
+  issueRate   Float    // fatura kesim kuru (1 yabancı = ? TRY)
+  paymentRate Float    // tahsilat anındaki kur
+  gainLossTRY Float    // (paymentRate − issueRate) × amountFx — pozitif=kazanç, negatif=zarar
+  createdAt   DateTime @default(now())
+  @@index([tenantId, invoiceId])
 }
 
 // ── Faz 6b — Hukuk (Sözleşme Yönetimi modülüne sekme) ────────────────────────

@@ -8,7 +8,7 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
 import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
-import { sumByCurrency, presentBreakdown, LineInput } from '../services/financeEngine';
+import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
@@ -64,7 +64,7 @@ router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res
   const {
     type, invoiceNo, amount, currency, issueDate, dueDate, status,
     projectId, contractId, milestoneId, customerName, vendorName,
-    notes, createdById, categoryCode,
+    notes, createdById, categoryCode, issueRateToTRY,
   } = req.body;
   if (amount == null) return res.status(400).json({ error: 'Fatura tutarı zorunlu.' });
   const docNumber = await maybeDocNumber(req.tenantId, categoryCode);
@@ -86,6 +86,8 @@ router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res
       notes: notes || null,
       createdById: createdById || null,
       docNumber,
+      // B-18 — yabancı para birimli faturada kesim kuru (döviz kur farkı hesabı için)
+      issueRateToTRY: (currency && currency !== 'TRY' && issueRateToTRY) ? Number(issueRateToTRY) : null,
     },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'INVOICE', entityId: item.id, details: { type: item.type, amount: item.amount, invoiceNo: item.invoiceNo } });
@@ -98,7 +100,7 @@ router.put('/invoices/:id', tenantMiddleware, asyncHandler(async (req: Request, 
   if (!record) return res.status(404).json({ error: 'Fatura bulunamadı.' });
   const {
     type, invoiceNo, amount, currency, issueDate, dueDate, status,
-    projectId, contractId, milestoneId, customerName, vendorName, notes,
+    projectId, contractId, milestoneId, customerName, vendorName, notes, issueRateToTRY,
   } = req.body;
   await prisma.invoice.update({
     where: { id },
@@ -109,6 +111,7 @@ router.put('/invoices/:id', tenantMiddleware, asyncHandler(async (req: Request, 
       issueDate: issueDate ? new Date(issueDate) : record.issueDate,
       dueDate: dueDate ? new Date(dueDate) : record.dueDate,
       projectId, contractId, milestoneId, customerName, vendorName, notes,
+      ...(issueRateToTRY !== undefined && { issueRateToTRY: issueRateToTRY ? Number(issueRateToTRY) : null }),
     },
   });
   await recalcInvoice(id);
@@ -138,7 +141,7 @@ router.post('/invoices/:id/payments', tenantMiddleware, asyncHandler(async (req:
   const id = String(req.params.id);
   const record = await prisma.invoice.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!record) return res.status(404).json({ error: 'Fatura bulunamadı.' });
-  const { amount, currency, paidAt, method, reference, notes, allowOverpayment } = req.body;
+  const { amount, currency, paidAt, method, reference, notes, allowOverpayment, fxRate } = req.body;
   if (amount == null) return res.status(400).json({ error: 'Ödeme tutarı zorunlu.' });
   const amt = Number(amount) || 0;
 
@@ -184,10 +187,25 @@ router.post('/invoices/:id/payments', tenantMiddleware, asyncHandler(async (req:
     }
   }
 
+  // B-18 — döviz kur farkı: yabancı para birimli faturada kesim kuru biliniyorsa
+  // (Invoice.issueRateToTRY) ve bu tahsilatın gerçek kuru girildiyse (fxRate),
+  // gerçek TRY kâr/zararı ayrı bir FxAdjustment kalemi olarak kaydedilir.
+  let fxAdjustment: { id: string; gainLossTRY: number } | null = null;
+  const invCurrency = currency || record.currency;
+  if (invCurrency !== 'TRY' && record.issueRateToTRY && fxRate) {
+    const gainLossTRY = computeFxGainLoss(amt, record.issueRateToTRY, Number(fxRate));
+    fxAdjustment = await prisma.fxAdjustment.create({
+      data: {
+        tenantId: req.tenantId, invoiceId: id, paymentId: payment.id,
+        currency: invCurrency, amountFx: amt, issueRate: record.issueRateToTRY, paymentRate: Number(fxRate), gainLossTRY,
+      },
+    });
+  }
+
   await recalcInvoice(id);
   const invoice = await prisma.invoice.findUnique({ where: { id }, include: { payments: true } });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'PAYMENT', entityType: 'INVOICE', entityId: id, details: { amount: payment.amount, paidTotal: invoice?.paidAmount, status: invoice?.status, overpay: overpay > 0.01 ? overpay : undefined } });
-  res.json({ payment, invoice });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'PAYMENT', entityType: 'INVOICE', entityId: id, details: { amount: payment.amount, paidTotal: invoice?.paidAmount, status: invoice?.status, overpay: overpay > 0.01 ? overpay : undefined, fxGainLossTRY: fxAdjustment?.gainLossTRY } });
+  res.json({ payment, invoice, fxAdjustment });
 }));
 
 router.delete('/payments/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
@@ -633,6 +651,18 @@ router.delete('/operating-cost-pool/:id', tenantMiddleware, overheadRoles, async
   await prisma.operatingCostPool.delete({ where: { id } });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'OPERATING_COST_POOL', entityId: id });
   res.json({ message: 'Havuz silindi.' });
+}));
+
+// B-18 — Döviz kur farkı raporu: fatura/proje bazında kayıtlı kur kazanç/zararları.
+router.get('/fx-adjustments', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { projectId } = req.query as { projectId?: string };
+  const items = await prisma.fxAdjustment.findMany({
+    where: { tenantId: req.tenantId, ...(projectId ? { invoice: { projectId } } : {}) },
+    include: { invoice: { select: { id: true, invoiceNo: true, projectId: true, customerName: true, vendorName: true } } },
+    orderBy: { createdAt: 'desc' },
+  });
+  const totalGainLossTRY = items.reduce((s, i) => s + i.gainLossTRY, 0);
+  res.json({ items, totalGainLossTRY });
 }));
 
 export default router;

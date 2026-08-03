@@ -785,6 +785,21 @@ export interface Invoice {
   createdAt: string;
   updatedAt: string;
   payments?: Payment[];
+  issueRateToTRY?: number | null; // B-18 — yabancı para birimli faturada kesim kuru
+}
+
+// B-18 — döviz kur farkı: fatura kesim kuru ile tahsilat kurunun farkı (gerçek TRY kâr/zarar).
+export interface FxAdjustment {
+  id: string;
+  invoiceId: string;
+  invoice?: { id: string; invoiceNo?: string | null; projectId?: string | null; customerName?: string | null; vendorName?: string | null };
+  paymentId: string;
+  currency: string;
+  amountFx: number;
+  issueRate: number;
+  paymentRate: number;
+  gainLossTRY: number;
+  createdAt?: string;
 }
 
 export interface GuaranteeLetter {
