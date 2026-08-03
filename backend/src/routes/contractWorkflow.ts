@@ -524,6 +524,7 @@ router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: R
           currency: b.currency || currency,
           refVendor: b.vendor || null,
           refSource: b.source || null,
+          lineKey: b.lineKey || null, // BoM Maliyet Varyansı'nın satır-bazlı karşılaştırma bağı
         })),
       } : undefined,
     },

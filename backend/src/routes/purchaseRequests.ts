@@ -182,8 +182,42 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
       where: { purchaseRequestId: pr.id, isSelected: true },
     });
     const amount = selected?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0;
-    if (pr.projectId) {
-      // Proje → Satınalma: doğru model ProjectCostItem (idempotent: purchaseRequestId)
+    const itemsWithBomKey = updated.items.filter(i => i.lineKey);
+    if (pr.projectId && itemsWithBomKey.length > 0 && amount > 0) {
+      // BoM'dan devredilmiş satırları taşıyan bir talep — BoM Maliyet Varyansı'nın
+      // satır-bazlı karşılaştırma yapabilmesi için tek toplamı (PO tek tedarikçi
+      // teklifi taşır) satırlara tahmini tutar (birim fiyat × miktar) ağırlığıyla
+      // ORANTILI dağıt — gerçek satır-bazlı fatura yoksa en iyi kestirim budur.
+      // lineKey'i olmayan (BoM dışı, elle eklenmiş) kalemler tek bir "diğer
+      // kalemler" satırında toplanır (idempotent anahtar çakışmasın diye).
+      const weight = (it: (typeof updated.items)[number]) => (it.estimatedUnitPrice ?? 0) * it.quantity;
+      const totalWeight = updated.items.reduce((s, it) => s + weight(it), 0);
+      const otherItems = updated.items.filter(i => !i.lineKey);
+
+      const upsertLineCost = async (bomLineKey: string | null, description: string, itemAmount: number) => {
+        const data = {
+          category: 'PROCUREMENT', description, actualAmount: itemAmount, amountTRY: itemAmount,
+          currency: pr.currency, purchaseRequestId: pr.id, bomLineKey,
+        };
+        const existing = await prisma.projectCostItem.findFirst({
+          where: { projectId: pr.projectId!, purchaseRequestId: pr.id, bomLineKey },
+        });
+        if (existing) await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
+        else await prisma.projectCostItem.create({ data: { projectId: pr.projectId!, createdById: req.userId, ...data } }).catch(() => {});
+      };
+
+      for (const it of itemsWithBomKey) {
+        const share = totalWeight > 0 ? weight(it) / totalWeight : 1 / updated.items.length;
+        await upsertLineCost(it.lineKey as string, `PO: ${it.name} (${updated.poNumber ?? ''})`, amount * share);
+      }
+      if (otherItems.length > 0) {
+        const otherWeight = otherItems.reduce((s, it) => s + weight(it), 0);
+        const share = totalWeight > 0 ? otherWeight / totalWeight : otherItems.length / updated.items.length;
+        await upsertLineCost(null, `PO: ${pr.title} — diğer kalemler (${updated.poNumber ?? ''})`, amount * share);
+      }
+    } else if (pr.projectId) {
+      // Proje → Satınalma (BoM bağı yok — mevcut davranış): talep başına tek
+      // maliyet kalemi (idempotent: purchaseRequestId)
       const data = {
         category: 'PROCUREMENT',
         description: `PO: ${pr.title} (${updated.poNumber ?? ''})`,

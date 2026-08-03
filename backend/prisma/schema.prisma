@@ -427,6 +427,7 @@ model ProjectCostItem {
   milestoneId     String?
   purchaseRequestId String?
   serviceTicketId String?  // Garanti & Servis maliyeti (idempotent anahtar)
+  bomLineKey      String?  // BoMItem.lineKey — dolu ise BoM Maliyet Varyansı satır bazında karşılaştırır
   date            DateTime?
   invoiceNo       String?
   notes           String?
@@ -700,6 +701,7 @@ model PurchaseItem {
   actualUnitPrice   Float?
   refVendor         String?  // BoM kaynağı: üretici/distribütör adı (referans alış fiyatının kaynağı)
   refSource         String?  // BoM source — referans fiyat kaynağı türü
+  lineKey           String?  // BoMItem.lineKey — BoM'dan devredildiyse satır-bazlı maliyet varyansı bağı
   createdAt         DateTime @default(now())
 }
 
