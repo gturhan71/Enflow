@@ -36,6 +36,8 @@ export function ServiceTicketsModule({ projects }: Props) {
   const [detailTicket, setDetailTicket] = useState<ServiceTicket | null>(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
   const [resolving, setResolving] = useState(false);
+  const [costAmount, setCostAmount] = useState('');
+  const [costCurrency, setCostCurrency] = useState('TRY');
 
   const [form, setForm] = useState({
     projectId: '', title: '', description: '', category: 'FAULT' as ServiceTicketCategory,
@@ -80,9 +82,16 @@ export function ServiceTicketsModule({ projects }: Props) {
     if (!detailTicket) return;
     setResolving(true);
     try {
-      await apiService.resolveServiceTicket(detailTicket.id, resolutionNotes || undefined);
+      await apiService.resolveServiceTicket(
+        detailTicket.id,
+        resolutionNotes || undefined,
+        costAmount ? Number(costAmount) : undefined,
+        costAmount ? costCurrency : undefined,
+      );
       setDetailTicket(null);
       setResolutionNotes('');
+      setCostAmount('');
+      setCostCurrency('TRY');
       load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'İşlem başarısız.');
@@ -142,7 +151,7 @@ export function ServiceTicketsModule({ projects }: Props) {
               <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Servis talebi bulunamadı.</td></tr>
             )}
             {tickets.map(t => (
-              <tr key={t.id} onClick={() => { setDetailTicket(t); setResolutionNotes(t.resolutionNotes || ''); }} className="hover:bg-slate-50 cursor-pointer transition-colors">
+              <tr key={t.id} onClick={() => { setDetailTicket(t); setResolutionNotes(t.resolutionNotes || ''); setCostAmount(t.costAmount ? String(t.costAmount) : ''); setCostCurrency(t.costCurrency || 'TRY'); }} className="hover:bg-slate-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3">
                   <div className="font-bold text-slate-800">{t.title}</div>
                   {t.reportedByName && <div className="text-xs text-slate-400">{t.reportedByName}</div>}
@@ -233,16 +242,32 @@ export function ServiceTicketsModule({ projects }: Props) {
               {OPEN_STATUSES.includes(detailTicket.status) ? (
                 <div className="pt-2 space-y-2">
                   <textarea placeholder="Çözüm notu (opsiyonel)" rows={3} value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} className="input-glass w-full resize-none" />
+                  <div className="flex gap-2">
+                    <input type="number" min="0" step="0.01" placeholder="Maliyet (opsiyonel — yedek parça/işçilik)" value={costAmount} onChange={e => setCostAmount(e.target.value)} className="input-glass flex-1" />
+                    <select value={costCurrency} onChange={e => setCostCurrency(e.target.value)} className="input-glass w-24">
+                      <option value="TRY">TRY</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
+                  </div>
+                  <p className="text-[10px] text-slate-400">Maliyet girilirse projenin maliyet kalemlerine otomatik işlenir.</p>
                   <button onClick={handleResolve} disabled={resolving} className="btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                     {resolving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Çözüldü Olarak İşaretle
                   </button>
                 </div>
               ) : (
-                detailTicket.resolutionNotes && (
+                <>
+                {detailTicket.costAmount != null && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
+                    <strong>Maliyet:</strong> {detailTicket.costAmount.toLocaleString('tr-TR')} {detailTicket.costCurrency || 'TRY'} — projenin maliyet kalemlerine işlendi.
+                  </div>
+                )}
+                {detailTicket.resolutionNotes && (
                   <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-700">
                     <strong>Çözüm:</strong> {detailTicket.resolutionNotes}
                   </div>
-                )
+                )}
+                </>
               )}
             </div>
           </div>

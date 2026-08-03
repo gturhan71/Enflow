@@ -168,7 +168,7 @@ class ApiService {
   async getServiceTickets(filters?: { status?: string; projectId?: string; priority?: string }) { return serviceTicketService.getServiceTickets(filters); }
   async createServiceTicket(data: Partial<ServiceTicket>) { return serviceTicketService.createServiceTicket(data); }
   async updateServiceTicket(id: string, data: Partial<ServiceTicket>) { return serviceTicketService.updateServiceTicket(id, data); }
-  async resolveServiceTicket(id: string, resolutionNotes?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes); }
+  async resolveServiceTicket(id: string, resolutionNotes?: string, costAmount?: number, costCurrency?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes, costAmount, costCurrency); }
   async deleteServiceTicket(id: string) { return serviceTicketService.deleteServiceTicket(id); }
 
   // --- DOCUMENTS ---

@@ -8,6 +8,25 @@ const router: Router = Router();
 const ROLES = requireRole(['GENERAL_MANAGER', 'PROJECT_MGR', 'OPERATIONS_MGR']);
 router.use(tenantMiddleware, ROLES);
 
+// Çözüm maliyeti (yedek parça/işçilik) girildiyse, projenin maliyet kalemlerine
+// idempotent olarak işle (T5 satınalma→proje deseninin aynısı — purchaseRequests.ts).
+async function upsertServiceCostItem(tenantId: string, projectId: string, ticketId: string, ticketTitle: string, amount: number, currency: string, userId?: string) {
+  const data = {
+    category: 'SERVICE',
+    description: `Servis: ${ticketTitle}`,
+    actualAmount: amount,
+    amountTRY: currency === 'TRY' ? amount : 0,
+    currency,
+    serviceTicketId: ticketId,
+  };
+  const existing = await prisma.projectCostItem.findFirst({ where: { projectId, serviceTicketId: ticketId } });
+  if (existing) {
+    await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
+  } else {
+    await prisma.projectCostItem.create({ data: { projectId, createdById: userId, ...data } }).catch(() => {});
+  }
+}
+
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   await sweepServiceTicketSla(req.tenantId); // SLA aşımı eskalasyonu (non-throwing)
   const { status, projectId, priority } = req.query as { status?: string; projectId?: string; priority?: string };
@@ -66,7 +85,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const record = await prisma.serviceTicket.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
 
-  const { title, description, category, priority, status, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours, resolutionNotes } = req.body;
+  const { title, description, category, priority, status, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours, resolutionNotes, costAmount, costCurrency } = req.body;
   const isResolving = status && (status === 'RESOLVED' || status === 'CLOSED') && record.status !== 'RESOLVED' && record.status !== 'CLOSED';
 
   const ticket = await prisma.serviceTicket.update({
@@ -83,10 +102,15 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       ...(unitId !== undefined && { unitId }),
       ...(slaHours !== undefined && { slaHours: slaHours ? Number(slaHours) : null }),
       ...(resolutionNotes !== undefined && { resolutionNotes }),
+      ...(costAmount !== undefined && { costAmount: costAmount != null ? Number(costAmount) : null }),
+      ...(costCurrency !== undefined && { costCurrency }),
       ...(isResolving && { resolvedAt: new Date() }),
     },
     include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
   });
+  if (costAmount != null && Number(costAmount) > 0) {
+    await upsertServiceCostItem(tenantId, ticket.projectId, id, ticket.title, Number(costAmount), costCurrency || 'TRY', req.userId);
+  }
   await logActivity({ tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'SERVICE_TICKET', entityId: id, details: { title: ticket.title, status: ticket.status } });
   res.json(ticket);
 }));
@@ -97,13 +121,22 @@ router.post('/:id/resolve', asyncHandler(async (req: Request, res: Response) => 
   const record = await prisma.serviceTicket.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
 
-  const { resolutionNotes } = req.body as { resolutionNotes?: string };
+  const { resolutionNotes, costAmount, costCurrency } = req.body as { resolutionNotes?: string; costAmount?: number; costCurrency?: string };
   const ticket = await prisma.serviceTicket.update({
     where: { id },
-    data: { status: 'RESOLVED', resolvedAt: new Date(), resolutionNotes: resolutionNotes || record.resolutionNotes },
+    data: {
+      status: 'RESOLVED',
+      resolvedAt: new Date(),
+      resolutionNotes: resolutionNotes || record.resolutionNotes,
+      ...(costAmount != null && { costAmount: Number(costAmount) }),
+      ...(costCurrency !== undefined && { costCurrency }),
+    },
     include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
   });
-  await logActivity({ tenantId, userId: req.userId, action: 'STATUS_RESOLVED', entityType: 'SERVICE_TICKET', entityId: id, details: { title: ticket.title } });
+  if (costAmount != null && Number(costAmount) > 0) {
+    await upsertServiceCostItem(tenantId, ticket.projectId, id, ticket.title, Number(costAmount), costCurrency || 'TRY', req.userId);
+  }
+  await logActivity({ tenantId, userId: req.userId, action: 'STATUS_RESOLVED', entityType: 'SERVICE_TICKET', entityId: id, details: { title: ticket.title, costAmount: costAmount ?? null } });
   res.json(ticket);
 }));
 

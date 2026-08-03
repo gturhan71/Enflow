@@ -374,6 +374,8 @@ model ServiceTicket {
   escalatedAt         DateTime? // SLA aşımı bildirimi bir kez gitti mi (idempotent)
   resolvedAt          DateTime?
   resolutionNotes     String?
+  costAmount          Float?    // çözüm maliyeti (yedek parça/işçilik) — opsiyonel
+  costCurrency        String?   // costAmount girildiyse zorunlu anlamda kullanılır
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   @@index([tenantId, status])
@@ -423,6 +425,7 @@ model ProjectCostItem {
   amountTRY       Float    @default(0)
   milestoneId     String?
   purchaseRequestId String?
+  serviceTicketId String?  // Garanti & Servis maliyeti (idempotent anahtar)
   date            DateTime?
   invoiceNo       String?
   notes           String?

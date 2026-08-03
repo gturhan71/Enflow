@@ -412,6 +412,8 @@ export interface ServiceTicket {
   escalatedAt?: string | null;
   resolvedAt?: string | null;
   resolutionNotes?: string | null;
+  costAmount?: number | null;
+  costCurrency?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }

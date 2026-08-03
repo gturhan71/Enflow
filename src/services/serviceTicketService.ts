@@ -25,10 +25,10 @@ export const serviceTicketService = {
     });
   },
 
-  async resolveServiceTicket(id: string, resolutionNotes?: string) {
+  async resolveServiceTicket(id: string, resolutionNotes?: string, costAmount?: number, costCurrency?: string) {
     return apiClient.fetchWithAuth(`/service-tickets/${id}/resolve`, {
       method: 'POST',
-      body: JSON.stringify({ resolutionNotes })
+      body: JSON.stringify({ resolutionNotes, costAmount, costCurrency })
     });
   },
 
