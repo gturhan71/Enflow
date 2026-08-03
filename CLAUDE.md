@@ -335,9 +335,6 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 ## deps
 ```
-backend/src/services/licenseVerify.ts ← config/licensePublicKey
-backend/src/services/entitlementService.ts ← prismaClient, pluginCatalog, licenseVerify
-src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 license-tool/server.mjs ← core
 src/contexts/AuthContext.tsx ← types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
@@ -346,7 +343,6 @@ src/components/settings/PermissionSettings.tsx ← ../lib/utils, ../types, ../co
 upgrade-tool/cli.mjs ← core
 upgrade-tool/server.mjs ← core
 backend/src/services/updateNotifier.ts ← prismaClient
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/components/settings/SubscriptionSettings.tsx ← ../services/apiService, ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/HandOffModal.tsx ← services/apiService
@@ -355,81 +351,56 @@ src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudServic
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, services/apiService, contexts/UnsavedChangesContext
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/components/HealthCards.tsx ← types
-backend/src/services/analyticsService.ts ← prismaClient
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, types
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, types
 backend/src/services/overheadService.ts ← prismaClient, financeEngine, moneyRounding
-src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
 backend/src/middleware.ts ← prismaClient, services/auth
 backend/src/services/aiClient.ts ← prismaClient
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/SetupWizard.tsx ← services/apiService, types
-src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
-src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/modules/BackupModule.tsx ← services/apiService, types
-src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
 src/modules/ContractWorkflowModule.tsx ← services/apiClient, services/apiService, contexts/AIGateContext, contexts/AuthContext, types
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
-src/modules/Dashboard.tsx ← types, constants, lib/utils, contexts/AuthContext, services/apiService
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/HelpModule.tsx ← constants, contexts/AuthContext, services/apiService, content/helpArticles, lib/utils
-src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
-src/modules/ServiceTicketsModule.tsx ← services/apiService, types
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, components/AgentTag, lib/agentProvenance
 backend/src/services/guaranteeReminders.ts ← prismaClient
-backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/slaEscalation.ts ← prismaClient
-backend/src/services/serviceTicketReminders.ts ← prismaClient
+backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
+src/modules/BackupModule.tsx ← services/apiService, types
+backend/src/services/dmoCosting.ts ← prismaClient, moneyRounding
 backend/src/services/salesCosting.ts ← prismaClient
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
+src/modules/CRMModule.tsx ← lib/utils, types, components/HealthCards, ProposalEditor, NegotiationModule
+backend/src/services/serviceTicketReminders.ts ← prismaClient
+src/modules/Dashboard.tsx ← types, constants, lib/utils, contexts/AuthContext, services/apiService
+src/modules/HelpModule.tsx ← constants, contexts/AuthContext, services/apiService, content/helpArticles, lib/utils
+src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
+src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
+src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/ManagementReportingModule.tsx ← services/apiService, components/HealthCards, contexts/AuthContext, constants, types
+src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, types
+src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, types
+src/modules/ServiceTicketsModule.tsx ← services/apiService, types
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
 ## changes (last 10 commits — 1 second ago)
 ```
-src/modules/ContractWorkflowModule.tsx        ~bestProposalPrice  ~ContractWorkflowModule
-src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule
+src/modules/ManagementReportingModule.tsx     +ArchiveCard  ~BomVarianceCard  ~DocPortfolioCard  ~AnalyticsTab
+src/modules/SalesSupport.tsx                  +EkapTab  ~EkapTab  ~GuaranteesTab
+src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 src/services/apiService.ts                    ~ApiService
-backend/src/services/approvalChainService.ts  +getDelegatedRoles  +resolveEffectiveApprover  ~autoSkipOrphanStages  ~resetApprovalChain
-backend/src/services/dmoCosting.ts            ~getDmoParams  ~setDmoParams  ~computeOrderCosting
-backend/src/services/guaranteeReminders.ts    +sweepGuaranteeReminders  +safeParse
-backend/src/services/financeEngine.ts         +computeFxGainLoss  ~presentBreakdown
-backend/src/services/restoreService.ts        ~analyzeRestore
-backend/src/services/slaEscalation.ts         +sweepSlaEscalations  +resolveEscalationTarget
-backend/src/services/serviceTicketReminders.ts +sweepServiceTicketSla
-backend/src/services/salesCosting.ts          +monthsUntil  +forwardRate  +computeForwardRates  +computeSalesCosting
-backend/src/services/virtualAgentService.ts   +scoreQuotes
+backend/src/services/analyticsService.ts      +computeArchiveAnalytics  ~computeTenderAnalytics  ~computeBomVariance  ~computeDocumentPortfolio
+backend/src/services/virtualAgentService.ts   +scoreQuotes  ~scoreQuotes
 ```
 
 ## backend
-
-### backend/src/services/licenseVerify.ts
-```
-export interface LicensePayload  :11-20
-v: number  :12-12
-tenantId: string  :13-13
-sku: string  :14-14
-plugins: string[]  :15-15
-limits: { users?: number  :16-16
-issuedAt: number  :17-17
-expiresAt: number | null  :18-18
-nonce: string  :19-19
-export type VerifyResult  :22-22
-export function verifyLicenseToken  :32-47
-```
-
-### backend/src/services/entitlementService.ts
-```
-export async function isPluginEntitled  :18-26
-export async function listEntitlementsWithCatalog  :29-45
-export async function activatePluginLicense  :53-57
-export async function updateEntitlement  :93-97
-```
 
 ### backend/src/services/updateNotifier.ts
 ```
@@ -465,35 +436,6 @@ INDEX DmoOrderItem_orderId_idx ON DmoOrderItem
 ```
 TABLE new_DmoOrderItem
 INDEX DmoOrderItem_orderId_idx ON DmoOrderItem
-```
-
-### backend/src/services/analyticsService.ts
-```
-export interface FunnelResult  :18-22
-stages: { name: string  :19-19
-lossByReason: { reason: string  :20-20
-entered: number  :21-21
-export interface TenderGroup  :58-58
-key: string  :58-58
-export interface TenderAnalytics  :59-63
-byAuthority: TenderGroup[]  :60-60
-byMethod: TenderGroup[]  :61-61
-overall: { winRate: number  :62-62
-export interface BomVarianceLine  :112-112
-name: string  :112-112
-export interface BomVarianceReport  :113-113
-lines: BomVarianceLine[]  :113-113
-export interface ForecastReport  :159-163
-rawPipeline: number  :160-160
-target: number  :161-161
-byStage: { status: string  :162-162
-export interface BidScoreLine  :195-201
-id: string  :196-196
-deadline: string | null  :197-197
-score: number  :198-198
-factors: { authorityWinRate: number  :199-199
-authorityWinPct: number | null  :200-200
-export interface BidScorecard  :202-206
 ```
 
 ### backend/src/services/pluginCatalog.ts
@@ -597,42 +539,6 @@ export function signAuthToken  :44-47
 export function verifyAuthToken  :49-59
 ```
 
-### backend/prisma/migrations/migration_lock.toml
-```
-key provider
-```
-
-### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
-```
-TABLE new_PurchaseRequest
-```
-
-### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
-```
-TABLE new_User
-INDEX User_email_key ON User
-```
-
-### backend/prisma/migrations/20260802204241_service_ticket_model/migration.sql
-```
-TABLE ServiceTicket
-INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
-INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
-```
-
-### backend/prisma/migrations/20260802202515_contact_model/migration.sql
-```
-TABLE Contact
-INDEX Contact_tenantId_customerId_idx ON Contact
-```
-
-### backend/prisma/migrations/20260802205629_fx_adjustment_model/migration.sql
-```
-TABLE FxAdjustment
-INDEX FxAdjustment_paymentId_key ON FxAdjustment
-INDEX FxAdjustment_tenantId_invoiceId_idx ON FxAdjustment
-```
-
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain  :22-51
@@ -643,19 +549,27 @@ export async function resolveEffectiveApprover  :224-230
 export async function resetApprovalChain  :233-246
 ```
 
-### backend/src/services/bootstrapTenant.ts
+### backend/prisma/migrations/20260802185546_faz10_1_contract_cancel_delegate/migration.sql
 ```
-export interface BootstrapInput  :36-43
-companyName: string  :37-37
-admin: { name: string  :38-38
-license?: string  :40-40
-tenantId?: string  :42-42
-export interface BootstrapResult  :44-49
-tenantId: string  :45-45
-token: string  :46-46
-user: { id: string  :47-47
-subscription: { plan: string  :48-48
-export async function bootstrapTenant  :51-127
+TABLE new_User
+INDEX User_email_key ON User
+```
+
+### backend/src/services/guaranteeReminders.ts
+```
+export async function sweepGuaranteeReminders  :19-59
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations  :13-64
+```
+
+### backend/src/services/restoreService.ts
+```
+export async function analyzeRestore  :59-63
+export async function applyLogicalRestore  :152-152
+export async function stageStateRestore  :207-207
 ```
 
 ### backend/src/services/dmoCosting.ts
@@ -686,55 +600,9 @@ export function computeOrderCosting  :118-179
 export async function recomputeOrderCosting  :182-211
 ```
 
-### backend/src/services/guaranteeReminders.ts
+### backend/prisma/migrations/20260802194029_faz10_3_purchase_resubmit_proposal_rejection/migration.sql
 ```
-export async function sweepGuaranteeReminders  :19-59
-```
-
-### backend/src/services/financeEngine.ts
-```
-export interface MoneyBreakdown  :13-18
-netMinor: number  :14-14
-vatMinor: number  :15-15
-grossMinor: number  :16-16
-currency: Currency  :17-17
-export interface LineInput  :20-26
-qty: number  :21-21
-unitPrice: number  :22-22
-vatRate?: number  :23-23
-currency?: Currency  :24-24
-discountPct?: number  :25-25
-export type Currency  :11-11
-export type OverheadMethod  :94-94
-export function toMinor  :29-31
-export function fromMinor  :33-35
-export function roundMinor  :37-39
-export function applyVat  :42-42
-export function lineBreakdown  :49-58
-export function sumByCurrency  :64-75
-export function convertMinor  :78-80
-export function presentBreakdown  :83-83
-export function computeFxGainLoss  :89-91
-export function computeCompanyOverhead  :101-105
-export function computeUnitParticipationLoad  :112-115
-export function projectMargins  :126-126
-```
-
-### backend/src/services/restoreService.ts
-```
-export async function analyzeRestore  :59-63
-export async function applyLogicalRestore  :152-152
-export async function stageStateRestore  :207-207
-```
-
-### backend/src/services/slaEscalation.ts
-```
-export async function sweepSlaEscalations  :13-64
-```
-
-### backend/src/services/serviceTicketReminders.ts
-```
-export async function sweepServiceTicketSla  :12-54
+TABLE new_PurchaseRequest
 ```
 
 ### backend/src/services/salesCosting.ts
@@ -766,6 +634,115 @@ export interface SalesManualCostItemInput  :39-44
 description?: string  :40-40
 ```
 
+### backend/prisma/migrations/20260802202515_contact_model/migration.sql
+```
+TABLE Contact
+INDEX Contact_tenantId_customerId_idx ON Contact
+```
+
+### backend/prisma/migrations/20260802204241_service_ticket_model/migration.sql
+```
+TABLE ServiceTicket
+INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
+INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
+```
+
+### backend/src/services/serviceTicketReminders.ts
+```
+export async function sweepServiceTicketSla  :12-54
+```
+
+### backend/prisma/migrations/20260802205629_fx_adjustment_model/migration.sql
+```
+TABLE FxAdjustment
+INDEX FxAdjustment_paymentId_key ON FxAdjustment
+INDEX FxAdjustment_tenantId_invoiceId_idx ON FxAdjustment
+```
+
+### backend/src/services/financeEngine.ts
+```
+export interface MoneyBreakdown  :13-18
+netMinor: number  :14-14
+vatMinor: number  :15-15
+grossMinor: number  :16-16
+currency: Currency  :17-17
+export interface LineInput  :20-26
+qty: number  :21-21
+unitPrice: number  :22-22
+vatRate?: number  :23-23
+currency?: Currency  :24-24
+discountPct?: number  :25-25
+export type Currency  :11-11
+export type OverheadMethod  :94-94
+export function toMinor  :29-31
+export function fromMinor  :33-35
+export function roundMinor  :37-39
+export function applyVat  :42-42
+export function lineBreakdown  :49-58
+export function sumByCurrency  :64-75
+export function convertMinor  :78-80
+export function presentBreakdown  :83-83
+export function computeFxGainLoss  :89-91
+export function computeCompanyOverhead  :101-105
+export function computeUnitParticipationLoad  :112-115
+export function projectMargins  :126-126
+```
+
+### backend/src/services/bootstrapTenant.ts
+```
+export interface BootstrapInput  :36-43
+companyName: string  :37-37
+admin: { name: string  :38-38
+license?: string  :40-40
+tenantId?: string  :42-42
+export interface BootstrapResult  :44-49
+tenantId: string  :45-45
+token: string  :46-46
+user: { id: string  :47-47
+subscription: { plan: string  :48-48
+export async function bootstrapTenant  :51-127
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/prisma/migrations/20260803135207_invoice_customer_fk/migration.sql
+```
+TABLE new_Invoice
+INDEX Invoice_tenantId_status_idx ON Invoice
+```
+
+### backend/src/services/analyticsService.ts
+```
+export interface FunnelResult  :18-22
+stages: { name: string  :19-19
+lossByReason: { reason: string  :20-20
+entered: number  :21-21
+export interface TenderGroup  :58-58
+key: string  :58-58
+export interface TenderAnalytics  :59-63
+byAuthority: TenderGroup[]  :60-60
+byMethod: TenderGroup[]  :61-61
+overall: { winRate: number  :62-62
+export interface BomVarianceLine  :114-114
+name: string  :114-114
+export interface BomVarianceReport  :115-115
+lines: BomVarianceLine[]  :115-115
+export interface ForecastReport  :194-198
+rawPipeline: number  :195-195
+target: number  :196-196
+byStage: { status: string  :197-197
+export interface BidScoreLine  :230-236
+id: string  :231-231
+deadline: string | null  :232-232
+score: number  :233-233
+factors: { authorityWinRate: number  :234-234
+authorityWinPct: number | null  :235-235
+export interface BidScorecard  :237-241
+```
+
 ### backend/src/services/virtualAgentService.ts
 ```
 export interface AgentOutput  :13-25
@@ -776,6 +753,7 @@ autonomousAction?: { kind: string  :19-20
 summary: string  :21-21
 reversible: boolean  :22-22
 execute:  :23-23
+export function scoreQuotes  :189-191
 export function hasHandler  :505-507
 export async function runAgent  :513-518
 export async function ratifyAgentRun  :626-632
@@ -810,16 +788,6 @@ export type AgentMode  :14-14
 
 ## license-tool
 
-### license-tool/README.md
-```
-h1 Enflow Lisans Üreteci (Vendor — yerel web GUI)
-h2 Çalıştır
-h2 Güvenlik
-h2 Dosyalar
-code-fence bash
-code-fence plain
-```
-
 ### license-tool/server.mjs
 ```
 function ensurePublic  :12-16
@@ -844,20 +812,6 @@ p#payloadInfo
 ```
 
 ## src
-
-### src/modules/VirtualAgentsTestModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VirtualAgentsTestModule
-handler onChange
-handler onClick
-handler onSetMode
-handler onDisable
-handler onRatify
-```
 
 ### src/contexts/AuthContext.tsx
 ```
@@ -904,20 +858,6 @@ hook useState
 export PermissionSettings
 handler onClick
 handler onChange
-```
-
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
 ```
 
 ### src/components/settings/SubscriptionSettings.tsx
@@ -998,16 +938,6 @@ export ProjectHealthCard
 export CustomerHealthCard
 ```
 
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
-```
-
 ### src/modules/DmoModule.tsx
 ```
 component DmoModule
@@ -1061,35 +991,6 @@ handler onPrintReport
 handler onSelect
 ```
 
-### src/modules/ManagementReportingModule.tsx
-```
-component MetricCard
-component ChartBlock
-component BottleneckPanel
-component ConsolidationView
-component ReportForm
-component IncomingReportCard
-component FunnelCard
-component TenderCard
-component BomVarianceCard
-component ConcentrationCard
-component ForecastCard
-component BidScorecardCard
-component DocPortfolioCard
-component BusinessHealthCard
-component DmoAnalyticsCard
-component UnitAbsorptionCard
-component AnalyticsTab
-component ManagementReportingModule
-hook useAuth
-hook useState
-hook useEffect
-hook useCallback
-handler onClick
-handler onChange
-handler onSaved
-```
-
 ### src/services/apiClient.ts
 ```
 class ApiClient  :3-74
@@ -1118,26 +1019,21 @@ handler onChange
 handler onClick
 ```
 
-### src/App.tsx
+### src/modules/ContractWorkflowModule.tsx
 ```
+component ContractWorkflowModule
+component LegalView
+component LegalCaseForm
+props Props
+hook useAuth
 hook useState
-hook useRef
+hook useAIGate
+hook useCallback
 hook useEffect
-hook useOpportunities
-hook useCustomers
-hook useProjects
-hook useContracts
-hook useTasks
-hook useUnits
-hook useUsers
-hook useDocuments
-hook useProposals
-export App
-handler onApproveProposal
-handler onNavigate
-handler onLogout
-handler onComplete
-handler onLogin
+export ContractWorkflowModule
+handler onChange
+handler onClick
+handler onBlur
 ```
 
 ### src/components/settings/UserManagement.tsx
@@ -1148,29 +1044,15 @@ export UserManagement
 handler onSubmit
 ```
 
-### src/content/helpArticles.ts
-```
-export interface HelpArticleSection  :8-11
-heading: string  :9-9
-body: string  :10-10
-export interface HelpArticle  :13-18
-moduleId: string  :14-14
-summary: string  :15-15
-audience: string  :16-16
-sections: HelpArticleSection[]  :17-17
-export const getHelpArticle  :186-186
-```
-
-### src/layout/Header.tsx
+### src/modules/TodoModule.tsx
 ```
 hook useAuth
-hook useTheme
 hook useState
-hook useRef
+hook useCallback
 hook useEffect
-export Header
-handler onAccess
+export TodoModule
 handler onClick
+handler onChange
 ```
 
 ### src/modules/BackupModule.tsx
@@ -1182,6 +1064,17 @@ export BackupModule
 handler onRun
 handler onVerify
 handler onRestore
+handler onChange
+handler onClick
+```
+
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export CostAnalysisModule
 handler onChange
 handler onClick
 ```
@@ -1205,34 +1098,6 @@ handler onConfirm
 handler onSubmit
 ```
 
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-component LegalView
-component LegalCaseForm
-props Props
-hook useAuth
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onChange
-handler onClick
-handler onBlur
-```
-
-### src/modules/CostAnalysisModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/Dashboard.tsx
 ```
 hook useAuth
@@ -1244,6 +1109,108 @@ handler onClick
 handler onOpps
 handler onValue
 handler onCount
+```
+
+### src/modules/HelpModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export HelpModule
+handler onChange
+```
+
+### src/App.tsx
+```
+hook useState
+hook useRef
+hook useEffect
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useContracts
+hook useTasks
+hook useUnits
+hook useUsers
+hook useDocuments
+hook useProposals
+export App
+handler onApproveProposal
+handler onNavigate
+handler onLogout
+handler onComplete
+handler onLogin
+```
+
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+```
+
+### src/content/helpArticles.ts
+```
+export interface HelpArticleSection  :8-11
+heading: string  :9-9
+body: string  :10-10
+export interface HelpArticle  :13-18
+moduleId: string  :14-14
+summary: string  :15-15
+audience: string  :16-16
+sections: HelpArticleSection[]  :17-17
+export const getHelpArticle  :186-186
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+```
+
+### src/components/settings/TenantSettings.tsx
+```
+props TenantSettingsProps
+hook useState
+hook useEffect
+hook useCallback
+export TenantSettings
+handler onChange
+handler onClick
+```
+
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
+### src/modules/DocumentsModule.tsx
+```
+props DocumentsModuleProps
+hook useState
+hook useMemo
+export DocumentsModule
+handler onChange
+handler onSubmit
 ```
 
 ### src/modules/FinanceModule.tsx
@@ -1264,13 +1231,32 @@ handler onBlur
 handler onClose
 ```
 
-### src/modules/HelpModule.tsx
+### src/modules/ManagementReportingModule.tsx
 ```
+component MetricCard
+component ChartBlock
+component BottleneckPanel
+component ConsolidationView
+component ReportForm
+component IncomingReportCard
+component FunnelCard
+component TenderCard
+component BomVarianceCard
+component ConcentrationCard
+component ForecastCard
+component BidScorecardCard
+component DocPortfolioCard
+component ArchiveCard
+component BusinessHealthCard
+component DmoAnalyticsCard
+component UnitAbsorptionCard
+component AnalyticsTab
+component ManagementReportingModule
 hook useAuth
 hook useState
 hook useEffect
-hook useMemo
-export HelpModule
+hook useCallback
+handler onClick
 handler onChange
 ```
 
@@ -1292,6 +1278,35 @@ handler onRefresh
 handler onSave
 ```
 
+### src/modules/SalesSupport.tsx
+```
+component TenderList
+component TenderCalendar
+component ChecklistTab
+component GuaranteesTab
+component EkapTab
+component SubmittedTenders
+component TenderSelectorEmpty
+component Modal
+component TenderForm
+props SalesSupportProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+hook useAIGate
+export SalesSupport
+handler onSelect
+handler onChanged
+handler onWithdraw
+handler onSelectTender
+handler onChange
+handler onClick
+handler onKeyDown
+handler onClose
+```
+
 ### src/modules/ServiceTicketsModule.tsx
 ```
 component ServiceTicketsModule
@@ -1303,17 +1318,6 @@ export ServiceTicketsModule
 handler onClick
 handler onChange
 handler onSubmit
-```
-
-### src/modules/TodoModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export TodoModule
-handler onClick
-handler onChange
 ```
 
 ### src/services/apiService.ts

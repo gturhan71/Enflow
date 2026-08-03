@@ -1,191 +1,839 @@
-# ENFLOW — Karar Vericiler İçin Bilgilendirme Dökümanı
-### Entegratör Süreçlerinde Hata Yakalama, Kontrol Mekanizması ve Tek-Bakış Görünürlük
+# ENFLOW — Karar Vericiler İçin Kapsamlı Platform Analizi
+### Her Modülün, Her Ekranın ve Aralarındaki Akışın Sistem İçinden Analizi
 
-> **Bu döküman kime hitap eder?** IT sistem entegrasyonu, donanım/yazılım tedariki ve kamu
-> ihalesi ile B2B proje yürüten şirketlerin **Genel Müdür, Finans, Satış, Satınalma ve Proje**
-> yöneticilerine. Amaç: Enflow'un günlük operasyonda **hangi hataları nasıl yakaladığını**,
-> **hangi kontrol mekanizmasını kurduğunu**, **olası ve yürüyen işlerin durumunu tek bakışta
-> nasıl gösterdiğini** ve **kullanıcıya günlük işte ne kolaylık sağladığını** somut örneklerle
-> anlatmaktır.
+> **Bu döküman nasıl üretildi?** Önceki sürüm, projenin geliştirme tarihçesindeki
+> "faz"lara (Faz 0, Faz 1, ... Faz 9) göre kurgulanmıştı — bu, geliştiricinin ne
+> zaman ne yaptığını anlatır ama karar vericinin sorduğu soruyu ("bu platform
+> bugün, bir bütün olarak ne yapıyor?") cevaplamaz. Bu sürüm **sıfırdan**, tarihçeye
+> bakılmaksızın, **platformdaki her bir modülün güncel koduna (ekranlar, iş
+> mantığı, hesaplamalar, uç noktalar) tek tek girilerek** üretildi. Amaç: modüllerin
+> tek tek ne yaptığını değil, **birlikte nasıl tek bir karar sistemi oluşturduklarını**
+> göstermek — bu bütünlük ancak sistemin içinden, ekran ekran, akış akış görülünce
+> anlatılabilir; dışarıdan bir özellik listesiyle anlatılamaz.
 >
-> Bu döküman, `docs/ENFLOW_Tanitim_ve_Mimari.md` (genel tanıtım & mimari) ve
-> `docs/ENFLOW_SUNUM_SLAYTLARI.md` (Marp sunum) ile birlikte okunmak üzere tasarlanmıştır;
-> onların **"kontrol ve görünürlük" derinleştirmesidir** — aynı örnekleri tekrar etmez,
-> odağını üç somut soruya daraltır. Sonundaki **§7** bu dökümanın satış sunumuna nasıl
-> dönüştürüleceğini gösterir.
+> Kapsam: **19 üst-seviye modül + Dashboard'un role-bazlı kokpit sistemi**, her biri
+> ekranları, adım adım kullanıcı akışı, dikkat çeken iş mantığı/hesaplama/güvenlik
+> kuralı ve komşu modüllerle somut veri bağlantısıyla birlikte. `docs/
+> ENFLOW_Tanitim_ve_Mimari.md` ve `docs/ENFLOW_SUNUM_SLAYTLARI.md` ile birlikte
+> okunabilir (bu döküman onların yerini almaz, derinlemesine tamamlar); §8'de bu
+> dökümanın bir satış sunumuna nasıl dönüştürülebileceği gösteriliyor.
 
 ---
 
-## 0. Neden Bu Üç Soru?
+## 1. Enflow Tek Bakışta Ne
 
-Bir sistem entegratörü şirketinde iş, birden çok elden geçer: satışçı fırsatı açar, presales
-malzeme listesini hazırlar, satış destek ihale evrakını toplar, sözleşme birimi imzayı yönetir,
-proje ekibi teslim eder, satınalma tedarik eder, finans tahsil eder. **Her el değişimi bir hata
-fırsatıdır:** unutulan bir görev, süresi geçen bir teminat, yanlış kurla verilen bir teklif,
-teknik olarak uygun olmayan bir tedarikçinin seçilmesi, kimsenin fark etmediği bir kârsız satış…
-
-Yönetim üç şeyi bilmek ister:
-
-1. **"Bu hatalar olduğunda sistem bunu yakalıyor mu, düzeltmeyi nasıl kolaylaştırıyor?"**
-2. **"Kim neyi yapabiliyor, kim neyi onaylıyor, bunu nasıl denetliyoruz?"**
-3. **"Sabah ofise geldiğimde, elimdeki ve gelmekte olan işlerin durumunu tek ekrandan görebiliyor muyum?"**
-
-Bu döküman bu üç soruyu sırasıyla cevaplar (§1, §2, §3), ardından kullanıcıya sağlanan
-kolaylıkları (§4) ve ölçülebilir faydayı (§6) özetler.
+Enflow; IT sistem entegrasyonu, donanım/yazılım tedariki ve kamu ihalesiyle iş
+yapan B2B şirketlerinin **satış fırsatından nakit tahsiline kadar tüm iş
+yaşam döngüsünü** tek platformda yöneten, çok-kiracılı bir kurumsal karar
+sistemidir. 19 modül var, ama bunlar 19 ayrı uygulama değil — her biri bir
+işin belirli bir aşamasında durur, kendi işini yapar, sonra **veriyi elle
+taşımadan** bir sonraki modüle devreder. Bu döküman önce bu devrin ortak
+altyapısını (§2), sonra her modülü tek tek (§3), sonunda da bunların
+toplamının neden "19 ayrı ekran" değil "tek bir platform" olduğunu (§4)
+anlatıyor.
 
 ---
 
-## 1. Süreç İçinde Oluşan Hatalar Nasıl Yakalanır ve Düzeltilir?
+## 2. Paylaşılan Altyapı — Her Modülde Tekrar Eden Ortak Mekanizmalar
 
-Enflow'da hata yönetimi **tek bir "onay butonu"** değil, üç farklı katmanda çalışan bir
-mekanizmadır: **(A) otomatik yakalama** (bir şey unutulduğunda/süresi geçtiğinde sistem
-kendiliğinden fark eder), **(B) düzeltme akışı** (bir şey reddedildiğinde/yanlış girildiğinde
-geri dönüp doğru şekilde tamamlamanın resmî bir yolu vardır) ve **(C) veri girişinde önleme**
-(bazı hatalar en baştan girilmesine izin verilmeyerek engellenir).
+Aşağıdaki yedi mekanizma platformun "sinir sistemi"dir; her modül bölümünde
+bunlara referans verilecek, burada tek seferde anlatılıyor.
 
-### 1.1 Hata Türü → Yakalama Mekanizması (Özet Tablo)
+### 2.1 Otomatik Geçiş Zinciri
+Bir iş bir modülden diğerine geçerken sistem devreder, kullanıcı elle veri
+girmez. Somut halkalar (kod tabanında T1, T3, T4/T4b, T5, T6 olarak
+adlandırılıyor):
 
-| Sahada olan hata | Kim fark etmezse ne olur | Enflow'un yakalama mekanizması |
+| Halka | Ne zaman tetiklenir | Ne olur |
 |---|---|---|
-| Bir görev unutulur, termini geçer | İş birim içinde sessizce donar | **SLA Eskalasyonu** — dueDate'i geçmiş, hâlâ açık görev bir üst yöneticiye (birimin ebeveyn yöneticisi, yoksa GM) otomatik bildirimle yükseltilir |
-| Teminat mektubunun süresi dolmak üzeredir | Teminat süresiz sanılıp iş sözleşme ihlaline düşer | **Teminat Hatırlatması** — 30/15/7 gün eşiklerinde, her eşik yalnız bir kez, Finans Müdürü'ne bildirim |
-| Garanti/servis talebi cevapsız kalır | Müşteri memnuniyetsizliği, sözleşme ihlali | **Servis SLA Eskalasyonu** — termini geçmiş açık servis talebi atanan kişiye, yoksa proje yöneticisine, o da yoksa GM'e yükseltilir |
-| Satınalma talebi yanlış/eksik bilgiyle onaya girer | Ya yanlış onaylanır ya da süreç tıkanır | **Gerekçeli Red + Yeniden Gönderim** — talep gerekçesiyle reddedilir, düzeltilip **resubmit** edilir (kaç kez düzeltildiği sayılır ve denetim izinde görünür) |
-| Onay sırası kimsenin olmadığı bir role denk gelir | Zincir sonsuza kadar bekler ("kilitlenme") | **Orphan-Skip** — o rolde aktif kullanıcı yoksa aşama otomatik atlanır (lisanslı bir sanal agent varsa agent-onaylı geçer) |
-| Onaycı izinli/hastadır | Onay bekleyen iş birikir | **Onay Vekaleti (Delegasyon)** — kullanıcı kendi rolündeki onayları belirli veya süresiz bir tarihe kadar bir vekile devredebilir |
-| Reddedilen bir teklif/sözleşme yeniden değerlendirilmelidir | Elle yeni bir kayıt açmak gerekir, iz kaybolur | **Onay Zincirini Sıfırlama** — aynı kayıt üzerinde zincir baştan PENDING'e alınır, geçmiş korunur |
-| Teklif spot kurla verilir, tahsilat vadesinde kur yükselir | Marj kur farkından erir | **Forward-Kur Zorunluluğu** — maliyet, tahsilat tarihindeki *tahmini* kurla hesaplanır; eksik kur girilmeden teklif ilerlemez |
-| Teknik olarak uygun olmayan ama ucuz bir tedarikçi seçilir | İş teslimde batar | **Teknik Uygunluk Filtresi** — yalnız "Uygun" işaretli + dosya kanıtlı teklifler seçilebilir; sistem uygunlar içinde en ucuzu önerir |
-| DMO gibi düşük-marj kanalda satış aslında zarar ediyordur | Kimse fark etmeden ciro büyür, kâr erir | **Kârsız-Satış Alarmı** — kur açığı + risturn + komisyon hesaplanıp net marj negatifse sipariş kırmızı uyarı verir |
-| İhaleye eksik/süresi geçmiş evrak ile girilir | Diskalifiye | **Otomatik Evrak Eşleme + Vade Hatırlatması** — şartname analiz edilip gereken evrak listesi çıkarılır, Şirket Evrakları'ndaki geçerli belgeler otomatik eşlenir, 3g/2g/12s/6s hatırlatmaları gider |
+| T1 | Fırsat WON | Proje kaydı otomatik açılır |
+| T3 | İhale WON | Sözleşme Yönetimi'nde DRAFT kayıt otomatik açılır |
+| T4 | Sözleşme imza onayı tamamlanır | Proje + milestone şablonu + AI'dan çıkan görev listesi otomatik oluşur |
+| T4b | Sözleşme SIGNED/TRANSFERRED, ayrı bir tıkla | BoM, Satın Alma'da bir talebe dönüşür — **yalnız alış fiyatı** taşınır, satış fiyatı asla satınalmaya sızmaz |
+| T5 | Satınalma PO_ISSUED (projeye bağlıysa) | Projenin maliyet kalemlerine otomatik işlenir (çift yönlü — Proje de Satınalma'ya talep açabilir) |
+| T6 | Satınalma faturası girilir | Finans'ta PURCHASE tipi fatura otomatik (idempotent) oluşur |
+| — | DMO sipariş teslim edilir | Finans'ta SALES faturası otomatik oluşur |
 
-### 1.2 Otomatik Yakalama Nasıl Çalışır? (Teknik Olmayan Anlatım)
+Her halka **idempotent**tir (aynı işlem iki kez tetiklense de kayıt
+tekrarlanmaz) — bu, sistemin güvenilirliğinin temelidir.
 
-Bu hatırlatma/eskalasyon mekanizmaları arka planda **"sweep" (tarama)** adı verilen bir
-kontrolle çalışır: kullanıcı ilgili ekranı her açtığında (görevler, teminatlar, servis
-talepleri) sistem o an süresi geçmiş/eşiğe girmiş kayıtları tarar ve **daha önce
-bildirilmemişse** (idempotent — aynı uyarı iki kez gitmez) bir bildirim üretir. Ayrı bir
-zamanlayıcı sunucusu (cron) kurulmasına gerek yoktur; kontrol, sistemin normal kullanımına
-gömülüdür — bu da kurulumu ve bakımı basitleştirir.
+### 2.2 Onay Swimlane'i
+Kurumsal onaylar (Fırsat/Teklif: Finans→İGPD→Üst Yönetim→KSU; Sözleşme
+imzası: KSU→Üst Yönetim) çok-aşamalı, sıralı bir zincirdir — bir aşama
+onaylanmadan sıradaki aşama göremez. Üç önemli güvence:
+- **Boş koltuk kilitlemez (orphan-skip):** bir aşamanın rolünde aktif
+  kullanıcı yoksa, lisanslı bir sanal agent varsa o aşamayı onaylar, yoksa
+  aşama otomatik "atlandı" işaretlenir — zincir asla sonsuza kadar bekleyen
+  bir role takılıp kalmaz.
+- **Vekalet:** bir yönetici izinliyse, kendi rolündeki onayları belirli
+  tarihe kadar bir vekile devredebilir.
+- **Görev Ayrılığı (SoD):** bir kaydı oluşturan kişi aynı kaydı onaylayamaz
+  — hem CRM maliyet onayında hem onay zincirinde zorlanır.
+- **Eşzamanlılık koruması:** iki yönetici aynı onayı aynı anda tıklarsa,
+  sistem "optimistic locking" ile ikinciyi 409 hatasıyla reddeder —
+  çift-onay riski yoktur.
 
-### 1.3 Somut Senaryo — "Bir Görev Nasıl Kaybolmaktan Kurtulur?"
+### 2.3 RBAC — 20 Rol
+`governance/role-matrix.ts` her rolün hangi modülü, hangi kararı, hangi
+uç-noktayı kullanabileceğini tek bir yerde tanımlar; otomatik bir denetim
+komutu bu matrisi gerçek kod ile karşılaştırıp sapmaları raporlar. İki
+katmanlı: menü görünürlüğü (kullanıcı izni olmayan modülü hiç görmez) +
+uç-nokta koruması (hassas işlemler ayrıca backend'de rol kilitli — ör.
+faiz oranı, işletme maliyeti havuzu, tenant oluşturma yalnız Genel
+Müdür'e açık).
 
-1. Sözleşme imzalanır → sistem otomatik olarak Proje Yönetimi'ne bir devir görevi açar
-   ("Devir paketini hazırla", termini iş-günü bazlı SLA'ya göre otomatik hesaplanır).
-2. Proje yöneticisi o hafta yoğundur, görev **PENDING** kalır, termin geçer.
-3. Proje yöneticisi görevler ekranını her açtığında sistem taramayı çalıştırır; termin
-   geçtiği ve daha önce eskale edilmediği için görev, proje yöneticisinin bağlı olduğu
-   birimin üst yöneticisine (yoksa GM'e) **bir kez** bildirimle yükseltilir.
-4. Üst yönetici görevi görür, proje yöneticisiyle konuşur veya görevi kendi üstlenir/başka
-   birine atar. **İş, hiçbir yerde sessizce kaybolmaz** — ya tamamlanır ya da yönetimin
-   bilgisi dahilinde gecikir.
+### 2.4 Denetim İzi
+Her oluşturma/güncelleme/silme ve durum geçişi, **kim yaptı** bilgisiyle
+(insan kullanıcı mı, hangi sanal agent mı) kayda geçer — "bu kararı kim,
+ne zaman verdi" sorusunun cevabı her zaman hazırdır, ayrıca bir Denetim
+İzi ekranından filtrelenip görüntülenebilir.
 
-Aynı desen teminat mektupları ve servis/garanti talepleri için de geçerlidir — tek fark
-kime/hangi eşikte bildirim gittiğidir (bkz. §1.1 tablosu).
+### 2.5 Sanal Agentlar — 8 Adet
+Boş kalan bir birim koltuğunu (o roldeki personel eksikse) deterministik
+(yapay-zeka-sohbet-tabanlı değil, kural/formül-tabanlı) bir vekil doldurur.
+Her agent bir lisans (Ed25519 imzalı, ayrı bir vendor aracıyla üretilen)
+gerektirir ve iki moddan birinde çalışır — **Danışman** (öneri üretir,
+insan onaylar) veya **Otonom** (geri-alınabilir/idempotent eylemi
+doğrudan uygular):
+
+| Agent | Birim/Rol | Ne yapar | İzinli mod |
+|---|---|---|---|
+| İhale Asistanı | İSAB | Checklist eksiksizliği + termin riski | Danışman + Otonom |
+| Proje Asistanı | Proje | Eksik devir evrakı + geciken milestone tespiti | Danışman + Otonom |
+| **Finans Asistanı** | Finans | Eşik-altı maliyet onayı/fatura taslağı önerir | **Yalnız Danışman** |
+| **Hukuk Asistanı** | Hukuk | Sözleşme inceleme notu/görüş taslağı | **Yalnız Danışman** |
+| CRM Asistanı | Satış | Fırsat triyajı + eksik alan/aşama önerisi | Danışman + Otonom |
+| İş Geliştirme Asistanı | İGPD | Beklenen değer, değer kademesi, öncelik değerlendirmesi | Danışman + Otonom |
+| Presales Asistanı | Presales | BoM eksiksizliği + maliyet analizi tutarlılığı | Danışman + Otonom |
+| Satınalma Asistanı | Satınalma | Talep doğrulama + teklif-bazlı tedarikçi önerisi | Danışman + Otonom |
+
+**Para (Finans) ve Hukuk agent'ları hiçbir yapılandırmada otonom karara
+geçemez** — bu kısıtlama iki ayrı kilitle korunur (eklenti tanımındaki
+izinli-mod listesi + çalışma-anı denetimi), yani API'den doğrudan
+zorlansa bile aşılamaz.
+
+### 2.6 Para Disiplini
+Tüm parasal hesaplar kuruş-tabanlı yuvarlama ile çalışır; farklı para
+birimleri **sessizce tek toplama çevrilmez** (döviz tutarları ayrı ayrı
+gösterilir, karışık toplam yoktur). Ödeme anındaki gerçek kur ile
+faturalama anındaki kur farklıysa, kur kazancı/zararı ayrıca hesaplanıp
+kullanıcıya anında bildirilir.
+
+### 2.7 Çok-Kiracılı İzolasyon + Ortak Doküman/Evrak Deseni
+Her kayıt `tenantId` ile ayrışır; bir kiracının verisi bir diğerine hiçbir
+koşulda sızmaz (otomatik izolasyon testleriyle her sürümde doğrulanır).
+Ayrıca dört farklı modülde (İhale, Sözleşme, Proje Devir Paketi, ve
+şirket-geneli doküman kodlama) **aynı** evrak-yönetim deseni tekrarlanır:
+varsayılan zorunlu-evrak listesi ilk açılışta otomatik oluşur, her evrak
+Yüklendi/Onaylandı/Muaf durumlarından birine geçer, dosyalar yerel diske
+ve (yapılandırılmışsa) Nextcloud'a eşzamanlı yazılır, ve terminal aksiyon
+(teklifi gönder / imzala / devri tamamla) tüm zorunlu evraklar
+tamamlanmadan ya engellenir ya da açık bir uyarıyla onay ister. Bu, dört
+ayrı sistem değil — uçtan uca tekrar kullanılan **tek bir "evrak kapısı"**
+mekanizmasıdır.
 
 ---
 
-## 2. Kurumsal Kontrol Mekanizması (Governance)
+## 3. Modül Modül — Ekranlar, Akışlar, Mantık
 
-Yönetimin ikinci sorusu **"kim neyi yapabiliyor ve bunu nasıl denetliyoruz"**dur. Enflow'da
-kontrol, tek bir özellik değil, birbirini tamamlayan **sekiz** mekanizmadan oluşur:
+### 3.1 Dashboard — Herkes İçin Farklı Bir Ekran
 
-| # | Mekanizma | Ne sağlar |
-|---|---|---|
-| 1 | **Rol Tabanlı Erişim (RBAC) — 20 rol** | Her modülün bir izni vardır; izni olmayan kullanıcı o menüyü hiç görmez. Hassas uç noktalar (faiz oranı, işletme maliyeti havuzu, lisans üretimi, ihaleden çekilme kararı) ayrıca rol-kapılıdır. |
-| 2 | **Tek-kaynak yetki matrisi + otomatik denetim** | `governance/role-matrix.ts` her rolün birimini, modüllerini ve karar haklarını tek yerde tanımlar; bir denetim komutu (`pnpm audit:roles`) bu matrisi gerçek kod ile karşılaştırıp sapmaları raporlar — "ekranda gördüğüm yetki ile kodun yaptığı aynı mı" sorusu otomatik doğrulanır. |
-| 3 | **Görev Ayrılığı (SoD)** | Bir kaydı oluşturan kişi, aynı kişi olsa bile onu onaylayamaz — kritik onay/geri-yükleme aksiyonlarında zorunlu kılınır. |
-| 4 | **Tutar-Bazlı Onay Matrisi (DoA)** | Tenant isterse tutar eşiği tanımlayabilir; belirli tutarın üzerindeki işler otomatik olarak daha üst onay rolüne yönlenir (opt-in — açılmadıysa sabit şablon geçerlidir). |
-| 5 | **Çok-Aşamalı Onay Swimlane + Orphan-Skip** | Finans→İGPD→GM→KSU sırası zorunludur; aktif kullanıcısı olmayan aşama otomatik atlanır (zincir hiç kilitlenmez), lisanslı bir sanal agent varsa o aşama agent-onaylı geçer. |
-| 6 | **Denetim İzi (ActivityLog)** | Her oluşturma/güncelleme/silme ve durum geçişi, **kim yaptı** (insan kullanıcı mı, hangi sanal agent mı) etiketiyle kayda geçer — "bu kararı kim, ne zaman verdi" sorusunun cevabı her zaman hazırdır. |
-| 7 | **Çok-Kiracılı İzolasyon** | Her kayıt `tenantId` ile ayrışır; bir müşterinin/şirketin verisi bir diğerine **hiçbir koşulda** sızmaz — bu, otomatik testlerle her sürümde doğrulanır. |
-| 8 | **Yedekleme & Felaket Kurtarma** | Zamanlanmış/manuel yedek (yerel/Nextcloud/S3), doğrulama ve fark-analizli kontrollü geri yükleme — yetkisi yalnız özel bir "Yedek Yöneticisi" rolüne verilir (o da başka hiçbir veriyi değiştiremez). |
+Dashboard tek bir statik ekran değil; her rolün o gün gerçekten neyle
+ilgilenmesi gerektiğine göre **kişiselleşen bir kokpit**tir. Giriş
+yapıldığında sistem role göre önceden tanımlı bir widget seti yükler:
+Genel Müdür KPI özeti + maliyet onayları + ihale vadeleri + teminat
+süreleri + finansman açığı + geri çekilen ihaleler + devredilen BoM'ları
+görür; bir Satış Temsilcisi yalnız kendi fırsatlarını ve görevlerini
+görür; Satın Alma Müdürü yalnız bekleyen satınalma taleplerini ve
+görevlerini görür. Rolü haritada tanımlı olmayan kullanıcılar varsayılan
+olarak "görevlerim + fırsatlarım" görür. Her kart tıklanabilir ve ilgili
+modüle doğrudan götürür — Dashboard yalnız bilgi vermez, aksiyona da
+yönlendirir.
 
-**Sanal agentlarda kontrol.** Boş kalan birim koltuklarını (ör. atanmamış bir Presales veya
-Satınalma rolü) dolduran 8 deterministik sanal agent vardır; ancak **Finans ve Hukuk agent'ları
-hiçbir zaman otonom karar veremez** — yalnızca öneri sunar, son kararı her zaman insan verir.
-Bu kısıtlama koddan değil, yapılandırmadan da değiştirilemez (çift kilit: hem eklenti izin
-listesi hem çalışma-anı denetimi).
+Yönetici rollerinde (Genel Müdür + tüm *_Müdür rolleri) kokpitin altında
+ayrıca klasik bir blok var: 4 KPI kartı (Toplam Pipeline, Kazanılan
+Değer, Aktif Projeler, Kaybedilen Değer), gelen birim raporları özeti,
+Satış Boru Hattı grafiği ve son projeler listesi.
 
-**Yönetime değeri:** Yetki değişikliği **dakikalar sürer, kod dağıtımı gerektirmez**; yanlış
-yetki riski otomatik test süitiyle (RBAC + kiracı-izolasyon, güncel: **486/486** kontrol yeşil)
-her sürümde güvence altındadır.
+**Dikkat çeken mantık:** Kazanma oranı hesaplanırken "İştirak Edilmeyen"
+(yönetimin bilinçli girmediği ihale) fırsatlar **hem payda hem paydan**
+çıkarılır — yönetim kararı satış ekibinin istatistiğini olumsuz
+etkilemez. Zaman-duyarlı uyarılar (ihale/teminat/milestone) aynı üç
+renkli eşiğe göre boyanır: ≤2 gün kırmızı, ≤7 gün amber, ötesi nötr.
+
+**Kimler kullanır:** Herkes — içerik role göre değişir.
 
 ---
 
-## 3. Tek Bakışta Görünürlük — Olası ve Yürüyen Projeler
+### 3.2 Ziyaret Planı — Saha Emeğini Ölçülebilir Kılan Katman
 
-Üçüncü soru: **"Sabah ofise geldiğimde ne görürüm?"**
+CRM'den önce gelen bir modül: haftalık müşteri ziyaret planlaması +
+günlük saha raporu. Kullanıcı haftalık bir plana ziyaretler ekler
+(demo/teknik görüşme/sunum/diğer); ziyaret gerçekleştiğinde "Tamamlandı"
+işaretlenir ve gerçekleşme tarihi damgalanır. Ayrı bir "Günlük Rapor"
+ekranında saha notu girilir — bu not bir mevcut ziyarete, fırsata ya da
+projeye bağlanabilir, ya da tamamen yeni bir temas ("Yeni İletişim")
+olarak işaretlenip **sistemde henüz hiçbir yerde olmayan** bir potansiyel
+müşteri olarak yakalanır.
 
-### 3.1 Dashboard — Role-Bazlı Kokpit
+Raporlar yöneticiye otomatik görünmez — temsilci belirli aralıkla
+(varsayılan 7 gün) "Dönemi Yöneticiyle Paylaş" ile toplu paylaşır.
 
-Herkes aynı uygulamayı açar ama **kendi işini** görür: Genel Müdür KPI + zaman-duyarlı
-uyarıları + darboğazları görür; Finans teminat/vade boşluklarını; Satış Destek ihale
-vadelerini; Satış Müdürü bekleyen maliyet onaylarını. Her kart tıklanınca ilgili modüle
-götürür — dashboard salt bilgi vermez, **aksiyona da yönlendirir**.
+**Dikkat çeken mantık:** Yönetici ekranındaki "eşleşme oranı" —
+performans ölçütü — bir ziyaretin yalnız "Tamamlandı" işaretlenmesiyle
+değil, **o gün ayrıca bir günlük rapor da girilmiş olmasıyla** hesaplanır.
+İki bağımsız girilen kaydın çapraz doğrulanması, saha faaliyetinin kendi
+kendine rapor edilmesinin ötesinde gerçek bir hesap verebilirlik ölçütü
+yaratır. Hedef eşleşme oranı (varsayılan %80) tenant-bazlı ayarlanabilir;
+altında kalan personel panoda amber işaretlenir.
 
-### 3.2 Olası Projeler (Pipeline) — Henüz Kazanılmamış İşler
+**Kimler kullanır:** Satış temsilcileri ve saha ekibi (raporlama/ayar
+Satış Müdürü + Genel Müdür'e özel).
 
-| Soru | Nerede cevaplanır |
+---
+
+### 3.3 CRM & Müşteri — Ticari Çekirdek
+
+CRM dört işlevi tek çatı altında toplar: müşteri kaydı, fırsat/pipeline
+yönetimi, kur-riskine karşı korumalı maliyetlendirme, ve (yalnız Genel
+Müdür'e özel) bir pazarlık simülatörü.
+
+**Fırsatlar** kanban görünümünde ilerler (Yeni→İletişimde→Nitelikli→
+Teklif→Pazarlık→Kazanıldı, ayrıca Kaybedildi). Bir fırsat kaybedilirken
+sabit bir nedenler listesinden ("Fiyat rekabeti", "Bütçe iptal edildi",
+"Rakip firma seçildi", "Teknik uygunsuzluk", "Zamanlama/termin",
+"Müşteri vazgeçti", "Diğer") seçim **zorunludur** — bu neden hem fırsata
+hem ileride kayıp-analizi raporlarına işlenir. Fırsat kazanılınca
+kullanıcı otomatik olarak Sözleşme Yönetimi'ne yönlendirilir — akış
+kesintisiz devam eder.
+
+**Müşteriler** ekranında her hesabın kredi limiti tanımlanabilir.
+**Somut bir risk-yakalama örneği:** bir teklif oluşturulurken, sistem o
+müşterinin henüz kazanılmamış/kaybedilmemiş tüm açık fırsatlarının
+toplam değerini kredi limitiyle karşılaştırır; limit aşılıyorsa hem
+temsilciye anlık bir uyarı gösterilir hem de tüm Satış Müdürleri ve Genel
+Müdür'e bildirim gider — daha önce hiçbir ekranda okunmayan kredi-limiti
+alanı artık karar anında devreye giriyor.
+
+**Maliyet Analizi (Fırsata özel bir alt ekran)** platformun en ince
+finansal mantıklarından birini barındırır: **forward-kur (vadeli kur)
+maliyetlendirme**. Kullanıcı bir satınalma usulü seçer (5 usul, her biri
+kendi maliyet kalemi şablonunu otomatik ekler — açık ihale/pazarlık gibi
+kamu usullerinde geçici teminat komisyonu, kesin teminat komisyonu,
+sözleşme damga vergisi, ihale karar damga vergisi, KİK payı, ihale
+dosyası bedeli, noter bedeli gibi kalemler otomatik satıra düşer),
+tahsilat tarihini ve yıllık değer-kaybı yüzdesini girer. Sistem, spot
+kuru bu vadeye göre **doğrusal olarak ileri taşıyarak** (`forward = spot
+× (1 + yıllık_kayıp% × ay/12)`) teklif maliyetini hesaplar — yani teklif
+verilirken kullanılan kur, paranın tahsil edileceği tarihe kadar
+beklenen değer kaybını baştan fiyata yansıtır. Hedef marj girilince
+teklif fiyatı ve gerçek marj (marj = kâr/satış fiyatı, maliyet üzerinden
+değil) otomatik hesaplanır. **Marj tabanı güvencesi:** Genel Müdür
+tenant-geneli bir marj tabanı (varsayılan %10) tanımlar; bir analiz bu
+tabanın altında onaya gelirse onay ekranında kırmızı bir uyarı belirir ve
+görev önceliği otomatik "Acil" olur. **Hesap, hem tarayıcıda canlı önizleme
+için hem sunucuda kalıcı kayıt için ayrı ayrı çalışır — sunucu hesabı
+her zaman esas alınır**, tarayıcı asla kendi hesabına güvenip
+kaydetmez. BoM revize edilirse, daha önce onaylanmış/onay bekleyen bir
+analiz otomatik olarak yeniden onaya düşer — güncel olmayan bir BoM
+üzerinden teklif verilmesi engellenir.
+
+**Canlı Pazarlıklar** — yalnız Genel Müdür'e açık bir eğitim/karar-destek
+simülatörüdür (nav izninden daha sıkı, bileşen içinde ayrıca kilitli).
+İki modu var: birebir pazarlık (müşteri karşı teklifi simüle edilir; taban
+maliyetin altına inen bir teklif sistemde **sert biçimde engellenir**,
+fiyat farkı %3'e indiğinde otomatik anlaşma sağlanır, 5 turda anlaşma
+olmazsa süreç biter) ve açık eksiltme (birden çok simüle rakip, azalan
+minimum kırım kuralıyla sıralı teklif turları).
+
+**Kimler kullanır:** Satış ekibi ve yöneticileri; pazarlık simülatörü
+yalnız Genel Müdür.
+
+---
+
+### 3.4 Presales & Dizayn — Belgeli En Uygun Tedarik
+
+Presales'in işi, teknik şartnameyi fiyatlanabilir, kanıtlı bir malzeme
+listesine (BoM) çevirmek — ticari fiyatlamadan **bilinçli olarak** ayrı
+tutulur.
+
+**Şartname Analizi:** şartname metni yapıştırılır/yüklenir; tenant'ın
+yapılandırdığı yapay zekâ ile (yapılandırma yoksa deterministik bir
+örnek sonuçla, sessizce ve açıkça — kullanıcı Ayarlar'a yönlendirilir)
+ürün/miktar önerileri çıkarılır ve tek tıkla BoM'a aktarılır.
+
+**Çoklu-tedarikçi teklif karşılaştırması:** her BoM satırı için birden
+fazla tedarikçi teklifi girilebilir — fiyat + teknik uygunluk
+(Uygun/Kısmen Uygun/Uygun Değil) + orijinal teklif dosyası (kanıt olarak
+saklanır, Nextcloud'a da yansıtılabilir). Sistem uygun olanlar arasında
+en ucuzu önerir, ama **"Uygun Değil" işaretli bir teklifin seçilmesi
+sunucu tarafında kesin olarak reddedilir** — arayüzde gizlemekle
+yetinilmez, API'den zorlansa bile geçmez. Bu, en ucuz ama teknik olarak
+uygun olmayan bir bileşenin yanlışlıkla seçilmesini kesin olarak
+engelleyen somut bir kontrol noktasıdır.
+
+**Devir:** BoM Satışa devredildiğinde bir onay ya da fatura tetiklenmez —
+Presales'in işi "teknik olarak doğru ve kaynaklı" ile biter, fiyatlama
+Satış'ın işidir. Ancak her devir, değişmez bir anlık görüntü (item
+listesi + değerlendirme detayı) olarak kaydedilir — bu, Dashboard'daki
+"Devredilen BoM" widget'ını ve yönetici denetim ekranını besler. BoM her
+revize edildiğinde devir sayacı artar ve eğer maliyet analizi zaten
+onaylanmışsa otomatik olarak yeniden onaya düşürülür.
+
+**Kimler kullanır:** Presales mühendisleri/müdürü, teknik uzmanlar.
+
+---
+
+### 3.5 Satış Destek / İhale (İSAB) — Diskalifiye Riskini Sıfırlayan Katman
+
+Bu modül "katılalım mı, nasıl katılalım" kararının ve fiili ihale
+dosyası hazırlığının yürütüldüğü yer — CRM/Presales'teki "kazanma
+niyeti" ile Sözleşme arasında durur.
+
+**Uygunluk Denetimi** ekranı operasyonel çekirdektir: şartname
+yapıştırılır/PDF yüklenir → yapay zekâ analiz eder → gerekli evrak
+listesi çıkar (idari şartname, teknik şartname, birim fiyat teklif
+cetveli, geçici teminat mektubu, imza sirküleri, ticaret sicil gazetesi,
+vergi/SGK borcu yoktur belgeleri gibi standart bir liste, yapay zekâ
+yoksa bile otomatik oluşur) → sistem bu listeyi **Şirket Evrakları**
+envanteriyle otomatik eşler: geçerlilik tarihi henüz dolmamış bir belge
+varsa o kalem otomatik "Tamam" işaretlenir, dosyası önceden ekli gelir.
+Kullanıcı yalnız eksikleri tamamlar. Bu eşleşme, kaç ihalede kaç evrağın
+yeniden yüklenmesini gereksiz kıldığı olarak Yönetim Raporları'nda ayrıca
+ölçülür.
+
+**Teklifi gönderme koruması:** eksik zorunlu evrak varken "Teklif
+İletildi"ye basılırsa sistem eksik listesini gösterip onay ister —
+sessizce izin vermez. Zaman-duyarlı hatırlatmalar 72/48/12/6 saat
+eşiklerinde otomatik gider (her eşik yalnız bir kez).
+
+**Yönetimin "katılmama" kararı** (İştirak Etme) yalnız Genel Müdür
+yetkisindedir, zorunlu bir gerekçe ister ve fırsatı **"Kaybedildi" değil
+"İştirak Edilmedi"** olarak işaretler — hazırlığı yapan Satış Destek/
+Presales ekibinin performans göstergesi bu karardan **olumsuz
+etkilenmez**; sistem bunu ilgili herkese açıkça bildirir. Bu, teşvik
+yapısını bozmayan bilinçli bir tasarım kararıdır.
+
+**İhale WON → Sözleşme (T3):** durum "Kazanıldı"ya çevrildiği an, henüz
+bağlı bir sözleşme kaydı yoksa, sistem Sözleşme Yönetimi'nde otomatik
+bir DRAFT kayıt açar (isim, İKN, tahmini bedel otomatik taşınır).
+
+**Kimler kullanır:** Satış Destek ve İSAB ekibi (geri çekilme kararı
+Genel Müdür'e özel).
+
+---
+
+### 3.6 Sözleşme Yönetimi — İmza ile İş Başlangıcı Arasındaki Boşluğu Kapatan Modül
+
+Beş sekmeli, durum-makinesi tabanlı bir akış: **Bağlam → Analiz → Evrak
+Takibi → İmzalama → Proje Aktarımı**. Durum sırası: Taslak → Analiz
+Tamamlandı → Hazırlık → İmzaya Hazır → İmza Onayında → İmzalandı →
+Aktarıldı (her yerden İptal, yalnız İmzalandı'dan Fesih — kurallı, atlama
+yok, yanlış bir geçiş denenirse reddedilir).
+
+**Analiz** sekmesi, İhale modülüyle **aynı** yapay-zekâ servisini
+kullanır (kod tekrarlanmaz) — ayrıca proje adı, İKN, sözleşme türü,
+vergi yükümlülükleri, kritik terminler gibi bir "sözleşme özeti" çıkarır
+ve bu özetten workflow başlığını otomatik günceller.
+
+**Evrak Takibi → İmzaya Hazır otomatik geçişi:** tüm zorunlu evraklar
+Yüklendi/Onaylandı/Muaf durumuna geldiği an, kullanıcı hiçbir düğmeye
+basmadan durum otomatik "İmzaya Hazır"a geçer ve ekran İmzalama sekmesine
+yönlenir.
+
+**İmza onayı:** "Birim Yöneticisinin Onayına Gönder" ile resmî iki
+aşamalı bir onay zinciri açılır — **KSU → Genel Müdür**. Onaylandığında
+tek bir tıkla hem imza tamamlanır hem proje aktarımı tetiklenir.
+
+**Proje Aktarımı — iki bağımsız devir:**
+1. **Sözleşme → Proje (T4):** imzalı sözleşmeden proje tipine göre
+   milestone şablonu otomatik oluşur; yapay-zekâ analizinden çıkan
+   görevler doğrudan ilgili birime atanmış görevlere dönüşür.
+2. **Sözleşme → Satınalma (T4b, ayrı bir tıkla):** BoM'daki kalemler bir
+   satınalma talebine dönüşür — **kritik bir tasarım kararı olarak yalnız
+   alış fiyatı taşınır, satış fiyatı Satınalma'ya asla sızmaz** (kodda
+   açıkça yorumlanmış bir kural).
+
+**Kimler kullanır:** Bütün rota, yedi yönetici rolüne (Genel Müdür, KSU,
+Satış Müdürü, Proje Müdürü, Hukuk Müdürü, Finans Müdürü, İGPD) açık;
+imza onayı ve iptal/fesih ayrıca role-kilitlidir.
+
+---
+
+### 3.7 Proje Yönetimi — Gerçek (Tam-Yüklü) Marj
+
+İmzalı bir sözleşme otomatik olarak buraya bir proje + tipine göre
+standart milestone şablonuyla düşer:
+
+| Tip | Aşamalar (özet) |
 |---|---|
-| Fırsatlarımız hangi aşamada tıkanıyor? | **Dönüşüm Hunisi** (yeni→iletişimde→nitelikli→teklif→pazarlık→kazanıldı/kaybedildi, kayıp nedenleriyle) |
-| Bu çeyrek/yıl hedefi tutar mıyız? | **Ağırlıklı Tahmin & Hedef Kapsama** — açık pipeline, aşama olasılığıyla ağırlıklandırılıp hedefe oranlanır |
-| Bu ihaleye girmeli miyiz? | **Bid/No-Bid Skorkartı** — idare geçmişi + kalan süre + evrak hazırlığı + değer uyumuna göre 0–100 puan, Katıl/İncele/Katılma önerisi |
-| Tek müşteriye/kamu segmentine ne kadar bağımlıyız? | **Portföy Konsantrasyonu (HHI)** |
+| Donanım | Planlama → Satınalma → Sevkiyat → Kurulum → **Test & Kabul (onaylı)** → Garanti → Faturalandırma → Tahsilat |
+| Yazılım | Planlama&Analiz → Geliştirme → Test → **Kabul&Geçiş (onaylı)** → Garanti → Faturalandırma → Tahsilat |
+| Hizmet | Planlama → Hizmet Sözleşmesi → Hizmet Teslimi → **Kabul (onaylı)** → Garanti → Faturalandırma → Tahsilat |
+| Karma | Planlama → Satınalma+Geliştirme (paralel) → Kurulum&Entegrasyon → **Test&Kabul (onaylı)** → Garanti → Faturalandırma → Tahsilat |
 
-### 3.3 Yürüyen Projeler — İmzalanmış, Uygulamada Olan İşler
+Dört şablon de aynı üç adımla biter (Garanti/Faturalandırma/Tahsilat) ve
+her birinde tam olarak bir "Kabul" aşaması yönetici onayı ister — bilinçli
+bir tutarlılık.
 
-| Soru | Nerede cevaplanır |
-|---|---|
-| Bu projenin gerçek kârı ne? | **Proje → Karlılık** sekmesi: katkı marjı **vs** işletme maliyeti dahil **tam-yüklü net marj** |
-| Proje takvimi/bütçesi sapıyor mu? | **Proje Sağlığı Skoru** (Marj %40 + Takvim %35 + Bütçe %25 ağırlıklı kompozit) → Kritik/İzlemede/Sağlıklı |
-| Teklif ettiğimiz maliyeti tutturduk mu? | **BoM Maliyet Varyansı** (teklif ↔ gerçekleşen alış farkı) |
-| Paramız nerede takılı? | **Alacak Yaşlandırma & DSO** |
-| Birimler arası darboğaz nerede? | **Yönetim Raporları → İş Akışı Darboğazı** |
+**Kârlılık — iki katmanlı gerçek:** ekran hem **katkı marjı** (yalnız
+direkt maliyet) hem **tam-yüklü net marj**'ı (+ işletme maliyeti) yan
+yana gösterir. İşletme maliyeti iki katmanda projeye yansır: (1) şirket
+genel giderinin bir yüzdesi, (2) projeye iştirak eden her birimin dönem
+maliyetinin bir katsayı ile ağırlıklandırılmış payı. **Bu overhead'in
+raporlanan marja girip girmeyeceği yönetimin bilinçli tercihidir** — proje
+bazlı bir anahtarla açılır, varsayılan kapalıdır; kapalıyken direkt marj
+değişmez. Ayrı bir "Birim Bütçe Absorpsiyonu" raporu, her birimin
+bütçesinin projelere ne kadar dağıtıldığını gösterir — hem atıl kapasiteyi
+(şirketin cebinden çıkan, hiçbir projeye yansımayan maliyet) hem
+aşırı-tahsisi (bir birimin kapasitesinin projeler arası toplamda %100'ü
+aşacak şekilde vaat edilmesi) yakalar.
 
-Tüm bu göstergeler **Büyüme Analitiği** katmanında toplanır: **13 salt-okunur, deterministik
-rapor + 3 seviyeli sağlık skoru** (İş Sağlığı, Proje Sağlığı, Müşteri Sağlığı) — her biri
-zayıf halkayı renkle işaretler, hiçbiri veri üretmez/değiştirmez, hepsi kiracı-izole ve
-denetlenebilirdir.
+**Proje Sağlık Skoru** (yalnız aktif projeler): %40 marj + %35 takvim
+(gecikmiş milestone oranı, projenin kendi son tarihi geçtiyse tavan 40
+ile sınırlanır) + %25 bütçe ağırlıklı bileşik skor — 40 altı Kritik, 70
+altı İzlemede, üstü Sağlıklı; en riskliden başlayarak sıralanır. Tek bir
+sayı, portföydeki hangi projenin dikkat istediğini anında gösterir.
 
-**Yönetime değeri:** "Büyümenin bir sonraki adımı nerede?" ve "hangi proje riskte?" sorularının
-cevabı **toplantı beklemeden**, tek ekrandan alınır.
+**Devir Paketi — 11 zorunlu evrak:** onaylı fizibiliteden proje devir
+formuna kadar sabit bir liste ilk açılışta otomatik oluşur; başlıkta
+kalıcı bir "Devir Bekliyor" rozeti tüm evraklar tamamlanana kadar görünür
+kalır.
+
+**Kimler kullanır:** Proje ekibi; overhead-uygulama kararı ve birim-iştirak
+düzenlemesi yalnız Genel Müdür/Finans Müdürü'ne açık.
 
 ---
 
-## 4. Kullanıcılara Sağlanan Kolaylıklar
+### 3.8 Satın Alma — Bilerek Pazarlık
 
-Kontrol ve görünürlük kadar önemli olan, günlük kullanıcının işini **kolaylaştırmasıdır** —
-aksi halde disiplin bir yük olarak algılanır ve terk edilir. Enflow'da somut kolaylıklar:
+9 statülü, sıkı sıralı bir onay akışı: Taslak → Birim Onayında → Satın
+Alma Onayında → Genel Müdür Onayında → Sipariş Verildi → Teslimatta →
+Faturalandı → Kapandı (her onay aşamasından Reddedildi'ye dallanabilir).
+Her aşamanın onaycısı role-kilitlidir (Birim: Satış Müdürü/GM; Satın
+Alma: Satın Alma Müdürü/GM; son aşama: yalnız GM). Sipariş verilince
+sıralı bir PO numarası otomatik üretilir.
 
-1. **Otomatik devir zinciri** — İhale kazanılınca sözleşme, sözleşme imzalanınca proje +
-   satınalma kaydı, satınalma faturası kesilince finans faturası **kendiliğinden** oluşur.
-   Kullanıcı aynı bilgiyi ikinci kez elle girmez.
-2. **YZ destekli şartname/sözleşme analizi** — İdari şartname veya sözleşme metni yüklenir,
-   gerekli evrak listesi otomatik çıkarılır; sağlayıcıdan bağımsız (tenant kendi anahtarını
-   girer) — hiçbir tek YZ firmasına bağımlılık yoktur, yapılandırılmamışsa deterministik bir
-   örnek sonuçla çalışmaya devam eder (sistem hiçbir zaman kilitlenmez).
-3. **Şirket Evrakları'ndan otomatik eşleme** — İhale evrak listesi çıkınca, geçerlilik
-   tarihi dolmamış şirket belgeleri otomatik eşlenir; kullanıcı sadece eksikleri tamamlar.
-4. **Proaktif hatırlatmalar** — Kullanıcının hiçbir şeyi aklında tutmasına gerek yok: teminat,
-   görev, servis talebi ve ihale vadeleri sistem tarafından zamanı geldiğinde hatırlatılır
-   (bkz. §1).
-5. **Uygulama-içi Yardım modülü + Enflow Wiki** *(2026-08-03 eklendi)* — Header'daki Yardım
-   ikonuna tıklayan kullanıcı, **o an bulunduğu ekranın** kullanım kılavuzuyla karşılaşır;
-   arama kutusuyla başka bir konuyu da bulabilir. Rol-duyarlıdır — kullanıcı yalnız kendi
-   yetkisi dahilindeki modüllerin kılavuzunu görür. Yazılımı hiç tanımayan biri için ayrıca
-   dışa açık bir **Wiki** sayfası (uçtan uca akışı anlatan statik kılavuz) mevcuttur.
-6. **Onay vekaleti** — İzinli/hasta bir yöneticinin onayları, kendisi tarafından bir vekile
-   devredilebilir; süreç kimseyi beklemeden akmaya devam eder.
-7. **Yazdırılabilir/konsolide raporlar** — Birim raporları tek tek veya birleştirilmiş olarak
-   yazdırılabilir; dönemsel karşılaştırma (▲/▼) otomatik hesaplanır.
-8. **Ekrandan yönetişim** — Yeni kullanıcı ekleme, rol/izin değişikliği, iş akışı şablonu
-   düzenleme; hiçbiri kod dağıtımı veya IT bileti gerektirmez.
-9. **Mobil uyum** — Sidebar mobilde çekmece (drawer) olarak çalışır, güvenli alan (safe-area)
-   desteğiyle telefon/tablet üzerinden de kullanılabilir.
-10. **Sanal agentlar boş koltuğu doldurur** — Bir birimde geçici olarak kimse yoksa (izin,
-    kadro boşluğu), ilgili sanal agent süreç önerisini üretmeye devam eder; süreç **durmaz**,
-    yalnız kritik kararlarda (para/hukuk) insan onayı beklenir.
+**Referans fiyat görünürlüğü:** Sözleşme'den (BoM üzerinden) gelen her
+kalemde üretici/distribütör referans alış fiyatı ve kaynağı açıkça
+gösterilir — satın alma uzmanı piyasa fiyatını bilerek pazarlık eder,
+körlemesine değil.
+
+**Kısmi teslimat mantığı:** durum "Faturalandı"ya yalnız **tüm
+teslimatların birikimli miktarı** sipariş miktarına ulaştığında geçer —
+tek bir kısmi teslimat kaydı tek başına siparişi kapatmaz. Hasarlı mal
+işaretlenmesi teslimat ilerlemesini durdurmaz ama otomatik olarak Satın
+Alma birimine acil bir görev açar.
+
+**Reddedilen talep → yeniden gönderim:** reddedilen bir talep **yeni bir
+kayıt açmadan** düzeltilip yeniden gönderilebilir — durum Taslak'a döner,
+üç onay damgası temizlenir, ama kayıt kimliği ve tüm denetim izi
+korunur; kaç kez düzeltildiği ayrıca sayılır.
+
+**Tedarikçi teklif skorlaması** (sanal agent danışmanlığı katmanında):
+fiyat %60 + puan %25 + teslim süresi %15 ağırlıklı bir formülle
+çalışır — ama fiyat skoru **min-max değil oran-bazlı** normalize edilir
+(`min(en_düşük_fiyat/bu_fiyat, 1)`), çünkü min-max en ucuzu her zaman tam
+puana, en pahalıyı sıfıra iter ve gerçek fiyat farkı küçükse bile teslim
+süresi/kalite farkını boğar; oran-bazlı yöntemde %2 daha pahalı bir
+teklif yalnız ~0.02 puan kaybeder. Bu incelik, "gerçekten en iyi" teklifin
+sadece "en ucuz" teklifle karıştırılmamasını sağlar.
+
+**PO→Proje (T5, çift yönlü)** ve **Fatura→Finans (T6)** halkaları
+paylaşılan altyapı bölümünde (§2.1) anlatıldı.
+
+**Kimler kullanır:** Satın Alma ekibi; onay aşamaları role-kilitli.
+
+---
+
+### 3.9 Garanti & Servis — Teslim Sonrası Kapanmayan Tek Nokta
+
+Teslim edilmiş bir projeye bağlı arıza bildirimi, yedek parça talebi ve
+bakım talebi tek bir listede yaşar (Kategori: Arıza/Yedek Parça/Bakım/
+Diğer; Öncelik: Düşük/Normal/Yüksek/Acil). Durum akışı: Açık → İşlemde →
+Parça Bekliyor → Çözüldü → Kapandı. Her talep bir SLA süresi (saat
+cinsinden) alır; süresi geçen ve hâlâ açık olan bir talep — atanan kişiye,
+yoksa projenin proje yöneticisine, o da yoksa Genel Müdür'e — otomatik
+bir kez bildirimle yükseltilir (aynı talep ikinci kez bildirim
+üretmez).
+
+**Kimler kullanır:** Genel Müdür, Proje Müdürü, Operasyon Müdürü.
+**Bağlantı:** her talep zorunlu olarak bir Projeye bağlıdır — Proje
+Yönetimi'nin doğal bir uzantısıdır.
+
+---
+
+### 3.10 Finans — Zamanın, Kurun ve Maliyetin Zekâsı
+
+Yedi sekme: **Faturalar, Tahsilat, Teminat Mektupları, Maliyet Onayı,
+Vade & Finansman, İşletme Maliyeti, Özet.**
+
+**Tahsilat mantığı:** her fatura kısmi ödeme kabul eder; kalan bakiyeyi
+%0,01'den fazla aşan bir tahsilat sistem tarafından **reddedilir**,
+yalnız kullanıcı açıkça "fazla ödemeyi kabul et" derse kaydedilir — bu
+durumda otomatik bir not eklenir ve tüm Finans Müdürleri "alacak/iade
+takibi" için uyarılır.
+
+**Kur farkı (FX) motoru:** döviz cinsinden bir faturanın kesim anındaki
+kur ile tahsilat anındaki gerçek kur farklıysa, fark otomatik hesaplanıp
+("kur kazancı" ya da "kur zararı" olarak) kullanıcıya anında gösterilir
+ve ayrı bir kayıtla saklanır — hiçbir kur farkı sessizce kaybolmaz.
+
+**Teminat mektubu hatırlatması:** süresi 30/15/7 gün kala (her eşik
+bağımsız olarak yalnız bir kez) ilgili talep sahibine ve tüm Finans
+Müdürlerine bildirim gider; süresiz mektuplar bu hatırlatmanın dışında
+tutulur.
+
+**Vade & Finansman:** bir fırsata bağlı taksitli tahsilat planı +
+kalem-bazlı ödeme vadeleri girilir; sistem döviz-bazlı finansman
+maliyeti/getirisini (taksit + banka faizi etkisi) hesaplar ve bir
+nakit-akış-açığı uyarısı üretir. Faiz oranları tenant-ayarlanabilir
+(varsayılan TRY %50, USD %10, EUR %8 — yüksek enflasyon ortamını
+yansıtır). **Negatif net etki** (finansman maliyeti) tek tıkla Maliyet
+Analizi'ne otomatik bir gider kalemi olarak eklenebilir; **pozitif etki
+(getiri) bilinçli olarak otomatik kâr yazılmaz** — ekranda açıkça
+"yönetim kararıdır" notuyla bırakılır. Bu işlem idempotenttir: yeniden
+uygulanırsa önceki otomatik kalemler silinip güncel hesapla değiştirilir,
+çift kayıt oluşmaz.
+
+**İşletme Maliyeti (Overhead) havuzu:** dönemsel personel+opex havuzunun
+tanımlandığı yer — Proje Yönetimi'ndeki tam-yüklü marj hesabının
+girdisidir (bkz. §3.7). Düzenleme yalnız Genel Müdür/Finans Müdürü'ne
+açık.
+
+**Alacak Yaşlandırma & DSO:** açık satış faturaları vadeye göre 5
+kovaya (vadesi gelmemiş / 0-30 / 31-60 / 61-90 / 90+ gün) ayrılır, hem
+toplu hem para-birimi bazında; DSO (ortalama tahsilat süresi) tek bir
+sayı olarak Özet ekranında görünür.
+
+**Kimler kullanır:** Finans Müdürü + Genel Müdür (faiz oranı ve overhead
+havuzu düzenlemesi ikisine kilitli).
+
+---
+
+### 3.11 DMO Kataloğu — Kârsız Satışı Kabul Etmeden Yakalayan Motor
+
+Devlet Malzeme Ofisi kanalı üzerinden yapılan satışları yöneten, **ana
+CRM→Sözleşme hattından bağımsız, ayrı lisanslı** paralel bir kanal. Beş
+sekme: Siparişler, Katalog, Çerçeve Anlaşmalar, Döviz Kurları, Risturn
+Mutabakatı.
+
+**Neden ayrı bir motor gerekiyor:** DMO'ya satış fiyatı DMO'nun **kendi**
+kuruyla, alış maliyeti ise **piyasa** kuruyla çevrilir — iki farklı,
+birbirinden bağımsız kaynaktan gelen kur, aradan geçen zamanda ayrı ayrı
+kayabilir ve brüt kârlı görünen bir satış sessizce zarara dönüşebilir.
+Bir çerçeve anlaşmaya bağlı sipariş oluşturulduğunda **satış fiyatı ve
+para birimi kilitlenir** (anlaşmadan gelir, değiştirilemez) ama **alış
+maliyeti düzenlenebilir kalır** (gerçekten değişken olduğu için).
+
+**Net kârlılık formülü:** ciro = miktar×satış fiyatı×DMO'nun satış kuru;
+maliyet = miktar×alış maliyeti×piyasa kuru; brüt kâr = ciro−maliyet;
+risturn oranı, **bu siparişi de dahil eden yıl-içi kümülatif ciroya**
+göre kademeli bir tablodan okunur (yani marjinal risturn oranı, kümülatif
+ciro bir eşiği geçtikçe sıçrayabilir); risturn kesintisi = ciro×oran;
+komisyon (yüzde ya da sabit, cirodan ya da kârdan) düşülür; net kâr =
+brüt kâr − risturn − komisyon. **Net kâr negatifse veya net marj
+tenant-tanımlı eşiğin (varsayılan %5) altındaysa alarm üretilir** — ayrıca
+DMO kurunun veya piyasa kurunun 7 günden eski (bayat) olması da
+simetrik olarak ayrı bir alarm üretir.
+
+**Sert onay kapısı:** sipariş "Onaylandı"ya ilerletilmek istendiğinde
+kârsız çıkıyorsa, geçiş **engellenir** — yalnız uyarı verilmez, gerçekten
+bloke edilir — ve otomatik olarak Genel Müdür onayına düşen bir onay
+zinciri açılır (aynı "Bekleyen Onaylarım" ekranında görünür); yalnız
+onaylandıktan sonra durum ilerleyebilir. Sipariş her durum değişikliğinde
+**o anki güncel** kur/parametrelerle yeniden hesaplanır — geçmiş bir
+siparişin kârlılığı sipariş anında donmuş kalmaz.
+
+**Çerçeve anlaşma kotası** siparişin ilk onaylanmasında otomatik düşer;
+sipariş sonradan iptal/reddedilirse kota simetrik olarak geri iade
+edilir — iptal edilen siparişlerin kotayı kalıcı olarak "yemesi" önlenir.
+
+**Teslim edilen sipariş** otomatik olarak Finans'ta bir SALES faturası
+oluşturur (idempotent).
+
+**Kimler kullanır:** Genel Müdür + Satış Müdürü (düzenleme); maliyet
+parametreleri (risturn tablosu, marj eşiği, komisyon, piyasa kuru) yalnız
+Genel Müdür + Finans Müdürü'ne açık. Ayrı bir modül lisansı gerektirir.
+
+---
+
+### 3.12 Görevler & Takip — Hiçbir İşin Düşmediği Yer
+
+İki farklı şey aynı ekranda birleşir: (1) genel amaçlı, birime/kişiye
+atanabilir görev havuzu, (2) ayrı, çok-aşamalı kurumsal **onay
+swimlane'i** ("Bekleyen Onaylarım").
+
+**Görev havuzu:** yeni görev açarken ilgili modül seçilirse (Fırsat/
+Proje/Sözleşme/Satınalma/Hukuk) sabit bir "işlevsel görev kataloğundan"
+seçim zorunludur (ör. Fırsat için: BoM hazırla / Maliyet analizi yap /
+Şartname analizi yap / Teklif hazırla / Pazarlık yürüt) — görev başlığı
+serbest yazılmaz, otomatik oluşur; genel görevlerde başlık serbesttir.
+Termin ya doğrudan girilir ya da iş-günü SLA'sından (hafta sonu ve
+tanımlıysa resmî tatiller hariç tutularak) otomatik hesaplanır. Bir
+kullanıcı yalnız kendine atanan, kendi açtığı, ya da kendi biriminin
+sahipsiz görevlerini görür — Genel Müdür hepsini görür.
+
+**SLA eskalasyonu:** termini geçmiş ve hâlâ açık bir görev, biriminin
+üst-birim yöneticisine (yoksa Genel Müdür'e) bir kez bildirimle
+yükseltilir.
+
+**Bekleyen Onaylarım — onay zinciri ekranı:** kullanıcının sırası gelen
+onay aşamaları burada listelenir; her kart zincirin tüm rol sırasını
+(ör. "Finans → İGPD → Üst Yönetim → KSU") ve önceki bir aşama bir sanal
+agent tarafından otomatik onaylandıysa bunu gösteren bir rozet içerir.
+Bu ekran; Fırsat/Teklif onayları, Sözleşme imza onayı **ve** DMO'nun
+kârsız-sipariş veto mekanizması için **aynı** altyapıyı kullanır — tek
+bir onay motoru, birden fazla modülden beslenir.
+
+**Kimler kullanır:** görev havuzu neredeyse tüm rollere açık (herkes
+birine görev atayabildiği için herkesin kendi gelen kutusunu görmesi
+gerekir); onay swimlane'i yalnız zincirdeki dört role (Finans/İGPD/Üst
+Yönetim/KSU) gerçek işlem sunar.
+
+---
+
+### 3.13 Yönetim Raporları — Platformun Görünürlük Katmanı
+
+Beş sekme: **Genel Bakış, Büyüme Analitiği, Birim Detayı, Raporlarım,
+Gelen Raporlar.**
+
+**Genel Bakış + Birim Detayı**, 7 birimin (CRM, Presales, Satınalma,
+Finans, Hukuk, İhale/İSAB, Proje) dönemsel operasyonel metriklerini
+gösterir — dönem-öncesi ile karşılaştırmalı (▲/▼) — ve bir iş-akışı
+darboğaz panelini içerir: onay zincirlerindeki ilk "sırası gelmiş"
+aşamayı role göre tarayıp en uzun bekleyen rolü işaret eder.
+
+**Raporlarım / Gelen Raporlar — biçimsel raporlama akışı:** birim
+yöneticisi bir dönem raporu açar; form, o anki gerçek metrikleri **ve**
+biriminin saha (ziyaret/günlük rapor) verisinin bir konsolidasyonunu
+canlı önizler. "Sun" dendiğinde bu iki veri seti **o andaki hâliyle
+donmuş bir anlık görüntü** olarak rapora yazılır (sonradan değişen canlı
+veriden etkilenmez) ve rapor otomatik olarak üst-birim yöneticisine
+(Genel Müdür her zaman tümünü görür) yönlenir. Yönetici onaylar ya da
+notla iade eder; yalnız Taslak/İade edilmiş raporlar yeniden
+düzenlenebilir. Her rapor tek başına ya da birleştirilmiş biçimde
+yazdırılabilir.
+
+**Büyüme Analitiği — 12 rapor, tamamı salt-okunur ve deterministik:**
+
+| # | Rapor | Ne ölçer | Neden önemli |
+|---|---|---|---|
+| 1 | Dönüşüm Hunisi | Aşamadan aşamaya dönüşüm % + kayıp nedeni dağılımı | Fırsatlar tam olarak nerede ölüyor? |
+| 2 | İhale Kazanma Kırılımı | İdare/yöntem bazında kazanma oranı, ortalama teklif | Hangi idare/usul gerçekten kazanılabiliyor? |
+| 3 | BoM Maliyet Varyansı | Teklif anındaki BoM maliyeti vs. gerçekleşen proje maliyeti | Teklifi tutturduk mu, marj nerede eridi? |
+| 4 | Ağırlıklı Tahmin & Hedef Kapsama | Açık pipeline × olasılık toplamı vs. GM'in koyduğu satış hedefi | Hedefi tutar mıyız? |
+| 5 | Bid/No-Bid Skorkartı | İdare geçmişi + kalan süre + evrak hazırlığı + değer uyumu + İGPD triyajı → 0-100 puan | Bu ihaleye girmeli miyiz? (deterministik, kara kutu değil) |
+| 6 | Belge Portföyü | Şirket Evrakları'nın kaç ihale evrakını otomatik karşıladığı, süresi dolan/dolacak belge sayısı | Evrak kütüphanesinin somut ROI'si |
+| 7 | Müşteri & Kamu Konsantrasyonu | HHI endeksi + ilk-3 müşteri payı + kamu payı | Tek müşteriye/segmente ne kadar bağımlıyız? |
+| 8 | Kurumsal Kompozit Sağlık Skoru | Satış%25+İhale%20+Finans%25+Müşteri%15+Uyum%15 tek skor | Yönetim kurulunun bakacağı ilk sayı |
+| 9 | Proje Sağlık Skoru | Marj%40+Takvim%35+Bütçe%25, proje bazında | Hangi proje riskte, tek tek açmadan? |
+| 10 | Müşteri Sağlık Skoru | Ödeme%35+Kazanma%30+Aktiflik%20+Sadakat%15 | Hangi kilit müşteri sessizce uzaklaşıyor? |
+| 11 | DMO Kanalı Analitiği | Sipariş durumu dağılımı, net kâr/marj, kârsız sipariş sayısı | (Yalnız lisanslıysa) ince marjlı kanalın sağlığı |
+| 12 | Birim Bütçe Absorpsiyonu | Bütçe vs. projelere dağıtılan pay, atıl/aşırı-tahsis | Overhead nerede boşa gidiyor, nerede fazla vaat ediliyor? |
+
+Her skor kompozit ise **alt bileşenleri de gösterilir** — "kara kutu"
+değil, her rakamın nasıl hesaplandığı izlenebilir. Kazanılmayan/geri
+çekilen (İştirak Edilmeyen) kayıtlar tüm oranlarda tutarlı biçimde
+paydadan hariç tutulur (§3.5'teki KPI-nötr kural buraya kadar uzanır).
+
+**Kimler kullanır:** Genel Müdür (tam görünürlük) + ilgili birim
+yöneticileri (kendi birimleri + kendilerine yönlenen raporlar).
+
+---
+
+### 3.14 Genel Hususlar — Kurumsal Hafıza
+
+Dört sekme, ortak bir kayıt-oluşturma deseniyle: **Alınan Dersler**
+(kategori/etki + isteğe bağlı proje bağlantısı), **Risk & Fırsat**
+(olasılık×etki = skor, 1-25 arası, 5×5 matriste renk kodlu — 15+ kırmızı,
+8+ amber), **Kurumsal KPI** (dönem bazlı hedef/gerçekleşen, tenant içinde
+isim+dönem tekil), **Dış Doküman Sicili** (dışarıdan gelen standart/
+mevzuat takibi).
+
+Her kayıt, isteğe bağlı olarak platformun ortak **doküman kodlama**
+motorundan (§2.7'nin numaralandırma kısmı) sıralı bir belge numarası
+alabilir — şirket kodu + kategori kodu + (isteğe bağlı yıl) + sıra
+numarası, tamamen tenant-yapılandırılabilir; hiçbir üçüncü-taraf
+notasyonu varsayılan olarak gelmez, her tenant kendi notasyonunu
+tanımlar.
+
+**Kimler kullanır:** Kalite ve yönetim ekibi (Genel Müdür varsayılan
+erişimli).
+
+---
+
+### 3.15 Şirket Evrakları — Görünmeyen Otomasyonun Kaynağı
+
+Basit bir envanter gibi görünür (isim, kategori — Hukuki/ISO/Sertifika/
+İş Deneyimi —, geçerlilik tarihi, etiketler) ama platformun en yüklü
+"görünmez otomasyon" noktalarından biridir: bir ihale şartnamesi analiz
+edildiğinde, çıkan her gerekli-evrak kalemi burada bulanık isim
+eşleştirmesiyle (alt-metin ya da en az 2 ortak anlamlı kelime + hâlâ
+geçerli olma şartı) taranır; eşleşen ve süresi geçmemiş her belge
+otomatik "Tamam" işaretlenir, dosyası önceden ekli gelir. Bu eşleşmenin
+kaç kez, kaç ihalede tekrar kullanıldığı Yönetim Raporları'ndaki Belge
+Portföyü kartında ölçülür — yani kütüphanenin somut değeri sayıyla
+görünür.
+
+**Kimler kullanır:** İdari ekip + evrağı üreten/tüketen tüm birimler.
+
+---
+
+### 3.16 Fiziksel Arşiv — Denetime Hazır Gerekçe Kayıtları
+
+Kutu/raf bazlı fiziksel arşiv takibi görünse de, iki iş olayı için
+**otomatik ve değişmez** bir dijital kayıt üretir:
+
+1. Bir fırsat **Kaybedildi** durumuna geçtiği an — yalnız o geçişte, bir
+   kez — başlık/müşteri/değer/kayıp nedenini özetleyen bir arşiv kaydı
+   otomatik oluşur. "Neden kaybettik" sorusunun cevabı kalıcı olarak
+   saklanır.
+2. Bir BoM, tedarikçi teklifleriyle birlikte Satışa devredildiğinde,
+   tüm tekliflerin (seçilen + alternatifler, fiyat + teknik uygunluk)
+   değişmez bir anlık görüntüsü hem fırsata hem arşive yazılır — "neden
+   bu tedarikçi, o rakiplerine karşı" sorusunun zaman damgalı, itiraza
+   kapalı kanıtı oluşur.
+
+**Dikkat çeken erişim kararı:** bu modül nav düzeyinde geniş bir izinle
+görünse de, **sunucu tarafında tüm uç noktalar yalnız Genel Müdür'e
+kilitlidir** — fiziksel/hukuki kayıt gözetimi bilinçli olarak tek elde
+toplanmış.
+
+**Kimler kullanır:** Fiilen yalnız Genel Müdür (idari ekip nav'da
+görünse de yazma/okuma sunucuda GM'e kilitli).
+
+---
+
+### 3.17 Yedekleme — Veri Güvencesi
+
+Üç sekme: **Yedekler, Geri Yükle, Zamanlama.** Hedef: yerel disk,
+Nextcloud, veya S3; kapsam tüm platform ya da yalnız bu tenant; tür tam,
+durum-dosyası, ya da yalnız veri.
+
+**Doğrulama** iki farklı yöntemle çalışır: veri yedekleri için
+checksum + JSON bütünlüğü + model bazında satır-sayısı karşılaştırması;
+durum-dosyası (SQLite) yedekleri için ayrı bir bağlantı üzerinden
+bütünlük kontrolü.
+
+**Geri yükleme asla kör değildir:** önce bir **fark analizi** çalışır —
+her veri modelinde eklenen/silinen/değişen kayıt sayısı hesaplanır,
+yedek alındığından beri şemaya eklenmiş modeller açıkça "bunlara
+dokunulmayacak" diye işaretlenir; kullanıcı bu raporu görüp onayladıktan
+sonra geri yükleme başlar. Mantıksal geri yüklemeden **hemen önce**,
+sistem otomatik olarak ayrı bir güvenlik yedeği alır — bu adım
+başarısız olursa geri yükleme hiç başlamaz.
+
+**Zamanlama** sunucu-içi bir döngüyle çalışır (ayrı bir cron sunucusu
+gerekmez), tenant başına ayarlanabilir eşik saatte bir tetiklenir.
+
+**Dikkat çeken rol tasarımı:** özel bir "Yedek Yöneticisi" rolü
+platformun **her yerinde salt-okunur**dur (herhangi bir modülde veri
+değiştiremez) — **yalnız** Yedekleme/Geri Yükleme uç noktalarında yazma
+yetkisi vardır. Bu kısıtlama tüm platformu kapsayan ortak bir güvenlik
+katmanında (her isteğin önünden geçen) uygulanır, tek tek ekranlarda
+değil — yani bu rolün bir yerden veri değiştirmesi mimari olarak mümkün
+değildir, unutulmuş bir ekran riski yoktur.
+
+**Kimler kullanır:** Yedek Yöneticisi + Genel Müdür.
+
+---
+
+### 3.18 Şirket Ayarları — Koddan Değil Ekrandan Yönetim
+
+Dokuz alt-sekme: Şirket Profili, Birimler, Kullanıcılar, İş Akışı,
+Yetkiler, Entegrasyonlar, Abonelik & Kullanım, Lisans Planları, Modüller.
+
+**Şirket Profili** aynı zamanda iki başka önemli yapılandırmayı da
+barındırır: yedekleme zamanlaması (Yedekleme modülüyle aynı API'yi
+paylaşır) ve **doküman kodlama notasyonu** — şirket kodu, ayraç, sıra
+numarası basamak sayısı, yıl dahil edilsin mi — platformun her yerinde
+(Genel Hususlar, Yönetim Raporları'ndaki raporlar, vb.) kullanılan tek
+numaralandırma motoru.
+
+**Kullanıcılar** ekranında rol ataması + **vekalet ataması** yapılır
+(bir kullanıcıya, belirli bir tarihe kadar, kendi onaylarını devredecek
+bir vekil atanır) — Görevler modülündeki onay-vekaleti mekanizmasının
+yönetim arayüzü tam olarak burasıdır.
+
+**Entegrasyonlar — YZ sağlayıcısı, sağlayıcıdan bağımsız:** tenant kendi
+API adresini, model adını ve anahtarını girer — herhangi bir OpenAI-
+uyumlu sağlayıcı çalışır, hiçbir tek YZ firmasına kilitlenme yoktur.
+Anahtar **yazma-amaçlı**dır: bir kez girildikten sonra ekranda asla
+tekrar gösterilmez, yalnız "kayıtlı" işareti görünür. Ayrıca Nextcloud/
+e-posta (Exchange)/WhatsApp bağlantı sihirbazı burada.
+
+**Modüller (yalnız Genel Müdür):** hangi "test" modüllerinin tüm
+kullanıcılara açılacağını kontrol eder; platformun çekirdek modülleri
+ayrıca burada kalıcı/kilitli olarak listelenir — şeffaflık için.
+
+**Sanal Agent lisanslama:** lisanslar artık bu uygulama içinde
+üretilmez — ayrı bir vendor aracı özel bir imza anahtarıyla üretir, bu
+uygulama yalnız **doğrular** ve aktive eder. Bir lisans token'ı aktive
+edildiğinde ilgili tüm agent'lar için bir yetki kaydı (durum: Aktif,
+mod: agent'ın varsayılan modu) otomatik oluşur. Mod değişiklikleri
+sunucu tarafında agent'ın **izinli-mod listesine karşı** doğrulanır —
+yani bir Finans ya da Hukuk agent'ını doğrudan API çağrısıyla bile
+Otonom moda geçirmek yapısal olarak mümkün değildir; kısıtlama arayüzde
+değil, agent tanımının kendisinde kilitlidir.
+
+**Kimler kullanır:** Sistem yöneticisi rolü + Genel Müdür; en hassas
+işlemler (tenant oluşturma/abonelik, YZ anahtarı, yönetişim ayarları,
+kullanıcı oluşturma/silme, birim bütçesi) yalnız Genel Müdür'e
+kilitlidir — Sistem Yöneticisi rolü bile bunları yapamaz.
+
+---
+
+### 3.19 Yardım — Uygulama İçi, Bağlamsal Kılavuz
+
+*(2026-08-03 eklendi.)* Header'daki Yardım ikonuyla açılır; kullanıcı o
+an hangi ekrandaysa doğrudan o modülün "ne işe yarar / nasıl kullanılır"
+makalesiyle karşılaşır, arama kutusuyla başka bir konuyu da bulabilir.
+Rol-duyarlıdır — kullanıcı yalnız kendi sidebar'ında gördüğü modüllerin
+kılavuzunu görür, ne fazlası ne eksiği. Sayfa üstünde, yazılımı hiç
+tanımayan biri için ayrı bir **Wiki** sayfasına (uçtan uca akışı anlatan
+dışa açık statik kılavuz) link verir — iki katman birbirini tekrar
+etmez: Wiki dışa dönük genel tanıtım, Yardım içe dönük ekran kılavuzu.
+
+**Kimler kullanır:** Herkes.
+
+---
+
+## 4. Bütünsel Sentez — Neden "19 Ayrı Ekran" Değil, "Tek Bir Platform"
+
+Yukarıdaki 19 bölümü tek tek okumak bile aslında platformun ne olduğunu
+tam anlatmaz — asıl gösterge, **bir tek işin** bu modüllerin arasından
+nasıl kesintisiz aktığıdır. Somut bir örnek üzerinden özetleyelim:
+
+Bir saha ziyareti sırasında yeni bir temas günlük rapora düşer (§3.2).
+CRM'de fırsata dönüşür; kredi limiti kontrolü arka planda sessizce
+çalışır (§3.3). Presales, teknik olarak uygun **ve** kanıtlı bir BoM
+hazırlar — en ucuz ama uygunsuz bir tedarikçi seçimi sunucu tarafında
+zaten imkânsızdır (§3.4). Satış, forward-kur ile korunmuş bir teklif
+üretir; marj tabanının altına düşerse onay ekranı bunu kırmızı ile
+işaretler (§3.3). Kamu işiyse, şartname otomatik analiz edilir, gerekli
+evrakın çoğu Şirket Evrakları'ndan **kendiliğinden** eşlenir (§3.5,
+§3.15). İhale kazanılınca sözleşme kendiliğinden açılır (§3.5→§3.6);
+imza onaylanınca hem proje hem satınalma talebi **aynı anda, elle veri
+taşınmadan** doğar — ve satınalmaya yalnız alış fiyatı geçer, satış
+fiyatı hiçbir zaman sızmaz (§3.6). Proje ilerlerken gerçek maliyet
+Satınalma'dan otomatik işlenir (§3.7↔§3.8); teslim sonrası bir arıza
+bildirimi gelirse süresi geçmeden önce otomatik eskale edilir (§3.9).
+Her fatura, her kur farkı, her teminat süresi Finans'ta izlenir (§3.10);
+paralel bir DMO satışı varsa, aynı işin kârlı mı zararlı mı olduğu kabul
+edilmeden önce görülür (§3.11). Bu zincirin her adımı Görevler'de bir
+görev, bir onay ya da bir bildirim üretir (§3.12); hepsi Yönetim
+Raporları'nda tek bir sağlık skoruna, tek bir darboğaz paneline döner
+(§3.13). Ve zincirin her halkasında **kim neyi yaptı** Denetim İzi'nde
+kalıcıdır (§2.4).
+
+İşte bu yüzden 19 modül "19 ayrı özellik" değil: her biri aynı işin farklı
+bir anındaki durağıdır, ve aralarındaki **otomatik geçişler, ortak onay
+motoru, ortak RBAC, ortak denetim izi ve ortak para disiplini** —
+tek başına hiçbirinin sahip olmadığı bir şeyi, bütünün kendisini,
+üretir: satılan hiçbir işin kâr mı zarar mı ettiğini bilmeden ilerlemediği,
+hiçbir onayın sahipsiz kalmadığı, hiçbir kararın izsiz geçmediği bir
+karar sistemi.
 
 ---
 
@@ -194,74 +842,73 @@ aksi halde disiplin bir yük olarak algılanır ve terk edilir. Enflow'da somut 
 | Gösterge | Sayı |
 |---|---|
 | Veri modeli (Prisma) | 67 |
-| Ekran modülü | 33 |
+| Ekran modülü (19 üst-seviye + alt-sekmeler) | 33 dosya |
 | API alanı (`/api/*`) | 38 |
 | Backend servisi | 35 |
-| Sanal agent | 8 (para/hukuk daima danışman) |
+| Sanal agent | 8 (Finans + Hukuk daima danışman) |
 | Rol | 20 |
-| Mimari katman | 8 (0–7) |
-| Büyüme Analitiği raporu | 13 + 3 seviyeli sağlık skoru |
-| RBAC + kiracı-izolasyon test sonucu | **486/486 yeşil** |
+| Büyüme Analitiği raporu | 12 + 3 seviyeli sağlık skoru |
+| Otomatik geçiş halkası | 6 (T1, T3, T4, T4b, T5, T6) |
 
-*(Kaynak: `walkthrough.md §27`, `CLAUDE.md`, ilgili servis/route dosyaları — bu döküman kod
-tabanından türetilmiştir, spekülatif rakam içermez.)*
+*(Kaynak: bu döküman, her modülün 2026-08-03 tarihli güncel kodunun
+doğrudan okunmasıyla üretildi — `walkthrough.md §27` ve `CLAUDE.md` ile
+tutarlıdır ama onlardan kopyalanmadı.)*
 
 ---
 
 ## 6. Ölçülebilir Fayda (ROI Dili)
 
-| Alan | Fayda |
-|---|---|
-| **Kâr koruması** | Forward-kur + tam-yüklü marj + DMO kârsız-satış alarmı → zarar eden/erozyona uğrayan işin **kabul edilmeden** önlenmesi |
-| **Kayıp iş önleme** | SLA eskalasyonu + teminat/servis hatırlatmaları → unutulan görev/süresi geçen evrak riskinin sıfıra inmesi |
-| **İhale kazanımı** | Bid/No-Bid odaklanması + otomatik evrak eşleme → diskalifiye riskinin düşmesi, hazırlık emeğinin doğru ihaleye yönlenmesi |
-| **Süreç hızı** | Otomatik devir zinciri → imza-iş başlangıcı arasındaki gecikmenin ortadan kalkması |
-| **Yönetişim maliyeti** | Ekrandan RBAC/iş akışı + vekalet → IT/danışmanlık bağımlılığının ve onay tıkanıklığının azalması |
-| **Risk azaltımı** | Konsantrasyon (HHI) + denetim izi + çok-kiracılı izolasyon + yedekleme → bağımlılık, hesap verebilirlik ve veri kaybı risklerinin görünür/yönetilir olması |
-| **Kullanıcı benimsemesi** | Otomatik doldurma + proaktif hatırlatma + uygulama-içi Yardım → disiplinin yük değil, kolaylık olarak algılanması |
+| Alan | Fayda | Hangi mekanizmadan gelir |
+|---|---|---|
+| Kâr koruması | Zarar eden/erozyona uğrayan işin kabul edilmeden önlenmesi | Forward-kur (§3.3), marj tabanı (§3.3), DMO kârsız-alarm+veto (§3.11), tam-yüklü marj (§3.7) |
+| Kayıp iş önleme | Unutulan görev/süresi geçen evrak riskinin sıfıra inmesi | SLA eskalasyonu (§3.9, §3.12), teminat hatırlatması (§3.10) |
+| İhale kazanımı | Diskalifiye riskinin düşmesi, hazırlığın doğru ihaleye yönlenmesi | Otomatik evrak eşleme (§3.5, §3.15), Bid/No-Bid skorkartı (§3.13) |
+| Süreç hızı | İmza-iş başlangıcı gecikmesinin ortadan kalkması | T3/T4/T4b/T5/T6 otomatik zincir (§2.1, §4) |
+| Pazarlık gücü | Körlemesine değil referans-fiyat destekli tedarik | Satınalma referans fiyat görünürlüğü (§3.8) |
+| Yönetişim maliyeti | IT/danışmanlık bağımlılığının azalması | Ekrandan RBAC/iş akışı/vekalet (§2.3, §3.18) |
+| Risk azaltımı | Bağımlılık, hesap verebilirlik, veri kaybı riskinin görünür olması | Konsantrasyon/HHI (§3.13), denetim izi (§2.4), izolasyon+yedekleme (§2.7, §3.17) |
+| Kullanıcı benimsemesi | Disiplinin yük değil kolaylık olarak algılanması | Otomatik doldurma, proaktif hatırlatma, uygulama-içi Yardım (§3.19) |
 
 ---
 
 ## 7. Bu Dökümandan Satış Sunumu (Pitch Deck) Üretimi
 
-Bu döküman, mevcut `docs/ENFLOW_SUNUM_SLAYTLARI.md` (Marp formatlı sunum) ile birlikte
-kullanılmak üzere tasarlandı. Aşağıdaki eşleme, bu dökümanın hangi bölümünün hangi slayda
-karşılık geldiğini (veya mevcut sunuma **hangi yeni slaytların eklenebileceğini**) gösterir:
+Mevcut `docs/ENFLOW_SUNUM_SLAYTLARI.md` (Marp) ile birlikte kullanılabilir:
 
 | Bu dökümanın bölümü | Sunumdaki karşılığı | Not |
 |---|---|---|
-| §0 Neden bu üç soru | Problem slaydı ("Üç Sessiz Maliyet") | Mevcut sunumda var — bu döküman gerekçeyi derinleştirir |
-| §1 Hata yakalama tablosu (1.1) | **Yeni slayt önerisi:** "Hatayı Nasıl Yakalarız?" | Tablo doğrudan slayt içeriğine çevrilebilir; her satır bir madde |
-| §1.3 Somut senaryo | **Yeni slayt önerisi:** "Bir Görevin Hikâyesi" (before/after) | Mevcut sunumdaki DMO before/after örneğiyle aynı üslupta |
-| §2 Kontrol mekanizması tablosu | "Yönetişim & Güvenlik" slaydı | Mevcut slaydı 8-mekanizma tablosuyla genişletir |
-| §3 Tek bakışta görünürlük | "Büyüme Analitiği" + "Raporlara Nasıl Ulaşılır" slaytları | Olası/yürüyen proje ayrımı yeni bir alt-başlık olarak eklenebilir |
-| §4 Kullanıcı kolaylıkları | **Yeni slayt önerisi:** "Kullanıcıya Ne Kolaylaştırır?" | Yardım modülü + Wiki maddesi mevcut sunumda yok, eklenmeli |
-| §5 Ölçek rakamları | "Mimari — Neden Güven Verir" slaydı | Rakamları güncel tut (67 model, 20 rol, 8 katman) |
-| §6 ROI tablosu | "Ölçülebilir Fayda (ROI)" slaydı | Mevcut slaytla birebir uyumlu, ek satır (Kullanıcı benimsemesi) eklenebilir |
-
-**Öneri:** Yeni bir satış görüşmesi öncesi, dinleyici kitlesine göre bu dökümandan §1 (hata
-yakalama) veya §2 (kontrol) öne çıkarılabilir — teknik/operasyon odaklı bir GM için §1,
-kurumsal yönetişim/denetim odaklı bir yönetim kurulu için §2 daha ikna edicidir. §3 ve §4 her
-izleyici kitlesi için ortak zemindir (herkes "sabah ne görürüm" ve "işim kolaylaşıyor mu"
-sorularını sorar).
+| §1 Tek bakışta | Kapak + Problem/Çözüm slaytları | Faz tarihçesi yok, doğrudan kullanılabilir |
+| §2 Paylaşılan altyapı | "Mimari — Neden Güven Verir" + "Yönetişim & Güvenlik" | 8-agent tablosu doğrudan slayta çevrilir |
+| §3.1-3.19 modül bölümleri | Her modül için 1 slayt önerisi | Her bölümün "dikkat çeken mantık" paragrafı hazır slayt notu |
+| §3.3, §3.11 (forward-kur, DMO) | "Finansal Zekâ" + "Kârsız Satışı Yakalar" slaytları | Somut formüller zaten yazılı |
+| §3.13 tablo (12 rapor) | "Büyüme Analitiği" slaydı | Tablo satırları doğrudan madde işareti olur |
+| §4 Bütünsel sentez | **Yeni slayt önerisi:** "Bir İşin Hikâyesi — Uçtan Uca" | Tek bir işin 19 modülden geçişini anlatan akış slaydı |
+| §5-6 Ölçek + ROI | "Mimari" + "Ölçülebilir Fayda" slaytları | Rakamları güncel tut |
 
 ---
 
 ## 8. Şeffaflık Notları (Kısıtlar)
 
-- İşletme maliyeti (overhead), projeye yalnız yönetim bilinçli olarak açarsa (proje bazlı
-  toggle) marja dahil olur — varsayılan kapalıdır, direkt marj hesabı değişmez.
-- DMO Kataloğu ayrı lisanslı bir modüldür; lisans yoksa menü görünmez, API erişimi engellenir.
-- Finans ve Hukuk sanal agentları hiçbir yapılandırmada otonom karara geçemez.
-- Sweep tabanlı hatırlatmalar (§1.2) bir zamanlayıcı sunucusu gerektirmez, ilgili ekran
-  açıldığında tetiklenir — çok uzun süre hiç açılmayan bir ekranın bildirimi de o ekran
-  açıldığı an gönderilir (kaçırılmaz, yalnız gecikebilir).
-- Bu döküman kod tabanından (`walkthrough.md §27`, `CLAUDE.md`, ilgili servis dosyaları)
-  türetilmiştir; iddia edilen her mekanizma ilgili servis dosyasında doğrulanmıştır.
+- İşletme maliyeti (overhead), projeye yalnız yönetim bilinçli olarak
+  açarsa marja dahil olur — varsayılan kapalıdır.
+- DMO Kataloğu ayrı lisanslı bir modüldür; lisans yoksa menü görünmez,
+  API erişimi engellenir.
+- Finans ve Hukuk sanal agentları hiçbir yapılandırmada otonom karara
+  geçemez (iki bağımsız kilitle korunur).
+- Fiziksel Arşiv, nav izninden bağımsız olarak sunucuda yalnız Genel
+  Müdür'e açıktır.
+- Sweep-tabanlı hatırlatmalar (SLA, teminat) bir zamanlayıcı sunucusu
+  gerektirmez, ilgili ekran açıldığında tetiklenir — kaçırılmaz, yalnız
+  ekran açılana kadar gecikebilir.
+- Bu döküman, kod tabanının 2026-08-03 tarihli hâlinin doğrudan
+  okunmasıyla üretildi; iddia edilen her mekanizma ilgili modülün/
+  servisin gerçek kodunda doğrulanmıştır — spekülatif ya da eski
+  sürümden kopyalanmış bilgi içermez.
 
 ---
 
-*İlgili dökümanlar: `docs/ENFLOW_Tanitim_ve_Mimari.md` (genel tanıtım & mimari, modül-modül
-anlatı) · `docs/ENFLOW_SUNUM_SLAYTLARI.md` (Marp sunum) · `docs/BUYUME_ANALITIGI.md` (Büyüme
-Analitiği derinlemesine) · `docs/DMO_KATALOG.md` · `docs/ISLETME_MALIYETI.md` · proje kökü
-`walkthrough.md §27` (canlı wiki kaynağı, `wiki/index.html` / `/wiki`).*
+*İlgili dökümanlar: `docs/ENFLOW_Tanitim_ve_Mimari.md` (genel tanıtım &
+mimari) · `docs/ENFLOW_SUNUM_SLAYTLARI.md` (Marp sunum) ·
+`docs/BUYUME_ANALITIGI.md` · `docs/DMO_KATALOG.md` ·
+`docs/ISLETME_MALIYETI.md` · proje kökü `walkthrough.md §27` (canlı wiki
+kaynağı, `wiki/index.html` / `/wiki`).*
