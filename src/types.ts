@@ -696,6 +696,7 @@ export interface PurchaseQuote {
   validUntil?: string | null;
   notes?: string | null;
   isSelected: boolean;
+  score?: number | null; // 0-1 ağırlıklı uygunluk skoru (fiyat/puan/teslim süresi) — backend hesaplar
   createdAt: string;
   updatedAt: string;
 }

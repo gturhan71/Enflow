@@ -399,11 +399,22 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
         {tab === 'quotes' && (
           <div className="space-y-4">
             {pr.quotes.length === 0 && <p className="text-sm text-slate-400 text-center py-6">Henüz teklif eklenmedi.</p>}
-            {pr.quotes.map((q: PurchaseQuote) => (
+            {(() => {
+              const topScoreId = pr.quotes.length
+                ? pr.quotes.reduce((best, q) => (q.score ?? -1) > (best.score ?? -1) ? q : best, pr.quotes[0]).id
+                : null;
+              return pr.quotes.map((q: PurchaseQuote) => (
               <div key={q.id} className={`rounded-xl p-4 border ${q.isSelected ? 'border-green-500/50 bg-green-900/10' : 'border-white/10 bg-white/5'}`}>
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="font-semibold">{q.vendorName}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold">{q.vendorName}</p>
+                      {q.score != null && (
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${q.id === topScoreId ? 'bg-amber-500/20 text-amber-300' : 'bg-white/10 text-slate-300'}`} title="Fiyat %60 + tedarikçi puanı %25 + teslim süresi %15 ağırlıklı uygunluk skoru">
+                        {q.id === topScoreId ? '★ ' : ''}Uygunluk: %{Math.round(q.score * 100)}
+                        </span>
+                      )}
+                    </div>
                     <p className="text-lg font-bold text-indigo-300 mt-1">{formatCurrency(q.totalAmountTRY, 'TRY')}</p>
                     {q.deliveryDays && <p className="text-xs text-slate-400 mt-0.5">{q.deliveryDays} gün teslimat</p>}
                     {q.validUntil && <p className="text-xs text-slate-400">Geçerlilik: {formatDate(q.validUntil)}</p>}
@@ -421,7 +432,8 @@ const PRDetailDrawer: React.FC<PRDetailDrawerProps> = ({ pr, vendors, currentUse
                   )}
                 </div>
               </div>
-            ))}
+              ));
+            })()}
 
             {['PENDING_PROCUREMENT','PENDING_GM','PO_ISSUED'].includes(pr.status) && (
               <div className="border border-white/10 rounded-xl p-4 space-y-3">

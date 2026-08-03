@@ -186,7 +186,7 @@ const presalesHandler: AgentHandler = async (tenantId, entityId) => {
 // rating/deliveryDays eksikse nötr (0.5) kabul edilir (cezalandırmaz).
 const QUOTE_SCORE_WEIGHTS = { price: 0.6, rating: 0.25, delivery: 0.15 };
 
-function scoreQuotes<T extends { totalAmount: number; totalAmountTRY: number | null; deliveryDays: number | null; vendor?: { rating: number | null } | null }>(
+export function scoreQuotes<T extends { totalAmount: number; totalAmountTRY: number | null; deliveryDays: number | null; vendor?: { rating: number | null } | null }>(
   quotes: T[],
 ): { quote: T; score: number }[] {
   const prices = quotes.map((q) => q.totalAmountTRY ?? q.totalAmount);

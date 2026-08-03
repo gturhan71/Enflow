@@ -2,9 +2,22 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { scoreQuotes } from '../services/virtualAgentService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
+
+// Her tekliften 0-1 arası ağırlıklı uygunluk skoru (fiyat %60 oransal + puan
+// %25 + teslim süresi %15 — bkz. virtualAgentService.scoreQuotes) ekler.
+// Skor daha önce yalnız sanal agent'ın arka-plan danışmanlığındaydı; kullanıcı
+// artık aynı hesabı ekranda da görüyor, seçim yine insan kararı.
+type ScorableQuote = { id: string; totalAmount: number; totalAmountTRY: number | null; deliveryDays: number | null; vendor?: { rating: number | null } | null };
+function withQuoteScores<Q extends ScorableQuote, T extends { quotes: Q[] }>(pr: T): T {
+  if (!pr.quotes?.length) return pr;
+  const scored = scoreQuotes(pr.quotes);
+  const byId = new Map(scored.map(s => [s.quote.id, s.score]));
+  return { ...pr, quotes: pr.quotes.map(q => ({ ...q, score: byId.get(q.id) ?? null })) };
+}
 
 // ── LIST ──────────────────────────────────────────────────────────────────
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
@@ -22,7 +35,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
     },
     orderBy: { createdAt: 'desc' },
   });
-  res.json(requests);
+  res.json(requests.map(withQuoteScores));
 }));
 
 // ── GET ONE ───────────────────────────────────────────────────────────────
@@ -36,7 +49,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     },
   });
   if (!pr) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
-  res.json(pr);
+  res.json(withQuoteScores(pr));
 }));
 
 // ── CREATE ────────────────────────────────────────────────────────────────
