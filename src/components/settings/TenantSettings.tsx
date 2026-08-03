@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Building, X, ShieldCheck, Hash, Plus, Trash2, Save, DatabaseBackup, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
-import { Tenant, BackupSettings } from '../../types';
+import { Tenant, BackupSettings, User } from '../../types';
 import { apiService } from '../../services/apiService';
 
 // Yedekleme zamanlaması — eşik değer Şirket Profili'nden girilir (detay: Yedekleme modülü).
@@ -248,6 +248,7 @@ interface TenantSettingsProps {
   newTenantName: string;
   setNewTenantName: (name: string) => void;
   handleCreateTenant: () => void;
+  currentUser: User;
 }
 
 export const TenantSettings = ({
@@ -258,8 +259,13 @@ export const TenantSettings = ({
   tenants,
   newTenantName,
   setNewTenantName,
-  handleCreateTenant
+  handleCreateTenant,
+  currentUser
 }: TenantSettingsProps) => {
+  // Backend POST /api/tenants yalnız GENERAL_MANAGER'a açık (platform-seviyesi
+  // işlem — yeni bir müşteri şirketi onboard etmek). ADMIN vb. rollere bu formu
+  // göstermek "yetkiniz yok" hatasıyla sonuçlanan kullanılamaz bir UI bırakır.
+  const canCreateTenant = currentUser?.role === 'GENERAL_MANAGER';
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -328,24 +334,26 @@ export const TenantSettings = ({
             </p>
           </div>
 
-          <div className="p-6 border border-slate-100 rounded-[2rem] space-y-4 bg-slate-50/30">
-            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Yeni Şirket Tanımla</p>
-            <div className="flex gap-2">
-              <input 
-                type="text" 
-                placeholder="Şirket Tam Adı..." 
-                value={newTenantName}
-                onChange={(e) => setNewTenantName(e.target.value)}
-                className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm"
-              />
-              <button 
-                onClick={handleCreateTenant}
-                className="bg-slate-900 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
-              >
-                Ekle
-              </button>
+          {canCreateTenant && (
+            <div className="p-6 border border-slate-100 rounded-[2rem] space-y-4 bg-slate-50/30">
+              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Yeni Şirket Tanımla</p>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Şirket Tam Adı..."
+                  value={newTenantName}
+                  onChange={(e) => setNewTenantName(e.target.value)}
+                  className="flex-1 px-4 py-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm"
+                />
+                <button
+                  onClick={handleCreateTenant}
+                  className="bg-slate-900 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all"
+                >
+                  Ekle
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-2 max-h-[200px] overflow-y-auto pr-2 custom-scrollbar">
              {tenants.map(t => (

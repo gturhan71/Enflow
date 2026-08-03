@@ -376,6 +376,7 @@ const SettingsModule = ({
             newTenantName={newTenantName}
             setNewTenantName={setNewTenantName}
             handleCreateTenant={handleCreateTenant}
+            currentUser={currentUser}
           />
         );
       case 'units':
