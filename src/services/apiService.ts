@@ -80,6 +80,7 @@ class ApiService {
   async setSalesTarget(target: number): Promise<{ target: number }> { return apiClient.fetchWithAuth('/reports/sales-target', { method: 'PUT', body: JSON.stringify({ target }) }); }
   async getBidScorecard(): Promise<import('../types').BidScorecard> { return apiClient.fetchWithAuth('/reports/bid-scorecard'); }
   async getDocumentPortfolio(): Promise<import('../types').DocumentPortfolio> { return apiClient.fetchWithAuth('/reports/document-portfolio'); }
+  async getArchiveAnalytics(): Promise<import('../types').ArchiveAnalytics> { return apiClient.fetchWithAuth('/reports/archive-analytics'); }
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
   // İşletme maliyeti (overhead) + birim bütçe

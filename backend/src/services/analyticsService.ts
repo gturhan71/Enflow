@@ -330,6 +330,54 @@ export async function computeDocumentPortfolio(tenantId: string): Promise<Docume
   };
 }
 
+// ── Fiziksel Arşiv Analitiği ──────────────────────────────────────────────────
+// ArchiveItem envanteri: kategori/durum dağılımı + fiziksel-vs-dijital ayrımı
+// (otomatik arşivlenen kayıp-fırsat/BoM-değerlendirme kayıtları boxNo='DİJİTAL'
+// ile işaretlenir, bkz. opportunities.ts) + uzun süredir "Ödünç Verildi"
+// durumunda kalan kayıtlar (dikkat listesi).
+const LONG_BORROWED_DAYS = 30;
+export interface ArchiveAttentionLine {
+  id: string; boxNo: string; shelfNo: string; category: string; daysSinceUpdate: number;
+}
+export interface ArchiveAnalytics {
+  summary: { total: number; physical: number; digital: number; inArchive: number; borrowed: number };
+  categories: { category: string; count: number }[];
+  attention: ArchiveAttentionLine[];
+  note: string;
+}
+
+export async function computeArchiveAnalytics(tenantId: string): Promise<ArchiveAnalytics> {
+  const items = await prisma.archiveItem.findMany({ where: { tenantId } });
+
+  const now = Date.now();
+  let digital = 0, inArchive = 0, borrowed = 0;
+  const catMap: Record<string, number> = {};
+  const attention: ArchiveAttentionLine[] = [];
+
+  for (const it of items) {
+    catMap[it.category || '—'] = (catMap[it.category || '—'] || 0) + 1;
+    if (it.boxNo === 'DİJİTAL') digital++;
+    if (it.status === 'BORROWED') {
+      borrowed++;
+      const daysSinceUpdate = Math.floor((now - new Date(it.updatedAt).getTime()) / 86400000);
+      if (daysSinceUpdate >= LONG_BORROWED_DAYS) {
+        attention.push({ id: it.id, boxNo: it.boxNo, shelfNo: it.shelfNo, category: it.category || '—', daysSinceUpdate });
+      }
+    } else {
+      inArchive++;
+    }
+  }
+  attention.sort((a, b) => b.daysSinceUpdate - a.daysSinceUpdate);
+  const categories = Object.entries(catMap).map(([category, count]) => ({ category, count })).sort((a, b) => b.count - a.count);
+
+  return {
+    summary: { total: items.length, physical: items.length - digital, digital, inArchive, borrowed },
+    categories,
+    attention,
+    note: `Fiziksel Arşiv envanteri. "Dijital" kayıtlar (kaybedilen fırsat + BoM tedarikçi değerlendirmesi) sistemin kendisi tarafından otomatik oluşturulur. ${LONG_BORROWED_DAYS} günden uzun süredir "Ödünç Verildi" durumunda kalan kayıtlar dikkat listesindedir.`,
+  };
+}
+
 // ── Müşteri & Kamu Konsantrasyonu · #12 ──────────────────────────────────────
 // Kazanılan (WON) gelir üzerinden müşteri yoğunlaşması (HHI + top-N) + kamu payı.
 // Kamu payı best-effort: müşteri adı/sektörü kamu terimleri içeriyor mu (heuristik, note).

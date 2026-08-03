@@ -1022,6 +1022,16 @@ export interface DocumentPortfolio {
   note: string;
 }
 
+export interface ArchiveAttentionLine {
+  id: string; boxNo: string; shelfNo: string; category: string; daysSinceUpdate: number;
+}
+export interface ArchiveAnalytics {
+  summary: { total: number; physical: number; digital: number; inArchive: number; borrowed: number };
+  categories: { category: string; count: number }[];
+  attention: ArchiveAttentionLine[];
+  note: string;
+}
+
 export interface HealthPillar { key: string; label: string; score: number; detail: string; }
 export interface BusinessHealth {
   overall: number;
