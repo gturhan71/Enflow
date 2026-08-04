@@ -11,6 +11,7 @@ import { logActivity } from '../services/activityLog';
 import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
 import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
+import { recalcInvoice } from '../services/invoiceEngine';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -23,26 +24,6 @@ const guaranteeUpload = documentUpload(50);
 async function maybeDocNumber(tenantId: string, categoryCode?: string): Promise<string | null> {
   if (!categoryCode) return null;
   return nextDocumentNumber(tenantId, categoryCode);
-}
-
-// Fatura statüsü tahsil edilen tutara + vadeye göre türetilir.
-function deriveInvoiceStatus(amount: number, paidAmount: number, dueDate: Date | null, current: string): string {
-  if (current === 'DRAFT' || current === 'CANCELLED') return current;
-  if (paidAmount >= amount && amount > 0) return 'PAID';
-  if (paidAmount > 0 && paidAmount < amount) return 'PARTIAL';
-  if (dueDate && dueDate.getTime() < Date.now() && paidAmount < amount) return 'OVERDUE';
-  return current === 'PAID' || current === 'PARTIAL' ? 'ISSUED' : current;
-}
-
-async function recalcInvoice(invoiceId: string): Promise<void> {
-  const inv = await prisma.invoice.findUnique({ where: { id: invoiceId }, include: { payments: true } });
-  if (!inv) return;
-  const paidAmount = inv.payments.reduce((s, p) => s + p.amount, 0);
-  const status = deriveInvoiceStatus(inv.amount, paidAmount, inv.dueDate, inv.status);
-  await prisma.invoice.update({
-    where: { id: invoiceId },
-    data: { paidAmount, status, paidAt: paidAmount >= inv.amount && inv.amount > 0 ? new Date() : null },
-  });
 }
 
 // ── 1) Faturalar ─────────────────────────────────────────────────────────────
