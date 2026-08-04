@@ -126,8 +126,22 @@
     23 dosya toplam. Davranış değişikliği YOK. Doğrulama: tsc 0 (ilk denemede) · pnpm verify
     yeşil · canlı Playwright (Genel Bakış/Büyüme Analitiği 13 kart/Birim Detayı/Raporlarım+Yeni
     Rapor modali/Gelen Raporlar) — 0 console/page error.
-  **Kalan (4/7):** NegotiationModule/ProjectManagementModule/ContractWorkflowModule/CRMModule —
-  aynı desenle, her biri ayrı tur+commit.
+  - **4/7 (`a0dad44`):** NegotiationModule.tsx (1319→624 satır ana dosya, %53 küçülme — diğerlerinden
+    düşük çünkü bu dosya öncekilerin aksine HİÇ ayrı alt bileşene bölünmemişti, tek dev fonksiyon +
+    2 büyük render modu; simülasyon mantığı state'e derinden bağlı, ayrıştırılan JSX kısmı sınırlı) →
+    `src/modules/negotiation/` (types.ts, AccessDeniedPanel, ProposalSelectorHeader, ModeTabBar,
+    ChatInfoPanel+ChatWindow — 1v1 sohbet modu, AuctionSidePanel+AuctionBoard — açık eksiltme modu).
+    Ana bileşen TÜM state (sohbet 7 + eksiltme 13 değişken) + async handler'ları tutuyor.
+    **Davranış notu:** `roundCalculated` state'i orijinalde yazılıyor ama hiç okunmuyordu (etkisiz
+    "ölü" state) — davranış-koruyan kapsam gereği KASITLI korundu, temizlenmedi (Faz 3 kararı,
+    Faz 5 değil). Doğrulama: tsc 0 (1 RefObject<T|null> tip düzeltmesi hariç ilk denemede) · pnpm
+    verify yeşil · canlı Playwright GERÇEK uçtan-uca akış — API üzerinden (raw SQL değil) geçici
+    fırsat+"pazarlığa açık" teklif oluşturuldu → seçildi → 1v1 sohbet başlatıldı+mesaj aktı → mod
+    sekmesi NEGOTIATING sırasında doğru devre dışı kaldı (guard doğrulandı) → eksiltme kurulum
+    formu+katılımcı tablosu+tur kontrolü render edildi — 0 console/page error. Test verisi
+    adminTest.ts "RBAC Test*" ucuyla temizlendi.
+  **Kalan (3/7):** ProjectManagementModule/ContractWorkflowModule/CRMModule — aynı desenle, her
+  biri ayrı tur+commit.
 
 ## Temiz session'da ilk adımlar
 
@@ -137,7 +151,7 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (3/7 tamam)** — sıradaki: NegotiationModule.tsx (1319 satır).
+4. **Faz 5 DEVAM EDİYOR (4/7 tamam)** — sıradaki: ProjectManagementModule.tsx (1322 satır).
    Oturan deseni (`src/modules/<modül>/` altında helpers/constants + alt bileşenler, ana dosya
    ince orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
 
