@@ -10,7 +10,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
-import { NAV_ITEMS } from '../constants';
+import { NAV_ITEMS, APP_VERSION } from '../constants';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 
@@ -95,7 +95,7 @@ const Sidebar = ({
         </div>
         <div className="flex flex-col">
           <h1 className="font-black text-slate-900 leading-none uppercase tracking-tighter text-2xl italic">ENFLOW</h1>
-          <p className="text-[10px] text-primary uppercase tracking-[0.2em] font-black mt-1 opacity-70">COCKPIT v1.2</p>
+          <p className="text-[10px] text-primary uppercase tracking-[0.2em] font-black mt-1 opacity-70">COCKPIT {APP_VERSION}</p>
         </div>
       </div>
 
