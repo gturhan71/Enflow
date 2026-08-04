@@ -35,16 +35,22 @@
   taraması → 0 gerçek TODO (rakam Temmuz'dan beri zaten kapanmış). Backend 8 gerçek `: any`
   (generated/prisma hariç) → `AuditContext` tipleri + Prisma otomatik-çıkarım. tsc 0 · verify
   yeşil · RBAC 147/147 · canlı audit:roles + curl doğrulaması.
-- **Faz 4 BAŞLADI (1/N tamamlandı, commit `dba45fd`)** — kullanıcı kararı: "tek bir endpoint ile
-  başla, dikkatlice doğrula" (65 endpoint'i tek oturumda zorlamak yerine). İlk parça: finance.ts'teki
-  `deriveInvoiceStatus`/`recalcInvoice` (3 endpoint'te kullanılan private route-içi fonksiyonlardı,
-  test edilemez/yeniden kullanılamaz) → `backend/src/services/invoiceEngine.ts`, mantık birebir
-  korunarak + 9 unit test (Faz 0 deseninde) + canlı curl doğrulaması (fatura oluştur→kısmi ödeme→
-  PARTIAL→tam ödeme→PAID→ödeme sil→PARTIAL'a dönüş). RBAC 127/127.
-  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/financing-effect/
-  fx-adjustments — hâlâ route içinde) + contractWorkflow.ts (515 satır, 12 endpoint) + projects.ts
-  (509 satır, 20+ endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/cost-analysis/approval
-  akışları). Her biri ayrı commit, curl before/after zorunlu.
+- **Faz 4 DEVAM EDİYOR (2/N tamamlandı)** — kullanıcı kararı: "tek bir endpoint ile başla, dikkatlice
+  doğrula" (65 endpoint'i tek oturumda zorlamak yerine).
+  - **1/N (`dba45fd`):** finance.ts'teki `deriveInvoiceStatus`/`recalcInvoice` (3 endpoint'te
+    kullanılan private route-içi fonksiyonlardı) → `backend/src/services/invoiceEngine.ts`, 9 unit
+    test + canlı curl (PARTIAL→PAID→ödeme sil→PARTIAL'a dönüş).
+  - **2/N (`864151f`):** finance.ts GET /summary agregasyon mantığı → `backend/src/services/
+    financeSummary.ts` (`summarizeFinance` saf + `computeFinanceSummary` I/O sarmalayıcı), 8 unit
+    test + canlı curl (kısmi-ödemeli+vadesi-geçmiş fatura → overdue toplamı doğru +700 arttı).
+    Belgelenen bulgu: bu endpoint zaten `status==='OVERDUE'`'a değil dueDate/paidAmount'a bakıyordu
+    — [[invoice-status-partial-before-overdue]] tuzağına baştan düşmüyordu, artık açıkça yorumlu.
+  Her iki parça da RBAC 127/127, tsc 0, pnpm verify yeşil.
+  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees CRUD/upload, cost-approvals,
+  aging/DSO, financing-effect, operating-cost-pool, fx-adjustments — hâlâ route içinde, çoğu zaten
+  ince CRUD ama `/aging` genişçe hesap içeriyor) + contractWorkflow.ts (515 satır, 12 endpoint) +
+  projects.ts (509 satır, 20+ endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/
+  cost-analysis/approval akışları). Her biri ayrı commit, curl before/after zorunlu.
 
 ## Temiz session'da ilk adımlar
 
