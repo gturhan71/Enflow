@@ -4,6 +4,7 @@
   "version": "2.1.0",
   "type": "module",
   "scripts": {
+    "prepare": "sh scripts/install-git-hooks.sh",
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
