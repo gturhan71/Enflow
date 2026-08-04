@@ -32,3 +32,6 @@ backend/*.db-wal
 
 # Installer portatif Node indirme dizini (otomatik kurulum)
 install/.tools/
+
+# SigMap yerel önbellek/kullanım telemetrisi (context regen hook'u üretir — makineye özel)
+.context/
