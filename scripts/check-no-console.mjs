@@ -9,7 +9,7 @@ import { join, relative } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname;
 
 // Sanctioned console wrapper'lar / operatör-yüzlü CLI script'leri — guard kapsamı dışı.
-const EXCLUDE_FILES = new Set([join(ROOT, 'src/utils/logger.ts')]);
+const EXCLUDE_FILES = new Set([join(ROOT, 'src/utils/logger.ts'), join(ROOT, 'backend/src/utils/logger.ts')]);
 const EXCLUDE_DIRS = [join(ROOT, 'backend/src/scripts')]; // CLI araçları: stdout'a rapor basmak amaçlı, prod istek/yanıt akışı değil
 
 function walk(dir) {
@@ -33,25 +33,10 @@ function countConsole(file) {
   return matches ? matches.length : 0;
 }
 
-// Faz 0 kurulumu sırasında (2026-08) yakalanan mevcut borç — bu sayıların ÜZERİNE çıkılamaz.
-const BASELINE = {
-  'src/layout/Header.tsx': 1,
-  'src/components/ErrorBoundary.tsx': 1,
-  'src/modules/ArchiveModule.tsx': 1,
-  'src/modules/SpecAnalysis.tsx': 2,
-  'src/modules/CRMModule.tsx': 1,
-  'src/services/whatsappService.ts': 1,
-  'backend/src/middleware.ts': 1,
-  'backend/src/index.ts': 3,
-  'backend/src/routes/tenders.ts': 1,
-  'backend/src/routes/projects.ts': 1,
-  'backend/src/routes/bomQuotes.ts': 1,
-  'backend/src/routes/logs.ts': 1,
-  'backend/src/routes/documents.ts': 1,
-  'backend/src/routes/contractWorkflow.ts': 1,
-  'backend/src/routes/legal.ts': 1,
-  'backend/src/routes/finance.ts': 1,
-};
+// Faz 1b'de (2026-08) tüm mevcut borç logger'a taşındı — baseline sıfırlandı.
+// Bundan sonra src/utils/logger.ts ve backend/src/utils/logger.ts DIŞINDA
+// (+ backend/src/scripts/ CLI araçları hariç) HİÇBİR console.* eklenemez.
+const BASELINE = {};
 
 const offenders = [];
 let cleanedUp = 0;

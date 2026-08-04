@@ -27,7 +27,7 @@ class WhatsAppService {
 
   async sendMessage(to: string, text: string): Promise<boolean> {
     if (!this.config.isEnabled) {
-      console.warn('WhatsApp service is not enabled.');
+      logger.warn('WhatsApp service is not enabled.');
       return false;
     }
     logger.debug(`[WhatsApp] Sending message to ${to}: ${text}`);

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { logger } from '../utils/logger';
 import { analyzeSpec } from '../services/specAnalysis';
 import { documentUpload } from '../utils/secureUpload';
 import path from 'path';
@@ -385,7 +386,7 @@ router.post(
         ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
         fileUrl = ncUrl;
       } catch (e) {
-        console.warn('[Nextcloud] Upload failed, using local:', (e as Error).message);
+        logger.warn('[Nextcloud] Upload failed, using local:', (e as Error).message);
         fileUrl = localUrl;
       }
     }

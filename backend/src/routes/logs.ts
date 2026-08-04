@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { logger } from '../utils/logger';
 import fs from 'fs';
 import path from 'path';
 import { asyncHandler, tenantMiddleware } from '../middleware';
@@ -12,7 +13,7 @@ router.post('/', (req: Request, res: Response) => {
 
   fs.appendFile(logPath, logMessage, (err) => {
     if (err) {
-      console.error('Logging failed:', err);
+      logger.error('Logging failed:', err);
       return res.status(500).json({ error: 'Logging failed' });
     }
     res.json({ success: true });

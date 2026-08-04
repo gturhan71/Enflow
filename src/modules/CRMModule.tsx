@@ -58,6 +58,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useSearch, useForm } from '../hooks/useShared';
 import { CustomerImportWizard } from '../components/CustomerImportWizard';
 import { generateProposalPDF } from '../utils/generateProposalPDF';
+import { logger } from '../utils/logger';
 import { PROCUREMENT_METHODS } from '../lib/procurementCosts';
 
 const CRMModule = ({
@@ -1423,7 +1424,7 @@ const CRMModule = ({
           openForNegotiation: content.openForNegotiation,
         };
       } catch (e) {
-        console.error("Failed to parse proposal content", e);
+        logger.error("Failed to parse proposal content", e);
       }
     }
 

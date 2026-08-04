@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { prisma } from './prismaClient';
 import { verifyAuthToken } from './services/auth';
+import { logger } from './utils/logger';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
@@ -100,7 +101,7 @@ export const withRetry = async <T>(fn: () => Promise<T>, retries = 3, delay = 50
     const e = error as { code?: string; message?: string };
     if (e.code === 'P2028' || e.code === 'P2034' || e.message?.includes('database is locked')) {
       if (retries > 0) {
-        console.warn(`[DB Lock] Retrying operation... ${retries} attempts left.`);
+        logger.warn(`[DB Lock] Retrying operation... ${retries} attempts left.`);
         await new Promise(resolve => setTimeout(resolve, delay));
         return withRetry(fn, retries - 1, delay * 2);
       }

@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
 import { documentUpload } from '../utils/secureUpload';
@@ -134,7 +135,7 @@ router.post('/:qid/upload', quoteUpload.single('file'), asyncHandler(async (req:
       ncUrl = await uploadToNextcloud(req.file.buffer, safeName, `/ENFLOW_DMS/BoM_Teklifleri/${folder}`, NC_URL, NC_USER, NC_PASS);
       fileUrl = ncUrl;
     } catch (e) {
-      console.warn('[Nextcloud] BoM quote upload failed, using local:', (e as Error).message);
+      logger.warn('[Nextcloud] BoM quote upload failed, using local:', (e as Error).message);
       fileUrl = localUrl;
     }
   }

@@ -18,6 +18,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'motion/react';
 import { Notification } from '../types';
 import { apiService } from '../services/apiService';
+import { logger } from '../utils/logger';
 
 const Header = ({ 
   title,
@@ -84,7 +85,7 @@ const Header = ({
         })
       });
     } catch (err) {
-      console.error('Logging access failed:', err);
+      logger.error('Logging access failed:', err);
     }
   };
 

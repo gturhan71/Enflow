@@ -22,6 +22,7 @@ import autoTable from 'jspdf-autotable';
 import * as pdfjs from 'pdfjs-dist';
 import { apiService } from '../services/apiService';
 import { useAIGate } from '../contexts/AIGateContext';
+import { logger } from '../utils/logger';
 import { AnalysisResult } from '../types';
 
 // Configure PDF.js worker using a reliable CDN with modern mjs support
@@ -181,7 +182,7 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
           fontLoaded = true;
         }
       } catch (err) {
-        console.warn('Custom font load failed, falling back to Helvetica', err);
+        logger.warn('Custom font load failed, falling back to Helvetica', err);
       }
       
       const font = fontLoaded ? 'Roboto' : 'helvetica';
@@ -253,7 +254,7 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
 
       doc.save(`Analiz_Raporu_${opportunityId}.pdf`);
     } catch (err) {
-      console.error('PDF export failed:', err);
+      logger.error('PDF export failed:', err);
       alert('PDF oluşturulurken bir hata oluştu: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setIsExporting(false);

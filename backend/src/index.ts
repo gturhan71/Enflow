@@ -54,6 +54,7 @@ const port = 3002;
 
 import path from 'path';
 import fs from 'fs';
+import { logger } from './utils/logger';
 
 // Güvenlik başlıkları (clickjacking, MIME-sniff, referrer sızıntısı vb.).
 // SPA'yı bozmamak için CSP ve COEP kapalı (API + inline dist için).
@@ -165,11 +166,11 @@ if (fs.existsSync(distDir)) {
     if (req.path.startsWith('/api') || req.path.startsWith('/uploads') || req.path.startsWith('/wiki')) return next();
     res.sendFile(path.join(distDir, 'index.html'));
   });
-  console.log('[Enflow Backend] Üretim: dist tek-origin sunuluyor (SPA fallback aktif).');
+  logger.info('[Enflow Backend] Üretim: dist tek-origin sunuluyor (SPA fallback aktif).');
 }
 
 app.use((err: { status?: number; message?: string; stack?: string }, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[API Error Detail]', err);
+  logger.error('[API Error Detail]', err);
   res.status(err.status || 500).json({
     error: err.message || 'Dahili Sunucu Hatası',
     details: process.env.NODE_ENV === 'development' ? err.stack : undefined
@@ -177,7 +178,7 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 });
 
 app.listen(port, () => {
-  console.log(`[Enflow Backend] Server is running at http://localhost:${port}`);
+  logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
   startBackupScheduler();
   startUpdateNotifier();
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı

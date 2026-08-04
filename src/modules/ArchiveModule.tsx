@@ -18,6 +18,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { ArchiveItem } from '../types';
 import { apiService } from '../services/apiService';
+import { logger } from '../utils/logger';
 import { PermissionGate } from '../components/PermissionGate';
 
 const ArchiveModule = () => {
@@ -41,7 +42,7 @@ const ArchiveModule = () => {
       const data = await apiService.getArchiveItems();
       setItems(data);
     } catch (err) {
-      console.error('Arşiv yüklenemedi');
+      logger.error('Arşiv yüklenemedi');
     } finally {
       setLoading(false);
     }
