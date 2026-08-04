@@ -134,16 +134,12 @@ const Header = ({
       case 'crm-proposals': return 'Teklif Yönetimi';
       case 'presales': return 'AI Presales & Teknik Analiz';
       case 'sales-support': return 'Satış Destek Operasyonları';
-      case 'crm-cost':
-      case 'presales-cost':
-      case 'cost-analysis': return 'Maliyetlendirme & Marj';
+      case 'crm-cost': return 'Maliyetlendirme & Marj';
       case 'documents': return 'Kurumsal Belge Yönetimi';
-      case 'contract': return 'Sözleşme Yönetim Modülü';
       case 'archive': return 'Fiziksel Arşiv Sistemi';
       case 'procurement': return 'Satın Alma & Tedarik';
       case 'project-mgmt': return 'Proje Yönetim Paneli';
       case 'todo': return 'İşlerim & Görev Havuzu';
-      case 'subscription': return 'Lisans & Abonelik Yönetimi';
       default: return 'Enflow ERP';
     }
   };

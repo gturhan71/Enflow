@@ -16,7 +16,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     include: { customer: true, assignedTo: true, createdBy: true, bomItems: true, costItems: true }
   });
   // costConfig JSON string'ini parse ederek nesne olarak gönder
-  const parsed = opps.map((o: any) => ({
+  const parsed = opps.map((o) => ({
     ...o,
     costConfig: o.costConfig ? (() => { try { return JSON.parse(o.costConfig); } catch { return undefined; } })() : undefined,
     agentTriage: o.agentTriage ? (() => { try { return JSON.parse(o.agentTriage); } catch { return null; } })() : null,

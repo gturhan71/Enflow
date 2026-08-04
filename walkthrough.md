@@ -1387,7 +1387,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 
 | Katman | Bileşenler (model → modül → API) |
 |---|---|
-| **0 · Platform/SaaS** | Tenant, Subscription, UsageMetric → SubscriptionModule / LicenseTypes / LicenseGenerator / ProvisionWizard → `/tenants` |
+| **0 · Platform/SaaS** | Tenant, Subscription, UsageMetric → SettingsModule (Abonelik alt-sekmesi) / LicenseTypes / LicenseGenerator / ProvisionWizard → `/tenants` |
 | **1 · Kimlik & Yetki (RBAC)** | User, Unit → UserManagement / UnitManagement / PermissionSettings → `/auth`, `/users`, `/units` |
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Contact/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter/FxAdjustment · LegalCase · ServiceTicket → ilgili modüller (+ Garanti & Servis) → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal`,`/service-tickets` |

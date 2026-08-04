@@ -47,7 +47,6 @@ import CostAnalysisModule from './modules/CostAnalysisModule';
 import BackupModule from './modules/BackupModule';
 import HelpModule from './modules/HelpModule';
 import ArchiveModule from './modules/ArchiveModule';
-import SubscriptionModule from './modules/SubscriptionModule';
 import ContractWorkflowModule from './modules/ContractWorkflowModule';
 import SecurityTestModule from './modules/SecurityTestModule';
 import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
@@ -217,8 +216,8 @@ const TenantAppInner = ({
   const isTodoActive = activeTab === 'todo';
   const isDocsActive = activeTab === 'documents';
   const isContractsActive = activeTab === 'contracts';
-  const isCostActive = activeTab === 'cost-analysis' || activeTab === 'crm-cost';
-  const isContractWorkflowActive = activeTab === 'contract-workflow' || activeTab === 'contract-workflow-test';
+  const isCostActive = activeTab === 'crm-cost';
+  const isContractWorkflowActive = activeTab === 'contract-workflow';
 
   const { data: opportunitiesData, isLoading: opportunitiesLoading } = useOpportunities(tenantId, {
     enabled: isCrmActive || isDashboardActive || isPresalesActive || isContractsActive || isTodoActive || isCostActive || isContractWorkflowActive || isVisitPlanActive
@@ -338,15 +337,12 @@ const TenantAppInner = ({
       case 'presales-bom':
         return <PresalesModule opportunities={opportunities} setOpportunities={setOpportunities} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} setTasks={setTasks} initialOppId={navItemId} />;
       case 'crm-cost':
-      case 'presales-cost': // geriye dönük uyumluluk (eski Presales konumu)
-      case 'cost-analysis': // geriye dönük uyumluluk
         return <CostAnalysisModule opportunities={opportunities} setOpportunities={setOpportunities} setActiveTab={setActiveTab} tenantId={tenantId} initialItemId={navItemId} />;
 
       case 'sales-support': return <SalesSupport opportunities={opportunities} />;
 
       // Sözleşme — yeni ContractWorkflow ana modül
       case 'contract-workflow':
-      case 'contract-workflow-test': // geriye dönük uyumluluk (legacy alias)
       case 'contracts':              // eski mock-tabanlı ContractModule kaldırıldı → gerçek modüle yönlendir
         return <ContractWorkflowModule opportunities={opportunities} proposals={proposals} initialItemId={navItemId} />;
 
@@ -366,9 +362,6 @@ const TenantAppInner = ({
       case 'virtual-agents-test': return <VirtualAgentsTestModule />;
       case 'activity-log': return <ActivityLogModule />;
       case 'help': return <HelpModule contextModuleId={navItemId} />;
-
-      // Abonelik ve Lisans artık settings altında — doğrudan URL'ler için geriye dönük uyumluluk
-      case 'subscription': return <SubscriptionModule />;
 
       default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} onNavigate={setActiveTab} />;
     }

@@ -96,6 +96,17 @@ type Sev = 'ERROR' | 'WARN' | 'INFO';
 const findings: { sev: Sev; cat: string; msg: string }[] = [];
 const add = (sev: Sev, cat: string, msg: string) => findings.push({ sev, cat, msg });
 
+type RouteGate = { domain: string; roles: string[] };
+type PluginAgent = { key: string; role: string; unitKey: string; allowedModes: string[] };
+interface AuditContext {
+  labels: Set<string>;
+  navPerms: string[];
+  gates: RouteGate[];
+  approvals: Record<string, string[]>;
+  agents: PluginAgent[];
+  dbRoles: Set<string>;
+}
+
 async function main() {
   const roleArg = process.argv.find((a) => a.startsWith('--role='))?.split('=')[1];
   const labels = new Set(extractRoleLabels());
@@ -179,20 +190,20 @@ async function main() {
   await prisma.$disconnect();
 }
 
-function showRole(role: string, ctx: any) {
+function showRole(role: string, ctx: AuditContext) {
   const spec = ROLE_MATRIX.find((s) => s.role === role);
   console.log(`\n════════ VAR OLANI GÖSTER: ${role} ════════`);
   console.log(`ROLE_LABELS'ta: ${ctx.labels.has(role) ? 'EVET' : 'HAYIR (!)'}`);
   console.log(`DB'de kullanıcı: ${ctx.dbRoles.has(role) ? 'VAR' : 'YOK'}`);
   console.log(`\n── Backend endpoint kapıları (requireRole içeren) ──`);
-  const g = ctx.gates.filter((x: any) => x.roles.includes(role));
-  console.log(g.length ? g.map((x: any) => `  • ${x.domain}.ts [${x.roles.join(', ')}]`).join('\n') : '  (hiçbir requireRole bu rolü içermiyor)');
+  const g = ctx.gates.filter((x) => x.roles.includes(role));
+  console.log(g.length ? g.map((x) => `  • ${x.domain}.ts [${x.roles.join(', ')}]`).join('\n') : '  (hiçbir requireRole bu rolü içermiyor)');
   console.log(`\n── Onay zincirleri (= yönetici karar mekanizması) ──`);
-  const inAppr = Object.entries(ctx.approvals).filter(([, roles]: any) => roles.includes(role));
-  console.log(inAppr.length ? inAppr.map(([et, roles]: any) => `  • ${et}: [${roles.join(' → ')}]`).join('\n') : '  (hiçbir onay zincirinde yok)');
+  const inAppr = Object.entries(ctx.approvals).filter(([, roles]) => roles.includes(role));
+  console.log(inAppr.length ? inAppr.map(([et, roles]) => `  • ${et}: [${roles.join(' → ')}]`).join('\n') : '  (hiçbir onay zincirinde yok)');
   console.log(`\n── Agent ikamesi ──`);
-  const ag = ctx.agents.filter((a: any) => a.role === role);
-  console.log(ag.length ? ag.map((a: any) => `  • ${a.key} (unit ${a.unitKey}, modes ${a.allowedModes.join('/')})`).join('\n') : '  (bu rolü dolduran agent yok)');
+  const ag = ctx.agents.filter((a) => a.role === role);
+  console.log(ag.length ? ag.map((a) => `  • ${a.key} (unit ${a.unitKey}, modes ${a.allowedModes.join('/')})`).join('\n') : '  (bu rolü dolduran agent yok)');
   console.log(`\n── MATRİS (tanımlı) ──`);
   if (!spec) { console.log('  ⚠️ matriste YOK'); return; }
   console.log(`  unit=${spec.unit} kind=${spec.kind} staffing=${spec.staffing}`);
@@ -206,7 +217,7 @@ function showRole(role: string, ctx: any) {
   console.log('\n→ Sıradaki: eksikse matrise ekle, uyumsuzsa kaynağı düzelt.\n');
 }
 
-function printReport(_ctx: any) {
+function printReport(_ctx: AuditContext) {
   const order: Sev[] = ['ERROR', 'WARN', 'INFO'];
   console.log('\n════════════ ENFLOW ROL/BİRİM UYGUNLUK DENETİMİ ════════════\n');
   for (const sev of order) {
