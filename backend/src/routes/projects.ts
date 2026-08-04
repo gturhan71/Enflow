@@ -9,6 +9,7 @@ import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
 import { computeProjectOverhead, applyProjectOverhead } from '../services/overheadService';
 import { computeProjectProgress } from '../services/projectProgress';
+import { summarizeProject } from '../services/projectSummary';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
@@ -49,26 +50,7 @@ router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
     orderBy: { createdAt: 'desc' },
   });
 
-  const summary = projects.map(p => {
-    const totalPlanned = p.projectCostItems.reduce((s, c) => s + c.plannedAmount, 0);
-    const totalActual  = p.projectCostItems.reduce((s, c) => s + c.amountTRY, 0);
-    const plannedMargin = p.totalValue > 0 ? ((p.totalValue - totalPlanned) / p.totalValue) * 100 : 0;
-    const actualMargin  = p.totalValue > 0 ? ((p.totalValue - totalActual)  / p.totalValue) * 100 : 0;
-    const delayedMs = p.milestones.filter(m =>
-      m.status !== 'COMPLETED' && m.status !== 'CANCELLED' &&
-      m.plannedEnd && new Date(m.plannedEnd) < new Date()
-    ).length;
-    return {
-      id: p.id, name: p.name, type: p.type, status: p.status, phase: p.phase,
-      customerName: p.customerName, pmName: p.pmName,
-      totalValue: p.totalValue, contractCurrency: p.contractCurrency,
-      totalPlanned, totalActual, plannedMargin, actualMargin,
-      progress: p.progress, delayedMs,
-      plannedEndDate: p.plannedEndDate,
-      milestoneCount: p.milestones.length,
-      completedMs: p.milestones.filter(m => m.status === 'COMPLETED').length,
-    };
-  });
+  const summary = projects.map((p) => summarizeProject(p));
 
   res.json(summary);
 }));
