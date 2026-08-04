@@ -5,6 +5,7 @@ import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 import { computeSalesCosting, getSalesMarginFloor, SalesBoMItemInput, SalesManualCostItemInput, SalesCostConfig } from '../services/salesCosting';
+import { buildBomEvaluationSnapshot, sumBomTotalsByCurrency } from '../services/bomHandoff';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -227,24 +228,10 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
 
     // Tedarikçi teklif değerlendirme snapshot'ı → teklif detayı/rapor + arşiv (değişmez kayıt)
     const quotes = await prisma.boMLineQuote.findMany({ where: { tenantId, opportunityId } });
-    let evalSnapshot: object | null = null;
+    const evalSnapshot = buildBomEvaluationSnapshot(quotes);
     if (quotes.length > 0) {
       const byLine = new Map<string, typeof quotes>();
       for (const q of quotes) { const arr = byLine.get(q.lineKey) || []; arr.push(q); byLine.set(q.lineKey, arr); }
-      evalSnapshot = {
-        evaluatedAt: new Date().toISOString(),
-        totalQuotes: quotes.length,
-        lines: [...byLine.entries()].map(([lineKey, qs]) => {
-          const sel = qs.find(x => x.isSelected) || null;
-          return {
-            lineKey,
-            componentName: qs[0].componentName || null,
-            quoteCount: qs.length,
-            selected: sel ? { vendorName: sel.vendorName, unitPrice: sel.unitPrice, currency: sel.currency, technicalCompliance: sel.technicalCompliance, specSummary: sel.specSummary, fileName: sel.fileName, fileUrl: sel.fileUrl } : null,
-            alternatives: qs.filter(x => !x.isSelected).map(x => ({ vendorName: x.vendorName, unitPrice: x.unitPrice, currency: x.currency, technicalCompliance: x.technicalCompliance })),
-          };
-        }),
-      };
       await prisma.opportunity.update({ where: { id: opportunityId }, data: { bomEvaluation: JSON.stringify(evalSnapshot) } }).catch(() => {});
       await prisma.archiveItem.create({
         data: {
@@ -258,11 +245,7 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
     }
 
     // Devir kaydı (fırsat-bazlı upsert): KPI + Presales yönetici liste/detay
-    const totalsByCurrency: Record<string, number> = {};
-    for (const b of result) {
-      const cur = b.currency || 'TRY';
-      totalsByCurrency[cur] = (totalsByCurrency[cur] || 0) + (b.purchaseCost || 0) * (b.quantity || 0);
-    }
+    const totalsByCurrency = sumBomTotalsByCurrency(result);
     const handoffSnapshot = {
       items: result.map(b => ({ partNumber: b.partNumber, description: b.description, quantity: b.quantity, purchaseCost: b.purchaseCost, currency: b.currency || 'TRY', vendor: b.vendor || null })),
       evaluation: evalSnapshot,
