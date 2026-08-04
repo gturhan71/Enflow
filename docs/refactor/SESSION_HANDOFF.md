@@ -111,8 +111,16 @@
     modül=Fırsat seçilince İşlevsel Görev seçici koşullu render, birim filtre butonu) — 0
     console/page error. `taskTargetTab` export'u grep ile TodoModule.tsx dışında hiç
     kullanılmadığı doğrulanıp helpers.ts'e taşındı (dışa dönük import kırılmadı).
-  **Kalan (6/7):** ProcurementModule/ManagementReportingModule/NegotiationModule/
-  ProjectManagementModule/ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
+  - **2/7 (`0431417`):** ProcurementModule.tsx (1188→247 satır ana dosya, %79 küçülme) →
+    `src/modules/procurement/` (constants.tsx — STATUS_CONFIG JSX ikon içerdiği için .ts değil
+    .tsx —, StatusBadge/VendorForm/PRDetailDrawer/PRForm — dosya zaten bunları ayrı fonksiyon
+    olarak tanımlıyordu, birebir taşındı — + yeni çıkarılan RequestsTab/VendorsTab/SummaryTab).
+    Davranış değişikliği YOK (bu dosyada TodoModule'deki gibi tekrarlı 3-adım mantık yoktu).
+    Doğrulama: tsc 0 · pnpm verify yeşil · canlı Playwright (Satın Alma render, PR kartı→drawer,
+    Teklifler sekmesi geçişi, Tedarikçiler/Özet sekmeleri, Yeni Talep modali) — 0 console/page
+    error.
+  **Kalan (5/7):** ManagementReportingModule/NegotiationModule/ProjectManagementModule/
+  ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
 
 ## Temiz session'da ilk adımlar
 
@@ -122,9 +130,9 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (1/7 tamam)** — sıradaki: ProcurementModule.tsx (1188 satır). TodoModule'de
-   oturan deseni (`src/modules/<modül>/` altında helpers + alt bileşenler, ana dosya ince
-   orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
+4. **Faz 5 DEVAM EDİYOR (2/7 tamam)** — sıradaki: ManagementReportingModule.tsx (1263 satır).
+   Oturan deseni (`src/modules/<modül>/` altında helpers/constants + alt bileşenler, ana dosya
+   ince orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
 
 ## Değişmez kurallar (refactor boyunca)
 
