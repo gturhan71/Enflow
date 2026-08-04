@@ -35,22 +35,23 @@
   taraması → 0 gerçek TODO (rakam Temmuz'dan beri zaten kapanmış). Backend 8 gerçek `: any`
   (generated/prisma hariç) → `AuditContext` tipleri + Prisma otomatik-çıkarım. tsc 0 · verify
   yeşil · RBAC 147/147 · canlı audit:roles + curl doğrulaması.
-- **Faz 4 DEVAM EDİYOR (2/N tamamlandı)** — kullanıcı kararı: "tek bir endpoint ile başla, dikkatlice
+- **Faz 4 DEVAM EDİYOR (3/N tamamlandı)** — kullanıcı kararı: "tek bir endpoint ile başla, dikkatlice
   doğrula" (65 endpoint'i tek oturumda zorlamak yerine).
-  - **1/N (`dba45fd`):** finance.ts'teki `deriveInvoiceStatus`/`recalcInvoice` (3 endpoint'te
-    kullanılan private route-içi fonksiyonlardı) → `backend/src/services/invoiceEngine.ts`, 9 unit
-    test + canlı curl (PARTIAL→PAID→ödeme sil→PARTIAL'a dönüş).
-  - **2/N (`864151f`):** finance.ts GET /summary agregasyon mantığı → `backend/src/services/
-    financeSummary.ts` (`summarizeFinance` saf + `computeFinanceSummary` I/O sarmalayıcı), 8 unit
-    test + canlı curl (kısmi-ödemeli+vadesi-geçmiş fatura → overdue toplamı doğru +700 arttı).
-    Belgelenen bulgu: bu endpoint zaten `status==='OVERDUE'`'a değil dueDate/paidAmount'a bakıyordu
-    — [[invoice-status-partial-before-overdue]] tuzağına baştan düşmüyordu, artık açıkça yorumlu.
-  Her iki parça da RBAC 127/127, tsc 0, pnpm verify yeşil.
-  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees CRUD/upload, cost-approvals,
-  aging/DSO, financing-effect, operating-cost-pool, fx-adjustments — hâlâ route içinde, çoğu zaten
-  ince CRUD ama `/aging` genişçe hesap içeriyor) + contractWorkflow.ts (515 satır, 12 endpoint) +
-  projects.ts (509 satır, 20+ endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/
-  cost-analysis/approval akışları). Her biri ayrı commit, curl before/after zorunlu.
+  - **1/N (`dba45fd`):** finance.ts'teki `deriveInvoiceStatus`/`recalcInvoice` → `invoiceEngine.ts`,
+    9 unit test + canlı curl (PARTIAL→PAID→ödeme sil→PARTIAL'a dönüş).
+  - **2/N (`864151f`):** finance.ts GET /summary agregasyonu → `financeSummary.ts`
+    (`summarizeFinance` saf + `computeFinanceSummary` I/O), 8 unit test + canlı curl. Belgelenen
+    bulgu: bu endpoint zaten `status==='OVERDUE'`'a değil dueDate/paidAmount'a bakıyordu —
+    [[invoice-status-partial-before-overdue]] tuzağına baştan düşmüyordu.
+  - **3/N (`48054d1`):** finance.ts GET /aging (vade-kovaları + DSO) → `agingReport.ts`
+    (`computeAging(invoices, now?)` saf + `computeAgingReport` I/O), 13 unit test + canlı curl
+    (45 gün vadeli 300₺ fatura → d31_60 kovası doğru +300). RBAC 110/110, hiç flake yok.
+  Üç parça da tsc 0, pnpm verify yeşil, RBAC temiz.
+  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees CRUD/upload — çoğu ince CRUD
+  ama bildirim/docNumber yan-etkileri var, cost-approvals, financing-effect, operating-cost-pool,
+  fx-adjustments) + contractWorkflow.ts (515 satır, 12 endpoint) + projects.ts (509 satır, 20+
+  endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/cost-analysis/approval akışları).
+  Her biri ayrı commit, curl before/after zorunlu.
 
 ## Temiz session'da ilk adımlar
 
