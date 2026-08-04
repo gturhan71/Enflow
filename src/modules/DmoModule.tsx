@@ -6,12 +6,12 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtCurrency as fmt } from '../lib/format';
 import type {
   DmoCatalogItem, DmoFrameworkAgreement, DmoExchangeRate, DmoOrder, DmoOrderItem,
   DmoCostParams, DmoReconciliation,
 } from '../types';
 
-const fmt = (n: number, cur = 'TRY') => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: cur, maximumFractionDigits: 0 }).format(n || 0);
 const pct = (n: number) => `%${Math.round((n || 0) * 100)}`;
 
 type TabKey = 'orders' | 'catalog' | 'agreements' | 'rates' | 'reconciliation';

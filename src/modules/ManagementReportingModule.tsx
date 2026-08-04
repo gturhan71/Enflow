@@ -11,11 +11,11 @@ import { apiService } from '../services/apiService';
 import { healthColor, healthBar, ProjectHealthCard, CustomerHealthCard } from '../components/HealthCards';
 import { useAuth } from '../contexts/AuthContext';
 import { ROLE_LABELS } from '../constants';
+import { fmtCurrency as fmtTRY } from '../lib/format';
 import type {
   ReportOverview, UnitMetrics, ReportMetric, ReportChartSeries, UnitDefinition, UnitReport, FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard, DocumentPortfolio, BusinessHealth, ProjectHealthReport, CustomerHealthReport, DmoAnalytics, UnitAbsorptionReport, ArchiveAnalytics,
 } from '../types';
 
-const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
 const pct = (n: number) => `${Math.round((n || 0) * 100)}%`;
 
 const STATUS_BADGE: Record<string, { label: string; cls: string }> = {

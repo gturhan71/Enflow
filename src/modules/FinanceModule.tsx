@@ -8,6 +8,7 @@ import * as XLSX from 'xlsx';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { Invoice, Payment, GuaranteeLetter, FinanceSummary, Opportunity, BoMItem, CostItem, AgingReport } from '../types';
+import { fmtCurrency as fmt } from '../lib/format';
 
 interface FinancingByCurrency { cost: number; benefit: number; net: number }
 interface FinancingResult { closingDate: string; interestRates: Record<string, number>; byCurrency: Record<string, FinancingByCurrency>; cashFlowGap: { currency: string; maxDeficit: number }[] }
@@ -33,9 +34,6 @@ const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
   { key: 'overhead', label: 'İşletme Maliyeti', icon: <Building2 size={16} /> },
   { key: 'summary', label: 'Özet', icon: <BarChart3 size={16} /> },
 ];
-
-const fmt = (n: number, c = 'TRY') =>
-  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
 
 const fmtDate = (d?: string | null) => d ? new Date(d).toLocaleDateString('tr-TR') : '—';
 

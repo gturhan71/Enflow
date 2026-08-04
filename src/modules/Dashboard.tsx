@@ -33,6 +33,7 @@ interface KPI {
 }
 
 import { cn } from '../lib/utils';
+import { fmtCurrency as cfmt } from '../lib/format';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 
@@ -94,8 +95,7 @@ const ROLE_DASHBOARD: Record<string, WK[]> = {
 };
 const DEFAULT_WIDGETS: WK[] = ['myTasks', 'myOpportunities'];
 
-const cfmt = (n: number, c = 'TRY') => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
-const byCurStr = (m: Record<string, number>) => Object.entries(m || {}).filter(([, v]) => v).map(([c, v]) => cfmt(v, c)).join(' · ') || '—';
+const byCurStr =(m: Record<string, number>) => Object.entries(m || {}).filter(([, v]) => v).map(([c, v]) => cfmt(v, c)).join(' · ') || '—';
 const dleftBadge = (d: number | null) => {
   if (d == null) return { t: '—', c: 'text-slate-400' };
   if (d < 0) return { t: 'süre doldu', c: 'text-red-600' };

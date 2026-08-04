@@ -11,6 +11,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { ProjectHealthCard } from '../components/HealthCards';
+import { fmtCurrencyExact as fmt } from '../lib/format';
 import {
   Project, ProjectMilestone, ProjectCostItem,
   ProjectType, ProjectStatus, MilestoneStatus, CostCategory,
@@ -66,8 +67,6 @@ const COST_CAT_COLOR: Record<CostCategory, string> = {
   OTHER: 'bg-slate-100 text-slate-600',
 };
 
-const fmt = (v: number, c = 'TRY') =>
-  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, minimumFractionDigits: 0 }).format(v);
 const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const fmtShort = (d?: string | null) =>

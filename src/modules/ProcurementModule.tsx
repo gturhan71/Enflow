@@ -9,6 +9,7 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { fmtCurrencyOrDash as formatCurrency } from '../lib/format';
 import {
   Vendor, PurchaseRequest, PurchaseStatus, PurchaseUrgency,
   PurchaseItem, PurchaseQuote, DeliveryRecord, Project, Unit
@@ -44,12 +45,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const CURRENCIES = ['TRY', 'USD', 'EUR', 'GBP'];
 
-const formatCurrency = (amount: number | null | undefined, currency = 'TRY') => {
-  if (amount == null) return '—';
-  return new Intl.NumberFormat('tr-TR', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount);
-};
-
-const formatDate = (d: string | null | undefined) =>
+const formatDate =(d: string | null | undefined) =>
   d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
 // ── StatusBadge ───────────────────────────────────────────────────────────────

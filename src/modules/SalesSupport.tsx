@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useAIGate } from '../contexts/AIGateContext';
+import { fmtCurrency as fmt } from '../lib/format';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
 interface SalesSupportProps {
@@ -61,8 +62,6 @@ const STATUS_STYLES: Record<string, string> = {
 // Aktif sekmelerden çıkarılan terminal/arşiv durumları
 const ARCHIVED_STATUSES = ['SUBMITTED', 'EVALUATING', 'WON', 'LOST', 'WITHDRAWN'];
 
-const fmt = (n: number, c = 'TRY') =>
-  new Intl.NumberFormat('tr-TR', { style: 'currency', currency: c, maximumFractionDigits: 0 }).format(n || 0);
 const fmtDate = (d?: string | null) => (d ? new Date(d).toLocaleDateString('tr-TR') : '—');
 const daysUntil = (d?: string | null) => {
   if (!d) return null;

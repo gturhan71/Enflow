@@ -1,8 +1,8 @@
 import { HeartPulse } from 'lucide-react';
 import type { ProjectHealthReport, CustomerHealthReport } from '../types';
+import { fmtCurrency as fmtTRY } from '../lib/format';
 
 // Sağlık skoru kartları — Yönetim Raporları + Proje Yönetimi + CRM ortak kullanır.
-const fmtTRY = (n: number) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(n || 0);
 
 export const healthColor = (n: number) => n >= 75 ? 'text-emerald-600' : n >= 55 ? 'text-amber-600' : 'text-red-600';
 export const healthBar = (n: number) => n >= 75 ? 'bg-emerald-500' : n >= 55 ? 'bg-amber-500' : 'bg-red-500';
