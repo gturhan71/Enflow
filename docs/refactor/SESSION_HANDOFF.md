@@ -61,19 +61,26 @@
     parça (dosya zaten paylaşımlı fileUpload.ts kullanıyor, kopya yok). Belgelenen kasıtlı davranış:
     boş milestone listesi → `[].every()` vacuous-truth → completed=true/phase='Tamamlandı' (aynen
     korundu, "düzeltilmedi").
-  Yedi parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı —
+  - **8/N (`3ebaedb`):** contractWorkflow.ts POST /:id/analyze'deki otomatik başlık üretimi →
+    `contractWorkflowState.ts` `buildAutoTitle()`. **Yan bulgu (kapsam dışı, düzeltilmedi):** canlı
+    testte, POST / (create, kendi title="{tenderName}—İKN:{tenderNo}" üretiyor) ile POST /:id/analyze
+    zincirlendiğinde ve mock YZ fallback'i (zaten İKN ekli) title'ı project_name olarak yankıladığında
+    başlıkta İKN eki İKİ KEZ görünüyor — matematiksel olarak ÖNCEDEN VAR OLAN bir etkileşim olduğu
+    doğrulandı (buildAutoTitle orijinal ifadenin birebir kopyası), YENİ bir regresyon değil.
+  Sekiz parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı —
   7/N GERÇEK bir üretim projesi (SASE ALIMII) üzerinde test edilip birebir eski haline döndürüldü.
   **Yan bulgu (düzeltilmedi, kapsam dışı):** adminTest.ts RBAC cleanup endpoint'i Opportunity'yi
   silmeden önce BoMItem/BomHandoff/BoMLineQuote'u silmiyor → FK ihlali (mevcut RBAC senaryoları bu
   kombinasyonu hiç üretmediği için şimdiye kadar yakalanmamıştı).
   **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/operating-cost-
   pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts'in kalan
-  11 endpoint'i (analyze/documents/transfer/handoff-procurement — henüz bakılmadı, transfer zaten
-  projectFactory'ye delege ediyor muhtemelen ince) + projects.ts'in kalan endpoint'leri (overhead
-  zaten overheadService'e delege ediyor muhtemelen ince; handover-docs/participations henüz
-  incelenmedi) + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e
-  delege ediyor muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/
-  revert-approval henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
+  10 endpoint'i (documents CRUD/upload muhtemelen ince; transfer zaten projectFactory'ye delege
+  ediyor muhtemelen ince; handoff-procurement çoğunlukla basit alan-eşleme+orkestrasyon, düşük
+  saf-mantık değeri — muhtemelen atlanabilir) + projects.ts'in kalan endpoint'leri (overhead zaten
+  overheadService'e delege ediyor muhtemelen ince; handover-docs/participations henüz incelenmedi)
+  + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e delege ediyor
+  muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/revert-approval
+  henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
   **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
   fileUpload.ts'te zaten var ama kasıtlı dokunulmamış — bu dosyada BAŞKA fat-route parçası
   ararken bu bölgeyi "kolay kazanç" sanıp dokunma, önce o yorumu oku.
