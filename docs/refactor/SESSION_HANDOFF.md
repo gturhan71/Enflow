@@ -35,8 +35,9 @@
   taraması → 0 gerçek TODO (rakam Temmuz'dan beri zaten kapanmış). Backend 8 gerçek `: any`
   (generated/prisma hariç) → `AuditContext` tipleri + Prisma otomatik-çıkarım. tsc 0 · verify
   yeşil · RBAC 147/147 · canlı audit:roles + curl doğrulaması.
-- **Faz 4 DEVAM EDİYOR (4/N tamamlandı)** — kullanıcı kararı: "tek bir endpoint ile başla, dikkatlice
-  doğrula" (65 endpoint'i tek oturumda zorlamak yerine).
+- **Faz 4 TAMAMLANDI (9/N)** — kullanıcı kararı: önce "tek bir endpoint ile başla, dikkatlice
+  doğrula" (65 endpoint'i tek oturumda zorlamak yerine), sonra 8/N sonrası "kalan ince parçaları
+  da hiçbir şey atlamadan tara" (durup Faz 5'e geçmek yerine).
   - **1/N (`dba45fd`):** finance.ts'teki `deriveInvoiceStatus`/`recalcInvoice` → `invoiceEngine.ts`.
   - **2/N (`864151f`):** finance.ts GET /summary agregasyonu → `financeSummary.ts`. Belgelenen
     bulgu: bu endpoint zaten `status==='OVERDUE'`'a değil dueDate/paidAmount'a bakıyordu —
@@ -67,20 +68,25 @@
     zincirlendiğinde ve mock YZ fallback'i (zaten İKN ekli) title'ı project_name olarak yankıladığında
     başlıkta İKN eki İKİ KEZ görünüyor — matematiksel olarak ÖNCEDEN VAR OLAN bir etkileşim olduğu
     doğrulandı (buildAutoTitle orijinal ifadenin birebir kopyası), YENİ bir regresyon değil.
-  Sekiz parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı —
+  - **9/N (`c06c455`):** projects.ts GET /summary/all'daki inline özet `.map()`'i (totalPlanned/
+    totalActual/plannedMargin/actualMargin/delayedMs) → `projectSummary.ts` `summarizeProject()`.
+    Sıfıra-bölme guard'ı (totalValue=0 → margin=0, NaN/Infinity değil) korunup teste bağlandı.
+    Canlı curl gerçek 2 projeyle doğrulandı (SASE ALIMII: totalValue=48.2M/cost yok→margin=100;
+    2. proje: totalValue=0→margin=0).
+  Dokuz parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı —
   7/N GERÇEK bir üretim projesi (SASE ALIMII) üzerinde test edilip birebir eski haline döndürüldü.
   **Yan bulgu (düzeltilmedi, kapsam dışı):** adminTest.ts RBAC cleanup endpoint'i Opportunity'yi
   silmeden önce BoMItem/BomHandoff/BoMLineQuote'u silmiyor → FK ihlali (mevcut RBAC senaryoları bu
   kombinasyonu hiç üretmediği için şimdiye kadar yakalanmamıştı).
-  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/operating-cost-
-  pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts'in kalan
-  10 endpoint'i (documents CRUD/upload muhtemelen ince; transfer zaten projectFactory'ye delege
-  ediyor muhtemelen ince; handoff-procurement çoğunlukla basit alan-eşleme+orkestrasyon, düşük
-  saf-mantık değeri — muhtemelen atlanabilir) + projects.ts'in kalan endpoint'leri (overhead zaten
-  overheadService'e delege ediyor muhtemelen ince; handover-docs/participations henüz incelenmedi)
-  + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e delege ediyor
-  muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/revert-approval
-  henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
+  **Tarama TAMAMLANDI — kullanıcının "kalan ince parçaları atlamadan tara" talimatı yerine
+  getirildi.** finance.ts, contractWorkflow.ts, projects.ts, opportunities.ts uçtan uca satır
+  satır okundu. Geri kalan tüm endpoint'ler (finance.ts guarantees/cost-approvals/operating-
+  cost-pool/fx-adjustments; contractWorkflow.ts documents CRUD/upload/transfer/handoff-
+  procurement; projects.ts overhead/handover-docs/participations; opportunities.ts cost-analysis/
+  request-approval/submit-cost-approval/approve-cost/approve/revert-approval) **gerçekten ince** —
+  ya doğrudan DB CRUD/orkestrasyon ya da zaten var olan bir servise (projectFactory/salesCosting/
+  overheadService) delege ediyor; saf/test edilebilir hesap mantığı barındırmıyorlar. Faz 4'te
+  başka çıkarım YOK — 9 parça nihai sayı.
   **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
   fileUpload.ts'te zaten var ama kasıtlı dokunulmamış — bu dosyada BAŞKA fat-route parçası
   ararken bu bölgeyi "kolay kazanç" sanıp dokunma, önce o yorumu oku.
@@ -91,12 +97,11 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 4 (devam, YÜKSEK RİSK — dikkatli, tek endpoint/parça ilerle):** finance.ts'in kalanı →
-   contractWorkflow.ts → projects.ts → opportunities.ts sırasıyla, her parça kendi commit'i +
-   Faz 0 unit test deseni + curl before/after ile davranış korunduğu kanıtlanmalı. Kullanıcı
-   "tek endpoint ile başla" tercihini belirtmişti — aynı temponun sürdürülmesi önerilir.
-4. Sonra Faz 5 (en riskli, en son: god-component ayrıştırma — CRMModule 2030/ContractWorkflowModule
-   1677/ProjectManagementModule 1322 satır) **ayrı turlar**, modül-başı commit.
+3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
+   her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
+4. **Sıradaki: Faz 5** (en riskli, en son: god-component ayrıştırma — CRMModule 2030/
+   ContractWorkflowModule 1677/ProjectManagementModule 1322 satır) **ayrı turlar**, modül-başı
+   commit — henüz başlanmadı, kullanıcı onayı/tercihi bekleniyor (kapsam/sıra/tempo).
 
 ## Değişmez kurallar (refactor boyunca)
 
