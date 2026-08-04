@@ -140,8 +140,17 @@
     sekmesi NEGOTIATING sırasında doğru devre dışı kaldı (guard doğrulandı) → eksiltme kurulum
     formu+katılımcı tablosu+tur kontrolü render edildi — 0 console/page error. Test verisi
     adminTest.ts "RBAC Test*" ucuyla temizlendi.
-  **Kalan (3/7):** ProjectManagementModule/ContractWorkflowModule/CRMModule — aynı desenle, her
-  biri ayrı tur+commit.
+  - **5/7 (`5884115`):** ProjectManagementModule.tsx (1322→288 satır ana dosya, %78 küçülme) —
+    Procurement gibi zaten 5 iç fonksiyona bölünmüştü (OpportunityPicker/ProjectForm/CostForm/
+    OverheadPanel/ProjectDetail — 5 sekmeli detay çekmecesi) → `src/modules/project-mgmt/` 13
+    dosya (constants.tsx+helpers.ts + 5 zaten-ayrı bileşen birebir taşındı + yeni çıkarılan
+    KanbanView/ProjectListView/RiskPanel). **Davranış notu:** Risk Paneli'ndeki proje kartı
+    tıklaması Kanban/Liste'nin aksine TOGGLE değil, doğrudan `setSelectedProject(p)` — bu asimetri
+    birebir korundu (ayrı `onSelect` callback'leri: RiskPanel→direkt set, Kanban/Liste→toggle
+    sarmalayıcı). `MS_TYPE_ICON` orijinalde tanımlı ama hiç kullanılmıyordu — davranış-koruyan
+    kapsam gereği korundu. Doğrulama: tsc 0 (ilk denemede) · pnpm verify yeşil · canlı Playwright
+    (Kanban/Liste/detay çekmecesi 5 sekme/Yeni Proje akışı) — 0 console/page error.
+  **Kalan (2/7):** ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
 
 ## Temiz session'da ilk adımlar
 
@@ -151,7 +160,7 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (4/7 tamam)** — sıradaki: ProjectManagementModule.tsx (1322 satır).
+4. **Faz 5 DEVAM EDİYOR (5/7 tamam)** — sıradaki: ContractWorkflowModule.tsx (1677 satır).
    Oturan deseni (`src/modules/<modül>/` altında helpers/constants + alt bileşenler, ana dosya
    ince orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
 
