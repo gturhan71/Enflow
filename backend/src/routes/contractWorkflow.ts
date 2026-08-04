@@ -11,6 +11,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
 import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
+import { checkStatusTransition } from '../services/contractWorkflowState';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -94,26 +95,6 @@ async function uploadToNextcloud(
 
 const pid = (req: Request) => String(req.params.id);
 
-// ── Durum makinesi (B-01) ────────────────────────────────────────────────────
-const STATUS_TRANSITIONS: Record<string, string[]> = {
-  DRAFT: ['ANALYSIS_DONE', 'CANCELLED'],
-  ANALYSIS_DONE: ['PREPARATION', 'CANCELLED'],
-  PREPARATION: ['READY_TO_SIGN', 'CANCELLED'],
-  READY_TO_SIGN: ['PENDING_SIGNATURE_APPROVAL', 'CANCELLED'],
-  PENDING_SIGNATURE_APPROVAL: ['SIGNED', 'PREPARATION', 'CANCELLED'],
-  SIGNED: ['TRANSFERRED', 'TERMINATED'],
-  TRANSFERRED: [],
-  CANCELLED: [],
-  TERMINATED: [],
-};
-
-// Yalnız hassas geçişler için rol kısıtlaması; tanımsız geçişler route-seviyesi 7-rol kapısına tabi.
-const TRANSITION_ROLES: Record<string, string[]> = {
-  SIGNED: ['GENERAL_MANAGER', 'KSU_MGR'],
-  CANCELLED: ['GENERAL_MANAGER', 'KSU_MGR', 'LEGAL_MGR'],
-  TERMINATED: ['GENERAL_MANAGER', 'KSU_MGR', 'LEGAL_MGR'],
-};
-
 // ── LIST ─────────────────────────────────────────────────────────────────────
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const workflows = await prisma.contractWorkflow.findMany({
@@ -168,17 +149,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     const current = await prisma.contractWorkflow.findFirst({ where: { id: pid(req), tenantId: req.tenantId } });
     if (!current) return res.status(404).json({ error: 'Not found' });
     if (status !== current.status) {
-      const allowed = STATUS_TRANSITIONS[current.status] || [];
-      if (!allowed.includes(status)) {
-        return res.status(409).json({ error: `${current.status} → ${status} geçişine izin verilmiyor.` });
-      }
-      const rolesForTransition = TRANSITION_ROLES[status];
-      if (rolesForTransition && !rolesForTransition.includes(req.userRole || '')) {
-        return res.status(403).json({ error: 'Bu durum geçişi için yetkiniz yok.' });
-      }
-      if ((status === 'CANCELLED' || status === 'TERMINATED') && !String(cancelReason || '').trim()) {
-        return res.status(400).json({ error: 'İptal/fesih gerekçesi zorunludur.' });
-      }
+      const check = checkStatusTransition(current.status, status, req.userRole || '', cancelReason);
+      if (!check.ok) return res.status(check.code).json({ error: check.error });
     }
   }
 
