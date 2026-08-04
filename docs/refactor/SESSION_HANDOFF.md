@@ -5,7 +5,8 @@
 
 ## Durum (2026-08-04 — güncel)
 
-- Refactor planı **onaylandı** (bkz. `REFACTOR_PLAN.md`).
+- Refactor planı **onaylandı** (bkz. `REFACTOR_PLAN.md`) ve **TAMAMLANDI** — Faz 0'dan Faz 5'e
+  (god-component ayrıştırma, 7/7 modül) kadar tüm kapsam bitti. Aşağıdaki tarihçe referans içindir.
 - **Faz 0 TAMAMLANDI** (commit `fce5f23`): Vitest kuruldu (`backend/vitest.config.mts`), 54 unit test
   (financeEngine tam kapsam, dmoCosting effectiveRisturnRate+computeOrderCosting, moneyRounding.round2,
   analyticsService.median) + `scripts/check-no-console.mjs` (o zaman baseline-tolerans) + `pnpm verify`
@@ -90,7 +91,7 @@
   **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
   fileUpload.ts'te zaten var ama kasıtlı dokunulmamış — bu dosyada BAŞKA fat-route parçası
   ararken bu bölgeyi "kolay kazanç" sanıp dokunma, önce o yorumu oku.
-- **Faz 5 BAŞLADI (1/7)** — kullanıcı kararı: "sen seç, sırayla en küçükten en büyüğe ilerle".
+- **Faz 5 TAMAMLANDI (7/7)** — kullanıcı kararı: "sen seç, sırayla en küçükten en büyüğe ilerle".
   Sıra: TodoModule(1084)→ProcurementModule(1188)→ManagementReportingModule(1263)→
   NegotiationModule(1319)→ProjectManagementModule(1322)→ContractWorkflowModule(1677)→
   CRMModule(2030). **Desen (bu turda oturdu, sonraki modüllere aynen uygulanacak):** her
@@ -159,7 +160,29 @@
     dokunma" notu bu FRONTEND dosyasını etkilemiyordu, ayrı bir konu. Doğrulama: tsc 0 (ilk
     denemede) · pnpm verify yeşil · canlı Playwright GERÇEK uçtan-uca akış (yeni süreç oluştur→
     otomatik Analiz sekmesine geçiş→5 sekme tek tek+Hukuk modu) — 0 console/page error.
-  **Kalan (1/7 — SON):** CRMModule.tsx (2030 satır, en büyük god-component) — aynı desenle.
+  - **7/7 (`edef4f1`, SON):** CRMModule.tsx (2030→655 satır ana dosya, %68 küçülme) — Faz 5'in en
+    büyük parçası, hiçbir alt bileşene bölünmemişti (4 render fonksiyonu + 6 modal, hepsi tek
+    gövdede) → `src/modules/crm/` 13 dosya (constants.ts+helpers.ts + DashboardView/
+    OpportunitiesView/CustomersView/ProposalsView — en karmaşığı ProposalsView 326 satır — +
+    CustomerReportModal/LostReasonModal/NewOpportunityModal/NewCustomerModal/ContactsModal).
+    ProposalsView'daki iki büyük inline handler (onaya-gönder+PDF-oluştur) ana bileşene
+    `handleSendForApproval`/`handleGeneratePdf` olarak taşındı, mantık birebir korundu.
+    **Davranış notu:** `showOpportunitySelector` state'i ve `handleRevertApproval` fonksiyonu
+    orijinalde tanımlı ama hiç kullanılmıyordu (iki ayrı ölü kod parçası) — davranış-koruyan
+    kapsam gereği KASITLI korundu (Faz 3 kararı, Faz 5 değil) — Negotiation'daki roundCalculated
+    ve ProjectMgmt'teki MS_TYPE_ICON ile aynı ilke. Doğrulama: tsc 0 (ilk denemede, en büyük modül
+    için) · pnpm verify yeşil · canlı Playwright (Genel Bakış/Fırsatlar+Yeni Fırsat modali/
+    Müşteriler+Kişiler modali+Yeni Müşteri modali/Teklifler/Müşteri Detay Raporu — 6 müşteride
+    test edildi) — 0 console/page error.
+
+  **FAZ 5 TAMAMLANDI — 7/7 god-component ayrıştırıldı.** Toplam satır azalması (ana dosyalar):
+  TodoModule 1084→248, ProcurementModule 1188→247, ManagementReportingModule 1263→185,
+  NegotiationModule 1319→624, ProjectManagementModule 1322→288, ContractWorkflowModule 1677→622,
+  CRMModule 2030→655 — ortalama ~%70 küçülme, toplam ~86 yeni odaklı dosya. Oturan desen
+  (`src/modules/<kebab-modül>/` altında constants/helpers/types + her ana JSX bloğu kendi
+  bileşeni, ana dosya yalnız state+handler tutan ince orkestratör) tüm 7 modülde tutarlı
+  uygulandı. Her parçada bulunan pre-existing "ölü kod"/asimetrik davranış kasıtlı korundu,
+  hiçbiri sessizce "düzeltilmedi" (davranış-koruyan ilkesi).
 
 ## Temiz session'da ilk adımlar
 
@@ -167,11 +190,9 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
-   her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (6/7 tamam, SON MODÜL KALDI)** — sıradaki: CRMModule.tsx (2030 satır,
-   en büyük god-component). Oturan deseni (`src/modules/<modül>/` altında helpers/constants +
-   alt bileşenler, ana dosya ince orkestratör) aynen uygula. Bu tamamlanınca Faz 5 TAMAMEN biter.
+3. **Faz 0-5 TAMAMLANDI** — planın tamamı bitti (bkz. yukarı her fazın detayı). Yeni bir refactor
+   ihtiyacı ortaya çıkmadıkça bu klasörde ek iş beklenmiyor; kullanıcı yeni bir kapsam
+   belirlemeden kendiliğinden ek çıkarım/bölme aranmasın.
 
 ## Değişmez kurallar (refactor boyunca)
 
@@ -196,7 +217,8 @@
 
 ## Ölçülebilir çıkış kriterleri
 
-- 0 `console.*` (guard aktif) · `fmt` tek kaynak · types domain-bölünmüş · ölü alias yok ·
-  iş motorları unit-testli · en büyük FE modülleri belirgin küçülmüş (Faz 5) · RBAC+IDOR+verify yeşil.
+- 0 `console.*` (guard aktif) ✓ · `fmt` tek kaynak ✓ · types domain-bölünmüş ✓ · ölü alias yok ✓ ·
+  iş motorları unit-testli ✓ · en büyük FE modülleri belirgin küçülmüş ✓ (Faz 5 TAMAM, 7/7) ·
+  RBAC+IDOR+verify yeşil ✓ — **tüm çıkış kriterleri karşılandı.**
 
 İlgili: `REFACTOR_PLAN.md` · memory [[refactor-plan]]
