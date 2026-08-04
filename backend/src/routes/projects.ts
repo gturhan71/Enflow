@@ -8,6 +8,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
 import { computeProjectOverhead, applyProjectOverhead } from '../services/overheadService';
+import { computeProjectProgress } from '../services/projectProgress';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
@@ -218,15 +219,13 @@ router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Respo
 
   // Proje ilerlemesini güncelle
   const allMs = await prisma.projectMilestone.findMany({ where: { projectId: String(req.params.id) } });
-  const avgProgress = allMs.length ? Math.round(allMs.reduce((s, m) => s + m.progress, 0) / allMs.length) : 0;
-  const activeMs = allMs.find(m => m.status === 'IN_PROGRESS');
-  const allDone  = allMs.every(m => m.status === 'COMPLETED' || m.status === 'CANCELLED');
+  const { progress, phase, completed } = computeProjectProgress(allMs);
   await prisma.project.update({
     where: { id: String(req.params.id) },
     data: {
-      progress: avgProgress,
-      phase: activeMs?.title ?? (allDone ? 'Tamamlandı' : allMs[0]?.title ?? 'Planlama'),
-      ...(allDone ? { status: 'COMPLETED', actualEndDate: new Date() } : {}),
+      progress,
+      phase,
+      ...(completed ? { status: 'COMPLETED', actualEndDate: new Date() } : {}),
     },
   });
 
