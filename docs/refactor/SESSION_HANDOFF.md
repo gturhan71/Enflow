@@ -8,11 +8,22 @@
 - Refactor planı **onaylandı** (bkz. `REFACTOR_PLAN.md`).
 - **Faz 0 TAMAMLANDI** (commit `fce5f23`): Vitest kuruldu (`backend/vitest.config.mts`), 54 unit test
   (financeEngine tam kapsam, dmoCosting effectiveRisturnRate+computeOrderCosting, moneyRounding.round2,
-  analyticsService.median) + `scripts/check-no-console.mjs` (baseline-tolerans guard, mevcut 46(BE)+7(FE)
-  console.* borcu bloklamıyor, yalnız artışı engelliyor) + `pnpm verify` zincirine + `test:unit`'e eklendi.
-  Yan bulgu: check-tenant-scope guard'ı `serviceTickets.ts`'te savunma-derinliği eksikliği yakaladı,
-  düzeltildi (relation-filter'lı updateMany). Doğrulama: tsc 0, verify yeşil, tenant-izolasyon 46/46.
-- **Sıradaki: Faz 1** (tekrar + logger, mekanik, düşük-orta risk) — henüz başlanmadı.
+  analyticsService.median) + `scripts/check-no-console.mjs` (o zaman baseline-tolerans) + `pnpm verify`
+  zincirine + `test:unit`'e eklendi. Yan bulgu: check-tenant-scope guard'ı `serviceTickets.ts`'te
+  savunma-derinliği eksikliği yakaladı, düzeltildi (relation-filter'lı updateMany).
+- **Faz 1 TAMAMLANDI** (commit `7d81590` + `abb1c4d`):
+  - **1a — dedup:** `src/lib/format.ts` — para formatlayıcı 8 dosyada kopyaydı, kod incelemesi 3 FARKLI
+    davranış ortaya çıkardı (fmtCurrency/fmtCurrencyExact/fmtCurrencyOrDash), hiçbiri "düzeltilmedi",
+    her dosya kendi orijinal davranışına aynen bağlandı. pct/date'e KASITLI dokunulmadı (pct 2 gerçek
+    paylaşımlı tanımda zaten tutarsız/ters biçimliydi — %50 vs 50%; date 25+ yerde farklı seçeneklerle
+    kullanılıyor, "8 dosya" iddiası özellikle para formatlayıcısınaydı).
+  - **1b — logger:** `backend/src/utils/logger.ts` (yeni, dev-gate YOK — sunucu logu ops-görünürlüğü
+    için her zaman basılır) + BE 10 dosya (middleware/index/8 route) + FE 6 dosya → console.* → logger.
+    `backend/src/scripts/` (CLI araçları) kasıtlı dokunulmadı. `check-no-console.mjs` BASELINE={} —
+    artık sıfır-tolerans (yeni HİÇBİR console.* eklenemez, logger/scripts hariç).
+  - Doğrulama (her iki alt-faz + kapanış): tsc FE+BE 0 · `pnpm verify` yeşil · tam RBAC (api-permissions+
+    tenant-isolation) 487/487 · Playwright (GM, gerçek login) 7 ekran, 0 console/page error.
+- **Sıradaki: Faz 2** (types.ts bölünmesi, mekanik, düşük risk) — henüz başlanmadı.
 
 ## Temiz session'da ilk adımlar
 
@@ -20,11 +31,11 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 1 (sıradaki iş):**
-   - `src/lib/format.ts` (fmt/pct/fmtDate) çıkar → 8 kopyayı buradan import ettir.
-   - 51 `console.*` → logger (FE `utils/logger` zaten var; BE için `backend/src/utils/logger.ts` ekle,
-     sonra `scripts/check-no-console.mjs`'teki BASELINE objesini sıfıra indir).
-4. Sonra sırayla Faz 2→3 (düşük-orta risk). Faz 4–5 (yüksek risk) **ayrı turlar**, modül/endpoint-başı commit.
+3. **Faz 2 (sıradaki iş):** `src/types.ts` (1213 satır) → `src/types/` domain dosyaları (crm/finance/
+   dmo/overhead/analytics/project/…) + barrel `src/types/index.ts` re-export → import yolları
+   (`from '../types'`) DEĞİŞMEZ.
+4. Sonra Faz 3 (ölü kod/legacy temizliği, orta risk). Faz 4–5 (yüksek risk) **ayrı turlar**,
+   modül/endpoint-başı commit.
 
 ## Değişmez kurallar (refactor boyunca)
 
