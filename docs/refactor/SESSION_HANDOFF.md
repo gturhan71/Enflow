@@ -28,7 +28,18 @@
   çakışma önceden doğrulandı), tek bir çağıran dosya bile düzenlenmedi (`from '../types'` barrel'a
   çözülüyor). Cross-domain import yalnız `crm.ts`'te gerekti (User + BoMItem/CostItem). tsc 0 (ilk
   denemede) · export kümesi 129/129 eşleşti · pnpm verify yeşil · Playwright 7 ekran 0 hata.
-- **Sıradaki: Faz 3** (ölü kod/legacy temizliği, orta risk) — henüz başlanmadı.
+- **Faz 3 TAMAMLANDI** (commit `ee99978`): Legacy alias temizliği (cost-analysis/presales-cost/
+  contract-workflow-test/bare-subscription kaldırıldı, hepsi FE+BE 0-referans doğrulanarak;
+  `contracts` bilinçli olarak korundu — eski veri/bookmark riski tam doğrulanamadı) + orphan
+  `SubscriptionModule.tsx` (480 satır) silindi + `walkthrough.md`/wiki güncellendi. 149 TODO
+  taraması → 0 gerçek TODO (rakam Temmuz'dan beri zaten kapanmış). Backend 8 gerçek `: any`
+  (generated/prisma hariç) → `AuditContext` tipleri + Prisma otomatik-çıkarım. tsc 0 · verify
+  yeşil · RBAC 147/147 · canlı audit:roles + curl doğrulaması.
+- **Sıradaki: Faz 4** (fat route → service çıkarımı, orta-yüksek risk) — henüz başlanmadı.
+  Hedef route'lar: finance.ts (604 satır) · contractWorkflow.ts (515) · projects.ts (508) ·
+  opportunities.ts (481). Faz 0'ın unit-test güvenlik ağı + curl before/after ile davranış
+  korunacak şekilde iş mantığı service katmanına taşınacak (mevcut `projectFactory`/
+  `overheadService` deseni).
 
 ## Temiz session'da ilk adımlar
 
@@ -36,11 +47,11 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 3 (sıradaki iş):** Kullanılmayan geriye-dönük alias'ları grep-doğrula → kaldır (ör.
-   `contract-workflow-test`, `cost-analysis` legacy yönlendirmeleri gerçekten kullanılmıyorsa).
-   149 TODO'yu tara: önemsizleri çöz, niyetli notları koru/etiketle. 9 BE `: any` daralt.
-4. Sonra Faz 4–5 (yüksek risk: fat route→service çıkarımı, god-component ayrıştırma) **ayrı turlar**,
-   modül/endpoint-başı commit.
+3. **Faz 4 (sıradaki iş, YÜKSEK RİSK — dikkatli):** finance/contractWorkflow/projects/opportunities
+   route'larındaki iş mantığını service'e taşı. Her endpoint ayrı commit; Faz 0 unit testleri +
+   curl before/after ile davranış korunduğu kanıtlanmalı.
+4. Sonra Faz 5 (en riskli, en son: god-component ayrıştırma — CRMModule 2030/ContractWorkflowModule
+   1677/ProjectManagementModule 1322 satır) **ayrı turlar**, modül-başı commit.
 
 ## Değişmez kurallar (refactor boyunca)
 
