@@ -8,6 +8,7 @@
     "start": "ts-node src/index.ts",
     "audit:roles": "ts-node --transpile-only src/scripts/auditRoles.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test:unit": "vitest run",
     "sync:roles": "ts-node --transpile-only src/scripts/syncRolePermissions.ts"
   },
   "keywords": [],
@@ -43,7 +44,8 @@
     "nodemon": "^3.1.14",
     "prisma": "^7.8.0",
     "ts-node": "^10.9.2",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

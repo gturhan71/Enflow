@@ -12,7 +12,8 @@
     "audit:roles": "cd backend && pnpm audit:roles",
     "check:no-mock": "node scripts/check-no-mock.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
-    "verify": "tsc --noEmit && (cd backend && pnpm exec tsc --noEmit) && node scripts/check-no-mock.mjs && node scripts/check-tenant-scope.mjs && vite build"
+    "check:no-console": "node scripts/check-no-console.mjs",
+    "verify": "tsc --noEmit && (cd backend && pnpm exec tsc --noEmit) && node scripts/check-no-mock.mjs && node scripts/check-tenant-scope.mjs && node scripts/check-no-console.mjs && (cd backend && pnpm test:unit) && vite build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

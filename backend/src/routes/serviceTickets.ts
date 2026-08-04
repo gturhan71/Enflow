@@ -19,9 +19,9 @@ async function upsertServiceCostItem(tenantId: string, projectId: string, ticket
     currency,
     serviceTicketId: ticketId,
   };
-  const existing = await prisma.projectCostItem.findFirst({ where: { projectId, serviceTicketId: ticketId } });
+  const existing = await prisma.projectCostItem.findFirst({ where: { projectId, serviceTicketId: ticketId, project: { tenantId } } });
   if (existing) {
-    await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
+    await prisma.projectCostItem.updateMany({ where: { id: existing.id, project: { tenantId } }, data }).catch(() => {});
   } else {
     await prisma.projectCostItem.create({ data: { projectId, createdById: userId, ...data } }).catch(() => {});
   }

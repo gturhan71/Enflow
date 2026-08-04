@@ -240,7 +240,7 @@ export interface BidScorecard {
   note: string;
 }
 
-function median(nums: number[]): number {
+export function median(nums: number[]): number {
   if (nums.length === 0) return 0;
   const s = [...nums].sort((a, b) => a - b);
   const m = Math.floor(s.length / 2);
