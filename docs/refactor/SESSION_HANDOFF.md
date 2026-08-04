@@ -119,8 +119,15 @@
     Doğrulama: tsc 0 · pnpm verify yeşil · canlı Playwright (Satın Alma render, PR kartı→drawer,
     Teklifler sekmesi geçişi, Tedarikçiler/Özet sekmeleri, Yeni Talep modali) — 0 console/page
     error.
-  **Kalan (5/7):** ManagementReportingModule/NegotiationModule/ProjectManagementModule/
-  ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
+  - **3/7 (`6ff4058`):** ManagementReportingModule.tsx (1263→185 satır ana dosya, %85 küçülme,
+    şimdiye dek en büyük Faz 5 çıkarımı) → `src/modules/reporting/` (helpers.ts — JSX-siz HTML
+    üretici print fonksiyonları .ts olarak — + 17 zaten-ayrı JSX bileşeni birebir taşındı +
+    yeni çıkarılan 4 sekme gövdesi: OverviewTab/UnitDetailTab/MyReportsTab/IncomingReportsTab).
+    23 dosya toplam. Davranış değişikliği YOK. Doğrulama: tsc 0 (ilk denemede) · pnpm verify
+    yeşil · canlı Playwright (Genel Bakış/Büyüme Analitiği 13 kart/Birim Detayı/Raporlarım+Yeni
+    Rapor modali/Gelen Raporlar) — 0 console/page error.
+  **Kalan (4/7):** NegotiationModule/ProjectManagementModule/ContractWorkflowModule/CRMModule —
+  aynı desenle, her biri ayrı tur+commit.
 
 ## Temiz session'da ilk adımlar
 
@@ -130,7 +137,7 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (2/7 tamam)** — sıradaki: ManagementReportingModule.tsx (1263 satır).
+4. **Faz 5 DEVAM EDİYOR (3/7 tamam)** — sıradaki: NegotiationModule.tsx (1319 satır).
    Oturan deseni (`src/modules/<modül>/` altında helpers/constants + alt bileşenler, ana dosya
    ince orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
 
