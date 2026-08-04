@@ -11,11 +11,12 @@ export default defineConfig(({mode}) => {
       chunkSizeWarningLimit: 600,
       rollupOptions: {
         output: {
-          // Vite 8 / Rolldown: manualChunks fonksiyonu yerine advancedChunks.groups
-          // (regex `test` tabanlı). İlk eşleşen grup kazanır — spesifik vendor'lar
-          // genel `vendor` (node_modules) catch-all'ından ÖNCE. minSize:0 → küçük
-          // shared modüller de inline edilmeyip kendi adlı chunk'ına gider.
-          advancedChunks: {
+          // Vite 8 / Rolldown: manualChunks fonksiyonu yerine codeSplitting.groups
+          // (regex `test` tabanlı; eski adı advancedChunks — Rolldown 1.x'te deprecated,
+          // aynı şekil). İlk eşleşen grup kazanır — spesifik vendor'lar genel `vendor`
+          // (node_modules) catch-all'ından ÖNCE. minSize:0 → küçük shared modüller de
+          // inline edilmeyip kendi adlı chunk'ına gider.
+          codeSplitting: {
             minSize: 0,
             groups: [
               { name: 'vendor-lucide',  test: /lucide-react/ },
@@ -31,6 +32,15 @@ export default defineConfig(({mode}) => {
               { name: 'vendor-misc',    test: /html2canvas|dompurify|date-fns|sonner/ },
               { name: 'vendor-react',   test: /react-dom|[/]react[/]|scheduler|react-is/ },
               { name: 'vendor',         test: /node_modules/ },
+              // En büyük 2 modül (CRM 2030 satır, ContractWorkflow 1677 satır) tek başına
+              // 600kB üstü chunk uyarısına neden oluyordu — statik olarak ayrı chunk'a
+              // alındı (dinamik import/lazy-loading DEĞİL — Faz 5'in god-component ayrıştırma
+              // kapsamı ayrı; bu yalnız build-çıktısı kategorilendirmesi, runtime davranışı aynı).
+              { name: 'modules-crm',    test: /[/]src[/]modules[/]CRMModule/ },
+              { name: 'modules-contract', test: /[/]src[/]modules[/]ContractWorkflowModule/ },
+              { name: 'modules-project', test: /[/]src[/]modules[/]ProjectManagementModule/ },
+              { name: 'modules-reports', test: /[/]src[/]modules[/]ManagementReportingModule/ },
+              { name: 'modules-procurement', test: /[/]src[/]modules[/]ProcurementModule/ },
               { name: 'modules',        test: /[/]src[/]modules[/]/ },
               { name: 'components',     test: /[/]src[/]components[/]/ },
             ],
