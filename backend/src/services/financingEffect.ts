@@ -68,3 +68,41 @@ export function paymentDate(referenceStart: string | undefined, termDays: number
   const base = referenceStart ? new Date(referenceStart).getTime() : Date.now();
   return new Date(base + (termDays || 0) * 86400000).toISOString();
 }
+
+export interface FinancingBomInput { partNumber: string; purchaseCost: number | null; quantity: number | null; currency: string | null; paymentTermDays: number | null }
+export interface FinancingCostInput { description: string; category: string; amount: number | null; currency: string | null; paymentTermDays: number | null }
+export interface FinancingInstallmentInput { note: string | null; dueDate: Date; amount: number | null; currency: string | null }
+
+/**
+ * BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, FINANCE kategorisi
+ * hariç — önceki otomatik finansman kalemi döngüye girmesin) + tahsilat
+ * taksitleri (giriş) → nakit-akış olay listesi. Saf; DB'den zaten çekilmiş
+ * kayıtlar üzerinde çalışır.
+ */
+export function buildFinancingEvents(
+  boms: FinancingBomInput[],
+  costs: FinancingCostInput[],
+  installments: FinancingInstallmentInput[],
+  referenceStart?: string,
+): CashEvent[] {
+  const events: CashEvent[] = [];
+  for (const b of boms) {
+    events.push({
+      kind: 'PAYMENT', label: `BoM: ${b.partNumber}`,
+      date: paymentDate(referenceStart, b.paymentTermDays),
+      amount: (b.purchaseCost || 0) * (b.quantity || 0), currency: b.currency || 'TRY',
+    });
+  }
+  for (const c of costs) {
+    if (c.category === 'FINANCE') continue; // önceki finansman kalemini hesaba katma (döngü önleme)
+    events.push({
+      kind: 'PAYMENT', label: c.description,
+      date: paymentDate(referenceStart, c.paymentTermDays),
+      amount: c.amount || 0, currency: c.currency || 'TRY',
+    });
+  }
+  for (const i of installments) {
+    events.push({ kind: 'COLLECTION', label: i.note || 'Tahsilat taksiti', date: i.dueDate.toISOString(), amount: i.amount || 0, currency: i.currency || 'TRY' });
+  }
+  return events;
+}

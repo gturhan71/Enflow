@@ -8,7 +8,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
-import { computeFinancingEffect, paymentDate, CashEvent } from '../services/financingEffect';
+import { computeFinancingEffect, buildFinancingEvents } from '../services/financingEffect';
 import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 import { recalcInvoice } from '../services/invoiceEngine';
@@ -470,14 +470,7 @@ async function buildFinancing(tenantId: string, opportunityId: string, reference
     prisma.collectionInstallment.findMany({ where: { tenantId, opportunityId } }),
   ]);
 
-  const events: CashEvent[] = [];
-  for (const b of boms) events.push({ kind: 'PAYMENT', label: `BoM: ${b.partNumber}`, date: paymentDate(referenceStart, b.paymentTermDays), amount: (b.purchaseCost || 0) * (b.quantity || 0), currency: b.currency || 'TRY' });
-  for (const c of costs) {
-    if (c.category === 'FINANCE') continue; // önceki finansman kalemini hesaba katma (döngü önleme)
-    events.push({ kind: 'PAYMENT', label: c.description, date: paymentDate(referenceStart, c.paymentTermDays), amount: c.amount || 0, currency: c.currency || 'TRY' });
-  }
-  for (const i of installments) events.push({ kind: 'COLLECTION', label: i.note || 'Tahsilat taksiti', date: i.dueDate.toISOString(), amount: i.amount || 0, currency: i.currency || 'TRY' });
-
+  const events = buildFinancingEvents(boms, costs, installments, referenceStart);
   const result = computeFinancingEffect(events, rates, referenceStart);
   return { rates, result };
 }
