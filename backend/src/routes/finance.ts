@@ -13,6 +13,7 @@ import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '.
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 import { recalcInvoice } from '../services/invoiceEngine';
 import { computeFinanceSummary } from '../services/financeSummary';
+import { computeAgingReport } from '../services/agingReport';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -390,37 +391,8 @@ router.get('/summary', tenantMiddleware, asyncHandler(async (req: Request, res: 
 // SALES faturaları vade-geçmişi kovalarına ayırır + DSO (ort. tahsil süresi) hesaplar.
 // Salt-okunur; tenant-scoped. Para birimi bazında da ayrıştırılır (karışık kur sağlıklı toplanamaz).
 router.get('/aging', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const invoices = await prisma.invoice.findMany({ where: { tenantId: req.tenantId, type: 'SALES' } });
-  const now = Date.now();
-  const DAY = 86_400_000;
-  const emptyBuckets = () => ({ notDue: 0, d0_30: 0, d31_60: 0, d61_90: 0, d90plus: 0 });
-
-  // Açık (tahsil edilmemiş) SALES alacakları — DRAFT/CANCELLED/PAID hariç
-  const open = invoices.filter(i => i.status !== 'DRAFT' && i.status !== 'CANCELLED' && i.status !== 'PAID' && (i.amount - i.paidAmount) > 0);
-
-  const buckets = emptyBuckets();
-  const byCurrency: Record<string, { totalReceivable: number; buckets: ReturnType<typeof emptyBuckets> }> = {};
-  let totalReceivable = 0;
-
-  for (const inv of open) {
-    const rem = inv.amount - inv.paidAmount;
-    const cur = inv.currency || 'TRY';
-    if (!byCurrency[cur]) byCurrency[cur] = { totalReceivable: 0, buckets: emptyBuckets() };
-    const dpd = inv.dueDate ? Math.floor((now - inv.dueDate.getTime()) / DAY) : -1; // vade yoksa "vadesi gelmemiş"
-    const key = dpd <= 0 ? 'notDue' : dpd <= 30 ? 'd0_30' : dpd <= 60 ? 'd31_60' : dpd <= 90 ? 'd61_90' : 'd90plus';
-    buckets[key] += rem; totalReceivable += rem;
-    byCurrency[cur].buckets[key] += rem; byCurrency[cur].totalReceivable += rem;
-  }
-
-  // DSO = toplam açık alacak / (son 365g tahsil-esaslı SALES tutarı) × 365
-  const yearAgo = now - 365 * DAY;
-  const salesLast365 = invoices
-    .filter(i => i.status !== 'CANCELLED' && i.status !== 'DRAFT')
-    .filter(i => (i.issueDate ?? i.createdAt).getTime() >= yearAgo)
-    .reduce((s, i) => s + i.amount, 0);
-  const dso = salesLast365 > 0 ? Math.round((totalReceivable / salesLast365) * 365) : 0;
-
-  res.json({ buckets, dso, totalReceivable, byCurrency });
+  const report = await computeAgingReport(req.tenantId);
+  res.json(report);
 }));
 
 // ── Vade & Finansman Etkisi (Faz B) ──────────────────────────────────────────
