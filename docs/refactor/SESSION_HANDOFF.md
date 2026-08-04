@@ -49,17 +49,27 @@
   - **5/N (`22fcaa8`):** opportunities.ts POST /:id/bom (116 satır, BoM Presales→Satış devri) —
     TAMAMI değil, İÇİNDEKİ 2 SAF hesap (`buildBomEvaluationSnapshot`, `sumBomTotalsByCurrency`) →
     yeni `bomHandoff.ts`. Geri kalanı (transaction+upsert+notification+archive sırası birbirine
-    bağımlı) BİLİNÇLİ OLARAK route'ta bırakıldı — tam ayrıştırma riski değere değmezdi.
-  Beş parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı.
+    bağımlı) BİLİNÇLİ OLARAK route'ta bırakıldı.
+  - **6/N (`b370e45`):** contractWorkflow.ts PUT /:id'deki durum-geçişi doğrulaması
+    (STATUS_TRANSITIONS+TRANSITION_ROLES+cancelReason zorunluluğu, sıralı 3 kontrol) →
+    `contractWorkflowState.ts` `checkStatusTransition()`. contractWorkflow.ts'e dokunulan İLK
+    parça — dosyanın üstündeki slugify/getUploadDir/uploadToNextcloud'a KASITLI dokunulmadı
+    (fileUpload.ts'in kendi yorumu bunun önceki bir session'da "regresyon riskine karşı kasıtlı
+    bırakıldığını" söylüyor — o karara saygı gösterildi).
+  Altı parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı.
   **Yan bulgu (düzeltilmedi, kapsam dışı):** adminTest.ts RBAC cleanup endpoint'i Opportunity'yi
   silmeden önce BoMItem/BomHandoff/BoMLineQuote'u silmiyor → FK ihlali (mevcut RBAC senaryoları bu
   kombinasyonu hiç üretmediği için şimdiye kadar yakalanmamıştı).
   **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/operating-cost-
-  pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts (515
-  satır, 12 endpoint — henüz hiç bakılmadı) + projects.ts (509 satır, 20+ endpoint) +
-  opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e delege ediyor
-  muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/revert-approval
-  henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
+  pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts'in kalan
+  11 endpoint'i (analyze/documents/transfer/handoff-procurement — henüz bakılmadı, transfer zaten
+  projectFactory'ye delege ediyor muhtemelen ince) + projects.ts (509 satır, 20+ endpoint, HİÇ
+  bakılmadı) + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e
+  delege ediyor muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/
+  revert-approval henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
+  **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
+  fileUpload.ts'te zaten var ama kasıtlı dokunulmamış — bu dosyada BAŞKA fat-route parçası
+  ararken bu bölgeyi "kolay kazanç" sanıp dokunma, önce o yorumu oku.
 
 ## Temiz session'da ilk adımlar
 
