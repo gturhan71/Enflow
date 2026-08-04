@@ -35,11 +35,16 @@
   taraması → 0 gerçek TODO (rakam Temmuz'dan beri zaten kapanmış). Backend 8 gerçek `: any`
   (generated/prisma hariç) → `AuditContext` tipleri + Prisma otomatik-çıkarım. tsc 0 · verify
   yeşil · RBAC 147/147 · canlı audit:roles + curl doğrulaması.
-- **Sıradaki: Faz 4** (fat route → service çıkarımı, orta-yüksek risk) — henüz başlanmadı.
-  Hedef route'lar: finance.ts (604 satır) · contractWorkflow.ts (515) · projects.ts (508) ·
-  opportunities.ts (481). Faz 0'ın unit-test güvenlik ağı + curl before/after ile davranış
-  korunacak şekilde iş mantığı service katmanına taşınacak (mevcut `projectFactory`/
-  `overheadService` deseni).
+- **Faz 4 BAŞLADI (1/N tamamlandı, commit `dba45fd`)** — kullanıcı kararı: "tek bir endpoint ile
+  başla, dikkatlice doğrula" (65 endpoint'i tek oturumda zorlamak yerine). İlk parça: finance.ts'teki
+  `deriveInvoiceStatus`/`recalcInvoice` (3 endpoint'te kullanılan private route-içi fonksiyonlardı,
+  test edilemez/yeniden kullanılamaz) → `backend/src/services/invoiceEngine.ts`, mantık birebir
+  korunarak + 9 unit test (Faz 0 deseninde) + canlı curl doğrulaması (fatura oluştur→kısmi ödeme→
+  PARTIAL→tam ödeme→PAID→ödeme sil→PARTIAL'a dönüş). RBAC 127/127.
+  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/financing-effect/
+  fx-adjustments — hâlâ route içinde) + contractWorkflow.ts (515 satır, 12 endpoint) + projects.ts
+  (509 satır, 20+ endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/cost-analysis/approval
+  akışları). Her biri ayrı commit, curl before/after zorunlu.
 
 ## Temiz session'da ilk adımlar
 
@@ -47,9 +52,10 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 4 (sıradaki iş, YÜKSEK RİSK — dikkatli):** finance/contractWorkflow/projects/opportunities
-   route'larındaki iş mantığını service'e taşı. Her endpoint ayrı commit; Faz 0 unit testleri +
-   curl before/after ile davranış korunduğu kanıtlanmalı.
+3. **Faz 4 (devam, YÜKSEK RİSK — dikkatli, tek endpoint/parça ilerle):** finance.ts'in kalanı →
+   contractWorkflow.ts → projects.ts → opportunities.ts sırasıyla, her parça kendi commit'i +
+   Faz 0 unit test deseni + curl before/after ile davranış korunduğu kanıtlanmalı. Kullanıcı
+   "tek endpoint ile başla" tercihini belirtmişti — aynı temponun sürdürülmesi önerilir.
 4. Sonra Faz 5 (en riskli, en son: god-component ayrıştırma — CRMModule 2030/ContractWorkflowModule
    1677/ProjectManagementModule 1322 satır) **ayrı turlar**, modül-başı commit.
 
