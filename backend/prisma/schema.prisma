@@ -506,8 +506,37 @@ model ActivityLog {
   userId        String
   actorType     String?     // HUMAN | AGENT — işlemi yapan aktörün tipi (köken etiketi)
   agentRunId    String?     // AGENT ise ilgili sanal agent çalıştırması
+  actorName     String?     // Yazma anında çözülen aktör adı (kullanıcı/agent) — silinen kullanıcıda bile kalır
+  entityLabel   String?     // Yazma anında çözülen varlık başlığı/adı (örn. fırsat başlığı) — silinen kayıtta bile kalır
+  summary       String?     // Türkçe tek-satır okunabilir özet (Denetim İzi ekranında birincil satır)
   tenantId      String
   timestamp     DateTime    @default(now())
+  @@index([tenantId, timestamp])
+}
+
+// Denetim izi arşivleme işi — periyodik olarak eski ActivityLog kayıtlarını
+// NDJSON dosyasına (sha256 mühürlü) dışa aktarır, hedefe yazar, doğrulanınca
+// canlı tablodan siler (bkz. activityLogArchiveService.ts). BackupJob ile
+// aynı desen (LOCAL|NEXTCLOUD|S3 hedef, checksum, MANUAL|SCHEDULED tetik).
+model ActivityLogArchive {
+  id            String    @id @default(cuid())
+  tenantId      String
+  trigger       String    @default("MANUAL")  // MANUAL | SCHEDULED
+  targetType    String    @default("LOCAL")   // LOCAL | NEXTCLOUD | S3
+  location      String?                        // dosyanın yazıldığı yol/uri
+  format        String    @default("NDJSON")
+  fromTimestamp DateTime?                       // arşivlenen en eski kayıt zamanı
+  toTimestamp   DateTime?                       // arşivlenen en yeni kayıt zamanı
+  recordCount   Int       @default(0)
+  sizeBytes     Int       @default(0)
+  checksum      String?                        // sha256 — içerik mührü
+  status        String    @default("PENDING")  // PENDING | RUNNING | COMPLETED | FAILED
+  pruned        Boolean   @default(false)       // arşivlenen kayıtlar canlı tablodan silindi mi
+  error         String?
+  startedAt     DateTime  @default(now())       // zaman mührü
+  completedAt   DateTime?
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
 }
 
 model Notification {

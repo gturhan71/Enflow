@@ -22,6 +22,7 @@ import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
 import { startBackupScheduler } from './services/backupScheduler';
+import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import projectsRouter from './routes/projects';
 import serviceTicketsRouter from './routes/serviceTickets';
@@ -180,6 +181,7 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 app.listen(port, () => {
   logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
   startBackupScheduler();
+  startActivityLogArchiveScheduler();
   startUpdateNotifier();
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
   // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.

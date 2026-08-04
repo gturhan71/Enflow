@@ -661,6 +661,14 @@ class ApiService {
     return apiClient.fetchWithAuth(`/activity-logs${qs ? `?${qs}` : ''}`);
   }
 
+  async getActivityLogArchives() {
+    return apiClient.fetchWithAuth('/activity-logs/archives');
+  }
+
+  async runActivityLogArchive(data?: { retentionDays?: number }) {
+    return apiClient.fetchWithAuth('/activity-logs/archive', { method: 'POST', body: JSON.stringify(data || {}) });
+  }
+
   // ── DMO Katalog & Kârlılık ──
   async getDmoCatalog(): Promise<import('../types').DmoCatalogItem[]> { return apiClient.fetchWithAuth('/dmo/catalog'); }
   async createDmoCatalog(d: Partial<import('../types').DmoCatalogItem>) { return apiClient.fetchWithAuth('/dmo/catalog', { method: 'POST', body: JSON.stringify(d) }); }

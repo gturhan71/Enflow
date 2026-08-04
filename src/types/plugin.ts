@@ -61,6 +61,28 @@ export interface ActivityLog {
   userId: string;
   actorType?: 'HUMAN' | 'AGENT' | null;
   agentRunId?: string | null;
+  actorName?: string | null;
+  entityLabel?: string | null;
+  summary?: string | null;
   tenantId: string;
   timestamp: string;
+}
+
+export interface ActivityLogArchive {
+  id: string;
+  tenantId: string;
+  trigger: 'MANUAL' | 'SCHEDULED';
+  targetType: 'LOCAL' | 'NEXTCLOUD' | 'S3';
+  location?: string | null;
+  format: string;
+  fromTimestamp?: string | null;
+  toTimestamp?: string | null;
+  recordCount: number;
+  sizeBytes: number;
+  checksum?: string | null;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  pruned: boolean;
+  error?: string | null;
+  startedAt: string;
+  completedAt?: string | null;
 }

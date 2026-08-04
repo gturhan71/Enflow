@@ -217,4 +217,4 @@ export async function getBackupSettings(tenantId: string): Promise<BackupModuleS
   return (ms.backup as BackupModuleSettings) || null;
 }
 
-export { BACKUPS_ROOT };
+export { BACKUPS_ROOT, sha256File, makeTarget };

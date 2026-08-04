@@ -355,6 +355,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
@@ -407,8 +408,7 @@ backend/src/services/workflowTemplateService.ts ← prismaClient
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/ErrorBoundary.tsx ← utils/logger
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
-src/modules/ArchiveModule.tsx ← types, services/apiService, utils/logger, components/PermissionGate
+src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
@@ -448,15 +448,18 @@ src/modules/reporting/ReportForm.tsx ← ../services/apiService, ../contexts/Aut
 src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format
 src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
-src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, contexts/AIGateContext, utils/logger, types
 src/modules/todo/NewTaskModal.tsx ← ../types, helpers
 src/modules/todo/PendingDeliveryNotifications.tsx ← ../types
 src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ProposalPreviewModal.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
-src/types/crm.ts ← auth, presales
+backend/src/services/activityLog.ts ← prismaClient, activityLogSummary
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
+backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
+backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/agingReport.ts ← prismaClient
+backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/financeSummary.ts ← prismaClient
 backend/src/services/invoiceEngine.ts ← prismaClient
 ```
@@ -492,7 +495,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 27 minutes ago)
 ```
 src/modules/contract-workflow/AnalysisTab.tsx +AnalysisTab
 src/modules/contract-workflow/CancelModal.tsx +CancelModal
@@ -636,6 +639,71 @@ export async function ensureDefaultWorkflow(tenantId)  :123-184  # Tenant'ın ak
 export function resolveNextStep(steps, currentStepId)  :194-198  # Skip-resolution motoru: verilen adımdan sonra görevin aktarı
 ```
 
+### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
+```
+TABLE ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
+INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
+```
+
+### backend/prisma/migrations/migration_lock.toml
+```
+key provider
+```
+
+### backend/src/services/activityLog.ts
+```
+export interface LogActivityParams  :12-21
+  tenantId: string  :13-13
+  userId?: string  :14-14
+  action: string  :15-15
+  entityType: string  :16-16
+  entityId: string  :17-17
+  details?: Record<string, unknown> | null  :18-18
+  actorType?: 'HUMAN' | 'AGENT'  :19-19
+  agentRunId?: string | null  :20-20
+export async function logActivity(p) → Promise<void>  :23-50
+```
+
+### backend/src/services/activityLogArchiveScheduler.ts
+```
+export function startActivityLogArchiveScheduler() → void  :40-45
+```
+
+### backend/src/services/activityLogArchiveService.ts
+```
+export interface ArchiveModuleSettings  :19-27
+  enabled?: boolean  :20-20
+  intervalDays?: number  :21-21
+  retentionDays?: number  :22-22
+  targetType?: TargetType  :23-23
+  location?: string  :24-24
+  nextcloud?: { url?: string  :25-25
+  s3?: { endpoint?: string  :26-26
+export interface RunArchiveOpts  :46-53
+  tenantId: string  :47-47
+  trigger?: 'MANUAL' | 'SCHEDULED'  :48-48
+  retentionDays?: number  :49-49
+  targetType?: TargetType  :50-50
+  location?: string | null  :51-51
+  settings?: ArchiveModuleSettings | null  :52-52
+export async function getArchiveSettings(tenantId) → Promise<ArchiveModuleSettings>  :38-44  # moduleSettings
+export async function runArchive(opts) → Promise<  :56-56  # Bir arşivleme işini baştan sona çalıştırır; ActivityLogArchi
+```
+
+### backend/src/services/activityLogSummary.ts
+```
+export interface SummaryInput  :156-161
+  actorName: string  :157-157
+  action: string  :158-158
+  entityType: string  :159-159
+  entityLabel: string | null  :160-160
+export async function resolveActorName(userId, actorType?) → Promise<string>  :13-24
+export async function resolveEntityLabel(tenantId, entityType, entityId) → Promise<string | null>  :72-80
+export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :164-169  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
+```
+
 ### backend/src/services/agingReport.ts
 ```
 export interface AgingBuckets  :3-3
@@ -646,6 +714,35 @@ export interface AgingReportResult  :4-9
   totalReceivable: number  :7-7
   byCurrency: Record<string, { totalReceivable: n  :8-8
 export async function computeAgingReport(tenantId) → Promise<AgingReportResult>  :58-61
+```
+
+### backend/src/services/backupService.ts
+```
+export interface ModelMeta  :27-31
+  name: string  :28-28
+  delegateKey: string  :29-29
+  hasTenantId: boolean  :30-30
+export interface BackupModuleSettings  :98-107
+  enabled?: boolean  :99-99
+  intervalHours?: number  :100-100
+  scope?: BackupScope  :101-101
+  kind?: BackupKind  :102-102
+  targetType?: TargetType  :103-103
+  location?: string  :104-104
+  nextcloud?: { url?: string  :105-105
+  s3?: { endpoint?: string  :106-106
+export interface RunBackupOpts  :109-119
+  tenantId: string  :110-110
+  scope: BackupScope  :111-111
+  kind: BackupKind  :112-112
+  targetType: TargetType  :113-113
+  location?: string | null  :114-114
+  trigger?: 'MANUAL' | 'SCHEDULED'  :115-115
+  startedById?: string  :116-116
+  startedByName?: string  :117-117
+  … +1 more members  :109-109
+export type BackupScope  :17-17
+export type BackupKind  :18-18
 ```
 
 ### backend/src/services/bomHandoff.ts
@@ -783,6 +880,16 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :186-186
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
 ```
 
 ### src/modules/contract-workflow/AnalysisTab.tsx
@@ -1324,23 +1431,16 @@ handler onAccess
 handler onClick
 ```
 
-### src/layout/Sidebar.tsx
+### src/modules/ActivityLogModule.tsx
 ```
-hook useUnsavedChanges
-hook useAuth
+component ArchivesTab
+component ActivityLogModule
 hook useState
+hook useCallback
 hook useEffect
-export Sidebar
+export ActivityLogModule
 handler onClick
-```
-
-### src/modules/ArchiveModule.tsx
-```
-hook useState
-hook useEffect
-export ArchiveModule
 handler onChange
-handler onSubmit
 ```
 
 ### src/modules/ManagementReportingModule.tsx
@@ -1671,16 +1771,6 @@ component UnitAbsorptionCard
 component UnitDetailTab
 ```
 
-### src/modules/SpecAnalysis.tsx
-```
-props SpecAnalysisProps
-hook useAIGate
-hook useState
-export SpecAnalysis
-handler onChange
-handler onClick
-```
-
 ### src/modules/todo/icons.tsx
 ```
 export ListTodo
@@ -1748,31 +1838,6 @@ export interface ConcentrationReport  :22-26
   totalRevenue: number  :25-25
 ```
 
-### src/types/auth.ts
-```
-export interface User  :1-13
-  id: string  :2-2
-  name: string  :3-3
-  email: string  :4-4
-  phone?: string  :5-5
-  role: string  :6-6
-  permissions: string[]  :7-7
-  unitId?: string  :8-8
-  status: 'ACTIVE' | 'INACTIVE'  :9-9
-  … +3 more members  :1-1
-export interface Permission  :14-19
-  id: string  :15-15
-  name: string  :16-16
-  code: string  :17-17
-  description: string  :18-18
-export interface Unit  :20-26
-  id: string  :21-21
-  name: string  :22-22
-  description?: string  :23-23
-  managerId?: string | null  :24-24
-  parentId?: string | null  :25-25
-```
-
 ### src/types/backup.ts
 ```
 export interface BackupJob  :2-24
@@ -1800,35 +1865,6 @@ export interface BackupSettings  :38-47
   intervalHours: number  :40-40
   scope: 'PLATFORM' | 'TENANT'  :41-41
   kind: 'FULL' | 'STATE' | 'DATA'  :42-42
-```
-
-### src/types/crm.ts
-```
-export interface Opportunity  :4-36
-  id: string  :5-5
-  title: string  :6-6
-  value: number  :7-7
-  probability: number  :8-8
-  expectedCloseDate?: string  :9-9
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
-  description?: string  :11-11
-  lostReason?: string  :12-12
-  … +21 more members  :4-4
-export interface Customer  :37-65
-  id: string  :38-38
-  name: string  :39-39
-  shortName?: string  :40-40
-  industry?: string  :41-41
-  website?: string  :42-42
-  logo?: string  :43-43
-  email?: string  :44-44
-  phone?: string  :45-45
-  … +19 more members  :37-37
-export interface Contact  :72-85
-  id: string  :73-73
-  tenantId?: string  :74-74
-  customerId: string  :75-75
-  name: string  :76-76
 ```
 
 ### src/types/dashboard.ts
@@ -2011,35 +2047,6 @@ export interface EntitlementWithCatalog  :30-34
   entitlement: PluginEntitlement | null  :32-32
   active: boolean  :33-33
 export interface AgentRun  :35-54
-```
-
-### src/types/presales.ts
-```
-export interface CostRequirement  :1-10
-  id: string  :2-2
-  projectId: string  :3-3
-  description: string  :4-4
-  category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' |   :5-5
-  identifiedBy: string  :6-6
-  costedBy?: string  :7-7
-  estimatedCost?: number  :8-8
-  status: 'IDENTIFIED' | 'COSTED' | 'APPROVED  :9-9
-export interface BoMItem  :11-27
-  id: string  :12-12
-  lineKey?: string  :13-13
-  opportunityId?: string  :14-14
-  projectId?: string  :15-15
-  partNumber: string  :16-16
-  description: string  :17-17
-  quantity: number  :18-18
-  purchaseCost: number  :19-19
-  … +7 more members  :11-11
-export interface BomHandoff  :30-43
-  id: string  :31-31
-  opportunityId: string  :32-32
-  oppTitle: string  :33-33
-  customerName?: string | null  :34-34
-  handedOffById?: string | null  :35-35
 ```
 
 ### src/types/procurement.ts
