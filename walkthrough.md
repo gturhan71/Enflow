@@ -29,7 +29,7 @@
 20. [Genel Hususlar & Doküman Kodlama](#20-genel-hususlar--doküman-kodlama)
 21. [Finans Modülü](#21-finans-modülü)
 22. [Hukuk Görünümü](#22-hukuk-görünümü)
-23. [İhale / İSAB Modülü](#23-ihale--isab-modülü)
+23. [İhale / İYB Modülü](#23-ihale--iyb-modülü)
 24. [Yönetim Raporları](#24-yönetim-raporları)
 25. [Onay Zinciri & Bekleyen Onaylarım](#25-onay-zinciri--bekleyen-onaylarım)
 26. [Sanal Agentlar (Eklenti)](#26-sanal-agentlar-eklenti)
@@ -83,11 +83,11 @@ Enflow, B2B teknoloji şirketleri için tasarlanmış **çok kiracılı (multi-t
 | `ADMIN` | Sistem Yöneticisi | Tüm ayarlar |
 | `LEGAL_MGR` | Hukuk Müdürü / Şirket Avukatı | Hukuk görünümü, vaka takibi |
 | `IGPD_MGR` | İş Geliştirme Müdürü | Onay zinciri aşaması |
-| `KGD_MGR` | Kalite Güvence Müdürü | Onay zinciri aşaması |
+| `KGD_MGR` | Kalite Yönetimi Yöneticisi | Onay zinciri aşaması |
 | `KSU_MGR` | Kontrat & Sözleşme Müdürü | Onay zinciri aşaması |
-| `ISAB_MGR` | İhale Birimi Müdürü | İhale/İSAB modülü |
+| `ISAB_MGR` | İhale Birimi Müdürü | İhale/İYB modülü |
 
-> **Kurumsal onay swimlane rolleri** (FINANCE_MGR, İGPD, KGD, KSU, İSAB) `ApprovalChain` onay aşamalarında kullanılır. Her birim yöneticisi "Bekleyen Onaylarım" sekmesinde kendi sırası gelmiş onayları görür (bkz. § 25). İzinler kullanıcının `permissions` JSON'undan verilir; GM tüm modülleri görür (superuser).
+> **Kurumsal onay swimlane rolleri** (FINANCE_MGR, İGB, KY, KSU, İYB) `ApprovalChain` onay aşamalarında kullanılır. Her birim yöneticisi "Bekleyen Onaylarım" sekmesinde kendi sırası gelmiş onayları görür (bkz. § 25). İzinler kullanıcının `permissions` JSON'undan verilir; GM tüm modülleri görür (superuser).
 
 ### İzin Kodları
 
@@ -1273,7 +1273,7 @@ Sidebar'da **Finans** (Proje Yönetimi'nden sonra). FINANCE_MGR operasyonel biri
 
 ---
 
-## 23. İhale / İSAB Modülü
+## 23. İhale / İYB Modülü
 
 Sidebar'da **Satış Destek** — backend destekli ihale yönetimi (ISAB_MGR). 5 sekme:
 
@@ -1306,7 +1306,7 @@ Rapor durumu: `DRAFT → SUBMITTED → REVIEWED / RETURNED`. Doküman no `ENF-RP
 
 ## 25. Onay Zinciri & Bekleyen Onaylarım
 
-Çok-aşamalı kurumsal onay (`ApprovalChain`) — örn. Fırsat/Teklif için **Finans → İGPD → GM → KSU**, Sözleşme imzası için **KSU → GM**.
+Çok-aşamalı kurumsal onay (`ApprovalChain`) — örn. Fırsat/Teklif için **Finans → İGB → GM → KSU**, Sözleşme imzası için **KSU → GM**.
 
 - **Görevler** modülünde **"Bekleyen Onaylarım"** sekmesi: rolünüz zincirin hangi aşamasındaysa ve **sırası geldiyse** (önceki tüm aşamalar onaylı) o onay burada görünür. **Onayla / Reddet**.
 - **Boş koltuk (deadlock önleme):** aktif kullanıcısı olmayan role ait aşama otomatik **atlanır (SKIPPED)**; lisanslı **otonom** bir sanal agent varsa aşamayı agent onaylar (§ 26).
@@ -1360,7 +1360,7 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
 [Teklif/Müzakere] Teklif versiyonlanır, onaya gönderilir (Onay Zinciri devreye girer),
      │            müşteriyle pazarlık turları yürütülür
      ▼
-[İhale/İSAB]      (Kamu işi ise) İhale dosyası + uygunluk checklist + geçici teminat
+[İhale/İYB]      (Kamu işi ise) İhale dosyası + uygunluk checklist + geçici teminat
      │
      ▼
 [Sözleşme]        ContractWorkflow: evrak hazırlık → imza onayı → SIGNED
@@ -1379,7 +1379,7 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
                   kur farkı (FX) mahsubu
 ```
 
-Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGPD→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller). Ayrıca ana hatla **paralel/opsiyonel bir kanal**: **DMO Kataloğu** — devlet malzeme ofisi tipi sipariş/kârlılık akışı, kendi kur+risturn+komisyon maliyetlendirme motoruyla ana CRM→Sözleşme hattından bağımsız çalışır.
+Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGB→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller). Ayrıca ana hatla **paralel/opsiyonel bir kanal**: **DMO Kataloğu** — devlet malzeme ofisi tipi sipariş/kârlılık akışı, kendi kur+risturn+komisyon maliyetlendirme motoruyla ana CRM→Sözleşme hattından bağımsız çalışır.
 
 > ⚙️ **Not (akış olgunluğu):** Birimler-arası geçiş halkaları **otomatik**tir (Faz 9): İhale WON→Sözleşme (T3) · Sözleşme SIGNED→Proje (T4) · Proje→Satınalma maliyet kalemi (T5) · Satınalma faturası→Finans (T6) · WON Fırsat→Proje (T1). Para tutarları kuruş hassasiyetinde yuvarlanır (`financeEngine`); döviz toplamları daima ayrı (sessiz tek-toplam yok).
 
@@ -1403,12 +1403,12 @@ Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:
 - **İş Akışı Şablonu (Workflow/WorkflowStep):** Tenant'ın aktif birimlerinden türeyen kanonik sıra; bir birim çıkarılınca iş otomatik bir sonraki **aktif** birime yönlenir (skip-logic, deadlock olmaz).
 - **Görevler (TodoTask):** Birimler-arası iş, görev olarak atanır. `relatedModule` etiketi işin hangi modüle ait olduğunu söyler: **OPPORTUNITY · PROPOSAL · CONTRACT · PROJECT · PROCUREMENT · DELIVERY · LEGAL · GENERAL**. İş günü SLA ile termin otomatik hesaplanır.
 - **Hand-off / Devir (`workflowService.triggerHandOff`):** Bir birim işini bitirince sonraki birime devreder → e-posta + bildirim + log üretilir.
-- **Onay Zinciri (ApprovalChain/Stage):** Çok-aşamalı onay (Finans→İGPD→GM→KSU). "Bekleyen Onaylarım" sekmesi role göre sırası gelmiş onayları gösterir; aktif kullanıcısı olmayan rol otomatik atlanır (orphan-skip).
+- **Onay Zinciri (ApprovalChain/Stage):** Çok-aşamalı onay (Finans→İGB→GM→KSU). "Bekleyen Onaylarım" sekmesi role göre sırası gelmiş onayları gösterir; aktif kullanıcısı olmayan rol otomatik atlanır (orphan-skip).
 - **Bildirim & Log (Notification / ActivityLog):** Kullanıcı bildirimleri + değişiklik/denetim izi (provenance: `AGENT:<key>` ile agent kökeni dahil).
 
 ### 27.5 Roller & birimler
 
-GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
+GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Yönetimi), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
 
 > **Görev Ayrılığı (SoD):** Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. **Onay matrisi (DoA):** tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). **Optimistic locking:** eşzamanlı onay/red yarışı 409 ile engellenir.
 
@@ -1422,7 +1422,7 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Ziyaret Planı | Haftalık ziyaret + günlük rapor; plan↔gerçekleşen mutabakatı | Satış / Saha |
 | CRM | Müşteri & fırsat, teklif, pazarlık; Maliyet Analizi (forward-kur + marj, müdür onayı) | Satış |
 | Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) → Satışa devir | Presales / Teknik |
-| Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İSAB |
+| Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İYB |
 | Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir | KSU + Yönetim |
 | Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı | Proje |
 | Satın Alma | BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura) | Satın Alma |

@@ -4,7 +4,7 @@ import { agentActorId } from './agentProvenance';
 import { resolveApproverRoles } from './governance';
 
 // Faz 0 — diyagramdaki kurumsal onay sırası:
-// Presales hazırlar → Finans değerlendirir → İGPD onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
+// Presales hazırlar → Finans değerlendirir → İGB onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
 // Presales bir onay aşaması değil (hazırlayan taraf); zincir Finans'tan başlar.
 export const APPROVAL_CHAIN_TEMPLATES: Record<string, string[]> = {
   OPPORTUNITY: ['FINANCE_MGR', 'IGPD_MGR', 'GENERAL_MANAGER', 'KSU_MGR'],
@@ -53,7 +53,7 @@ export async function ensureApprovalChain(
 /**
  * Mevcut tek-tıkla onay UI'ları (Opportunity GM onayı, ContractWorkflow imza
  * onayı) tüm zinciri tek seferde tamamlanmış olarak işaretler. Aşama bazlı
- * onay akışı (Finans → İGPD → GM → KSU) ileride Finans swimlane UI'sından
+ * onay akışı (Finans → İGB → GM → KSU) ileride Finans swimlane UI'sından
  * `/approval-chains/:id/stages/:stageId/approve` ile devreye girer.
  */
 export async function completeApprovalChain(

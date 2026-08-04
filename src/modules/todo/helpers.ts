@@ -52,7 +52,7 @@ export const taskTargetTab = (t: { actionKey?: string | null; relatedModule?: st
 // Onay zincirindeki rol kodları için görünen ad — Ayarlar'daki ROLE_LABELS ile tutarlı.
 export const CHAIN_ROLE_LABEL: Record<string, string> = {
   FINANCE_MGR: 'Finans',
-  IGPD_MGR: 'İGPD',
+  IGPD_MGR: 'İGB',
   GENERAL_MANAGER: 'Üst Yönetim',
   KSU_MGR: 'KSU',
 };

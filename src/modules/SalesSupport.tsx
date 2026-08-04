@@ -109,7 +109,7 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Gavel className="text-primary" /> Satış Destek & İhale (İSAB)
+            <Gavel className="text-primary" /> Satış Destek & İhale (İYB)
           </h2>
           <p className="text-slate-500 italic">İhale dosyaları, takvim, idari uygunluk denetimi ve geçici teminat takibi</p>
         </div>

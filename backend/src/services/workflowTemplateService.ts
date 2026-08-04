@@ -21,11 +21,11 @@ interface CanonicalStep {
 }
 
 // Sıra = Enflow uçtan-uca akışı + governance onay swimlane'i (governance/role-matrix.ts):
-//   Satış → Presales → [Finans → İGPD → Üst Yönetim onayı] → Hukuk(danışman)
-//   → İSAB/İhale(WON→Sözleşme T3) → KSU/Sözleşme imza(SIGNED→Proje T4)
-//   → Proje(→Satınalma T5) → KGD/Devir → Satın Alma(→Finans T6)
+//   Satış → Presales → [Finans → İGB → Üst Yönetim onayı] → Hukuk(danışman)
+//   → İYB/İhale(WON→Sözleşme T3) → KSU/Sözleşme imza(SIGNED→Proje T4)
+//   → Proje(→Satınalma T5) → KY/Devir → Satın Alma(→Finans T6)
 // exclude: birim adı çakışmalarını çözer (Satış≠Satış Destek, Yönetim≠Proje
-// Yönetimi, Presales≠Teknik Hizmetler, Satın Alma≠İSAB).
+// Yönetimi, Presales≠Teknik Hizmetler, Satın Alma≠İYB).
 export const DEFAULT_WORKFLOW_STEPS: CanonicalStep[] = [
   {
     match: ['satış', 'crm'],
@@ -49,11 +49,11 @@ export const DEFAULT_WORKFLOW_STEPS: CanonicalStep[] = [
     completionNote: 'Maliyet/marj onayı verilmiş olmalı',
   },
   {
-    match: ['igpd', 'iş geliştirme'],
-    description: 'İş geliştirme ve pazarlama onayı — swimlane 2 (İGPD — IGPD_MGR)',
+    match: ['igpd', 'igb', 'iş geliştirme'],
+    description: 'İş geliştirme ve pazarlama onayı — swimlane 2 (İGB — IGPD_MGR)',
     type: 'MANUAL',
     requiresCompletion: true,
-    completionNote: 'İGPD değerlendirmesi tamamlanmış olmalı',
+    completionNote: 'İGB değerlendirmesi tamamlanmış olmalı',
   },
   {
     match: ['yönetim', 'genel müdür', 'üst yönetim', 'gmü'],
@@ -70,8 +70,8 @@ export const DEFAULT_WORKFLOW_STEPS: CanonicalStep[] = [
     requiresCompletion: false,
   },
   {
-    match: ['isab', 'i̇sab', 'ihale'],
-    description: 'İhale uygunluk, teklif ve teminat (İSAB — ISAB_MGR) → WON→Sözleşme (T3)',
+    match: ['isab', 'i̇sab', 'iyb', 'i̇yb', 'ihale'],
+    description: 'İhale uygunluk, teklif ve teminat (İYB — ISAB_MGR) → WON→Sözleşme (T3)',
     type: 'MANUAL',
     requiresCompletion: true,
     completionNote: 'İhale uygunluk checklist ve teminat tamamlanmış olmalı',
@@ -90,14 +90,14 @@ export const DEFAULT_WORKFLOW_STEPS: CanonicalStep[] = [
     requiresCompletion: false,
   },
   {
-    match: ['kgd', 'kalite'],
-    description: 'Kalite güvence ve proje devri (KGD — KGD_MGR)',
+    match: ['kgd', 'ky', 'kalite'],
+    description: 'Kalite güvence ve proje devri (KY — KGD_MGR)',
     type: 'AUTO',
     requiresCompletion: false,
   },
   {
     match: ['satın alma', 'satınalma', 'satin alma'],
-    exclude: ['isab', 'i̇sab', 'ihale'],
+    exclude: ['isab', 'i̇sab', 'iyb', 'i̇yb', 'ihale'],
     description: 'Satınalma talebi, PO, teslimat ve fatura (Satın Alma — PROCUREMENT_MGR) → Finans (T6)',
     type: 'AUTO',
     requiresCompletion: false,

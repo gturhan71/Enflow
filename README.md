@@ -27,7 +27,7 @@ Farkı: süreçler birbirine **kopuk modüller** değil, **otomatik devir halkal
 ```
  Ziyaret ─▶ CRM (Fırsat) ─▶ Presales (BoM / Maliyet) ─▶ Teklif & Müzakere
      │                                                         │
-     └──────────────▶ [ İhale / İSAB ] ◀──────────────────────┘
+     └──────────────▶ [ İhale / İYB ] ◀──────────────────────┘
                               │
         Sözleşme (imza) ─▶ Proje ─▶ Satınalma ─▶ Finans (Fatura & Tahsilat)
 ```
@@ -54,8 +54,8 @@ Kısaca: **birden fazla birimin ortak bir süreçte koordine olması gereken** h
 ## ✨ Öne Çıkan Yetenekler
 
 - 🔄 **Uçtan uca otomasyon** — birimler-arası devir zinciri (İhale→Sözleşme→Proje→Satınalma→Finans) tam otomatik.
-- 🧭 **Akış motoru** — Workflow + skip-logic, birim görevleri (SLA'lı TodoTask), çok-aşamalı onay swimlane'leri (Finans→İGPD→GM→KSU).
-- 🤖 **8 sanal agent** — Tender · Project · Presales · Procurement · Finance · Legal · CRM · İGPD. Para & hukuk **yalnız danışman**.
+- 🧭 **Akış motoru** — Workflow + skip-logic, birim görevleri (SLA'lı TodoTask), çok-aşamalı onay swimlane'leri (Finans→İGB→GM→KSU).
+- 🤖 **8 sanal agent** — Tender · Project · Presales · Procurement · Finance · Legal · CRM · İGB. Para & hukuk **yalnız danışman**.
 - 📈 **Yönetim & büyüme analitiği** — birim metrikleri, huni analizi, tahmin, karlılık, müşteri/proje sağlık skorları.
 - 💰 **Gelişmiş finans** — çok para birimli, KDV, işletme maliyeti dağıtımı (overhead), DMO katalog & kârlılık motoru.
 - 🔐 **Kurumsal güvenlik** — parola (bcrypt) + imzalı JWT, tenant izolasyonu, RBAC (RBAC süiti **486/486**), denetim izi, imzalı lisans (Ed25519).

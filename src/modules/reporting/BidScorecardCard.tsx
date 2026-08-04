@@ -27,7 +27,7 @@ export default function BidScorecardCard({ s }: { s: BidScorecard }) {
                     {t.authority}{t.authorityWinPct !== null && ` · geçmiş %${Math.round(t.authorityWinPct * 100)}`}
                     {t.daysLeft !== null && ` · ${t.daysLeft}g kaldı`}
                     {` · hazırlık %${Math.round(t.readinessPct * 100)}`}
-                    {t.triageTier && ` · İGPD ${t.triageTier}`}
+                    {t.triageTier && ` · İGB ${t.triageTier}`}
                   </p>
                   <div className="flex gap-0.5 mt-1 h-1.5">
                     <div className="bg-indigo-400 rounded-sm" style={{ width: `${t.factors.authorityWinRate}%` }} title="İdare geçmişi" />

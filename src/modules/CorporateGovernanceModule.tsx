@@ -74,7 +74,7 @@ const CorporateGovernanceModule = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-black text-slate-900 tracking-tight">Genel Hususlar</h2>
-          <p className="text-slate-500 italic">Kurumsal hafıza, risk yönetimi ve KGD raporlama katmanı</p>
+          <p className="text-slate-500 italic">Kurumsal hafıza, risk yönetimi ve KY raporlama katmanı</p>
         </div>
         <button onClick={() => setShowForm(true)} className="btn-primary flex items-center gap-2">
           <Plus size={16} /> Yeni Kayıt

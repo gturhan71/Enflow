@@ -51,7 +51,7 @@ import {
   Notification
 } from './types';
 
-export const APP_VERSION = 'v1.2.0';
+export const APP_VERSION = 'v2.1.0';
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',
@@ -68,10 +68,10 @@ export const ROLE_LABELS: Record<string, string> = {
   FINANCE_MGR: 'Finans Müdürü',
   HR_MGR: 'İnsan Kaynakları Müdürü',
   AUDITOR: 'Denetçi / Auditor',
-  IGPD_MGR: 'İş Geliştirme Direktörü (İGPD)',
-  KGD_MGR: 'Kalite Güvence Direktörü (KGD)',
+  IGPD_MGR: 'İş Geliştirme Birimi Yöneticisi (İGB)',
+  KGD_MGR: 'Kalite Yönetimi Yöneticisi (KY)',
   KSU_MGR: 'Kontrat & Sözleşme Uzmanı (KSU)',
-  ISAB_MGR: 'İhale Birimi Yöneticisi (İSAB)',
+  ISAB_MGR: 'İhale Yönetim Birimi Yöneticisi (İYB)',
   LEGAL_MGR: 'Hukuk Müdürü / Şirket Avukatı',
   BACKUP_ADMIN: 'Yedek Yöneticisi'
 };
@@ -84,7 +84,7 @@ export const MOCK_TENANTS: Tenant[] = [
 
 export const NAV_ITEMS = [
   // ── İş akışı sırasına göre düzenlenmiş: Ziyaret → CRM(Fırsat) → Presales
-  // (BoM/Maliyet) → [İhale/İSAB] → Sözleşme(imza) → Proje → Satınalma →
+  // (BoM/Maliyet) → [İhale/İYB] → Sözleşme(imza) → Proje → Satınalma →
   // Garanti/Servis → Finans. Ardından paralel kanal (DMO), çalışma araçları
   // (Görevler), raporlama/yönetişim katmanı, en sonda sistem/ayarlar.
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, requiredPermission: 'DASHBOARD_VIEW' },

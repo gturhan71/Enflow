@@ -417,7 +417,7 @@ router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: 
     }
   });
 
-  // Faz 0 — kalıcı onay zinciri: Finans → İGPD → Üst Yönetim (GM) → KSU
+  // Faz 0 — kalıcı onay zinciri: Finans → İGB → Üst Yönetim (GM) → KSU
   // DoA: tenant onay matrisi tanımlıysa fırsat tutarına göre roller seçilir (opt-in).
   await ensureApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, undefined, opp.value);
 

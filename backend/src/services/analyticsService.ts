@@ -225,7 +225,7 @@ export async function computeForecast(tenantId: string): Promise<ForecastReport>
 // ── Bid / No-Bid Skorkartı · #3 ──────────────────────────────────────────────
 // Karar-öncesi ihaleleri (DRAFT|PREPARING) deterministik puanlar; şema değişmez.
 // Faktörler: idare kazanma geçmişi · son teslim tarihine kalan · checklist hazırlığı ·
-// değer uyumu (kazanılan medyana göre) + bağlı fırsatın İGPD agentTriage kademesi.
+// değer uyumu (kazanılan medyana göre) + bağlı fırsatın İGB agentTriage kademesi.
 const DECISION_STATUSES = new Set(['DRAFT', 'PREPARING']);
 export interface BidScoreLine {
   id: string; name: string; authority: string; estimatedValue: number; currency: string;
@@ -260,7 +260,7 @@ export async function computeBidScorecard(tenantId: string): Promise<BidScorecar
   }
   const medianWon = median(wonValues);
 
-  // Bağlı fırsatların İGPD triyaj kademesi
+  // Bağlı fırsatların İGB triyaj kademesi
   const oppIds = tenders.filter(t => t.opportunityId && DECISION_STATUSES.has(t.status)).map(t => t.opportunityId as string);
   const triageByOpp: Record<string, string> = {};
   if (oppIds.length) {
@@ -316,7 +316,7 @@ export async function computeBidScorecard(tenantId: string): Promise<BidScorecar
   return {
     tenders: lines,
     summary: { total: lines.length, bid, review, noBid, avgScore },
-    note: 'Deterministik skor: idare kazanma geçmişi + son teslim tarihi + evrak hazırlığı + değer uyumu (kazanılan medyan) + İGPD triyaj kademesi. Karar-öncesi (DRAFT/PREPARING) ihaleler.',
+    note: 'Deterministik skor: idare kazanma geçmişi + son teslim tarihi + evrak hazırlığı + değer uyumu (kazanılan medyan) + İGB triyaj kademesi. Karar-öncesi (DRAFT/PREPARING) ihaleler.',
   };
 }
 

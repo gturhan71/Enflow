@@ -15,7 +15,7 @@ export const UNIT_DEFINITIONS: UnitDefinition[] = [
   { key: 'PROCUREMENT', label: 'Satınalma', role: 'PROCUREMENT_MGR' },
   { key: 'FINANCE', label: 'Finans', role: 'FINANCE_MGR' },
   { key: 'LEGAL', label: 'Hukuk', role: 'LEGAL_MGR' },
-  { key: 'TENDER', label: 'İhale / İSAB', role: 'ISAB_MGR' },
+  { key: 'TENDER', label: 'İhale / İYB', role: 'ISAB_MGR' },
   { key: 'PROJECT', label: 'Proje Yönetimi', role: 'PROJECT_MGR' },
 ];
 
@@ -295,7 +295,7 @@ async function legalMetrics(tenantId: string, p: Period): Promise<{ metrics: Met
   return { metrics, charts };
 }
 
-// ── İhale / İSAB ─────────────────────────────────────────────────────────────
+// ── İhale / İYB ─────────────────────────────────────────────────────────────
 async function tenderMetrics(tenantId: string, p: Period): Promise<{ metrics: Metric[]; charts: ChartSeries[] }> {
   const now = new Date();
   const created = await prisma.tender.findMany({

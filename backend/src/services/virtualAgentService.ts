@@ -26,7 +26,7 @@ export interface AgentOutput {
 
 type AgentHandler = (tenantId: string, entityId: string) => Promise<AgentOutput | null>;
 
-// ── İhale/İSAB handler: checklist eksiksizliği + deadline riski ───────────────
+// ── İhale/İYB handler: checklist eksiksizliği + deadline riski ───────────────
 const tenderHandler: AgentHandler = async (tenantId, entityId) => {
   const tender = await prisma.tender.findFirst({
     where: { id: entityId, tenantId },
@@ -481,7 +481,7 @@ const igpdHandler: AgentHandler = async (tenantId, entityId) => {
       isOpen && recommendation !== 'NO_ACTION'
         ? {
             kind: 'WRITE_IGPD_TRIAGE',
-            summary: `İGPD triyajı yazıldı: beklenen değer ${expectedValue.toLocaleString('tr-TR')} ₺ (${recommendation})`,
+            summary: `İGB triyajı yazıldı: beklenen değer ${expectedValue.toLocaleString('tr-TR')} ₺ (${recommendation})`,
             reversible: true,
             execute: async () => {
               await mergeTriage(entityId, 'igpd', { recommendation, expectedValue, valueTier, at: new Date().toISOString() });

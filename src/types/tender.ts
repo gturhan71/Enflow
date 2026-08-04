@@ -1,4 +1,4 @@
-// Faz 6c — İhale / İSAB
+// Faz 6c — İhale / İYB
 export interface TenderChecklistItem {
   id: string;
   tenderId: string;

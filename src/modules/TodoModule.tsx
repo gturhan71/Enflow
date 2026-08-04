@@ -54,7 +54,7 @@ const TodoModule = ({
   const [pendingChainApprovals, setPendingChainApprovals] = useState<ApprovalChain[]>([]);
   const [chainActionLoading, setChainActionLoading] = useState<string | null>(null);
 
-  // Bekleyen Onaylarım — Onay Zinciri (Faz 1, Finans/İGPD/Üst Yönetim/KSU swimlane'i).
+  // Bekleyen Onaylarım — Onay Zinciri (Faz 1, Finans/İGB/Üst Yönetim/KSU swimlane'i).
   // Kullanıcının rolü zincirde hangi aşamadaysa, sırası gelmiş onaylar burada listelenir.
   const refreshPendingChainApprovals = useCallback(async () => {
     if (!currentUser?.role) return;

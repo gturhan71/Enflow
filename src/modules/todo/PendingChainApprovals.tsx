@@ -5,7 +5,7 @@ import AgentTag from '../../components/AgentTag';
 import { isAgentActor } from '../../lib/agentProvenance';
 import { CHAIN_ROLE_LABEL, CHAIN_ENTITY_LABEL } from './helpers';
 
-// Bekleyen Onaylarım — Onay Zinciri (Finans/İGPD/Üst Yönetim/KSU swimlane'i).
+// Bekleyen Onaylarım — Onay Zinciri (Finans/İGB/Üst Yönetim/KSU swimlane'i).
 // Kullanıcının rolü zincirde hangi aşamadaysa, sırası gelmiş onaylar burada listelenir.
 export default function PendingChainApprovals({
   chains,

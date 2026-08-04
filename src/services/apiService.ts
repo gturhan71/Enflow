@@ -550,7 +550,7 @@ class ApiService {
   }
   async getLegalRequests() { return apiClient.fetchWithAuth('/legal/requests'); }
 
-  // --- TENDERS: İhale / İSAB ---
+  // --- TENDERS: İhale / İYB ---
   async getTenders(params?: { status?: string; method?: string }) {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiClient.fetchWithAuth(`/tenders${qs}`);
