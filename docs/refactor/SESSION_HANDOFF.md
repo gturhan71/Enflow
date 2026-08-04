@@ -150,7 +150,16 @@
     sarmalayıcı). `MS_TYPE_ICON` orijinalde tanımlı ama hiç kullanılmıyordu — davranış-koruyan
     kapsam gereği korundu. Doğrulama: tsc 0 (ilk denemede) · pnpm verify yeşil · canlı Playwright
     (Kanban/Liste/detay çekmecesi 5 sekme/Yeni Proje akışı) — 0 console/page error.
-  **Kalan (2/7):** ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
+  - **6/7 (`fcd70ca`):** ContractWorkflowModule.tsx (1677→622 satır ana dosya, %63 küçülme) —
+    şimdiye dek en karmaşık çıkarım (LegalView/LegalCaseForm hariç hiç bölünmemişti) →
+    `src/modules/contract-workflow/` 13 dosya (types/constants/helpers + WorkflowListPanel + sol/
+    sağ 5-sekmeli detay panelinin DetailHeader'ı + ContextTab/AnalysisTab/DocumentsTab/SigningTab/
+    TransferTab yeni çıkarıldı + CancelModal + LegalView/LegalCaseForm zaten ayrıydı, birebir
+    taşındı). **Not:** backend'teki "contractWorkflow.ts üst kısmı — upload yardımcılarına
+    dokunma" notu bu FRONTEND dosyasını etkilemiyordu, ayrı bir konu. Doğrulama: tsc 0 (ilk
+    denemede) · pnpm verify yeşil · canlı Playwright GERÇEK uçtan-uca akış (yeni süreç oluştur→
+    otomatik Analiz sekmesine geçiş→5 sekme tek tek+Hukuk modu) — 0 console/page error.
+  **Kalan (1/7 — SON):** CRMModule.tsx (2030 satır, en büyük god-component) — aynı desenle.
 
 ## Temiz session'da ilk adımlar
 
@@ -160,9 +169,9 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Faz 5 DEVAM EDİYOR (5/7 tamam)** — sıradaki: ContractWorkflowModule.tsx (1677 satır).
-   Oturan deseni (`src/modules/<modül>/` altında helpers/constants + alt bileşenler, ana dosya
-   ince orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
+4. **Faz 5 DEVAM EDİYOR (6/7 tamam, SON MODÜL KALDI)** — sıradaki: CRMModule.tsx (2030 satır,
+   en büyük god-component). Oturan deseni (`src/modules/<modül>/` altında helpers/constants +
+   alt bileşenler, ana dosya ince orkestratör) aynen uygula. Bu tamamlanınca Faz 5 TAMAMEN biter.
 
 ## Değişmez kurallar (refactor boyunca)
 
