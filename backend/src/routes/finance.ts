@@ -12,6 +12,7 @@ import { computeFinancingEffect, paymentDate, CashEvent } from '../services/fina
 import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 import { recalcInvoice } from '../services/invoiceEngine';
+import { computeFinanceSummary } from '../services/financeSummary';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -381,38 +382,8 @@ router.put('/costs/:id/approve', tenantMiddleware, asyncHandler(async (req: Requ
 // ── 5) Finans Özeti ──────────────────────────────────────────────────────────
 
 router.get('/summary', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const invoices = await prisma.invoice.findMany({ where: { tenantId: req.tenantId } });
-  const guarantees = await prisma.guaranteeLetter.findMany({
-    where: { tenantId: req.tenantId, status: 'ACTIVE' },
-  });
-
-  const sales = invoices.filter(i => i.type === 'SALES');
-  const totalReceivable = sales
-    .filter(i => i.status !== 'CANCELLED' && i.status !== 'DRAFT')
-    .reduce((s, i) => s + (i.amount - i.paidAmount), 0);
-  const totalCollected = sales.reduce((s, i) => s + i.paidAmount, 0);
-  const now = Date.now();
-  const overdue = sales
-    .filter(i => i.dueDate && i.dueDate.getTime() < now && i.paidAmount < i.amount && i.status !== 'CANCELLED')
-    .reduce((s, i) => s + (i.amount - i.paidAmount), 0);
-
-  const soon = now + 30 * 24 * 60 * 60 * 1000;
-  const expiringGuarantees = guarantees.filter(g => g.expiryDate && g.expiryDate.getTime() <= soon);
-
-  const pendingCostApprovals = await prisma.projectCostItem.count({
-    where: { approvalStatus: 'PENDING', project: { tenantId: req.tenantId } },
-  });
-
-  res.json({
-    totalReceivable,
-    totalCollected,
-    overdue,
-    invoiceCount: invoices.length,
-    salesCount: sales.length,
-    activeGuarantees: guarantees.length,
-    expiringGuarantees: expiringGuarantees.length,
-    pendingCostApprovals,
-  });
+  const summary = await computeFinanceSummary(req.tenantId);
+  res.json(summary);
 }));
 
 // ── Alacak Yaşlandırma + DSO (Büyüme Analitiği Faz 1 · #9) ────────────────────
