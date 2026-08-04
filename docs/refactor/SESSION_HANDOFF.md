@@ -56,15 +56,22 @@
     parça — dosyanın üstündeki slugify/getUploadDir/uploadToNextcloud'a KASITLI dokunulmadı
     (fileUpload.ts'in kendi yorumu bunun önceki bir session'da "regresyon riskine karşı kasıtlı
     bırakıldığını" söylüyor — o karara saygı gösterildi).
-  Altı parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı.
+  - **7/N (`914b3ff`):** projects.ts PUT /:id/milestones/:msId'deki milestone→proje progress/phase
+    türetme mantığı → `projectProgress.ts` `computeProjectProgress()`. projects.ts'e dokunulan İLK
+    parça (dosya zaten paylaşımlı fileUpload.ts kullanıyor, kopya yok). Belgelenen kasıtlı davranış:
+    boş milestone listesi → `[].every()` vacuous-truth → completed=true/phase='Tamamlandı' (aynen
+    korundu, "düzeltilmedi").
+  Yedi parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı —
+  7/N GERÇEK bir üretim projesi (SASE ALIMII) üzerinde test edilip birebir eski haline döndürüldü.
   **Yan bulgu (düzeltilmedi, kapsam dışı):** adminTest.ts RBAC cleanup endpoint'i Opportunity'yi
   silmeden önce BoMItem/BomHandoff/BoMLineQuote'u silmiyor → FK ihlali (mevcut RBAC senaryoları bu
   kombinasyonu hiç üretmediği için şimdiye kadar yakalanmamıştı).
   **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/operating-cost-
   pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts'in kalan
   11 endpoint'i (analyze/documents/transfer/handoff-procurement — henüz bakılmadı, transfer zaten
-  projectFactory'ye delege ediyor muhtemelen ince) + projects.ts (509 satır, 20+ endpoint, HİÇ
-  bakılmadı) + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e
+  projectFactory'ye delege ediyor muhtemelen ince) + projects.ts'in kalan endpoint'leri (overhead
+  zaten overheadService'e delege ediyor muhtemelen ince; handover-docs/participations henüz
+  incelenmedi) + opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e
   delege ediyor muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/
   revert-approval henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
   **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
