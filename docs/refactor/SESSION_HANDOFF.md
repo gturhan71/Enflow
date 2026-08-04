@@ -3,11 +3,16 @@
 > Bu klasör (`docs/refactor/`) refactor operasyonunun **tek kaynağıdır**. Temiz bir session açıldığında
 > önce bu dosya + `REFACTOR_PLAN.md` okunur, sonra Faz 0'dan başlanır.
 
-## Durum (2026-07-04)
+## Durum (2026-08-04 — güncel)
 
 - Refactor planı **onaylandı** (bkz. `REFACTOR_PLAN.md`).
-- Henüz **hiç refactor kodu yazılmadı** — Faz 0 (güvenlik ağı) başlamadan durduruldu.
-- Karar: bu işi **ayrı/temiz bir session'da** yürüteceğiz.
+- **Faz 0 TAMAMLANDI** (commit `fce5f23`): Vitest kuruldu (`backend/vitest.config.mts`), 54 unit test
+  (financeEngine tam kapsam, dmoCosting effectiveRisturnRate+computeOrderCosting, moneyRounding.round2,
+  analyticsService.median) + `scripts/check-no-console.mjs` (baseline-tolerans guard, mevcut 46(BE)+7(FE)
+  console.* borcu bloklamıyor, yalnız artışı engelliyor) + `pnpm verify` zincirine + `test:unit`'e eklendi.
+  Yan bulgu: check-tenant-scope guard'ı `serviceTickets.ts`'te savunma-derinliği eksikliği yakaladı,
+  düzeltildi (relation-filter'lı updateMany). Doğrulama: tsc 0, verify yeşil, tenant-izolasyon 46/46.
+- **Sıradaki: Faz 1** (tekrar + logger, mekanik, düşük-orta risk) — henüz başlanmadı.
 
 ## Temiz session'da ilk adımlar
 
@@ -15,12 +20,11 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 0 (ilk iş):** Vitest kur (`cd backend && pnpm add -D vitest`) → iş motorları için unit test:
-   - `financeEngine`: computeCompanyOverhead · computeUnitParticipationLoad · projectMargins · lineBreakdown · applyVat · toMinor/fromMinor.
-   - `dmoCosting`: effectiveRisturnRate · computeOrderCosting (kur açığı/risturn/komisyon/alarm senaryoları).
-   - `overheadService`/`analyticsService` saf hesaplar (median, effectiveRisturnRate vb.).
-   - `scripts/check-no-console.mjs` guard (check-no-mock deseninde) + `package.json` `verify`'a ekle + `test:unit` script'i.
-4. Sonra sırayla Faz 1→2→3 (düşük-orta risk). Faz 4–5 (yüksek risk) **ayrı turlar**, modül/endpoint-başı commit.
+3. **Faz 1 (sıradaki iş):**
+   - `src/lib/format.ts` (fmt/pct/fmtDate) çıkar → 8 kopyayı buradan import ettir.
+   - 51 `console.*` → logger (FE `utils/logger` zaten var; BE için `backend/src/utils/logger.ts` ekle,
+     sonra `scripts/check-no-console.mjs`'teki BASELINE objesini sıfıra indir).
+4. Sonra sırayla Faz 2→3 (düşük-orta risk). Faz 4–5 (yüksek risk) **ayrı turlar**, modül/endpoint-başı commit.
 
 ## Değişmez kurallar (refactor boyunca)
 
