@@ -57,3 +57,19 @@ export function checkStatusTransition(
 
   return { ok: true };
 }
+
+export interface ContractAnalysisExtract { projectName: string | null; tenderNo: string | null }
+export interface ContractWorkflowFallback { tenderName: string | null; tenderNo: string | null; title: string }
+
+/**
+ * AI analizinden çıkarılan proje adı/İKN + mevcut workflow bilgisinden otomatik
+ * başlık üretir. Sıra: isim → extractedProjectName → tenderName → title.
+ * İKN eki → extractedTenderNo → wf.tenderNo → (hiç yok).
+ */
+export function buildAutoTitle(extracted: ContractAnalysisExtract, fallback: ContractWorkflowFallback): string {
+  const namePart = extracted.projectName || fallback.tenderName || fallback.title;
+  const iknPart = extracted.tenderNo
+    ? `İKN: ${extracted.tenderNo}`
+    : (fallback.tenderNo ? `İKN: ${fallback.tenderNo}` : null);
+  return [namePart, iknPart].filter(Boolean).join(' — ');
+}

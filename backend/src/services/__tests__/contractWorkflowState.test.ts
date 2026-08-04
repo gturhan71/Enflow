@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { checkStatusTransition } from '../contractWorkflowState';
+import { checkStatusTransition, buildAutoTitle } from '../contractWorkflowState';
 
 describe('contractWorkflowState — checkStatusTransition', () => {
   it('allows setting the same status (no-op)', () => {
@@ -64,5 +64,35 @@ describe('contractWorkflowState — checkStatusTransition', () => {
       const r = checkStatusTransition(terminal, 'DRAFT', 'GENERAL_MANAGER');
       expect(r.ok).toBe(false);
     }
+  });
+});
+
+describe('contractWorkflowState — buildAutoTitle', () => {
+  it('prefers the AI-extracted project name and tender number when both are present', () => {
+    const t = buildAutoTitle(
+      { projectName: 'SASE Alımı', tenderNo: '2026/123456' },
+      { tenderName: 'Eski Ad', tenderNo: '2026/000000', title: 'Taslak' },
+    );
+    expect(t).toBe('SASE Alımı — İKN: 2026/123456');
+  });
+
+  it('falls back to the workflow tenderName when no project name was extracted', () => {
+    const t = buildAutoTitle({ projectName: null, tenderNo: null }, { tenderName: 'İhale Adı', tenderNo: null, title: 'Taslak' });
+    expect(t).toBe('İhale Adı');
+  });
+
+  it('falls back to the workflow title when neither extracted name nor tenderName exist', () => {
+    const t = buildAutoTitle({ projectName: null, tenderNo: null }, { tenderName: null, tenderNo: null, title: 'Sözleşme Taslağı' });
+    expect(t).toBe('Sözleşme Taslağı');
+  });
+
+  it('uses the workflow tenderNo for the İKN suffix when nothing was extracted', () => {
+    const t = buildAutoTitle({ projectName: 'Proje X', tenderNo: null }, { tenderName: null, tenderNo: '2026/999', title: 'T' });
+    expect(t).toBe('Proje X — İKN: 2026/999');
+  });
+
+  it('omits the İKN suffix entirely when neither source has a tender number', () => {
+    const t = buildAutoTitle({ projectName: 'Proje X', tenderNo: null }, { tenderName: null, tenderNo: null, title: 'T' });
+    expect(t).toBe('Proje X');
   });
 });

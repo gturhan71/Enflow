@@ -11,7 +11,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
 import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
-import { checkStatusTransition } from '../services/contractWorkflowState';
+import { checkStatusTransition, buildAutoTitle } from '../services/contractWorkflowState';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -211,10 +211,10 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
   const extractedProjectName = summary?.project_name || null;
   const extractedTenderNo = summary?.tender_no || null;
 
-  const autoTitle = [
-    extractedProjectName || wf.tenderName || wf.title,
-    extractedTenderNo ? `İKN: ${extractedTenderNo}` : (wf.tenderNo ? `İKN: ${wf.tenderNo}` : null),
-  ].filter(Boolean).join(' — ');
+  const autoTitle = buildAutoTitle(
+    { projectName: extractedProjectName, tenderNo: extractedTenderNo },
+    { tenderName: wf.tenderName, tenderNo: wf.tenderNo, title: wf.title },
+  );
 
   // Save analysis, update title/projectName/tenderNo, auto-create document entries
   await prisma.contractWorkflow.update({
