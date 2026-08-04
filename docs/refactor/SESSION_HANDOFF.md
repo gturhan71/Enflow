@@ -44,18 +44,22 @@
   - **3/N (`48054d1`):** finance.ts GET /aging (vade-kovaları + DSO) → `agingReport.ts`.
   - **4/N (`dd0a171`):** finance.ts'in yerel `buildFinancing()` yardımcısındaki nakit-akış olay
     kurgusu (BoM/CostItem/CollectionInstallment → CashEvent[]) → zaten var olan
-    `financingEffect.ts`'e yeni `buildFinancingEvents()` olarak eklendi (computeFinancingEffect'in
-    doğal yuvası). `buildFinancing` artık yalnız fetch+2 servis çağrısı.
-  Dördü de tsc 0, pnpm verify yeşil, RBAC temiz (son ikisi 110/127, hiç flake yok), canlı curl
-  gerçek verilerle doğrulandı.
-  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees CRUD/upload — çoğu zaten ince
-  CRUD, cost-approvals — ince CRUD, operating-cost-pool — overheadService'e delege ediyor zaten
-  muhtemelen ince, fx-adjustments — muhtemelen ince) + contractWorkflow.ts (515 satır, 12 endpoint)
-  + projects.ts (509 satır, 20+ endpoint) + opportunities.ts (567 satır, 11 endpoint — bom/
-  cost-analysis/approval akışları, muhtemelen en zengin gömülü mantığa sahip). Her biri ayrı
-  commit, curl before/after zorunlu. **finance.ts'in "fat" kısmı büyük ölçüde temizlendi** —
-  sıradaki oturum muhtemelen contractWorkflow.ts veya opportunities.ts ile devam etmeli
-  (finance.ts'in kalanını hızlıca tara, çoğu muhtemelen zaten ince).
+    `financingEffect.ts`'e yeni `buildFinancingEvents()` olarak eklendi. finance.ts'in "fat" kısmı
+    büyük ölçüde temizlendi.
+  - **5/N (`22fcaa8`):** opportunities.ts POST /:id/bom (116 satır, BoM Presales→Satış devri) —
+    TAMAMI değil, İÇİNDEKİ 2 SAF hesap (`buildBomEvaluationSnapshot`, `sumBomTotalsByCurrency`) →
+    yeni `bomHandoff.ts`. Geri kalanı (transaction+upsert+notification+archive sırası birbirine
+    bağımlı) BİLİNÇLİ OLARAK route'ta bırakıldı — tam ayrıştırma riski değere değmezdi.
+  Beş parça da tsc 0, pnpm verify yeşil, RBAC temiz, canlı curl gerçek verilerle doğrulandı.
+  **Yan bulgu (düzeltilmedi, kapsam dışı):** adminTest.ts RBAC cleanup endpoint'i Opportunity'yi
+  silmeden önce BoMItem/BomHandoff/BoMLineQuote'u silmiyor → FK ihlali (mevcut RBAC senaryoları bu
+  kombinasyonu hiç üretmediği için şimdiye kadar yakalanmamıştı).
+  **Kalan (henüz yapılmadı):** finance.ts'in geri kalanı (guarantees/cost-approvals/operating-cost-
+  pool/fx-adjustments — muhtemelen çoğu zaten ince CRUD, hızlı tara) + contractWorkflow.ts (515
+  satır, 12 endpoint — henüz hiç bakılmadı) + projects.ts (509 satır, 20+ endpoint) +
+  opportunities.ts'in kalan endpoint'leri (cost-analysis zaten salesCosting.ts'e delege ediyor
+  muhtemelen ince; request-approval/submit-cost-approval/approve-cost/approve/revert-approval
+  henüz incelenmedi). Her biri ayrı commit, curl before/after zorunlu.
 
 ## Temiz session'da ilk adımlar
 
