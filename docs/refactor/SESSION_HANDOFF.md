@@ -23,7 +23,12 @@
     artık sıfır-tolerans (yeni HİÇBİR console.* eklenemez, logger/scripts hariç).
   - Doğrulama (her iki alt-faz + kapanış): tsc FE+BE 0 · `pnpm verify` yeşil · tam RBAC (api-permissions+
     tenant-isolation) 487/487 · Playwright (GM, gerçek login) 7 ekran, 0 console/page error.
-- **Sıradaki: Faz 2** (types.ts bölünmesi, mekanik, düşük risk) — henüz başlanmadı.
+- **Faz 2 TAMAMLANDI** (commit `c2b009d`): `src/types.ts` (1309 satır, 129 export) → `src/types/`
+  18 domain dosyası + barrel `src/types/index.ts`. Python script ile satır-satır kesildi (0 eksik/
+  çakışma önceden doğrulandı), tek bir çağıran dosya bile düzenlenmedi (`from '../types'` barrel'a
+  çözülüyor). Cross-domain import yalnız `crm.ts`'te gerekti (User + BoMItem/CostItem). tsc 0 (ilk
+  denemede) · export kümesi 129/129 eşleşti · pnpm verify yeşil · Playwright 7 ekran 0 hata.
+- **Sıradaki: Faz 3** (ölü kod/legacy temizliği, orta risk) — henüz başlanmadı.
 
 ## Temiz session'da ilk adımlar
 
@@ -31,10 +36,10 @@
 2. **Temiz ağaçta başla:** alakasız bekleyen değişiklikleri (test artefaktları `tests/rbac/auth/*.json`,
    `playwright-report`, `test-results`, oturum-öncesi `CLAUDE.md`/`copilot-instructions`) refactor'a
    **karıştırma**. Yalnız refactor dosyalarını commit et.
-3. **Faz 2 (sıradaki iş):** `src/types.ts` (1213 satır) → `src/types/` domain dosyaları (crm/finance/
-   dmo/overhead/analytics/project/…) + barrel `src/types/index.ts` re-export → import yolları
-   (`from '../types'`) DEĞİŞMEZ.
-4. Sonra Faz 3 (ölü kod/legacy temizliği, orta risk). Faz 4–5 (yüksek risk) **ayrı turlar**,
+3. **Faz 3 (sıradaki iş):** Kullanılmayan geriye-dönük alias'ları grep-doğrula → kaldır (ör.
+   `contract-workflow-test`, `cost-analysis` legacy yönlendirmeleri gerçekten kullanılmıyorsa).
+   149 TODO'yu tara: önemsizleri çöz, niyetli notları koru/etiketle. 9 BE `: any` daralt.
+4. Sonra Faz 4–5 (yüksek risk: fat route→service çıkarımı, god-component ayrıştırma) **ayrı turlar**,
    modül/endpoint-başı commit.
 
 ## Değişmez kurallar (refactor boyunca)
