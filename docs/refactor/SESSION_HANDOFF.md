@@ -90,6 +90,29 @@
   **NOT/DERS:** contractWorkflow.ts'in üst kısmındaki (satır 1-115) yerel upload yardımcıları
   fileUpload.ts'te zaten var ama kasıtlı dokunulmamış — bu dosyada BAŞKA fat-route parçası
   ararken bu bölgeyi "kolay kazanç" sanıp dokunma, önce o yorumu oku.
+- **Faz 5 BAŞLADI (1/7)** — kullanıcı kararı: "sen seç, sırayla en küçükten en büyüğe ilerle".
+  Sıra: TodoModule(1084)→ProcurementModule(1188)→ManagementReportingModule(1263)→
+  NegotiationModule(1319)→ProjectManagementModule(1322)→ContractWorkflowModule(1677)→
+  CRMModule(2030). **Desen (bu turda oturdu, sonraki modüllere aynen uygulanacak):** her
+  modül için `src/modules/<kebab-modül-adı>/` alt klasörü — `helpers.ts` (SAF fonksiyonlar,
+  props yerine açık parametre alır, test edilebilir), gerekiyorsa `icons.tsx` (JSX döndüren
+  küçük saf yardımcılar), sonra her ana JSX bloğu kendi adında bir `.tsx` alt bileşeni (props
+  ile veri + callback alır, KENDİ state'i yok). Ana modül dosyası TÜM state + async handler'ları
+  tutan ince bir orkestratöre dönüşür. **Prop/state birebir korunur** — davranış değişmez.
+  - **1/7 (`51e56ff`):** TodoModule.tsx (1084→248 satır ana dosya, %77 küçülme) →
+    `src/modules/todo/` (helpers.ts, icons.tsx, 7 alt bileşen: PendingChainApprovals,
+    PendingProposalApprovals, PendingDeliveryNotifications, TaskList, ResolvedApprovals,
+    ProposalPreviewModal, NewTaskModal). Tek davranış detayı: teklif onay/red 3-adımlı mantığı
+    (handleStatusChange+apiService.updateProposal+setProposals) liste satırı VE önizleme modali
+    footer'ında birebir tekrar ediyordu → ortak `approveProposalTask`/`rejectProposalTask`'a
+    çıkarıldı (modal versiyonu ek olarak `setPreviewTask(null)` çağırıyor, orijinaldeki gibi) —
+    mantık değişmedi, yalnız tekrar kaldırıldı. Doğrulama: tsc 0 · pnpm verify yeşil (test:unit
+    128/128 + vite build) · canlı Playwright (GM login→Görevler render, Yeni Görev Ata modali,
+    modül=Fırsat seçilince İşlevsel Görev seçici koşullu render, birim filtre butonu) — 0
+    console/page error. `taskTargetTab` export'u grep ile TodoModule.tsx dışında hiç
+    kullanılmadığı doğrulanıp helpers.ts'e taşındı (dışa dönük import kırılmadı).
+  **Kalan (6/7):** ProcurementModule/ManagementReportingModule/NegotiationModule/
+  ProjectManagementModule/ContractWorkflowModule/CRMModule — aynı desenle, her biri ayrı tur+commit.
 
 ## Temiz session'da ilk adımlar
 
@@ -99,9 +122,9 @@
    **karıştırma**. Yalnız refactor dosyalarını commit et.
 3. **Faz 4 TAMAMLANDI** (9/N, bkz. yukarı) — dört hedef dosya da uçtan uca tarandı, geri kalan
    her şey ince orkestrasyon/CRUD olarak doğrulandı. Bu fazda ek çıkarım aranmasına gerek yok.
-4. **Sıradaki: Faz 5** (en riskli, en son: god-component ayrıştırma — CRMModule 2030/
-   ContractWorkflowModule 1677/ProjectManagementModule 1322 satır) **ayrı turlar**, modül-başı
-   commit — henüz başlanmadı, kullanıcı onayı/tercihi bekleniyor (kapsam/sıra/tempo).
+4. **Faz 5 DEVAM EDİYOR (1/7 tamam)** — sıradaki: ProcurementModule.tsx (1188 satır). TodoModule'de
+   oturan deseni (`src/modules/<modül>/` altında helpers + alt bileşenler, ana dosya ince
+   orkestratör) aynen uygula. Her modül ayrı tur + commit + canlı Playwright doğrulama.
 
 ## Değişmez kurallar (refactor boyunca)
 
