@@ -161,11 +161,10 @@ const NCW = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "allow", i
 // GET /catalog,/agreements,/rates,/orders,/alarms → yalnız tenantMiddleware (gate yok) → NA ile aynı.
 // editRoles  = requireRole(['GENERAL_MANAGER','SALES_MGR'])   → catalog/agreements/rates/orders yazma
 // paramRoles = requireRole(['GENERAL_MANAGER','FINANCE_MGR']) → /settings (kur/ristürn parametreleri)
-// ⚠️ Tutarsızlık: governance/role-matrix.ts SALES_MGR.modules listesinde DMO_VIEW YOK
-// (bkz. mevcut "DMO Kataloğu menüsü" UI testi → sales_mgr: hidden). Yani SALES_MGR menüyü
-// göremiyor ama backend'e doğrudan istek atarsa yazabiliyor → frontend/backend izin driftı.
-// Karar verilmeli: (a) DMO_VIEW SALES_MGR'a eklenip menü açılsın, ya da (b) editRoles'tan
-// SALES_MGR çıkarılıp yalnız GM kalsın. Bu matris şu anki (b öncesi) gerçek davranışı test eder.
+// ✓ 2026-08-04 çözüldü: SALES_MGR'ın menüde DMO_VIEW'i yoktu ama backend zaten yazma izni
+// veriyordu (frontend/backend izin driftı). Karar (a): mevcut backend yetkisi korunarak
+// DMO_VIEW governance/role-matrix.ts'e + gerçek DB kullanıcısının permissions'ına eklendi —
+// menü artık görünür (DMO_MODULE entitlement kapısı ayrıca hâlâ geçerli).
 const NDMO_EDIT  = { sales_mgr: "allow", sales_support: "deny", finance_mgr: "deny", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
 const NDMO_PARAM = { sales_mgr: "deny", sales_support: "deny", finance_mgr: "allow", igpd_mgr: "deny", ksu_mgr: "deny", project_mgr: "deny", legal_mgr: "deny", procurement_mgr: "deny", isab_mgr: "deny", admin: "deny", presales_mgr: "deny", technical_spec: "deny", operations_mgr: "deny", hr_mgr: "deny", auditor: "deny", kgd_mgr: "deny", backup_admin: "deny" } as const;
 
@@ -521,10 +520,10 @@ export const uiMatrix: UiCase[] = [
     expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", ...UCRM },
   },
   {
-    // DMO Kataloğu: yalnız DMO_VIEW izni olanlarda (v1'de yalnız GM superuser).
+    // DMO Kataloğu: DMO_VIEW izni olanlarda (GM + SALES_MGR — 2026-08-04, bkz. yukarı not).
     name: "DMO Kataloğu menüsü",
     sidebarText: "DMO Kataloğu",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH },
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", ...UH, sales_mgr: "visible" },
   },
 
   // ── Modül boyutu — kalan NAV_ITEMS üst-seviye modülleri (2026-08-03) ────────

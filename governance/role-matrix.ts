@@ -71,8 +71,13 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'SALES_MGR', unit: 'Satış', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'COST_ANALYSIS_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: ['contractWorkflow'],
+    // DMO_VIEW 2026-08-04 eklendi — backend dmo.ts editRoles zaten SALES_MGR'a yazma izni
+    // veriyordu (DMO'nun kendi tasarımı), ama menü izni eksikti → frontend/backend izin
+    // driftı (menü gizli, API'ye doğrudan istekle erişilebiliyordu). Mevcut backend yetkisi
+    // korunarak (daraltma DEĞİL) menü görünür hale getirildi — DMO_MODULE entitlement
+    // kapısı zaten ayrıca var (lisanssız tenant'ta hâlâ gizli kalır).
+    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'COST_ANALYSIS_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW', 'DMO_VIEW'],
+    endpointDomains: ['contractWorkflow', 'dmo'],
     decisionRights: [
       { decision: 'Satınalma talebi birim onayı', via: 'statusTransition:PENDING_UNIT→PENDING_PROCUREMENT (ProcurementModule: SALES_MGR|GM)' },
       { decision: 'Sözleşme yönetimi erişimi (satış tarafı)', via: 'endpoint:contractWorkflow' },
