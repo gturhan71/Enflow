@@ -51,7 +51,7 @@ import {
   Notification
 } from './types';
 
-export const APP_VERSION = 'v2.1.0';
+export const APP_VERSION = 'v2.1.1';
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',

@@ -24,3 +24,27 @@ export interface Unit {
   managerId?: string | null;
   parentId?: string | null;
 }
+
+export interface OwnedCategory {
+  key: string;
+  label: string;
+  count: number;
+  sample: { id: string; label: string }[];
+}
+
+export interface OwnedItemsResult {
+  userId: string;
+  userName: string;
+  role: string;
+  status: string;
+  categories: OwnedCategory[];
+  totalActive: number;
+  inboundDelegationCount: number;
+  createdOpportunityCount: number;
+  hardDeleteBlocked: boolean;
+}
+
+export interface TransferResult {
+  transferred: Record<string, number>;
+  clearedInboundDelegations: number;
+}

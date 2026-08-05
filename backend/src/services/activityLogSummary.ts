@@ -121,6 +121,7 @@ const ACTION_VERB_TR: Record<string, string> = {
   TENDER_AUTOMATCH: 'ihale otomatik eşleşmesi yaptı', TENDER_SUBMITTED: 'ihaleyi teslim etti',
   TENDER_TRIGGERED: 'ihale sürecini tetikledi', TENDER_WITHDRAWN: 'ihaleden çekildi',
   DELIVERY_RECORD: 'teslimat kaydı oluşturdu', AGENT_ACTION: 'otonom eylem gerçekleştirdi', AGENT_RUN: 'agent çalıştırdı',
+  PERSONNEL_TRANSFER: 'iş kayıtlarını devretti', DEACTIVATE: 'pasifleştirdi',
 };
 
 const STATUS_LABEL_TR: Record<string, string> = {

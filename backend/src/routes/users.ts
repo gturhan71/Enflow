@@ -3,6 +3,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { hashPassword } from '../services/auth';
+import { getOwnedItems, transferOwnership, deactivateUser, hardDeleteUser } from '../services/personnelTransferService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
@@ -73,16 +74,79 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
   res.json(parsePermissions(user));
 }));
 
+// ── Personel devri (terfi/işten ayrılma) ─────────────────────────────────────
+// Sahip olduğu aktif iş kayıtlarının önizlemesi — devir modalının veri kaynağı.
+router.get('/:id/owned-items', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const id = req.params.id as string;
+  const record = await prisma.user.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!record) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+  res.json(await getOwnedItems(req.tenantId, id));
+}));
+
+// Sahiplik devri (silme/deaktivasyon gerektirmeden de çağrılabilir — terfi sonrası opsiyonel devir).
+router.post('/:id/transfer', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const tenantId = req.tenantId;
+  const fromId = req.params.id as string;
+  const { toUserId, categoryKeys } = req.body as { toUserId?: string; categoryKeys?: string[] };
+  if (!toUserId) return res.status(400).json({ error: 'toUserId zorunlu.' });
+
+  const fromUser = await prisma.user.findFirst({ where: { id: fromId, tenantId } });
+  if (!fromUser) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+  let result;
+  try {
+    result = await transferOwnership({ tenantId, fromUserId: fromId, toUserId, categoryKeys });
+  } catch (e: unknown) {
+    return res.status(400).json({ error: e instanceof Error ? e.message : 'Devir başarısız.' });
+  }
+
+  const toUser = await prisma.user.findFirst({ where: { id: toUserId, tenantId } });
+  await logActivity({
+    tenantId, userId: req.userId, action: 'PERSONNEL_TRANSFER', entityType: 'USER', entityId: fromId,
+    details: { toUserId, toUserName: toUser?.name, transferred: result.transferred, clearedInboundDelegations: result.clearedInboundDelegations },
+  });
+  res.json(result);
+}));
+
 router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
   const id = req.params.id as string;
+  const { transferToUserId, hardDelete } = req.body as { transferToUserId?: string; hardDelete?: boolean };
+
+  if (id === req.userId) return res.status(400).json({ error: 'Kendi hesabınızı silemez/pasifleştiremezsiniz.' });
 
   const record = await prisma.user.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
-  await prisma.user.delete({ where: { id } });
-  await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'USER', entityId: id, details: { email: record.email } });
-  res.json({ message: 'Kullanıcı silindi.' });
+  const owned = await getOwnedItems(tenantId, id);
+  if (owned.totalActive > 0 && !transferToUserId) {
+    return res.status(400).json({
+      error: 'TRANSFER_REQUIRED',
+      message: `Bu kullanıcının ${owned.totalActive} aktif iş kaydı var — önce başka bir kullanıcıya devredilmeli.`,
+      categories: owned.categories.filter((c) => c.count > 0),
+    });
+  }
+
+  if (transferToUserId) {
+    try {
+      await transferOwnership({ tenantId, fromUserId: id, toUserId: transferToUserId });
+    } catch (e: unknown) {
+      return res.status(400).json({ error: e instanceof Error ? e.message : 'Devir başarısız.' });
+    }
+  }
+
+  if (hardDelete) {
+    const result = await hardDeleteUser(tenantId, id);
+    if (!result.ok) {
+      return res.status(409).json({ error: 'HARD_DELETE_BLOCKED', message: result.reason, blockingCount: result.blockingCount });
+    }
+    await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'USER', entityId: id, details: { email: record.email, transferredTo: transferToUserId || null } });
+    return res.json({ message: 'Kullanıcı kalıcı olarak silindi.' });
+  }
+
+  await deactivateUser(tenantId, id);
+  await logActivity({ tenantId, userId: req.userId, action: 'DEACTIVATE', entityType: 'USER', entityId: id, details: { email: record.email, transferredTo: transferToUserId || null } });
+  res.json({ message: 'Kullanıcı pasifleştirildi.' });
 }));
 
 export default router;

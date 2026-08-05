@@ -206,7 +206,9 @@ class ApiService {
   async getUsers() { return settingsService.getUsers(); }
   async createUser(data: Omit<User, 'id'>) { return settingsService.createUser(data); }
   async updateUser(id: string, data: Partial<User>) { return settingsService.updateUser(id, data); }
-  async deleteUser(id: string) { return settingsService.deleteUser(id); }
+  async deleteUser(id: string, opts?: { transferToUserId?: string; hardDelete?: boolean }) { return settingsService.deleteUser(id, opts); }
+  async getOwnedItems(userId: string) { return settingsService.getOwnedItems(userId); }
+  async transferUserOwnership(userId: string, data: { toUserId: string; categoryKeys?: string[] }) { return settingsService.transferUserOwnership(userId, data); }
 
   // --- SUBSCRIPTION & USAGE ---
   async getSubscription() { return settingsService.getSubscription(); }

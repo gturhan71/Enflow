@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { UserPlus, Building2, Trash2, Loader2, UserCog, X } from 'lucide-react';
+import { UserPlus, Building2, Trash2, Loader2, UserCog, Edit3, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { User, Unit, Tenant } from '../../types';
 import { ROLE_LABELS } from '../../constants';
 import { apiService } from '../../services/apiService';
+import { PersonnelTransferModal, PersonnelTransferPayload } from './PersonnelTransferModal';
 
 interface UserManagementProps {
   users: User[];
@@ -26,6 +27,10 @@ export const UserManagement = ({
   const [loading, setLoading] = useState(false);
   const [delegateTarget, setDelegateTarget] = useState<User | null>(null);
   const [delegateSaving, setDelegateSaving] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [transferTarget, setTransferTarget] = useState<{ user: User; mode: 'optional' | 'mandatory' } | null>(null);
+  const [transferSaving, setTransferSaving] = useState(false);
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,19 +95,88 @@ export const UserManagement = ({
     }
   };
 
-  const handleDeleteUser = async (id: string) => {
+  // Terfi/rol değişikliği — mevcut kullanıcının rolünü/birimini düzenler.
+  // Backend PUT /:id zaten destekliyordu, sadece bu edit-UI eksikti.
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser) return;
+    const formData = new FormData(e.target as HTMLFormElement);
+    const role = formData.get('role') as string;
+    const unitId = (formData.get('unitId') as string) || null;
+    const previousRole = editingUser.role;
+    const targetId = editingUser.id;
+
+    setEditSaving(true);
+    try {
+      const updated = await apiService.updateUser(targetId, { role, unitId: unitId || undefined });
+      setUsers(prev => prev.map(u => u.id === targetId ? { ...u, ...updated } : u));
+      setEditingUser(null);
+      // Rol gerçekten değiştiyse (terfi/görev değişikliği): sahip olduğu aktif
+      // kayıtları başka birine devretmek isteyip istemediği opsiyonel olarak sorulur.
+      if (role && role !== previousRole) {
+        const owned = await apiService.getOwnedItems(targetId);
+        if (owned.totalActive > 0) {
+          setTransferTarget({ user: { ...editingUser, role }, mode: 'optional' });
+        }
+      }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Güncelleme başarısız.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  // İşten ayrılma / hesap kapatma — TRANSFER_REQUIRED gelirse zorunlu devir
+  // modalı açılır (UnitManagement.handleDeleteUnit ile aynı desen).
+  const attemptDeleteUser = async (id: string, transferToUserId?: string, hardDelete?: boolean) => {
+    try {
+      const result = await apiService.deleteUser(id, { transferToUserId, hardDelete });
+      setUsers(prev => hardDelete
+        ? prev.filter(u => u.id !== id)
+        : prev.map(u => u.id === id ? { ...u, status: 'INACTIVE' } : u));
+      setTransferTarget(null);
+      alert((result as { message?: string })?.message || 'İşlem tamamlandı.');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '';
+      if (msg.includes('TRANSFER_REQUIRED')) {
+        const user = users.find(u => u.id === id);
+        if (user) setTransferTarget({ user, mode: 'mandatory' });
+      } else if (msg.includes('HARD_DELETE_BLOCKED')) {
+        alert('Bu kullanıcı bazı fırsatların oluşturucusu olarak kayıtlı — kalıcı silinemez, bunun yerine pasifleştirildi/pasifleştirilmelidir.');
+      } else {
+        alert(msg || 'İşlem başarısız.');
+      }
+    } finally {
+      setTransferSaving(false);
+    }
+  };
+
+  const handleDeleteUser = (id: string) => {
     if (id === currentUser?.id) {
       alert('Kendinizi silemezsiniz reiz.');
       return;
     }
+    if (window.confirm('Bu kullanıcıyı pasifleştirmek istediğinize emin misiniz? (Aktif iş kaydı varsa önce devir istenecek)')) {
+      void attemptDeleteUser(id);
+    }
+  };
 
-    if (window.confirm('Bu kullanıcıyı sistemden tamamen silmek istediğinize emin misiniz?')) {
+  const handleTransferConfirm = async (payload: PersonnelTransferPayload) => {
+    if (!transferTarget) return;
+    setTransferSaving(true);
+    if (transferTarget.mode === 'mandatory') {
+      // Silme akışının bir parçası — tek DELETE çağrısı hem devri hem pasifleştirme/silmeyi yapar.
+      await attemptDeleteUser(transferTarget.user.id, payload.toUserId, payload.hardDelete);
+    } else {
+      // Terfi sonrası bağımsız devir — silme yok, yalnız POST /transfer.
       try {
-        await apiService.deleteUser(id);
-        setUsers(prev => prev.filter(u => u.id !== id));
-        alert('Kullanıcı sistemden uçuruldu.');
+        await apiService.transferUserOwnership(transferTarget.user.id, { toUserId: payload.toUserId, categoryKeys: payload.categoryKeys });
+        setTransferTarget(null);
+        alert('Kayıtlar devredildi.');
       } catch (err) {
-        alert(err instanceof Error ? err.message : 'Silme işlemi başarısız.');
+        alert(err instanceof Error ? err.message : 'Devir başarısız.');
+      } finally {
+        setTransferSaving(false);
       }
     }
   };
@@ -135,7 +209,12 @@ export const UserManagement = ({
               <tr key={user.id} className="hover:bg-slate-50/50 transition-colors">
                 <td className="px-6 py-4">
                   <div className="flex flex-col">
-                    <span className="font-bold text-slate-900">{user.name}</span>
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      {user.name}
+                      {user.status === 'INACTIVE' && (
+                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-400 rounded text-[9px] font-black uppercase tracking-widest">Pasif</span>
+                      )}
+                    </span>
                     <span className="text-xs text-slate-400">{user.email}</span>
                   </div>
                 </td>
@@ -164,6 +243,13 @@ export const UserManagement = ({
                 </td>
                 <td className="px-6 py-4 text-right flex justify-end gap-2">
                   <button
+                    onClick={() => setEditingUser(user)}
+                    title="Rol/Birim Düzenle (Terfi)"
+                    className="p-2 text-slate-400 hover:text-primary"
+                  >
+                    <Edit3 size={16} />
+                  </button>
+                  <button
                     onClick={() => setDelegateTarget(user)}
                     title="Vekil Ata"
                     className="p-2 text-slate-400 hover:text-primary"
@@ -172,6 +258,7 @@ export const UserManagement = ({
                   </button>
                   <button
                     onClick={() => handleDeleteUser(user.id)}
+                    title="Pasifleştir / Sil"
                     className="p-2 text-slate-400 hover:text-red-600"
                   >
                     <Trash2 size={16} />
@@ -327,6 +414,79 @@ export const UserManagement = ({
               </form>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* Rol/Birim Düzenle (Terfi) Modal */}
+      <AnimatePresence>
+        {editingUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden bg-white p-8"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="text-xl font-bold text-slate-900">Rol / Birim Düzenle</h4>
+                <button onClick={() => setEditingUser(null)} className="p-1 text-slate-400 hover:text-slate-600"><X size={18} /></button>
+              </div>
+              <form onSubmit={handleSaveEdit} className="space-y-4">
+                <div className="p-4 bg-primary/5 border border-primary/20 rounded-2xl mb-2">
+                  <p className="text-[10px] font-black text-primary uppercase tracking-widest">Kullanıcı</p>
+                  <p className="text-sm font-bold text-slate-900 mt-1">{editingUser.name}</p>
+                </div>
+                <select
+                  name="role"
+                  required
+                  defaultValue={editingUser.role}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                >
+                  {Object.entries(ROLE_LABELS).map(([code, label]) => (
+                    <option key={code} value={code}>{label}</option>
+                  ))}
+                </select>
+                <select
+                  name="unitId"
+                  defaultValue={editingUser.unitId || ''}
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                >
+                  <option value="">Birim (Opsiyonel)</option>
+                  {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+                <p className="text-[10px] text-slate-400">
+                  Rol değişirse, sahip olduğu aktif kayıtlar varsa kaydettikten sonra bir devir öneri ekranı açılır.
+                </p>
+                <div className="flex justify-end gap-3 pt-2">
+                  <button type="button" onClick={() => setEditingUser(null)} className="px-6 py-2 text-sm font-bold text-slate-500">
+                    Vazgeç
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+                  >
+                    {editSaving ? <Loader2 size={16} className="animate-spin" /> : 'Kaydet'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Personel devri (terfi opsiyonel / işten ayrılma zorunlu) */}
+      <AnimatePresence>
+        {transferTarget && (
+          <PersonnelTransferModal
+            fromUser={transferTarget.user}
+            users={users}
+            units={units}
+            mode={transferTarget.mode}
+            saving={transferSaving}
+            onClose={() => setTransferTarget(null)}
+            onConfirm={handleTransferConfirm}
+          />
         )}
       </AnimatePresence>
     </div>

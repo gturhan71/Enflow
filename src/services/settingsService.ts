@@ -59,9 +59,21 @@ export const settingsService = {
     });
   },
 
-  async deleteUser(id: string) {
+  async deleteUser(id: string, opts?: { transferToUserId?: string; hardDelete?: boolean }) {
     return apiClient.fetchWithAuth(`/users/${id}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      body: JSON.stringify(opts || {}),
+    });
+  },
+
+  async getOwnedItems(userId: string) {
+    return apiClient.fetchWithAuth(`/users/${userId}/owned-items`);
+  },
+
+  async transferUserOwnership(userId: string, data: { toUserId: string; categoryKeys?: string[] }) {
+    return apiClient.fetchWithAuth(`/users/${userId}/transfer`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   },
 
