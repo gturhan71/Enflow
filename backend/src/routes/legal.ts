@@ -72,6 +72,29 @@ router.put('/cases/:id', tenantMiddleware, asyncHandler(async (req: Request, res
     type, title, status, priority, relatedEntityType, relatedEntityId,
     summary, opinion, assignedToId, assignedToName, dueDate,
   } = req.body;
+
+  // Esas: bir ContractWorkflow'a bağlı hukuki vaka (Sözleşme İncelemesi), sözleşmenin
+  // zorunlu evrakları tamamlanmadan CLOSED yapılamaz — DocumentsTab'daki "zorunlu evrak
+  // tamamlanmadan imzaya hazır işaretlenemez" kuralıyla aynı ilke, hukuk onayına da uygulanır.
+  if (status === 'CLOSED' && record.status !== 'CLOSED') {
+    const effType = relatedEntityType !== undefined ? relatedEntityType : record.relatedEntityType;
+    const effId = relatedEntityId !== undefined ? relatedEntityId : record.relatedEntityId;
+    if (effType === 'CONTRACT_WORKFLOW' && effId) {
+      const wf = await prisma.contractWorkflow.findFirst({
+        where: { id: effId, tenantId: req.tenantId },
+        include: { documents: true },
+      });
+      if (wf) {
+        const missing = wf.documents.filter(d => d.isRequired && !['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status));
+        if (missing.length > 0) {
+          return res.status(400).json({
+            error: `Bağlı sözleşmenin ${missing.length} zorunlu evrağı henüz tamamlanmadı (${missing.map(d => d.name).join(', ')}). Vaka, sözleşme evrakları tamamlanmadan kapatılamaz.`,
+          });
+        }
+      }
+    }
+  }
+
   const item = await prisma.legalCase.update({
     where: { id },
     data: {

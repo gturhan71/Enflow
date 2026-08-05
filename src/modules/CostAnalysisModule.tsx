@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import {
   Calculator, Plus, Trash2, Save, Loader2, TrendingUp, DollarSign,
-  Package, Truck, AlertCircle, Globe, Percent, Gavel, CalendarClock,
+  Package, Truck, AlertCircle, Globe, Percent, Gavel, CalendarClock, Search, CheckCircle2, Lock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { toast } from 'sonner';
 import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem, CostConfig } from '../types';
 import { apiService } from '../services/apiService';
@@ -26,6 +27,16 @@ const DEFAULT_SPOT: Record<Currency, Record<string, number>> = {
 
 const OPERATIONAL_CATS: CostCategory[] = ['LABOR', 'LOGISTICS', 'TECHNICAL_SERVICE', 'TRAVEL', 'ACCOMMODATION', 'ACCEPTANCE', 'NOTARY', 'CUSTOMS', 'OTHER'];
 
+// Maliyet analizi durum rozeti — hangi fırsatın ilk kez analiz beklediği/yeniden
+// analiz gerektiği listede tek bakışta görülsün diye (dropdown'da bu ayrım kayboluyordu).
+const TECH_STATUS_BADGE: Record<string, { label: string; cls: string }> = {
+  PENDING: { label: 'Analiz Bekliyor', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
+  REJECTED: { label: 'Reddedildi — Revize', cls: 'bg-red-500/10 text-red-700 border-red-500/20' },
+  PENDING_APPROVAL: { label: 'Onay Bekliyor', cls: 'bg-amber-500/10 text-amber-700 border-amber-500/20' },
+  APPROVED: { label: 'Onaylandı', cls: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/20' },
+};
+const techStatusBadge = (status?: string) => TECH_STATUS_BADGE[status || 'PENDING'] || { label: status || 'Analiz Bekliyor', cls: 'bg-slate-100 text-slate-500 border-slate-200' };
+
 const CostAnalysisModule = ({
   opportunities, setOpportunities, setActiveTab, initialItemId,
 }: {
@@ -38,6 +49,7 @@ const CostAnalysisModule = ({
   const { currentUser } = useAuth();
   const canApprove = currentUser?.role === 'SALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState('');
+  const [oppSearch, setOppSearch] = useState('');
 
   // Deep-link: bildirim/görev "Git" ile gelen fırsatı otomatik seç.
   React.useEffect(() => {
@@ -93,6 +105,9 @@ const CostAnalysisModule = ({
   };
 
   const selectedOpp = useMemo(() => opportunities.find(o => o.id === selectedOppId), [opportunities, selectedOppId]);
+  // Fırsat oluşturulurken satınalma usulü belirtildiyse hesaplama doğrudan o usule
+  // kilitlenir (kullanıcı başka usul seçemez); belirtilmediyse tüm usuller serbest.
+  const methodLocked = !!selectedOpp?.procurementMethod;
 
   React.useEffect(() => {
     setSubmitted(false);
@@ -101,6 +116,11 @@ const CostAnalysisModule = ({
     const cc = selectedOpp.costConfig;
     // Manuel operasyonel giderler (auto olmayan)
     setCostItems((selectedOpp.costItems || []).filter(c => !c.auto));
+
+    const lockedMethod = selectedOpp.procurementMethod as ProcurementMethod | undefined;
+    const m: ProcurementMethod = lockedMethod || (cc?.procurementMethod as ProcurementMethod) || 'PRIVATE';
+    setMethod(m);
+
     if (cc) {
       setBaseCurrency((cc.baseCurrency as Currency) || 'TRY');
       // Geriye uyum: spotRates yoksa legacy rates
@@ -109,13 +129,13 @@ const CostAnalysisModule = ({
       setCollectionDate(cc.collectionDate || '');
       setForwardOverrides(cc.forwardOverrides || {});
       setTargetMargin(cc.targetMargin ?? cc.globalMargin ?? 20);
-      const m = (cc.procurementMethod as ProcurementMethod) || 'PRIVATE';
-      setMethod(m);
-      setMethodCosts((cc.methodCostLines as MethodCostLine[]) || METHOD_COST_TEMPLATES[m].map(l => ({ ...l })));
+      // Usul kalemleri: kayıtlı usul güncel usulle aynıysa (manuel düzenlemeler dahil)
+      // korunur; farklıysa (usul sonradan kilitlendi/değişti) şablondan yeniden üretilir.
+      setMethodCosts(cc.procurementMethod === m && cc.methodCostLines ? (cc.methodCostLines as MethodCostLine[]) : METHOD_COST_TEMPLATES[m].map(l => ({ ...l })));
     } else {
       setBaseCurrency('TRY'); setSpotRates(DEFAULT_SPOT.TRY); setAnnualDepreciation(30);
       setCollectionDate(''); setForwardOverrides({}); setTargetMargin(20);
-      setMethod('PRIVATE'); setMethodCosts([]);
+      setMethodCosts(METHOD_COST_TEMPLATES[m].map(l => ({ ...l })));
     }
   }, [selectedOpp]);
 
@@ -152,6 +172,7 @@ const CostAnalysisModule = ({
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleMethodChange = (m: ProcurementMethod) => {
+    if (methodLocked) return; // fırsatta usul belirliyse değiştirilemez
     setMethod(m);
     setMethodCosts(METHOD_COST_TEMPLATES[m].map(l => ({ ...l }))); // şablonu yeniden seed
   };
@@ -203,6 +224,8 @@ const CostAnalysisModule = ({
       setSubmitted(true);
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 4000);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Maliyet analizi kaydedilemedi.');
     } finally {
       setLoading(false);
     }
@@ -226,6 +249,15 @@ const CostAnalysisModule = ({
 
   const foreignCurrencies = CURRENCIES.filter(c => c !== baseCurrency);
 
+  // Maliyet analizi yapılabilecek fırsatlar: kapanmış (WON/LOST) fırsatlar hariç —
+  // PresalesModule ile aynı temel filtre. Arama kutusu başlık/müşteri üzerinden filtreler.
+  const analyzableOpps = useMemo(() => {
+    const q = oppSearch.trim().toLocaleLowerCase('tr-TR');
+    return opportunities
+      .filter(o => o.status !== 'WON' && o.status !== 'LOST')
+      .filter(o => !q || o.title.toLocaleLowerCase('tr-TR').includes(q) || (o.customer?.name || '').toLocaleLowerCase('tr-TR').includes(q));
+  }, [opportunities, oppSearch]);
+
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 font-sans bg-slate-50/30 custom-scrollbar">
       <AnimatePresence>
@@ -237,23 +269,60 @@ const CostAnalysisModule = ({
         )}
       </AnimatePresence>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Maliyet Analizi</h3>
-          <p className="text-slate-500 font-medium text-sm mt-2">Satınalma usulü, forward (tahsilat) kuru ve satış-üzerinden marj ile maliyet/teklif.</p>
+      <div>
+        <h3 className="text-3xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">Maliyet Analizi</h3>
+        <p className="text-slate-500 font-medium text-sm mt-2">Satınalma usulü, forward (tahsilat) kuru ve satış-üzerinden marj ile maliyet/teklif.</p>
+      </div>
+
+      {/* ── Fırsat Listesi — dropdown yerine: hangi fırsatın analiz beklediği/yeniden
+           analiz gerektiği tek bakışta görülsün, aynı fırsata yanlışlıkla ikinci kez
+           analiz yapılması azalsın diye durum rozetleriyle listelenir. ────────────── */}
+      <div className="glass-panel rounded-[32px] overflow-hidden">
+        <div className="p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center gap-3 bg-slate-50/50">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="w-9 h-9 bg-primary/10 text-primary rounded-xl flex items-center justify-center"><Calculator size={18} /></div>
+            <h4 className="font-black text-slate-900 uppercase italic tracking-widest text-sm">Analiz Edilecek Fırsatı Seçin</h4>
+            <span className="px-3 py-1 bg-white text-slate-400 rounded-full text-[10px] font-black uppercase tracking-widest border border-slate-200">{analyzableOpps.length}</span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+            <input type="text" value={oppSearch} onChange={e => setOppSearch(e.target.value)} placeholder="Fırsat veya müşteri ara..."
+              className="bg-white border border-slate-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold outline-none focus:border-primary w-full sm:w-64" />
+          </div>
         </div>
-        <select value={selectedOppId} onChange={(e) => setSelectedOppId(e.target.value)}
-          className="bg-white/40 border border-white/40 backdrop-blur-md px-6 py-3.5 rounded-[20px] text-sm font-bold shadow-sm focus:ring-4 focus:ring-primary/5 outline-none w-full sm:w-auto sm:min-w-[300px]">
-          <option value="">Analiz Edilecek Fırsatı Seçin</option>
-          {opportunities.map(opp => <option key={opp.id} value={opp.id}>{opp.title}</option>)}
-        </select>
+        <div className="divide-y divide-slate-50 max-h-[420px] overflow-y-auto custom-scrollbar">
+          {analyzableOpps.length === 0 && (
+            <div className="py-12 text-center text-slate-400 font-bold italic text-sm">Eşleşen fırsat bulunamadı.</div>
+          )}
+          {analyzableOpps.map(opp => {
+            const badge = techStatusBadge(opp.technicalStatus);
+            const methodLabel = PROCUREMENT_METHODS.find(m => m.key === opp.procurementMethod)?.label;
+            const isSelected = opp.id === selectedOppId;
+            return (
+              <button key={opp.id} onClick={() => setSelectedOppId(opp.id)}
+                className={cn('w-full flex flex-wrap items-center gap-3 px-6 py-4 text-left transition-colors',
+                  isSelected ? 'bg-primary/5' : 'hover:bg-slate-50/80')}>
+                {isSelected ? <CheckCircle2 size={16} className="text-primary shrink-0" /> : <div className="w-4 shrink-0" />}
+                <div className="flex-1 min-w-[180px]">
+                  <p className={cn('text-sm font-black truncate', isSelected ? 'text-primary' : 'text-slate-900')}>{opp.title}</p>
+                  <p className="text-[11px] text-slate-400 font-bold truncate">{opp.customer?.name || 'Müşteri belirtilmemiş'}</p>
+                </div>
+                <span className="text-xs font-black text-slate-600 whitespace-nowrap">{Number(opp.value || 0).toLocaleString('tr-TR')} ₺</span>
+                {methodLabel && (
+                  <span className="px-2.5 py-1 bg-violet-500/10 text-violet-600 rounded-full text-[10px] font-black uppercase tracking-widest border border-violet-500/20 whitespace-nowrap">{methodLabel}</span>
+                )}
+                <span className="text-[10px] font-bold text-slate-400 whitespace-nowrap">{opp.bomItems?.length ?? 0} BoM kalemi</span>
+                <span className={cn('px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border whitespace-nowrap', badge.cls)}>{badge.label}</span>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {!selectedOppId ? (
-        <div className="glass-panel p-20 rounded-[40px] border-dashed flex flex-col items-center justify-center text-center">
-          <div className="w-20 h-20 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mb-6"><Calculator size={40} /></div>
-          <h4 className="text-xl font-black text-slate-900 uppercase italic tracking-tighter">İşlem Yapılacak Fırsatı Seçin</h4>
-          <p className="text-sm text-slate-400 font-bold max-w-sm mt-2">Maliyet analizini başlatmak için yukarıdan bir satış fırsatı seçin.</p>
+        <div className="glass-panel p-12 rounded-[40px] border-dashed flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 bg-slate-50 text-slate-300 rounded-3xl flex items-center justify-center mb-4"><Calculator size={32} /></div>
+          <p className="text-sm text-slate-400 font-bold max-w-sm">Analizi başlatmak/incelemek için yukarıdaki listeden bir fırsat seçin.</p>
         </div>
       ) : (
         <>
@@ -262,16 +331,30 @@ const CostAnalysisModule = ({
             <div className="p-5 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
               <div className="w-9 h-9 bg-violet-500/10 text-violet-600 rounded-xl flex items-center justify-center"><Gavel size={18} /></div>
               <h4 className="font-black text-slate-900 uppercase italic tracking-widest text-sm">Satınalma / Teklif Usulü</h4>
+              {methodLocked && <Lock size={13} className="text-slate-300" />}
             </div>
             <div className="p-6 flex flex-wrap gap-3">
-              {PROCUREMENT_METHODS.map(m => (
-                <button key={m.key} onClick={() => handleMethodChange(m.key)} title={m.hint}
-                  className={cn('px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all text-left',
-                    method === m.key ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-500/20' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-400')}>
-                  {m.label}
-                </button>
-              ))}
+              {PROCUREMENT_METHODS.map(m => {
+                const disabled = methodLocked && method !== m.key;
+                return (
+                  <button key={m.key} onClick={() => handleMethodChange(m.key)} disabled={disabled}
+                    title={disabled ? 'Fırsatta bu usul belirlenmemiş — değiştirilemez.' : m.hint}
+                    className={cn('px-5 py-3 rounded-2xl text-xs font-black uppercase tracking-widest border transition-all text-left',
+                      method === m.key ? 'bg-violet-600 text-white border-violet-600 shadow-lg shadow-violet-500/20'
+                        : disabled ? 'bg-slate-50 text-slate-300 border-slate-100 cursor-not-allowed opacity-60' : 'bg-white text-slate-500 border-slate-200 hover:border-violet-400')}>
+                    {m.label}
+                  </button>
+                );
+              })}
             </div>
+            {methodLocked && (
+              <div className="px-6 pb-6 -mt-2 flex items-center gap-2">
+                <Lock size={13} className="text-slate-400 shrink-0" />
+                <p className="text-xs font-bold text-slate-500">
+                  Usul, fırsat oluşturulurken "{PROCUREMENT_METHODS.find(m => m.key === method)?.label}" olarak belirlendi ve buradan değiştirilemez.
+                </p>
+              </div>
+            )}
           </div>
 
           {/* ── Döviz, Forward Kur & Tahsilat ────────────────────────────── */}

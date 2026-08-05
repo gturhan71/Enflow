@@ -33,6 +33,11 @@ export default function NewOpportunityModal({
           </select>
           <input type="number" name="value" min={0} value={values.value ?? 0} onChange={handleChange} placeholder="Tahmini Bedel" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
           <div>
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Muhtemel Kapanış Tarihi (bilgi amaçlı)</label>
+            <input type="date" name="expectedCloseDate" value={values.expectedCloseDate ?? ''} onChange={handleChange}
+              className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none text-sm" />
+          </div>
+          <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Teklife Dönüşüm — Satış Destek Tetikleyici</p>
             <div className="grid grid-cols-2 gap-4">
               <select name="procurementMethod" value={values.procurementMethod ?? 'OPEN'} onChange={handleChange} className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20">

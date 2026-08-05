@@ -165,7 +165,7 @@ const CRMModule = ({
 
   const opportunityForm = useForm<Partial<Opportunity>>({
     title: '', value: 0, probability: 50, customerId: '', description: '', status: 'NEW',
-    procurementMethod: 'OPEN', targetBidDate: ''
+    procurementMethod: 'OPEN', targetBidDate: '', expectedCloseDate: ''
   });
 
   const handleRevertApproval = async (oppId: string) => {
@@ -453,7 +453,8 @@ const CRMModule = ({
       description: opp.description || '',
       status: opp.status,
       procurementMethod: opp.procurementMethod || 'OPEN',
-      targetBidDate: opp.targetBidDate ? opp.targetBidDate.slice(0, 10) : ''
+      targetBidDate: opp.targetBidDate ? opp.targetBidDate.slice(0, 10) : '',
+      expectedCloseDate: opp.expectedCloseDate ? opp.expectedCloseDate.slice(0, 10) : ''
     });
     setIsEditingOpp(true);
     setShowNewOpportunityModal(true);

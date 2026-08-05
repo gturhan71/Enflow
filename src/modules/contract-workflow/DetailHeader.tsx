@@ -1,8 +1,13 @@
 import { Fragment } from 'react';
-import { Calendar, XCircle, ChevronRight } from 'lucide-react';
+import { Calendar, XCircle, ChevronRight, AlertTriangle } from 'lucide-react';
 import { ContractWorkflow } from './types';
 import { TABS, TabId, WORKFLOW_STATUS_STEPS, CANCEL_TERMINATE_ROLES } from './constants';
-import { stepIndex } from './helpers';
+import { stepIndex, computeDeadlineAlarm } from './helpers';
+
+const ALARM_BANNER_STYLES: Record<'warning' | 'critical', string> = {
+  warning: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
+  critical: 'bg-red-500/10 border-red-500/30 text-red-300',
+};
 
 export default function DetailHeader({
   selected, currentUserRole, onCancelClick, tab, setTab,
@@ -13,8 +18,15 @@ export default function DetailHeader({
   tab: TabId;
   setTab: (t: TabId) => void;
 }) {
+  const alarm = computeDeadlineAlarm(selected);
   return (
     <div className="p-4 border-b border-white/10">
+      {alarm.level !== 'none' && (
+        <div className={`mb-3 px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-2 ${ALARM_BANNER_STYLES[alarm.level]}`}>
+          <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+          Esas: son sözleşme tarihine kadar tüm zorunlu evraklar tamamlanmalı — {alarm.label}.
+        </div>
+      )}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-lg font-semibold text-white">{selected.title}</h1>

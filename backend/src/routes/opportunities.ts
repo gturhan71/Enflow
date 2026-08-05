@@ -119,7 +119,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (description !== undefined) updateData.description = description;
   if (status !== undefined) updateData.status = status;
   if (lostReason !== undefined) updateData.lostReason = lostReason;
-  if (expectedCloseDate !== undefined) updateData.expectedCloseDate = new Date(expectedCloseDate as string);
+  if (expectedCloseDate !== undefined) updateData.expectedCloseDate = expectedCloseDate ? new Date(expectedCloseDate as string) : null;
   if (customerId !== undefined) updateData.customerId = customerId;
   if (technicalStatus !== undefined) updateData.technicalStatus = technicalStatus;
   if (costConfig !== undefined) updateData.costConfig = typeof costConfig === 'string' ? costConfig : JSON.stringify(costConfig);
@@ -317,6 +317,19 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
   const manualCostItems = (req.body.costItems || []) as SalesManualCostItemInput[];
   const costConfig = (req.body.costConfig || {}) as SalesCostConfig;
 
+  // Usul seçilmeden hesaplanan maliyet analizi onaya gönderilemez. Fırsat oluşturulurken
+  // bir satınalma usulü sabitlenmişse (Opportunity.procurementMethod) hesap doğrudan o
+  // usule kilitlenir — eşleşmeyen bir usulle gelen analiz reddedilir. Fırsatta usul hiç
+  // belirtilmemişse (null) kullanıcı serbestçe seçmiş olabilir; bu durumda eşleşme aranmaz.
+  if (!costConfig.procurementMethod) {
+    return res.status(400).json({ error: 'Maliyet analizi için bir satınalma usulü seçilmelidir.' });
+  }
+  if (opp.procurementMethod && costConfig.procurementMethod !== opp.procurementMethod) {
+    return res.status(400).json({
+      error: `Maliyet analizindeki satınalma usulü (${costConfig.procurementMethod}) fırsatın usulüyle (${opp.procurementMethod}) eşleşmiyor. Fırsatta belirlenen usul değiştirilemez.`,
+    });
+  }
+
   const marginFloorPct = await getSalesMarginFloor(tenantId);
   const result = computeSalesCosting({ bomItems, manualCostItems, costConfig, marginFloorPct });
 
@@ -436,6 +449,18 @@ router.post('/:id/submit-cost-approval', tenantMiddleware, asyncHandler(async (r
   const tenantId = req.tenantId;
   const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
   if (!opp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
+
+  // /cost-analysis'teki aynı kural: usul seçilmemişse veya fırsatta sabitlenmiş usulle
+  // eşleşmiyorsa onaya gönderilemez; fırsatta usul belirtilmemişse eşleşme aranmaz.
+  const storedConfig = opp.costConfig ? (() => { try { return JSON.parse(opp.costConfig as string) as SalesCostConfig; } catch { return null; } })() : null;
+  if (!storedConfig?.procurementMethod) {
+    return res.status(400).json({ error: 'Maliyet analizi için bir satınalma usulü seçilmelidir.' });
+  }
+  if (opp.procurementMethod && storedConfig.procurementMethod !== opp.procurementMethod) {
+    return res.status(400).json({
+      error: `Maliyet analizindeki satınalma usulü (${storedConfig.procurementMethod}) fırsatın usulüyle (${opp.procurementMethod}) eşleşmiyor. Onaya göndermeden önce maliyet analizini fırsatla aynı usulle yeniden kaydedin.`,
+    });
+  }
 
   await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'PENDING_APPROVAL' } });
 

@@ -3,8 +3,9 @@ import { XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { apiService } from '../../services/apiService';
 import { LEGAL_TYPE_LABELS } from './constants';
+import { ContractWorkflow } from './types';
 
-export default function LegalCaseForm({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+export default function LegalCaseForm({ workflows, onClose, onSaved }: { workflows: ContractWorkflow[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState<Record<string, string>>({ type: 'CONTRACT_REVIEW', priority: 'MEDIUM' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -14,7 +15,10 @@ export default function LegalCaseForm({ onClose, onSaved }: { onClose: () => voi
     setSaving(true); setErr(null);
     try {
       if (!f.title) throw new Error('Başlık zorunlu.');
-      await apiService.createLegalCase({ ...f, categoryCode: f.categoryCode || 'HUK' });
+      const relation = f.contractWorkflowId
+        ? { relatedEntityType: 'CONTRACT_WORKFLOW', relatedEntityId: f.contractWorkflowId }
+        : {};
+      await apiService.createLegalCase({ ...f, ...relation, categoryCode: f.categoryCode || 'HUK' });
       onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : 'Kaydetme hatası.'); setSaving(false); }
   };
@@ -37,6 +41,15 @@ export default function LegalCaseForm({ onClose, onSaved }: { onClose: () => voi
             {['LOW', 'MEDIUM', 'HIGH'].map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         </div>
+        {f.type === 'CONTRACT_REVIEW' && (
+          <div>
+            <select className="input-glass w-full text-sm" value={f.contractWorkflowId || ''} onChange={e => set('contractWorkflowId', e.target.value)}>
+              <option value="">Bağlı sözleşme süreci yok (opsiyonel)</option>
+              {workflows.map(w => <option key={w.id} value={w.id}>{w.title}</option>)}
+            </select>
+            <p className="text-[10px] text-slate-400 mt-1">Bağlanırsa: bu vaka, sözleşmenin zorunlu evrakları tamamlanmadan kapatılamaz.</p>
+          </div>
+        )}
         <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Özet / durum" value={f.summary || ''} onChange={e => set('summary', e.target.value)} />
         <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Hukuki görüş (opsiyonel)" value={f.opinion || ''} onChange={e => set('opinion', e.target.value)} />
         <input className="input-glass w-full text-sm" placeholder="Doküman Kategori Kodu (vars. HUK)" value={f.categoryCode || ''} onChange={e => set('categoryCode', e.target.value.toUpperCase())} />
