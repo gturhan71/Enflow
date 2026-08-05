@@ -61,6 +61,15 @@ import { logger } from './utils/logger';
 // SPA'yı bozmamak için CSP ve COEP kapalı (API + inline dist için).
 app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
 
+// Kiracı verisi arama motorlarında ASLA görünmemeli (uyum gereksinimi) — tüm
+// yanıtlar (API + uploads + /wiki yansıması + SPA dist) tek noktadan noindex.
+// robots.txt (public/, wiki/) bunu tamamlar; bu header robots.txt'i atlayan
+// veya yalnız HTTP başlığına bakan tarayıcılar için ikinci güvenlik katmanı.
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
+
 // Gövde limiti makul düzeye çekildi (bellek tabanlı DoS azaltımı). Dosyalar
 // multer üzerinden ayrı akar; JSON gövdeler yalnız metin/veri taşır.
 app.use(express.json({ limit: '5mb' }));

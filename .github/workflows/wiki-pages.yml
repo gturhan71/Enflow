@@ -8,6 +8,7 @@ on:
       - 'walkthrough.md'
       - 'wiki/build.mjs'
       - 'wiki/index.html'
+      - 'wiki/robots.txt'
       - '.github/workflows/wiki-pages.yml'
   workflow_dispatch: {}
 
@@ -30,10 +31,11 @@ jobs:
           node-version: 22
       - name: Generate wiki from walkthrough §27
         run: node wiki/build.mjs
-      - name: Stage site (yalnız index.html)
+      - name: Stage site (index.html + robots.txt)
         run: |
           mkdir -p _site
           cp wiki/index.html _site/index.html
+          cp wiki/robots.txt _site/robots.txt
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site

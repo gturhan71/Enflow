@@ -169,6 +169,7 @@ const out = `<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Enflow Wiki — Uçtan Uca Kılavuz</title>
 <meta name="description" content="Enflow süreç yönetim platformunu hiç bilmeyen birine baştan sona anlatan statik kılavuz." />
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet" />
 <style>${CSS}</style>
 </head>
 <body>
