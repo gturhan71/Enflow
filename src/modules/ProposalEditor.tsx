@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 import { Opportunity, BoMItem, CostItem, Customer, Proposal } from '../types';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { computeForwardRates } from '../lib/procurementCosts';
 
 // ── Currency helpers ──────────────────────────────────────────────────────────
 const CURRENCY_SYMBOLS: Record<string, string> = { USD: '$', EUR: '€', TRY: '₺' };
@@ -87,8 +88,16 @@ const ProposalEditor = ({
   // ── Maliyet analizinden döviz & kur bilgisi ───────────────────────────────
   const costConfig = opportunity.costConfig;
 
-  const baseCurrency = initialData?.currency ?? costConfig?.baseCurrency ?? 'USD';
-  const exchangeRates: Record<string, number> = costConfig?.rates ?? {};
+  // Maliyet analizi hangi para biriminde yapıldıysa teklif de o para biriminde
+  // üretilir; revizyonlarda da aynı kural geçerli — önceki teklif versiyonunun
+  // dondurulmuş para birimi (initialData.currency) yalnızca costConfig hiç
+  // yoksa (maliyet analizi yapılmamış eski kayıt) yedek olarak kullanılır.
+  const baseCurrency = costConfig?.baseCurrency ?? initialData?.currency ?? 'USD';
+  // Forward kur: CostAnalysisModule/backend (salesCosting.ts) ile aynı hesap —
+  // legacy costConfig.rates yalnız spotRates hiç kaydedilmemiş eski analizlerde kullanılır.
+  const exchangeRates: Record<string, number> = costConfig?.spotRates
+    ? computeForwardRates(costConfig.spotRates, costConfig.annualDepreciation ?? 0, costConfig.collectionDate, costConfig.forwardOverrides)
+    : (costConfig?.rates ?? {});
   const currencySym = sym(baseCurrency);
 
   // Döviz dönüşüm helper
