@@ -136,6 +136,7 @@ const ProposalEditor = ({
         currency: fresh.currency ?? item.currency,
         purchaseCost: fresh.purchaseCost,
         marginPercentage: fresh.marginPercentage,
+        vatRate: fresh.vatRate ?? item.vatRate,
       };
     });
 
@@ -179,7 +180,7 @@ const ProposalEditor = ({
         salePrice = Math.round(item.purchaseCost * (1 + margin / 100) * 100) / 100;
       }
 
-      return { ...item, salePrice, purchaseCostBase } as BoMItem & { salePrice: number; purchaseCostBase: number };
+      return { ...item, salePrice, purchaseCostBase, vatRate: item.vatRate ?? 20 } as BoMItem & { salePrice: number; purchaseCostBase: number };
     });
   });
 
@@ -243,6 +244,39 @@ const ProposalEditor = ({
 
   const netProfit = manualTotalPrice - grandCostBase;
   const realMargin = manualTotalPrice > 0 ? (netProfit / manualTotalPrice) * 100 : 0;
+
+  // ── KDV ───────────────────────────────────────────────────────────────────
+  // Her BoM kalemi kendi KDV oranını taşır (varsayılan %20, Maliyet Analizi'nde
+  // kalem bazında değiştirilebilir). Operasyonel gider kalemlerinde henüz KDV
+  // oranı alanı yok — varsayılan orana dahil edilir. Ağırlıklı ortalama oran
+  // hesaplanıp "Son Teklif Tutarı" (KDV hariç net) üzerine uygulanır — böylece
+  // tutar manuel değiştirilse bile KDV oranı tutarlı kalır.
+  const OPS_DEFAULT_VAT_RATE = 20;
+  const weightedVatRate = useMemo(() => {
+    let base = 0;
+    let vat = 0;
+    if (marginMode === 'PROJECT_WIDE') {
+      items.forEach(i => {
+        const it = i as BoMItem & { purchaseCostBase?: number; vatRate?: number };
+        const rowCost = (it.purchaseCostBase ?? i.purchaseCost) * i.quantity;
+        base += rowCost;
+        vat += rowCost * ((it.vatRate ?? OPS_DEFAULT_VAT_RATE) / 100);
+      });
+      base += totalOpsCostBase;
+      vat += totalOpsCostBase * (OPS_DEFAULT_VAT_RATE / 100);
+    } else {
+      items.forEach(i => {
+        const it = i as PricedBoMItem & { vatRate?: number };
+        const rowSale = it.salePrice * i.quantity;
+        base += rowSale;
+        vat += rowSale * ((it.vatRate ?? OPS_DEFAULT_VAT_RATE) / 100);
+      });
+    }
+    return base > 0 ? (vat / base) * 100 : OPS_DEFAULT_VAT_RATE;
+  }, [items, marginMode, totalOpsCostBase]);
+
+  const vatAmount = Math.round(manualTotalPrice * (weightedVatRate / 100) * 100) / 100;
+  const grandTotalWithVat = manualTotalPrice + vatAmount;
 
   // ── Item handlers ─────────────────────────────────────────────────────────
   const applyGlobalMarginToItems = () => {
@@ -347,13 +381,18 @@ const ProposalEditor = ({
       const descLines = doc.splitTextToSize(ct(description), pageWidth - 40);
       doc.text(descLines, 20, 122);
 
-      const priceFmt = (n: number) => `${currencySym}${Math.round(n).toLocaleString('tr-TR')}`;
+      // ISO para birimi kodu kullanılır (₺/$/€ değil) — jsPDF'in gömülü fontları
+      // (helvetica ve CDN Roboto alt kümesi) Türk Lirası işaretini (₺, U+20BA)
+      // güvenilir şekilde render etmiyor; kod her fontta ve her dilde doğru basılır.
+      const priceFmt = (n: number) => `${Math.round(n).toLocaleString('tr-TR')} ${baseCurrency}`;
 
       const tableData = [
         ...items.map((item, i) => {
-          const it = item as BoMItem & { salePrice: number };
+          const it = item as BoMItem & { salePrice: number; purchaseCostBase?: number };
+          // Müşteriye giden PDF'de iç maliyet asla görünmez — PROJECT_WIDE modunda
+          // da satır fiyatı proje marjı uygulanmış satış fiyatıdır (ham maliyet değil).
           const unitPrice = marginMode === 'PROJECT_WIDE'
-            ? (item as PricedBoMItem).purchaseCostBase ?? item.purchaseCost
+            ? (it.purchaseCostBase ?? item.purchaseCost) * (1 + globalMargin / 100)
             : it.salePrice;
           return [i + 1, ct(item.partNumber), ct(item.description), item.quantity, priceFmt(unitPrice), priceFmt(unitPrice * item.quantity)];
         }),
@@ -376,22 +415,43 @@ const ProposalEditor = ({
       });
 
       const lastTable = (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable;
-      let finalY = lastTable ? lastTable.finalY + 10 : 200;
+      const finalY = lastTable ? lastTable.finalY + 10 : 200;
 
-      doc.setFontSize(10);
-      doc.text(ct('Toplam Maliyet:'), 140, finalY + 5);
-      doc.text(priceFmt(grandCostBase), 190, finalY + 5, { align: 'right' });
+      // Müşteriye yönelik toplam bölümü: iç maliyet/kâr marjı GÖSTERİLMEZ
+      // (bunlar Finansal Kokpit panelinde yalnız satış ekibi görür) — burada
+      // yalnız Ara Toplam (KDV hariç net), KDV ve KDV Dahil Genel Toplam yer alır.
+      // Sabit x-koordinatlı doc.text yerine autoTable kullanılır — uzun etiket
+      // ("GENEL TOPLAM (KDV Dahil):") + tutar aynı satırda serbest metin olarak
+      // basılınca sütun genişliği paylaşılmadığından harfler üst üste biniyordu;
+      // autoTable her hücreye sabit genişlik ayırdığı için bu çakışmayı önler.
+      const W: [number, number, number] = [255, 255, 255];
+      const LABEL_NORMAL = { fillColor: W, textColor: [100, 116, 139] as [number, number, number], fontStyle: 'normal' as const, font, fontSize: 9, halign: 'right' as const };
+      const LABEL_BOLD = { fillColor: W, textColor: [30, 41, 59] as [number, number, number], fontStyle: 'bold' as const, font, fontSize: 10, halign: 'right' as const };
+      const AMT_NORMAL = { fillColor: W, textColor: [30, 41, 59] as [number, number, number], fontStyle: 'bold' as const, font, fontSize: 9, halign: 'right' as const };
+      const AMT_GRAND = { fillColor: W, textColor: [16, 185, 129] as [number, number, number], fontStyle: 'bold' as const, font, fontSize: 11, halign: 'right' as const };
 
-      if (marginMode === 'PROJECT_WIDE') {
-        doc.text(ct(`Kâr Marjı (%${globalMargin}):`), 140, finalY + 12);
-        doc.text(priceFmt(manualTotalPrice - grandCostBase), 190, finalY + 12, { align: 'right' });
-        finalY += 7;
-      }
-
-      doc.setFont(font, 'bold');
-      doc.setTextColor(16, 185, 129);
-      doc.text(ct('GENEL TOPLAM:'), 140, finalY + 12);
-      doc.text(priceFmt(manualTotalPrice), 190, finalY + 12, { align: 'right' });
+      autoTable(doc, {
+        startY: finalY,
+        tableWidth: 100,
+        margin: { left: pageWidth - 100 - 20 },
+        body: [
+          [
+            { content: ct('Ara Toplam (KDV Hariç)'), styles: LABEL_NORMAL },
+            { content: priceFmt(manualTotalPrice), styles: AMT_NORMAL },
+          ],
+          [
+            { content: ct(`KDV (%${weightedVatRate.toFixed(0)})`), styles: LABEL_NORMAL },
+            { content: priceFmt(vatAmount), styles: AMT_NORMAL },
+          ],
+          [
+            { content: ct('GENEL TOPLAM (KDV Dahil)'), styles: LABEL_BOLD },
+            { content: priceFmt(grandTotalWithVat), styles: AMT_GRAND },
+          ],
+        ],
+        theme: 'plain',
+        styles: { font, fontSize: 9, lineColor: [226, 232, 240], lineWidth: 0.3 },
+        columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 50 } },
+      });
 
       doc.save(`Teklif_${opportunity.title.replace(/\s+/g, '_')}_V${version}.pdf`);
     } catch (err) {
@@ -447,6 +507,7 @@ const ProposalEditor = ({
                 unitSalePrice: (item as PricedBoMItem).salePrice ?? item.unitSalePrice,
                 totalSalePrice: ((item as PricedBoMItem).salePrice ?? item.unitSalePrice ?? item.purchaseCost) * item.quantity,
                 purchaseCostBase: (item as PricedBoMItem).purchaseCostBase,
+                vatRate: item.vatRate ?? 20,
                 vendor: item.vendor,
                 source: item.source,
               }));
@@ -460,6 +521,9 @@ const ProposalEditor = ({
                 content: JSON.stringify({
                   items: cleanItems,
                   totalPrice: manualTotalPrice,
+                  vatRatePct: weightedVatRate,
+                  vatAmount,
+                  grandTotalWithVat,
                   description,
                   terms,
                   marginMode,
@@ -763,6 +827,14 @@ const ProposalEditor = ({
                         onChange={(e) => setManualTotalPrice(Number(e.target.value))}
                         className="w-full bg-white/10 border-2 border-primary/30 rounded-[28px] py-6 pl-14 pr-8 text-4xl font-black italic tracking-tighter outline-none focus:border-primary transition-all text-white"
                       />
+                    </div>
+                    <div className="mt-3 flex items-center justify-between text-[11px] bg-white/5 px-4 py-3 rounded-2xl border border-white/10">
+                      <span className="font-black uppercase tracking-widest text-slate-400">KDV (ağırlıklı ~%{weightedVatRate.toFixed(0)})</span>
+                      <span className="font-mono font-bold text-amber-300">+ {fmt(vatAmount, baseCurrency)}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between px-4 py-3.5 rounded-2xl bg-primary/10 border border-primary/20">
+                      <span className="text-xs font-black uppercase tracking-widest text-primary">KDV Dahil Genel Toplam</span>
+                      <span className="font-mono font-black text-white text-lg">{fmt(grandTotalWithVat, baseCurrency)}</span>
                     </div>
                   </div>
 

@@ -76,6 +76,7 @@ interface ContentItem {
   totalSalePrice?: number;
   purchaseCost?: number;
   marginPercentage?: number;
+  vatRate?: number;
 }
 
 interface ParsedContent {
@@ -87,7 +88,29 @@ interface ParsedContent {
   baseCurrency?: string;
   exchangeRates?: Record<string, number>;
   marginMode?: string;
+  // ProposalEditor kaydederken ağırlıklı KDV'yi kendisi hesaplayıp yazar (en doğru
+  // kaynak — marj modu/operasyonel gider bağlamını bilir). Yoksa (eski kayıt) items'tan
+  // ağırlıklı ortalama yeniden türetilir.
+  vatRatePct?: number;
+  vatAmount?: number;
+  grandTotalWithVat?: number;
 }
+
+const DEFAULT_VAT_RATE = 20;
+
+/** Kalemlerden ağırlıklı ortalama KDV oranı — ProposalEditor'ün kaydettiği
+ * vatRatePct yoksa (eski/legacy teklif) yedek olarak kullanılır. */
+const deriveWeightedVatRate = (items: ContentItem[]): number => {
+  let base = 0;
+  let vat = 0;
+  for (const item of items) {
+    const unit = item.salePrice ?? item.unitSalePrice ?? (item.purchaseCost ?? 0) * (1 + (item.marginPercentage ?? 0) / 100);
+    const total = item.totalSalePrice ?? unit * (item.quantity ?? 1);
+    base += total;
+    vat += total * ((item.vatRate ?? DEFAULT_VAT_RATE) / 100);
+  }
+  return base > 0 ? (vat / base) * 100 : DEFAULT_VAT_RATE;
+};
 
 const parseContent = (raw: string | Record<string, unknown> | undefined): ParsedContent => {
   if (!raw) return {};
@@ -117,6 +140,12 @@ export const generateProposalPDF = async (
   const version     = content.version ?? proposal.version ?? 1;
   const currency    = content.baseCurrency ?? customer?.currency ?? 'TRY';
   const fmt         = (n: number) => `${n.toLocaleString('tr-TR')} ${currency}`;
+
+  // KDV: ProposalEditor'ün kaydettiği değerler öncelikli (marj modu/operasyonel gider
+  // dahil doğru bağlamda hesaplanmıştır); yoksa kalemlerden ağırlıklı ortalama türetilir.
+  const vatRatePct       = content.vatRatePct ?? deriveWeightedVatRate(items);
+  const vatAmount        = content.vatAmount ?? Math.round(totalPrice * (vatRatePct / 100) * 100) / 100;
+  const grandTotalWithVat = content.grandTotalWithVat ?? (totalPrice + vatAmount);
 
   const doc       = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4', putOnlyUsedFonts: true });
   const pageW     = doc.internal.pageSize.getWidth();
@@ -296,16 +325,16 @@ export const generateProposalPDF = async (
     margin: { left: pageW - 100 - 20 },
     body: [
       [
-        { content: clean('Ara Toplam'), styles: LABEL_NORMAL },
+        { content: clean('Ara Toplam (KDV Hariç)'), styles: LABEL_NORMAL },
         { content: fmt(Math.round(totalPrice)), styles: AMT_NORMAL },
       ],
       [
-        { content: clean('KDV (%)'), styles: LABEL_NORMAL },
-        { content: '—', styles: { ...AMT_NORMAL, textColor: [100, 116, 139] as [number,number,number] } },
+        { content: clean(`KDV (%${vatRatePct.toFixed(0)})`), styles: LABEL_NORMAL },
+        { content: fmt(Math.round(vatAmount)), styles: AMT_NORMAL },
       ],
       [
-        { content: clean('GENEL TOPLAM'), styles: LABEL_BOLD },
-        { content: fmt(Math.round(totalPrice)), styles: AMT_GRAND },
+        { content: clean('GENEL TOPLAM (KDV Dahil)'), styles: LABEL_BOLD },
+        { content: fmt(Math.round(grandTotalWithVat)), styles: AMT_GRAND },
       ],
     ],
     theme: 'plain',
@@ -316,7 +345,8 @@ export const generateProposalPDF = async (
   const totalsEndY = getLastY(doc, tableEndY + 40);
 
   // ── Yazıyla ──────────────────────────────────────────────────────────────────
-  const rounded  = Math.round(totalPrice);
+  // Yazıyla tutar KDV dahil genel toplamı yansıtır — üstteki GENEL TOPLAM ile eşleşmeli.
+  const rounded  = Math.round(grandTotalWithVat);
   const inWords  = numberToTurkish(rounded);
   const currWord = CURRENCY_WORDS[currency] ?? currency;
   const wordsLine = clean(`Yazıyla: ${inWords} ${currWord}`);

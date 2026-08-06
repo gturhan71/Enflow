@@ -207,6 +207,7 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
           ...(unitSalePrice !== undefined && { unitSalePrice }),
           ...(totalSalePrice !== undefined && { totalSalePrice }),
           ...(item.currency ? { currency: String(item.currency) } : {}),
+          ...(item.vatRate !== undefined ? { vatRate: parseFloat(String(item.vatRate)) || 0 } : {}),
           ...(item.source ? { source: String(item.source) } : {}),
           vendor: String(item.vendor || '')
         }
@@ -349,6 +350,7 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
           unitSalePrice: item.unitSalePrice,
           totalSalePrice: item.totalSalePrice,
           ...(item.currency ? { currency: String(item.currency) } : {}),
+          vatRate: item.vatRate !== undefined && item.vatRate !== null ? Number(item.vatRate) : 20,
           ...(item.source ? { source: String(item.source) } : {}),
           vendor: String(item.vendor || ''),
         },

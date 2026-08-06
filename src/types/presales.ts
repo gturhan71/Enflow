@@ -22,6 +22,7 @@ export interface BoMItem {
   totalSalePrice?: number;
   vendor?: string;
   currency?: string;
+  vatRate?: number; // kalem bazında KDV % — teklif KDV hesabında kullanılır (varsayılan 20)
   source?: string;
   status?: 'PENDING_MATCH' | 'MATCHED';
 }

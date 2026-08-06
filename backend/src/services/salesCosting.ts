@@ -31,6 +31,7 @@ export interface SalesBoMItemInput {
   quantity: number;
   purchaseCost: number;
   currency?: string;
+  vatRate?: number;
   vendor?: string;
   source?: string;
   lineKey?: string;

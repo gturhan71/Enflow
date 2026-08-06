@@ -207,6 +207,7 @@ const CostAnalysisModule = ({
       const rawBomItems = localBomItems.map(item => ({
         lineKey: item.lineKey, partNumber: item.partNumber, description: item.description,
         quantity: item.quantity, purchaseCost: item.purchaseCost, currency: item.currency,
+        vatRate: item.vatRate ?? 20,
         vendor: item.vendor, source: item.source,
       }));
       const rawCostItems = costItems.map(i => ({ description: i.description, category: i.category, amount: i.amount, currency: i.currency }));
@@ -440,6 +441,7 @@ const CostAnalysisModule = ({
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest border-b border-slate-100">Açıklama</th>
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-100 w-16">Adet</th>
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest border-b border-slate-100 w-20">Döviz</th>
+                        <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-center border-b border-slate-100 w-16">KDV %</th>
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-100">Birim Maliyet</th>
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-100 whitespace-nowrap">Birim Satış ({baseCurrency})</th>
                         <th className="px-4 py-4 font-black text-slate-400 uppercase tracking-widest text-right border-b border-slate-100 whitespace-nowrap">Toplam Maliyet</th>
@@ -466,6 +468,12 @@ const CostAnalysisModule = ({
                               </select>
                               {!item.currency && <span className="text-[9px] text-red-600 font-bold block mt-0.5">Para birimi yok</span>}
                             </td>
+                            <td className="px-4 py-3 text-center">
+                              <input type="number" min={0} max={100} step={1} value={item.vatRate ?? 20}
+                                onChange={e => handleUpdateBomItem(i, 'vatRate', parseFloat(e.target.value) || 0)}
+                                title="KDV oranı (%) — varsayılan 20, kalem bazında değiştirilebilir"
+                                className="w-14 bg-white/60 border border-slate-200 rounded-lg py-1 px-1.5 text-center font-bold text-slate-900 outline-none focus:border-indigo-500" />
+                            </td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex flex-col items-end gap-0.5">
                                 <input type="number" value={item.purchaseCost} onChange={e => handleUpdateBomItem(i, 'purchaseCost', parseFloat(e.target.value) || 0)}
@@ -481,7 +489,7 @@ const CostAnalysisModule = ({
                         );
                       })}
                       {localBomItems.length === 0 && (
-                        <tr><td colSpan={7} className="px-6 py-12 text-center text-slate-400 font-bold italic">Bu fırsata bağlı BoM kalemi bulunamadı.</td></tr>
+                        <tr><td colSpan={8} className="px-6 py-12 text-center text-slate-400 font-bold italic">Bu fırsata bağlı BoM kalemi bulunamadı.</td></tr>
                       )}
                     </tbody>
                   </table>

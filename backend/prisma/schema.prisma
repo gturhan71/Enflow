@@ -246,6 +246,7 @@ model BoMItem {
   unitSalePrice    Float?
   totalSalePrice   Float?
   currency         String?
+  vatRate          Float       @default(20)  // kalem bazında KDV % — teklif KDV hesabı bunu kullanır
   source           String?
   vendor           String?
   paymentTermDays  Int?        // alış ödeme vadesi (referans tarihten gün) — finansman etkisi

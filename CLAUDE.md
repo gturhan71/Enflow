@@ -369,6 +369,7 @@ src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, co
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/workflowService
+src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, types
 src/modules/todo/helpers.ts ← ../types
@@ -388,9 +389,7 @@ backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
-src/components/ErrorBoundary.tsx ← utils/logger
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/modules/ArchiveModule.tsx ← types, services/apiService, utils/logger, components/PermissionGate
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
@@ -436,7 +435,6 @@ src/modules/project-mgmt/ProjectListView.tsx ← ../types, ../lib/format, consta
 src/modules/project-mgmt/RiskPanel.tsx ← ../types, helpers
 src/modules/project-mgmt/StatusBadge.tsx ← ../types, constants
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
-src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, ../components/HealthCards, ../types, BusinessHealthCard, DmoAnalyticsCard
 src/modules/reporting/ArchiveCard.tsx ← ../types
 src/modules/reporting/BomVarianceCard.tsx ← ../types, helpers, ../lib/format
@@ -468,6 +466,7 @@ src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentT
 backend/src/services/agingReport.ts ← prismaClient
 backend/src/services/financeSummary.ts ← prismaClient
 backend/src/services/invoiceEngine.ts ← prismaClient
+backend/src/services/salesCosting.ts ← prismaClient
 ```
 
 ## versions (installed direct deps)
@@ -501,7 +500,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 20 minutes ago)
+## changes (last 10 commits — 21 minutes ago)
 ```
 src/components/settings/PersonnelTransferModal.tsx +kullan  +Kullan
 src/modules/ActivityLogModule.tsx             +fallbackSummary  +ArchivesTab  ~actionTone  ~ActivityLogModule
@@ -746,6 +745,11 @@ export async function ensureDefaultWorkflow(tenantId)  :123-184  # Tenant'ın ak
 export function resolveNextStep(steps, currentStepId)  :194-198  # Skip-resolution motoru: verilen adımdan sonra görevin aktarı
 ```
 
+### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
+```
+TABLE new_BoMItem
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
@@ -883,6 +887,35 @@ export interface ProjectSummaryLine  :20-27
   totalPlanned: number  :24-24
   progress: number  :25-25
   milestoneCount: number  :26-26
+```
+
+### backend/src/services/salesCosting.ts
+```
+export interface SalesMethodCostLine  :10-15
+  label: string  :11-11
+  kind: 'PERCENT' | 'FIXED'  :12-12
+  value: number  :13-13
+  category: string  :14-14
+export interface SalesCostConfig  :17-26
+  baseCurrency: string  :18-18
+  spotRates?: Record<string, number>  :19-19
+  forwardOverrides?: Record<string, number>  :20-20
+  annualDepreciation?: number  :21-21
+  collectionDate?: string  :22-22
+  targetMargin?: number  :23-23
+  procurementMethod?: string  :24-24
+  methodCostLines?: SalesMethodCostLine[]  :25-25
+export interface SalesBoMItemInput  :28-38
+  partNumber?: string  :29-29
+  description?: string  :30-30
+  quantity: number  :31-31
+  purchaseCost: number  :32-32
+  currency?: string  :33-33
+  vatRate?: number  :34-34
+  vendor?: string  :35-35
+  source?: string  :36-36
+  … +1 more members  :28-28
+export interface SalesManualCostItemInput  :40-45
 ```
 
 ## src
@@ -1057,6 +1090,17 @@ handler onMarkDelivered
 handler onWonProposal
 handler onLostProposal
 handler onImported
+```
+
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
+handler onClick
+handler onChange
 ```
 
 ### src/modules/reporting/BidScorecardCard.tsx
@@ -1260,11 +1304,6 @@ handler onComplete
 handler onLogin
 ```
 
-### src/components/ErrorBoundary.tsx
-```
-props Props
-```
-
 ### src/layout/Header.tsx
 ```
 hook useAuth
@@ -1275,15 +1314,6 @@ hook useEffect
 export Header
 handler onAccess
 handler onClick
-```
-
-### src/modules/ArchiveModule.tsx
-```
-hook useState
-hook useEffect
-export ArchiveModule
-handler onChange
-handler onSubmit
 ```
 
 ### src/modules/contract-workflow/AnalysisTab.tsx
@@ -1751,17 +1781,6 @@ handler onPrintReport
 handler onSave
 ```
 
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
 ### src/modules/reporting/AnalyticsTab.tsx
 ```
 component AnalyticsTab
@@ -2035,62 +2054,33 @@ export interface DmoOrder  :21-31
   … +1 more members  :21-21
 ```
 
-### src/types/documents.ts
-```
-export interface CorporateDocument  :1-8
-  id: string  :2-2
-  name: string  :3-3
-  category: 'LEGAL' | 'ISO' | 'CERTIFICATE' | '  :4-4
-  expiryDate: string  :5-5
-  fileUrl: string  :6-6
-  tags: string[]  :7-7
-export interface Notification  :9-20
-  id: string  :10-10
-  userId: string  :11-11
-  title: string  :12-12
-  message: string  :13-13
-  type: 'SYSTEM' | 'URGENT' | 'SUCCESS' | '  :14-14
-  isRead: boolean  :15-15
-  timestamp: string  :16-16
-  scheduledAt?: string  :17-17
-  … +2 more members  :9-9
-export interface ArchiveItem  :21-34
-  id: string  :22-22
-  boxNo: string  :23-23
-  shelfNo: string  :24-24
-  category: string  :25-25
-  description?: string  :26-26
-  owner: string  :27-27
-  date: string  :28-28
-```
-
 ### src/types/finance.ts
 ```
 export interface Payment  :2-12
-  id: string  :3-3
-  invoiceId: string  :4-4
-  amount: number  :5-5
-  currency: string  :6-6
-  paidAt: string  :7-7
-  method?: string | null  :8-8
-  reference?: string | null  :9-9
-  notes?: string | null  :10-10
-  … +1 more members  :2-2
+id: string  :3-3
+invoiceId: string  :4-4
+amount: number  :5-5
+currency: string  :6-6
+paidAt: string  :7-7
+method?: string | null  :8-8
+reference?: string | null  :9-9
+notes?: string | null  :10-10
+… +1 more members  :2-2
 export interface Invoice  :13-37
-  id: string  :14-14
-  type: 'SALES' | 'PURCHASE'  :15-15
-  invoiceNo?: string | null  :16-16
-  amount: number  :17-17
-  currency: string  :18-18
-  issueDate?: string | null  :19-19
-  dueDate?: string | null  :20-20
-  status: 'DRAFT' | 'ISSUED' | 'SENT' | 'PART  :21-21
-  … +15 more members  :13-13
+id: string  :14-14
+type: 'SALES' | 'PURCHASE'  :15-15
+invoiceNo?: string | null  :16-16
+amount: number  :17-17
+currency: string  :18-18
+issueDate?: string | null  :19-19
+dueDate?: string | null  :20-20
+status: 'DRAFT' | 'ISSUED' | 'SENT' | 'PART  :21-21
+… +15 more members  :13-13
 export interface FxAdjustment  :39-50
-  id: string  :40-40
-  invoiceId: string  :41-41
-  invoice?: { id: string  :42-42
-  paymentId: string  :43-43
+id: string  :40-40
+invoiceId: string  :41-41
+invoice?: { id: string  :42-42
+paymentId: string  :43-43
 ```
 
 ### src/types/legal.ts
@@ -2145,33 +2135,33 @@ export interface UnitAbsorptionReport  :26-30
   note: string  :29-29
 ```
 
-### src/types/procurement.ts
+### src/types/presales.ts
 ```
-export interface Vendor  :3-20
-  id: string  :4-4
-  tenantId: string  :5-5
-  name: string  :6-6
-  taxNo?: string | null  :7-7
-  address?: string | null  :8-8
-  phone?: string | null  :9-9
-  email?: string | null  :10-10
-  contactName?: string | null  :11-11
-  … +8 more members  :3-3
-export interface PurchaseItem  :33-46
-  id: string  :34-34
-  purchaseRequestId: string  :35-35
-  name: string  :36-36
-  description?: string | null  :37-37
-  quantity: number  :38-38
-  unit: string  :39-39
-  estimatedUnitPrice?: number | null  :40-40
-  currency: string  :41-41
-  … +4 more members  :33-33
-export interface PurchaseQuote  :47-63
-  id: string  :48-48
-  purchaseRequestId: string  :49-49
-  vendorId?: string | null  :50-50
-  vendor?: Vendor | null  :51-51
+export interface CostRequirement  :1-10
+  id: string  :2-2
+  projectId: string  :3-3
+  description: string  :4-4
+  category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' |   :5-5
+  identifiedBy: string  :6-6
+  costedBy?: string  :7-7
+  estimatedCost?: number  :8-8
+  status: 'IDENTIFIED' | 'COSTED' | 'APPROVED  :9-9
+export interface BoMItem  :11-28
+  id: string  :12-12
+  lineKey?: string  :13-13
+  opportunityId?: string  :14-14
+  projectId?: string  :15-15
+  partNumber: string  :16-16
+  description: string  :17-17
+  quantity: number  :18-18
+  purchaseCost: number  :19-19
+  … +8 more members  :11-11
+export interface BomHandoff  :31-44
+  id: string  :32-32
+  opportunityId: string  :33-33
+  oppTitle: string  :34-34
+  customerName?: string | null  :35-35
+  handedOffById?: string | null  :36-36
 ```
 
 ### src/types/reports.ts
