@@ -6,11 +6,11 @@
       "localStorage": [
         {
           "name": "enflow_current_user_tenant-1",
-          "value": "{\"id\":\"cmqo85kzn000dhlw3n0omippc\",\"name\":\"Hukuk Müdürü\",\"email\":\"hukuk.muduru@enflow.com\",\"role\":\"LEGAL_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"CONTRACTS_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp9ztn6i000bbqw39d0qckmp\",\"createdAt\":\"2026-06-21T20:13:56.483Z\",\"updatedAt\":\"2026-07-14T11:48:06.602Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"moduleSettings\":\"{\\\"dailyReport\\\":{\\\"shareIntervalDays\\\":7},\\\"visitKpi\\\":{\\\"targetRate\\\":80},\\\"finance\\\":{\\\"interestRates\\\":{\\\"TRY\\\":50,\\\"USD\\\":10,\\\"EUR\\\":8}},\\\"ai\\\":{\\\"baseUrl\\\":\\\"https://api.deepseek.com\\\",\\\"model\\\":\\\"DEEPSEEK\\\",\\\"label\\\":\\\"DEEPSEEK API\\\",\\\"apiKey\\\":\\\"sk-cfa91a0f961a4df78ebe8a33d76851df\\\"},\\\"promotedModules\\\":[],\\\"governance\\\":{\\\"enforceSoD\\\":true},\\\"salesTarget\\\":0,\\\"dmo\\\":{\\\"risturnTiers\\\":[{\\\"thresholdMin\\\":0,\\\"rate\\\":0.02},{\\\"thresholdMin\\\":1000000,\\\"rate\\\":0.05}],\\\"minMarginPct\\\":0.1,\\\"defaultCommission\\\":{\\\"type\\\":\\\"PERCENT\\\",\\\"value\\\":3,\\\"basis\\\":\\\"REVENUE\\\"},\\\"costFxRates\\\":{\\\"TRY\\\":1,\\\"USD\\\":40,\\\"EUR\\\":45}}}\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-07-02T10:08:45.960Z\"}}"
+          "value": "{\"id\":\"cmqo85kzn000dhlw3n0omippc\",\"name\":\"Hukuk Müdürü\",\"email\":\"hukuk.muduru@enflow.com\",\"role\":\"LEGAL_MGR\",\"permissions\":[\"DASHBOARD_VIEW\",\"CONTRACTS_VIEW\",\"DOCUMENTS_VIEW\",\"TODO_VIEW\"],\"status\":\"ACTIVE\",\"tenantId\":\"tenant-1\",\"unitId\":\"cmp9ztn6i000bbqw39d0qckmp\",\"delegateToUserId\":null,\"delegateUntil\":null,\"createdAt\":\"2026-06-21T20:13:56.483Z\",\"updatedAt\":\"2026-07-14T11:48:06.602Z\",\"tenant\":{\"id\":\"tenant-1\",\"name\":\"T-Ecosystem Teknoloji\",\"createdAt\":\"2026-05-14T14:39:43.241Z\",\"updatedAt\":\"2026-08-04T15:51:35.009Z\"}}"
         },
         {
           "name": "enflow_auth_token",
-          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXFvODVrem4wMDBkaGx3M24wb21pcHBjIiwidGlkIjoidGVuYW50LTEiLCJyb2xlIjoiTEVHQUxfTUdSIiwiaWF0IjoxNzg0MDMwMTA2LCJleHAiOjE3ODQwNzMzMDZ9.ItGypD2b4if5gmqx6YEBAfglkmYvUtCQHurjdjFRhz0"
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJjbXFvODVrem4wMDBkaGx3M24wb21pcHBjIiwidGlkIjoidGVuYW50LTEiLCJyb2xlIjoiTEVHQUxfTUdSIiwiaWF0IjoxNzg1OTE1ODY4LCJleHAiOjE3ODU5NTkwNjh9.uJjo7pdhqbmN0Sqfpj1FZ8NMp-WclbB9ADgpPfzHwLY"
         },
         {
           "name": "enflow_active_tenant_id",
