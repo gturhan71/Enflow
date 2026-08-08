@@ -52,7 +52,6 @@ import SecurityTestModule from './modules/SecurityTestModule';
 import CorporateGovernanceModule from './modules/CorporateGovernanceModule';
 import FinanceModule from './modules/FinanceModule';
 import DmoModule from './modules/DmoModule';
-import ManagementReportingModule from './modules/ManagementReportingModule';
 import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
 import ActivityLogModule from './modules/ActivityLogModule';
 import Login from './modules/Login';
@@ -357,7 +356,6 @@ const TenantAppInner = ({
       case 'backup': return <BackupModule />;
       case 'finance': return <FinanceModule />;
       case 'dmo': return <DmoModule />;
-      case 'management-reports': return <ManagementReportingModule />;
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
       case 'virtual-agents-test': return <VirtualAgentsTestModule />;
       case 'activity-log': return <ActivityLogModule />;

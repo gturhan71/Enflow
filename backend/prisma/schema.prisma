@@ -122,6 +122,7 @@ model User {
   unitId       String?
   delegateToUserId String?   // onay vekaleti — bu kullanıcı izinliyken yerine onay verebilecek kişi
   delegateUntil    DateTime? // null = süresiz vekalet
+  dashboardLayout  String?   // JSON: kişiselleştirilmiş Dashboard widget seçimi/sıralaması — null ise rol varsayılanı kullanılır
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
   createdOpps  Opportunity[] @relation("CreatedBy")

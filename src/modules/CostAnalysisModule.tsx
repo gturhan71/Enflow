@@ -243,6 +243,8 @@ const CostAnalysisModule = ({
       setSubmitted(false);
       setApproveNote('');
       if (decision === 'APPROVE' && setActiveTab) setTimeout(() => setActiveTab('crm-proposals'), 600);
+    } catch (e: unknown) {
+      toast.error(e instanceof Error ? e.message : 'Karar kaydedilemedi.');
     } finally {
       setDecisionLoading(false);
     }

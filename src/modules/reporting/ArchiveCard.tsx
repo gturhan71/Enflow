@@ -1,11 +1,14 @@
 import { Archive } from 'lucide-react';
 import type { ArchiveAnalytics } from '../../types';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function ArchiveCard({ d }: { d: ArchiveAnalytics }) {
   const maxCat = Math.max(1, ...d.categories.map(c => c.count));
   return (
     <div className="glass-card p-6 space-y-4">
-      <div className="flex items-center gap-2"><Archive size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Fiziksel Arşiv</h4></div>
+      <div className="flex items-center gap-2"><Archive size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Fiziksel Arşiv</h4>
+        <InfoTooltip text="Fiziksel/dijital arşiv kutularının kategori dağılımı; dikkat listesi en uzun süredir ödünçte olan kayıtları en üstte gösterir — kaybolma/gecikme riskini erken görmek için." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Toplam</p><p className="text-2xl font-black text-slate-800">{d.summary.total}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Fiziksel</p><p className="text-2xl font-black text-slate-700">{d.summary.physical}</p></div>

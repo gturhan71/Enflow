@@ -1,13 +1,16 @@
 import { HeartPulse } from 'lucide-react';
 import type { BusinessHealth } from '../../types';
 import { healthColor, healthBar } from '../../components/HealthCards';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function BusinessHealthCard({ h }: { h: BusinessHealth }) {
   const statusBadge = h.status === 'GÜÇLÜ' ? 'bg-emerald-100 text-emerald-700' : h.status === 'ORTA' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600';
   return (
     <div className="glass-card p-6 space-y-5 lg:col-span-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İş Sağlığı Skoru</h4></div>
+        <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İş Sağlığı Skoru</h4>
+          <InfoTooltip text="Kazanma oranı, pipeline sağlığı, tahsilat ve süreç hızının ağırlıklı ortalamasından oluşan 0-100 kompozit skor; en düşük bileşen (zayıf halka) ayrıca vurgulanır." />
+        </div>
         <span className={`text-[10px] font-black uppercase px-2 py-1 rounded ${statusBadge}`}>{h.status}</span>
       </div>
       <div className="flex items-center gap-6">

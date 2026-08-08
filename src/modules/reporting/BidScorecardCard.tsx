@@ -1,11 +1,14 @@
 import { ClipboardCheck } from 'lucide-react';
 import type { BidScorecard } from '../../types';
 import { REC_STYLE } from './helpers';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function BidScorecardCard({ s }: { s: BidScorecard }) {
   return (
     <div className="glass-card p-6 space-y-4 lg:col-span-2">
-      <div className="flex items-center gap-2"><ClipboardCheck size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Bid / No-Bid Skorkartı</h4></div>
+      <div className="flex items-center gap-2"><ClipboardCheck size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Bid / No-Bid Skorkartı</h4>
+        <InfoTooltip text="Henüz karar verilmemiş (taslak/hazırlık) ihaleler için idare geçmişi + süre + hazırlık + değer-uyumu faktörlerinden oluşan öneri skoru; en yüksek skorlu ihale (Katıl önerisi) en üstte." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Karar-Öncesi</p><p className="text-2xl font-black text-slate-800">{s.summary.total}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Katıl</p><p className="text-2xl font-black text-emerald-600">{s.summary.bid}</p></div>

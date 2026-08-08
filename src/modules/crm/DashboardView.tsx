@@ -2,6 +2,22 @@ import { Target, Building, FileSignature, Activity, TrendingUp, Trophy, BarChart
 import { motion } from 'motion/react';
 import { Opportunity, Customer, Proposal } from '../../types';
 import { STATUS_LABEL, getStatusStyle } from './constants';
+import InfoTooltip from '../../components/InfoTooltip';
+
+// Kural: her dashboard itemı (kart, bölüm başlığı) ⓘ ile "ne gösteriyor, neye
+// göre düzenli" açıklaması taşır (bkz. Dashboard.tsx / Yönetim Raporları'ndaki aynı kural).
+const METRIC_PHILOSOPHY: Record<string, string> = {
+  'Aktif Müşteri': 'Durumu ACTIVE olan müşteri sayısı — pasif/arşivlenmiş müşteriler dahil değil.',
+  'Pipeline Değeri': 'Henüz kazanılmamış/kaybedilmemiş/iştirak-edilmemiş tüm aktif fırsatların toplam değeri.',
+  'Kazanılan Değer': 'Durumu WON olan fırsatların toplam değeri (tüm zamanlar, döneme göre filtrelenmez).',
+  'Kazanma Oranı': 'Kazanılan / (kazanılan + kaybedilen) — yönetim kararıyla iştirak edilmeyenler (WITHDRAWN) paydadan hariç tutulur, KPI\'yı etkilemez.',
+};
+const MODULE_PHILOSOPHY: Record<string, string> = {
+  'crm-opportunities': 'Rakam, WON/LOST/WITHDRAWN dışındaki tüm aktif fırsat sayısıdır.',
+  'crm-customers': 'Rakam, durumu ACTIVE olan müşteri sayısıdır.',
+  'crm-proposals': 'Onay bekleyen teklif varsa öncelikli gösterilir, yoksa toplam teklif sayısı.',
+  'crm-negotiation': 'Rakam, şu an NEGOTIATION aşamasındaki fırsat sayısıdır — canlı müzakere sayısıyla aynı değildir.',
+};
 
 export default function DashboardView({
   opportunities, customers, proposals, setActiveTab,
@@ -94,7 +110,10 @@ export default function DashboardView({
           { label: 'Kazanma Oranı',   value: `%${winRate}`,            icon: <BarChart2 size={20} />,    color: 'bg-purple-50 text-purple-600' },
         ].map(m => (
           <div key={m.label} className="glass-panel rounded-2xl p-5">
-            <div className={`inline-flex p-2 rounded-xl mb-3 ${m.color}`}>{m.icon}</div>
+            <div className="flex items-start justify-between">
+              <div className={`inline-flex p-2 rounded-xl mb-3 ${m.color}`}>{m.icon}</div>
+              <InfoTooltip text={METRIC_PHILOSOPHY[m.label]} />
+            </div>
             <p className="text-2xl font-black text-slate-900">{m.value}</p>
             <p className="text-xs text-slate-500 font-medium mt-0.5">{m.label}</p>
           </div>
@@ -117,7 +136,10 @@ export default function DashboardView({
                 <div className={`${mod.iconColor} mb-3`}>{mod.icon}</div>
                 <ChevronRight size={16} className="text-slate-400 mt-1" />
               </div>
-              <h5 className="font-black text-slate-900 text-lg">{mod.label}</h5>
+              <h5 className="font-black text-slate-900 text-lg flex items-center gap-1.5">
+                {mod.label}
+                <InfoTooltip text={MODULE_PHILOSOPHY[mod.id]} />
+              </h5>
               <p className="text-xs text-slate-500 mt-0.5">{mod.description}</p>
               <p className={`text-xs font-bold mt-3 ${mod.iconColor}`}>{mod.stat}</p>
             </motion.div>
@@ -128,7 +150,10 @@ export default function DashboardView({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Pipeline Özeti */}
         <div className="glass-panel rounded-2xl p-6">
-          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5">Pipeline Dağılımı</h4>
+          <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-5 flex items-center gap-1.5">
+            Pipeline Dağılımı
+            <InfoTooltip text="Fırsatların CRM aşamalarına (Yeni→İletişimde→Nitelikli→Teklif→Pazarlık) göre sayısal dağılımı, akış sırasıyla dizilir — kazanılan/kaybedilen/iştirak-edilmeyenler bu grafikte yok, sadece açık aşamalar." />
+          </h4>
           <div className="space-y-3">
             {stageCounts.map(({ status, label, count }) => (
               <div
@@ -158,7 +183,10 @@ export default function DashboardView({
         {/* Son Fırsatlar */}
         <div className="glass-panel rounded-2xl p-6">
           <div className="flex items-center justify-between mb-5">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Son Fırsatlar</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+              Son Fırsatlar
+              <InfoTooltip text="En son oluşturulan 5 fırsat, oluşturulma tarihine göre azalan sıralı — durumu ne olursa olsun (kazanılan/kaybedilen dahil) gösterilir." />
+            </h4>
             <button
               onClick={() => setActiveTab && setActiveTab('crm-opportunities')}
               className="text-xs text-primary font-semibold hover:underline flex items-center gap-1"

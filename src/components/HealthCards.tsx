@@ -1,6 +1,7 @@
 import { HeartPulse } from 'lucide-react';
 import type { ProjectHealthReport, CustomerHealthReport } from '../types';
 import { fmtCurrency as fmtTRY } from '../lib/format';
+import InfoTooltip from './InfoTooltip';
 
 // Sağlık skoru kartları — Yönetim Raporları + Proje Yönetimi + CRM ortak kullanır.
 
@@ -16,7 +17,9 @@ const HEALTH_STATUS: Record<string, { label: string; badge: string }> = {
 export function ProjectHealthCard({ p, className = 'lg:col-span-2' }: { p: ProjectHealthReport; className?: string }) {
   return (
     <div className={`glass-card p-6 space-y-4 ${className}`}>
-      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Proje Sağlığı</h4></div>
+      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Proje Sağlığı</h4>
+        <InfoTooltip text="Marj, takvim ve bütçe faktörlerinden oluşan 0-100 proje sağlık skoru; en düşük skorlu (en kritik) proje en üstte listelenir." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Aktif</p><p className="text-2xl font-black text-slate-800">{p.summary.total}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kritik</p><p className="text-2xl font-black text-red-600">{p.summary.critical}</p></div>
@@ -68,7 +71,9 @@ const CUST_STATUS: Record<string, { label: string; badge: string }> = {
 export function CustomerHealthCard({ c, className = 'lg:col-span-2' }: { c: CustomerHealthReport; className?: string }) {
   return (
     <div className={`glass-card p-6 space-y-4 ${className}`}>
-      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri Sağlığı</h4></div>
+      <div className="flex items-center gap-2"><HeartPulse size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri Sağlığı</h4>
+        <InfoTooltip text="Ödeme, kazanma oranı, aktivite ve sadakat faktörlerinden oluşan 0-100 müşteri sağlık skoru; en riskli (en düşük skorlu) müşteri en üstte listelenir." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Aktif</p><p className="text-2xl font-black text-slate-800">{c.summary.total}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Sadık</p><p className="text-2xl font-black text-emerald-600">{c.summary.loyal}</p></div>

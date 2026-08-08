@@ -3,14 +3,18 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts';
 import type { ReportChartSeries } from '../../types';
-import { PIE_COLORS } from './helpers';
+import { PIE_COLORS, CHART_PHILOSOPHY, DEFAULT_CHART_PHILOSOPHY } from './helpers';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function ChartBlock({ c }: { c: ReportChartSeries }) {
   const data = c.data.filter(d => d.value !== 0 || c.type === 'bar');
   if (data.length === 0) return null;
   return (
     <div className="glass-card p-5 rounded-2xl">
-      <h4 className="text-sm font-black text-slate-900 mb-3">{c.title}</h4>
+      <h4 className="text-sm font-black text-slate-900 mb-3 flex items-center gap-1.5">
+        {c.title}
+        <InfoTooltip text={CHART_PHILOSOPHY[c.title] || DEFAULT_CHART_PHILOSOPHY} />
+      </h4>
       <div className="h-60 w-full">
         <ResponsiveContainer width="100%" height="100%">
           {c.type === 'pie' ? (

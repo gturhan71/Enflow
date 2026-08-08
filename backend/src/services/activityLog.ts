@@ -1,5 +1,6 @@
 import { prisma } from '../prismaClient';
 import { resolveActorName, resolveEntityLabel, buildSummary } from './activityLogSummary';
+import { pingDashboard } from './dashboardStream';
 
 // Merkezi denetim-izi (ActivityLog) yazıcı.
 // NON-THROWING: loglama hiçbir koşulda ana işlemi bozmaz (hata yutulur).
@@ -44,6 +45,7 @@ export async function logActivity(p: LogActivityParams): Promise<void> {
         summary,
       },
     });
+    pingDashboard(p.tenantId);
   } catch {
     /* denetim-izi yazımı ana akışı asla bozmaz */
   }

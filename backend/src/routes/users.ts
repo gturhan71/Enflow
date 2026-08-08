@@ -49,6 +49,18 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
   res.json(parsePermissions(user));
 }));
 
+// Kişiselleştirilmiş Dashboard düzeni — herkes kendi görünümünü düzenler (rol kapısı yok).
+// MUTLAKA /:id'den ÖNCE tanımlanmalı (aksi halde Express 'me' değerini :id olarak yakalar).
+router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { widgets, order } = req.body;
+  if (!Array.isArray(order) || !Array.isArray(widgets)) {
+    return res.status(400).json({ error: 'Geçersiz düzen verisi.' });
+  }
+  const dashboardLayout = JSON.stringify({ widgets, order });
+  await prisma.user.update({ where: { id: req.userId }, data: { dashboardLayout } });
+  res.json({ dashboardLayout });
+}));
+
 router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const { name, email, role, unitId, permissions, status, password, delegateToUserId, delegateUntil } = req.body;
   const tenantId = req.tenantId;

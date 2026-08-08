@@ -1,6 +1,7 @@
 import { AlertTriangle, Clock } from 'lucide-react';
 import type { ReportOverview } from '../../types';
 import { ROLE_LABELS } from '../../constants';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function BottleneckPanel({ overview }: { overview: ReportOverview }) {
   const { bottlenecks } = overview;
@@ -9,6 +10,7 @@ export default function BottleneckPanel({ overview }: { overview: ReportOverview
       <div className="flex items-center gap-2 mb-4">
         <AlertTriangle className="text-amber-500" size={18} />
         <h3 className="text-base font-black text-slate-900">İş Akışı Darboğazı</h3>
+        <InfoTooltip text="Onay zincirinde (Finans→İGB→GM→KSU) sırası gelmiş ama bekleyen aşamalar; birimler en fazla bekleyen kaydın süresine (en eski gün) göre azalan sıralanır." />
         <span className="text-[10px] text-slate-400 font-bold">— onay zinciri hangi birimde bekliyor</span>
       </div>
       {bottlenecks.length === 0 ? (

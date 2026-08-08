@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Bell, 
   Search, 
@@ -19,6 +19,15 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Notification } from '../types';
 import { apiService } from '../services/apiService';
 import { logger } from '../utils/logger';
+import { useOpportunities, useCustomers, useProjects, useTasks } from '../hooks/useEnflowQueries';
+
+interface SearchResult {
+  id: string;
+  category: string;
+  label: string;
+  sub?: string;
+  targetTab: string;
+}
 
 const Header = ({ 
   title,
@@ -41,8 +50,45 @@ const Header = ({
   const { theme, toggleTheme } = useTheme();
   const [showSettings, setShowSettings] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showSearchResults, setShowSearchResults] = useState(false);
   const settingsRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  // Global arama — zaten yüklü (TanStack Query cache'i App.tsx ile paylaşılan)
+  // veriler üzerinde çalışır, ek bir arama endpoint'i gerekmez.
+  const tenantId = currentUser?.tenantId || '';
+  const { data: searchOpportunities } = useOpportunities(tenantId);
+  const { data: searchCustomers } = useCustomers(tenantId);
+  const { data: searchProjects } = useProjects(tenantId);
+  const { data: searchTasks } = useTasks(tenantId);
+
+  const searchResults: SearchResult[] = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (q.length < 2) return [];
+    const results: SearchResult[] = [];
+    for (const o of (searchOpportunities || []) as { id: string; title: string; status?: string }[]) {
+      if (o.title?.toLowerCase().includes(q)) results.push({ id: o.id, category: 'Fırsat', label: o.title, sub: o.status, targetTab: 'crm-opportunities' });
+    }
+    for (const c of (searchCustomers || []) as { id: string; name: string }[]) {
+      if (c.name?.toLowerCase().includes(q)) results.push({ id: c.id, category: 'Müşteri', label: c.name, targetTab: 'crm-customers' });
+    }
+    for (const p of (searchProjects || []) as { id: string; name: string; status?: string }[]) {
+      if (p.name?.toLowerCase().includes(q)) results.push({ id: p.id, category: 'Proje', label: p.name, sub: p.status, targetTab: 'project-mgmt' });
+    }
+    for (const t of (searchTasks || []) as { id: string; title: string; status?: string }[]) {
+      if (t.title?.toLowerCase().includes(q)) results.push({ id: t.id, category: 'Görev', label: t.title, sub: t.status, targetTab: 'todo' });
+    }
+    return results.slice(0, 12);
+  }, [searchQuery, searchOpportunities, searchCustomers, searchProjects, searchTasks]);
+
+  const handleSearchSelect = (r: SearchResult) => {
+    if (onNavigate) onNavigate(r.targetTab, r.id);
+    else setActiveTab?.(r.targetTab);
+    setSearchQuery('');
+    setShowSearchResults(false);
+  };
   // BOŞ başla — sahte demo bildirimleri ASLA gösterme (tenant izolasyonu: yalnız
   // backend'in döndürdüğü, bu kullanıcı+tenant'a ait gerçek bildirimler görünür).
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -103,6 +149,9 @@ const Header = ({
       if (notificationsRef.current && !notificationsRef.current.contains(event.target as Node)) {
         setShowNotifications(false);
       }
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowSearchResults(false);
+      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -161,13 +210,49 @@ const Header = ({
           </div>
         </div>
 
-        <div className="hidden lg:flex relative group max-w-md w-full ml-8">
+        <div className="hidden lg:flex relative group max-w-md w-full ml-8" ref={searchRef}>
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors duration-300" size={18} />
-          <input 
-            type="text" 
-            placeholder="Sistem genelinde ara..." 
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => { setSearchQuery(e.target.value); setShowSearchResults(true); }}
+            onFocus={() => setShowSearchResults(true)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') { setSearchQuery(''); setShowSearchResults(false); (e.target as HTMLInputElement).blur(); }
+              else if (e.key === 'Enter' && searchResults[0]) handleSearchSelect(searchResults[0]);
+            }}
+            placeholder="Sistem genelinde ara..."
             className="glass-input w-full pl-14 pr-6 py-3 rounded-[20px] text-xs font-bold"
           />
+
+          <AnimatePresence>
+            {showSearchResults && searchQuery.trim().length >= 2 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10, scale: 0.97 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 10, scale: 0.97 }}
+                className="absolute left-0 right-0 top-full mt-2 glass-panel rounded-[20px] overflow-hidden shadow-2xl z-50 border-white/40 dark:border-white/10 max-h-[400px] overflow-y-auto custom-scrollbar"
+              >
+                {searchResults.length === 0 ? (
+                  <p className="p-6 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Sonuç yok.</p>
+                ) : (
+                  searchResults.map((r) => (
+                    <button
+                      key={`${r.category}-${r.id}`}
+                      onClick={() => handleSearchSelect(r)}
+                      className="w-full px-5 py-3 text-left border-b border-white/5 last:border-0 hover:bg-white/10 transition-all flex items-center justify-between gap-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">{r.label}</p>
+                        {r.sub && <p className="text-[10px] text-slate-400 truncate">{r.sub}</p>}
+                      </div>
+                      <span className="shrink-0 text-[9px] font-black text-primary uppercase tracking-widest bg-primary/10 px-2 py-0.5 rounded-full">{r.category}</span>
+                    </button>
+                  ))
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 

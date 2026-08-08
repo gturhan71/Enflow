@@ -4,6 +4,7 @@ import { ROLE_LABELS } from '../../constants';
 import { printOverview } from './helpers';
 import BottleneckPanel from './BottleneckPanel';
 import MetricCard from './MetricCard';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function OverviewTab({ overview, start, end }: { overview: ReportOverview; start: string; end: string }) {
   return (
@@ -19,6 +20,7 @@ export default function OverviewTab({ overview, start, end }: { overview: Report
           <div className="flex items-center gap-2">
             <TrendingUp className="text-primary" size={16} />
             <h3 className="text-base font-black text-slate-900">{u.label}</h3>
+            <InfoTooltip text={`${u.label} biriminin seçili dönemdeki öne çıkan metrikleri; her kart bir önceki dönemle (▲/▼) otomatik karşılaştırılır.`} />
             <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">{ROLE_LABELS[u.role] || u.role}</span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

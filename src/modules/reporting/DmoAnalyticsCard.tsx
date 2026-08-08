@@ -2,12 +2,15 @@ import { Package, AlertTriangle } from 'lucide-react';
 import type { DmoAnalytics } from '../../types';
 import { DMO_STATUS_TR, pct } from './helpers';
 import { fmtCurrency as fmtTRY } from '../../lib/format';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function DmoAnalyticsCard({ d }: { d: DmoAnalytics }) {
   return (
     <div className="glass-card p-6 space-y-4 lg:col-span-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><Package size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">DMO Kanalı</h4></div>
+        <div className="flex items-center gap-2"><Package size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">DMO Kanalı</h4>
+          <InfoTooltip text="DMO (Devlet Malzeme Ofisi) siparişlerinin kur farkı + risturn + komisyon sonrası net kârlılığı; kârsız çıkan siparişler ayrıca sayaçla uyarılır, kurumlar ciroya göre büyükten küçüğe sıralanır." />
+        </div>
         {d.unprofitableCount > 0 && <span className="flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded"><AlertTriangle size={12} /> {d.unprofitableCount} kârsız</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">

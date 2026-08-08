@@ -1,13 +1,16 @@
 import { TrendingUp } from 'lucide-react';
 import type { FunnelReport } from '../../types';
 import { pct } from './helpers';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function FunnelCard({ f }: { f: FunnelReport }) {
   const max = Math.max(1, ...f.stages.map(s => s.count));
   const topLoss = f.lossByReason[0];
   return (
     <div className="glass-card p-6 space-y-4">
-      <div className="flex items-center gap-2"><TrendingUp size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Dönüşüm Hunisi</h4></div>
+      <div className="flex items-center gap-2"><TrendingUp size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Dönüşüm Hunisi</h4>
+        <InfoTooltip text="Fırsatların CRM aşamalarına göre sayısal dağılımı, aşamalar akış sırasına göre (Yeni→...→Kazanıldı) dizilir; her aşama altında bir sonrakine geçiş oranı gösterilir — düşük geçiş oranı süreçte sızıntı noktasını işaret eder." />
+      </div>
       <div className="space-y-2">
         {f.stages.map((s) => (
           <div key={s.status} className="flex items-center gap-3">

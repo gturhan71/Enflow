@@ -2,12 +2,15 @@ import { BarChart3 } from 'lucide-react';
 import type { TenderAnalytics } from '../../types';
 import { pct } from './helpers';
 import { fmtCurrency as fmtTRY } from '../../lib/format';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function TenderCard({ t }: { t: TenderAnalytics }) {
   const o = t.overall;
   return (
     <div className="glass-card p-6 space-y-4">
-      <div className="flex items-center gap-2"><BarChart3 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İhale Kazanma Kırılımı</h4></div>
+      <div className="flex items-center gap-2"><BarChart3 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">İhale Kazanma Kırılımı</h4>
+        <InfoTooltip text="İhale kazanma oranının yöntem ve idareye göre kırılımı; her grup toplam ihale sayısına göre azalan sıralanır — hangi idare/yöntemde daha güçlü olduğunuzu gösterir." />
+      </div>
       <div className="grid grid-cols-3 gap-2 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kazanma%</p><p className="text-2xl font-black text-emerald-600">{pct(o.winRate)}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Kazanılan Değer</p><p className="text-lg font-black text-slate-800">{fmtTRY(o.wonValue)}</p></div>

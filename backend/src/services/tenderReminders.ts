@@ -5,6 +5,7 @@
 // çağrılarında tetiklenir; kaçırılan eşikler bir sonraki sweep'te yakalanır.
 
 import { prisma } from '../prismaClient';
+import { pingDashboard } from './dashboardStream';
 
 interface Threshold { key: string; hours: number; label: string; }
 const THRESHOLDS: Threshold[] = [
@@ -29,6 +30,7 @@ export async function sweepTenderReminders(tenantId: string): Promise<void> {
     });
     if (tenders.length === 0) return;
     const salesSupport = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_SUPPORT' } });
+    let sentAny = false;
 
     for (const t of tenders) {
       const deadline = t.submissionDeadline!.getTime();
@@ -39,6 +41,7 @@ export async function sweepTenderReminders(tenantId: string): Promise<void> {
       if (due.length === 0) continue;
 
       // Sadece en yakın (en küçük saatli) eşiği bildir; kaçırılanları da işaretle (spam önleme)
+      sentAny = true;
       const closest = due.reduce((a, b) => (a.hours < b.hours ? a : b));
       const recipients = [...new Set([salesSupport?.id, t.ownerId].filter(Boolean) as string[])];
       for (const userId of recipients) {
@@ -53,6 +56,7 @@ export async function sweepTenderReminders(tenantId: string): Promise<void> {
       const merged = [...new Set([...sent, ...due.map(d => d.key)])];
       await prisma.tender.update({ where: { id: t.id }, data: { remindersSent: JSON.stringify(merged) } }).catch(() => {});
     }
+    if (sentAny) pingDashboard(tenantId);
   } catch {
     // sweep ana akışı bozmaz
   }

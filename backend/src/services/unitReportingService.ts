@@ -119,7 +119,7 @@ async function crmMetrics(tenantId: string, p: Period): Promise<{ metrics: Metri
   const charts: ChartSeries[] = [
     {
       title: 'Fırsat Sonuçları (dönem)',
-      type: 'bar',
+      type: 'pie',
       data: [
         { name: 'Açılan', value: opened.length },
         { name: 'Kazanılan', value: wonInPeriod.length },
@@ -206,7 +206,7 @@ async function procurementMetrics(tenantId: string, p: Period): Promise<{ metric
   ];
   const charts: ChartSeries[] = [{
     title: 'Talep Statü Dağılımı',
-    type: 'bar',
+    type: 'pie',
     data: Object.entries(byStatus).map(([name, value]) => ({ name, value })),
   }];
   return { metrics, charts };
@@ -338,7 +338,7 @@ async function tenderMetrics(tenantId: string, p: Period): Promise<{ metrics: Me
   ];
   const charts: ChartSeries[] = [{
     title: 'İhale Statü Dağılımı (dönem)',
-    type: 'bar',
+    type: 'pie',
     data: Object.entries(byStatus).map(([name, value]) => ({ name, value })),
   }];
   return { metrics, charts };

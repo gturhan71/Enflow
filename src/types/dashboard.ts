@@ -7,6 +7,8 @@ export interface DashboardPayload {
     costApprovalsPending: { id: string; title: string; value: number }[];
     invoicesDue: { id: string; invoiceNo?: string | null; amount: number; currency: string; dueDate: string | null; overdue: boolean }[];
     milestonesDue: { id: string; title: string; projectName?: string | null; plannedEnd: string | null; daysLeft: number | null }[];
+    contractDeadlines: { id: string; title: string; deadline: string | null; daysLeft: number | null }[];
+    legalDeadlines: { id: string; title: string; priority: string; dueDate: string | null; daysLeft: number | null }[];
   };
   management: {
     bottlenecks: { role: string; label?: string; pendingCount: number; oldestWaitingDays: number }[];
@@ -15,6 +17,8 @@ export interface DashboardPayload {
     financing: { receivableByCurrency: Record<string, number>; overdueByCurrency: Record<string, number> };
     purchaseRequests: Record<string, number>;
     projects: { active: number; avgMargin: number };
+    topRisks: { id: string; title: string; type: string; score: number }[];
+    agentActivityToday: { pendingRatification: number; actionsTaken: number; total: number };
   };
   personal: { myOpportunities: { id: string; title: string; value: number; status: string; technicalStatus?: string }[]; myTasksPending: number; unreadNotifications: number };
 }

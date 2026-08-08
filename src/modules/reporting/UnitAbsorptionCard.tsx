@@ -2,13 +2,16 @@ import { LayoutGrid, AlertTriangle } from 'lucide-react';
 import type { UnitAbsorptionReport } from '../../types';
 import { pct } from './helpers';
 import { fmtCurrency as fmtTRY } from '../../lib/format';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function UnitAbsorptionCard({ a }: { a: UnitAbsorptionReport }) {
   const barCol = (p: number) => p >= 1 ? 'bg-red-500' : p >= 0.7 ? 'bg-emerald-500' : 'bg-amber-500';
   return (
     <div className="glass-card p-6 space-y-4 lg:col-span-2">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><LayoutGrid size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Birim Bütçe Absorpsiyonu</h4></div>
+        <div className="flex items-center gap-2"><LayoutGrid size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Birim Bütçe Absorpsiyonu</h4>
+          <InfoTooltip text="Birim personel bütçesinin projelere ne kadarının dağıtıldığı (absorpsiyon oranı); %100 üzeri aşırı-dağıtım, düşük oran ise atıl kapasite/maliyet demektir. Birimler bütçe büyüklüğüne göre sıralanır." />
+        </div>
         {a.summary.overAllocatedCount > 0 && <span className="flex items-center gap-1 text-[10px] font-black text-red-600 bg-red-50 px-2 py-1 rounded"><AlertTriangle size={12} /> {a.summary.overAllocatedCount} aşırı-dağıtım</span>}
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">

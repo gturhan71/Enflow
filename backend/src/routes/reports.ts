@@ -12,6 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
+import { subscribeDashboard } from '../services/dashboardStream';
 import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth, computeDmoAnalytics, computeArchiveAnalytics } from '../services/analyticsService';
 
 const router: Router = Router();
@@ -141,6 +142,28 @@ router.get('/dashboard', tenantMiddleware, asyncHandler(async (req: Request, res
   const result = await computeDashboard(req.tenantId, req.userId);
   res.json(result);
 }));
+
+// Gerçek-zamanlılık: "bir şey değişti" sinyali (SSE). Tam veri taşımaz —
+// frontend bunu alınca GET /dashboard ile yeniden çeker. Uzun ömürlü bağlantı
+// olduğu için asyncHandler kullanılmaz; hata/kopma req 'close' ile temizlenir.
+router.get('/dashboard/stream', tenantMiddleware, (req: Request, res: Response) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  res.write(': connected\n\n');
+
+  const unsubscribe = subscribeDashboard(req.tenantId, (payload) => {
+    res.write(`data: ${JSON.stringify(payload)}\n\n`);
+  });
+  const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
+
+  req.on('close', () => {
+    clearInterval(heartbeat);
+    unsubscribe();
+  });
+});
 
 // Presales → Satışa devredilen BoM'lar (yönetici liste/detay) — ?start=&end=
 router.get('/bom-handoffs', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

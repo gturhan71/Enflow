@@ -70,6 +70,9 @@ class ApiService {
     return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);
   }
   async getDashboard() { return apiClient.fetchWithAuth('/reports/dashboard'); }
+  async saveDashboardLayout(layout: { widgets: { key: string; enabled: boolean }[]; order: string[] }): Promise<{ dashboardLayout: string }> {
+    return apiClient.fetchWithAuth('/users/me/dashboard-layout', { method: 'PUT', body: JSON.stringify(layout) });
+  }
   // Büyüme Analitiği Faz 1 — salt-okunur raporlar
   async getAging(): Promise<import('../types').AgingReport> { return apiClient.fetchWithAuth('/finance/aging'); }
   async getFunnel(): Promise<import('../types').FunnelReport> { return apiClient.fetchWithAuth('/reports/funnel'); }

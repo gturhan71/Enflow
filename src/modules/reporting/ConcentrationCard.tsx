@@ -1,12 +1,15 @@
 import { Building2 } from 'lucide-react';
 import type { ConcentrationReport } from '../../types';
 import { pct } from './helpers';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function ConcentrationCard({ c }: { c: ConcentrationReport }) {
   const risk = c.hhi > 2500 ? { t: 'Yüksek yoğunlaşma', col: 'text-red-600' } : c.hhi > 1500 ? { t: 'Orta yoğunlaşma', col: 'text-amber-600' } : { t: 'Dağınık (sağlıklı)', col: 'text-emerald-600' };
   return (
     <div className="glass-card p-6 space-y-4 lg:col-span-2">
-      <div className="flex items-center gap-2"><Building2 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri & Kamu Konsantrasyonu</h4></div>
+      <div className="flex items-center gap-2"><Building2 size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Müşteri & Kamu Konsantrasyonu</h4>
+        <InfoTooltip text="Gelirin kaç müşteriye bağımlı olduğunu ölçen HHI endeksi (yüksek = riskli tekelleşme) + en büyük müşterilerin payı; müşteriler gelir payına göre azalan sıralanır." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">HHI</p><p className={`text-2xl font-black ${risk.col}`}>{c.hhi}</p><p className="text-[9px] text-slate-400">{risk.t}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">En Büyük Müşteri</p><p className="text-2xl font-black text-slate-800">{pct(c.top1Pct)}</p></div>

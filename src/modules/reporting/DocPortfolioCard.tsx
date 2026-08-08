@@ -1,11 +1,14 @@
 import { FileStack } from 'lucide-react';
 import type { DocumentPortfolio } from '../../types';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function DocPortfolioCard({ d }: { d: DocumentPortfolio }) {
   const maxCat = Math.max(1, ...d.categories.map(c => c.count));
   return (
     <div className="glass-card p-6 space-y-4">
-      <div className="flex items-center gap-2"><FileStack size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Belge Portföyü</h4></div>
+      <div className="flex items-center gap-2"><FileStack size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Belge Portföyü</h4>
+        <InfoTooltip text="Kurumsal doküman envanterinin kategori dağılımı + süresi dolan/dolacak evraklar; kategoriler adede göre azalan, dikkat listesi süresi en kritik olan (dolmuş → yakın) sıralı." />
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Toplam</p><p className="text-2xl font-black text-slate-800">{d.summary.total}</p></div>
         <div><p className="text-[9px] font-black uppercase tracking-widest text-slate-400">Dolacak (90g)</p><p className="text-2xl font-black text-amber-600">{d.summary.expiringSoon}</p></div>

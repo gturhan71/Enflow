@@ -20,11 +20,13 @@ export interface HelpArticle {
 export const HELP_ARTICLES: HelpArticle[] = [
   {
     moduleId: 'dashboard',
-    summary: 'Rolünüze göre kişiselleştirilmiş özet ekranı — o an dikkat etmeniz gereken işleri, zamana duyarlı uyarıları ve genel KPI\'ları tek bakışta gösterir.',
-    audience: 'Herkes — içerik role göre otomatik değişir.',
+    summary: 'Rolünüze göre kişiselleştirilmiş özet ekranı — o an dikkat etmeniz gereken işleri, zamana duyarlı uyarıları ve genel KPI\'ları tek bakışta gösterir; yöneticiler için Yönetim Raporları & Analitik de burada.',
+    audience: 'Herkes — içerik role ve izinlerinize göre otomatik değişir.',
     sections: [
-      { heading: 'Ne görürsünüz', body: 'Üstte rolünüze özel "Kokpit" kartları (ör. Satış Müdürü için bekleyen maliyet onayları, Finans için teminat/fatura vadeleri). Yöneticiler için ayrıca 4 KPI kartı (Pipeline, Kazanılan, Aktif Proje, Kaybedilen), gelen birim raporları, satış boru hattı grafiği ve aktif projeler listesi.' },
-      { heading: 'Nasıl kullanılır', body: 'Herhangi bir kart üzerine tıklamak sizi ilgili modüle götürür (ör. "Bekleyen Maliyet Onayı" kartı Maliyet Analizi ekranına açılır). Dashboard salt-görüntüleme amaçlıdır; işlem yapmak için ilgili modüle geçmeniz gerekir.' },
+      { heading: 'Ne görürsünüz', body: 'Üstte kritik uyarılar şeridi, ardından rolünüze özel "Kokpit" kartları (ör. Satış Müdürü için bekleyen maliyet onayları, Finans için teminat/fatura vadeleri) — her kartın başlığındaki ⓘ ikonu o kartın neden var olduğunu ve hangi kararı beslediğini açıklar. Yöneticiler için ayrıca 4 KPI kartı (Pipeline, Kazanılan, Aktif Proje, Kaybedilen), gelen birim raporları, satış boru hattı grafiği ve aktif projeler listesi.' },
+      { heading: 'Detay ve kişiselleştirme', body: 'Listesi kısaltılmış kartlarda "Detay →" butonu tam listeyi bir panelde açar. "Kokpiti Düzenle" ile hangi kartları göreceğinizi ve sırasını kendinize göre ayarlayabilir, kaydedebilirsiniz — bu tercih sadece size özeldir.' },
+      { heading: 'Yönetim Raporları & Analitik', body: '`MANAGEMENT_REPORTS_VIEW` iznine sahip yöneticiler (GM ve birim müdürlerinin çoğu) için Dashboard\'ın altında birim bazlı performans metrikleri, süreç darboğazları, büyüme analitiği ve dönemsel birim raporları gömülü olarak görünür — ayrı bir sekmeye gerek yok. Bu izne sahip olmayan kullanıcılar sadece kendi Kokpit kartlarını görür. Birim müdürüyseniz buradan kendi biriminiz için dönemsel rapor gönderebilir, üstünüz onayına sunabilirsiniz; raporları tek tek veya konsolide yazdırabilirsiniz.' },
+      { heading: 'Nasıl kullanılır', body: 'Bir karta tıklamak (Detay dışındaki alan) sizi ilgili modüle götürür (ör. "Bekleyen Maliyet Onayı" kartı Maliyet Analizi ekranına açılır). Dashboard salt-görüntüleme amaçlıdır; işlem yapmak için ilgili modüle geçmeniz gerekir.' },
     ],
   },
   {
@@ -125,15 +127,6 @@ export const HELP_ARTICLES: HelpArticle[] = [
     sections: [
       { heading: 'Ne işe yarar', body: 'Sistemde bir birimden diğerine devredilen her iş burada bir görev olarak belirir (ör. sözleşme imzası sonrası proje ekibine düşen görevler). İş günü bazlı SLA\'ya göre termin otomatik hesaplanır.' },
       { heading: 'Nasıl kullanılır', body: '1) Size atanan görevleri listeden görüp durumunu (bekliyor/tamamlandı) güncelleyin. 2) **"Bekleyen Onaylarım"** sekmesi, çok-aşamalı onay zincirinde (Finans→İGB→GM→KSU) sıranın size geldiği kayıtları gösterir — buradan onaylayın veya reddedin, aktif kullanıcısı olmayan roller otomatik atlanır. 3) Görev başlığına tıklamak sizi ilgili modüldeki kayda götürür.' },
-    ],
-  },
-  {
-    moduleId: 'management-reports',
-    summary: 'Birim bazlı performans metrikleri, süreç darboğazları ve dönemsel birim raporları.',
-    audience: 'GM ve birim müdürleri.',
-    sections: [
-      { heading: 'Ne işe yarar', body: 'Her birimin ne kadar görev tamamladığını, nerede iş biriktiğini (darboğaz) ve dönemsel olarak birimlerin kendi hazırladığı raporları tek ekranda görürsünüz; önceki dönemle karşılaştırma (▲/▼) otomatik hesaplanır.' },
-      { heading: 'Nasıl kullanılır', body: '1) Üst sekmelerden birim metriklerini, darboğaz analizini veya gelen birim raporlarını seçin. 2) Bir birim müdürüyseniz kendi biriminiz için dönemsel rapor gönderebilir, üstünüz onayına sunabilirsiniz. 3) Raporları tek tek veya konsolide olarak yazdırabilirsiniz.' },
     ],
   },
   {

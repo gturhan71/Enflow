@@ -43,6 +43,32 @@ class ApiClient {
     return response;
   }
 
+  // Dashboard gerçek-zamanlılık (SSE) — EventSource özel header desteklemediği için
+  // (Authorization/x-tenant-id gerekiyor) fetch + ReadableStream ile aynı auth deseni kullanılır.
+  // Her "data:" satırında onMessage çağrılır; frontend tam veriyi ayrıca REST'ten çeker.
+  async streamDashboard(onMessage: () => void, signal: AbortSignal): Promise<void> {
+    const effectiveTenantId = this.tenantId || localStorage.getItem('enflow_active_tenant_id') || '';
+    const effectiveToken = this.token || localStorage.getItem('enflow_auth_token') || 'mock-token';
+    const response = await fetch(`${API_BASE_URL}/reports/dashboard/stream`, {
+      headers: { 'x-tenant-id': effectiveTenantId, Authorization: `Bearer ${effectiveToken}` },
+      signal,
+    });
+    if (!response.ok || !response.body) return;
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split('\n\n');
+      buffer = events.pop() || '';
+      for (const evt of events) {
+        if (evt.startsWith('data:')) onMessage();
+      }
+    }
+  }
+
   async login(email: string, password: string) {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',

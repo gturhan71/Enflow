@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { BarChart3, RefreshCw, LayoutGrid, TrendingUp, Building2, FileText, Inbox } from 'lucide-react';
+import { BarChart3, RefreshCw, LayoutGrid, TrendingUp, Building2, FileText, Inbox, Info } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import type {
@@ -13,14 +13,26 @@ import MyReportsTab from './reporting/MyReportsTab';
 import IncomingReportsTab from './reporting/IncomingReportsTab';
 import ReportForm from './reporting/ReportForm';
 
-export default function ManagementReportingModule() {
+type ReportTab = 'overview' | 'analytics' | 'unit' | 'my-reports' | 'incoming';
+
+// Her sekmenin ne gösterdiği + neye göre düzenlendiği — sekme çubuğunun altında
+// aktif sekme için her zaman görünür açıklama olarak gösterilir.
+const TAB_META: Record<ReportTab, string> = {
+  overview: 'Her birimin dönemsel öne çıkan metrikleri + onay zincirinde en uzun bekleyen aşamalar (darboğazlar); birimler sabit/kanonik sırayla, darboğazlar bekleme süresine göre azalan sıralı listelenir.',
+  analytics: 'Şirket geneli büyüme/sağlık göstergeleri (iş sağlığı skoru, kârlılık, kazanma oranı, doküman portföyü vb.) — her kart kendi ⓘ açıklamasını taşır, veriler dönemden bağımsız güncel durumu yansıtır.',
+  unit: 'Seçtiğiniz tek bir birimin dönem metrikleri + grafiği, önceki dönemle karşılaştırmalı (▲/▼); üstteki birim seçiciyle değiştirilir.',
+  'my-reports': 'Kendi biriminiz için hazırladığınız dönemsel raporlar, en yeni en üstte; durum etiketiyle (taslak/sunuldu/incelendi) sıralı.',
+  incoming: 'Size (yöneticinize) sunulmuş, henüz incelenmemiş birim raporları; en eski sunulan en üstte — SLA gecikmesini önlemek için.',
+};
+
+export default function ManagementReportingModule({ embedded = false }: { embedded?: boolean } = {}) {
   const { currentUser } = useAuth();
   const isGM = currentUser.role === 'GENERAL_MANAGER';
   const today = new Date();
   const monthStart = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().slice(0, 10);
   const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().slice(0, 10);
 
-  const [tab, setTab] = useState<'overview' | 'analytics' | 'unit' | 'my-reports' | 'incoming'>('overview');
+  const [tab, setTab] = useState<ReportTab>('overview');
   const [start, setStart] = useState(monthStart);
   const [end, setEnd] = useState(monthEnd);
   const [overview, setOverview] = useState<ReportOverview | null>(null);
@@ -95,18 +107,20 @@ export default function ManagementReportingModule() {
   const deleteReport = async (id: string) => { await apiService.deleteUnitReport(id); loadMyReports(); };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className={embedded ? 'space-y-6' : 'p-6 space-y-6'}>
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
-            <BarChart3 className="text-primary" size={22} />
+        {embedded ? <div /> : (
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-primary/10 flex items-center justify-center">
+              <BarChart3 className="text-primary" size={22} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tighter">Yönetim Raporları</h1>
+              <p className="text-xs text-slate-400 font-bold">Birim performansı ve iş akışı izleme</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tighter">Yönetim Raporları</h1>
-            <p className="text-xs text-slate-400 font-bold">Birim performansı ve iş akışı izleme</p>
-          </div>
-        </div>
+        )}
         <div className="flex items-center gap-2">
           <input type="date" value={start} onChange={e => setStart(e.target.value)} className="input-glass text-xs px-3 py-2 rounded-xl" />
           <span className="text-slate-400 text-xs">—</span>
@@ -138,6 +152,10 @@ export default function ManagementReportingModule() {
           </button>
         )}
       </div>
+      <p className="flex items-start gap-1.5 text-[11px] text-slate-400 leading-relaxed -mt-2">
+        <Info size={12} className="shrink-0 mt-0.5 text-slate-300" />
+        {TAB_META[tab]}
+      </p>
 
       {/* Büyüme Analitiği */}
       {tab === 'analytics' && <AnalyticsTab />}

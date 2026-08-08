@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { ForecastReport } from '../../types';
 import { pct, STAGE_LABELS } from './helpers';
 import { fmtCurrency as fmtTRY } from '../../lib/format';
+import InfoTooltip from '../../components/InfoTooltip';
 
 export default function ForecastCard({ f, onSaved }: { f: ForecastReport; onSaved: () => void }) {
   const { currentUser } = useAuth();
@@ -25,7 +26,9 @@ export default function ForecastCard({ f, onSaved }: { f: ForecastReport; onSave
   return (
     <div className="glass-card p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2"><Gauge size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Ağırlıklı Tahmin & Kapsama</h4></div>
+        <div className="flex items-center gap-2"><Gauge size={16} className="text-primary" /><h4 className="font-black text-slate-900 uppercase italic tracking-tighter">Ağırlıklı Tahmin & Kapsama</h4>
+          <InfoTooltip text="Her fırsatın değeri kendi kazanma olasılığıyla (probability) çarpılıp toplanır — 'ağırlıklı pipeline'; bunun satış hedefine oranı kapsama yüzdesini verir. Aşama dağılımı olasılığa göre ağırlıklı, en yüksek aşama en üstte." />
+        </div>
         {isGM && !editing && <button onClick={() => { setVal(String(f.target || '')); setEditing(true); }} className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline flex items-center gap-1"><Pencil size={11} />Hedef</button>}
       </div>
       <div className="grid grid-cols-3 gap-3 text-center">

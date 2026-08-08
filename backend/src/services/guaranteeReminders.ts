@@ -5,6 +5,7 @@
 // çağrısında tetiklenir; kaçırılan eşikler bir sonraki sweep'te yakalanır.
 
 import { prisma } from '../prismaClient';
+import { pingDashboard } from './dashboardStream';
 
 interface Threshold { key: string; days: number; label: string; }
 const THRESHOLDS: Threshold[] = [
@@ -28,6 +29,7 @@ export async function sweepGuaranteeReminders(tenantId: string): Promise<void> {
     });
     if (guarantees.length === 0) return;
     const financeUsers = await prisma.user.findMany({ where: { tenantId, role: 'FINANCE_MGR', status: 'ACTIVE' } });
+    let sentAny = false;
 
     for (const g of guarantees) {
       const expiry = g.expiryDate!.getTime();
@@ -38,6 +40,7 @@ export async function sweepGuaranteeReminders(tenantId: string): Promise<void> {
       if (due.length === 0) continue;
 
       // Sadece en yakın (en küçük günlü) eşiği bildir; kaçırılanları da işaretle (spam önleme)
+      sentAny = true;
       const closest = due.reduce((a, b) => (a.days < b.days ? a : b));
       const recipients = [...new Set([g.requestedById, ...financeUsers.map(u => u.id)].filter(Boolean) as string[])];
       for (const userId of recipients) {
@@ -53,6 +56,7 @@ export async function sweepGuaranteeReminders(tenantId: string): Promise<void> {
       const merged = [...new Set([...sent, ...due.map(d => d.key)])];
       await prisma.guaranteeLetter.update({ where: { id: g.id }, data: { remindersSent: JSON.stringify(merged) } }).catch(() => {});
     }
+    if (sentAny) pingDashboard(tenantId);
   } catch {
     // sweep ana akışı bozmaz
   }

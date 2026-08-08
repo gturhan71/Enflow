@@ -18,7 +18,6 @@ import {
   Truck,
   Package,
   History,
-  BarChart3,
   FileSignature,
   Kanban,
   Gavel,
@@ -51,7 +50,7 @@ import {
   Notification
 } from './types';
 
-export const APP_VERSION = 'v2.1.1';
+export const APP_VERSION = 'v2.2.0';
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',
@@ -121,7 +120,8 @@ export const NAV_ITEMS = [
   { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW', requiredEntitlement: 'DMO_MODULE' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
   // ── Raporlama & yönetişim (akış adımı değil, destek katmanı) ─────────────
-  { id: 'management-reports', label: 'Yönetim Raporları', icon: BarChart3, requiredPermission: 'MANAGEMENT_REPORTS_VIEW' },
+  // Yönetim Raporları artık ayrı sekme değil — MANAGEMENT_REPORTS_VIEW izni olan
+  // kullanıcılar için doğrudan Dashboard'a gömülü (bkz. src/modules/Dashboard.tsx).
   { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
   { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
   { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },

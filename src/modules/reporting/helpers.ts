@@ -12,6 +12,19 @@ export const STATUS_BADGE: Record<string, { label: string; cls: string }> = {
 
 export const PIE_COLORS = ['hsl(151 86% 39%)', '#6366f1', '#f59e0b', '#ef4444', '#0ea5e9', '#8b5cf6', '#ec4899', '#14b8a6'];
 
+// Birim Detayı grafiklerinin (ChartBlock) başlığa göre açıklaması — ⓘ tooltip'i besler.
+export const CHART_PHILOSOPHY: Record<string, string> = {
+  'Fırsat Sonuçları (dönem)': 'Dönem içinde açılan/kazanılan/kaybedilen fırsat sayıları; birimin o dönemki satış hacmini gösterir.',
+  'Kayıp Nedenleri': 'Kaybedilen fırsatların neden bazında dağılımı; en sık tekrar eden neden en büyük dilim — satış sürecindeki tekrarlayan zayıf noktayı işaret eder.',
+  'Teklif Durum Dağılımı': 'Dönemde oluşturulan tekliflerin statü dağılımı (taslak/onayda/gönderildi/kabul); onay/gönderim darboğazını gösterir.',
+  'Talep Statü Dağılımı': 'Satınalma taleplerinin 9 statülü akıştaki dağılımı; hangi aşamada talep biriktiğini gösterir.',
+  'Alacak vs Tahsilat vs Vadesi Geçen': 'Toplam alacak, tahsil edilen ve bunun içindeki vadesi geçmiş kısmı yan yana — bilinçli olarak bar bırakıldı (Vadesi Geçen, Alacak\'ın bir alt kümesi; pasta yanıltıcı olurdu).',
+  'Vaka Tipi (dönem)': 'Dönemde açılan hukuk dosyalarının tipe göre dağılımı (sözleşme incelemesi/görüş/uyuşmazlık vb.).',
+  'İhale Statü Dağılımı (dönem)': 'Dönemdeki ihalelerin statü dağılımı (hazırlık/teklif verildi/kazanıldı/kaybedildi); hattın nerede yoğunlaştığını gösterir.',
+  'Proje Durum Dağılımı': 'Aktif projelerin durum dağılımı (planlama/devam/tamamlandı); uygulama kapasitesinin dağılımını gösterir.',
+};
+export const DEFAULT_CHART_PHILOSOPHY = 'Bu grafik, seçili birimin dönemsel verisini kategori bazında kırılımlar hâlinde gösterir.';
+
 export const TONE_CLASSES: Record<string, string> = {
   default: 'text-slate-900',
   positive: 'text-emerald-600',

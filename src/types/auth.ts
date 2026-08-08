@@ -10,6 +10,7 @@ export interface User {
   tenantId?: string;
   delegateToUserId?: string | null;
   delegateUntil?: string | null;
+  dashboardLayout?: string | null;
 }
 export interface Permission {
   id: string;
