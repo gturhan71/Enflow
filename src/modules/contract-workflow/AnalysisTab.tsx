@@ -2,7 +2,7 @@ import { FileText, BookOpen, Upload, Loader2, Cpu, AlertCircle, Star, ClipboardL
 import { AiAnalysis } from './types';
 
 export default function AnalysisTab({
-  contractText, setContractText, specText, setSpecText, onSaveTexts, loading, onAnalyse, analysing, aiConfigured, analysis,
+  contractText, setContractText, specText, setSpecText, onSaveTexts, loading, onAnalyse, analysing, aiConfigured, analysisUsedAI, analysis,
 }: {
   contractText: string;
   setContractText: (v: string) => void;
@@ -13,6 +13,7 @@ export default function AnalysisTab({
   onAnalyse: () => void;
   analysing: boolean;
   aiConfigured: boolean | null;
+  analysisUsedAI: boolean | null;
   analysis: AiAnalysis | null;
 }) {
   return (
@@ -65,6 +66,12 @@ export default function AnalysisTab({
       {/* Analysis results */}
       {analysis && (
         <div className="space-y-4 mt-2">
+          {analysisUsedAI === false && aiConfigured !== false && (
+            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 text-xs text-amber-300">
+              <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+              YZ yapılandırılmış ama bu analiz çağrısı başarısız oldu (sağlayıcıya ulaşılamadı, API anahtarı/model adı geçersiz olabilir ya da sağlayıcı hesabında bakiye/kota sorunu olabilir) — aşağıdaki liste örnek (standart) evrak listesidir, belgenizin gerçek içeriğini yansıtmaz. Ayarlar → Entegrasyonlar'ı kontrol edip tekrar deneyin.
+            </div>
+          )}
           {/* Summary card */}
           <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
             <h3 className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">

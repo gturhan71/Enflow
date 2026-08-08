@@ -39,6 +39,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
   const [specText, setSpecText] = useState('');
   const [signedDate, setSignedDate] = useState('');
   const [analysis, setAnalysis] = useState<AiAnalysis | null>(null);
+  const [analysisUsedAI, setAnalysisUsedAI] = useState<boolean | null>(null);
   const [expandedDoc, setExpandedDoc] = useState<string | null>(null);
   const [uploadingDocId, setUploadingDocId] = useState<string | null>(null);
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
@@ -207,9 +208,10 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
       });
       const result = await apiFetch(`${BASE}/${selected.id}/analyze`, { method: 'POST' });
       setAnalysis(result.analysis);
+      setAnalysisUsedAI(Boolean(result.usedAI));
       selectWorkflow(result.workflow);
       setWorkflows(prev => prev.map(w => w.id === result.workflow.id ? result.workflow : w));
-      notify('AI analizi tamamlandı. Evrak listesi oluşturuldu.');
+      notify(result.usedAI ? 'AI analizi tamamlandı. Evrak listesi oluşturuldu.' : 'YZ çağrısı başarısız oldu — örnek (standart) evrak listesi gösteriliyor. Ayarlar → Entegrasyonlar\'ı kontrol edin.');
       setTab('documents');
     } catch (e) { notify((e as Error).message, true); }
     finally { setAnalysing(false); }
@@ -554,6 +556,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                       onAnalyse={handleAnalyse}
                       analysing={analysing}
                       aiConfigured={aiConfigured}
+                      analysisUsedAI={analysisUsedAI}
                       analysis={analysis}
                     />
                   )}

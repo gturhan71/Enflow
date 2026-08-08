@@ -204,7 +204,7 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
   }
 
   // Ortak şartname analiz servisi (tenant-yapılandırmalı YZ + mock fallback) — DRY (tenders ile paylaşımlı)
-  const { analysis } = await analyzeSpec(inputText, { tenantId: req.tenantId, fallbackName: wf.tenderName || wf.title, fallbackNo: wf.tenderNo });
+  const { analysis, usedAI } = await analyzeSpec(inputText, { tenantId: req.tenantId, fallbackName: wf.tenderName || wf.title, fallbackNo: wf.tenderNo });
 
   // Extract project name and tender no from analysis, update workflow title
   const summary = (analysis as { contract_summary?: { project_name?: string; tender_no?: string } }).contract_summary;
@@ -255,7 +255,7 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
     where: { id },
     include: { documents: { orderBy: { sortOrder: 'asc' } } },
   });
-  res.json({ workflow: result, analysis });
+  res.json({ workflow: result, analysis, usedAI });
 }));
 
 // ── DELETE WORKFLOW ───────────────────────────────────────────────────────────

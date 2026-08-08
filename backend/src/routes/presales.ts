@@ -6,7 +6,7 @@
 
 import { Router, Request, Response } from 'express';
 import { asyncHandler, tenantMiddleware } from '../middleware';
-import { chatJSON } from '../services/aiClient';
+import { chatJSON, isAIConfigured } from '../services/aiClient';
 import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
@@ -52,11 +52,17 @@ router.post('/spec-extract', asyncHandler(async (req: Request, res: Response) =>
   if (result) {
     return res.json({ usedAI: true, ...result });
   }
-  // YZ yapılandırılmamış → boş ama tutarlı sonuç (UI kullanıcıyı yönlendirir)
+  // chatJSON hem "yapılandırılmamış" hem "yapılandırılmış ama çağrı başarısız oldu"
+  // durumunda null döner (bkz. aiClient.ts — anahtar/hata detayı asla client'a
+  // sızdırılmaz). İkisini burada ayırıp kullanıcıya doğru mesajı veriyoruz —
+  // aksi halde yapılandırılmış bir tenant'a yanlışlıkla "yapılandırılmadı" denir.
+  const configured = await isAIConfigured(req.tenantId);
   res.json({
     usedAI: false,
     title: '',
-    summary: 'Yapay zeka entegrasyonu yapılandırılmadı. Ayarlar → Entegrasyonlar bölümünden bir YZ bağlayın ya da ürünleri elle ekleyin.',
+    summary: configured
+      ? 'YZ entegrasyonu yapılandırılmış ama analiz çağrısı başarısız oldu — sağlayıcıya ulaşılamadı, API anahtarı/model adı geçersiz olabilir ya da sağlayıcı hesabında bakiye/kota sorunu olabilir. Ayarlar → Entegrasyonlar\'dan yapılandırmayı kontrol edin ya da birazdan tekrar deneyin.'
+      : 'Yapay zeka entegrasyonu yapılandırılmadı. Ayarlar → Entegrasyonlar bölümünden bir YZ bağlayın ya da ürünleri elle ekleyin.',
     specDetails: '',
     extractedProducts: [],
   });
