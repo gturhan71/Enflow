@@ -14,6 +14,9 @@ export interface AbbreviatedBoMItem {
   margin: number;
   vendor?: string;
   currency?: string; // BoM kaleminin hazırlandığı döviz — maliyetlendirmeye değişmeden taşınmalı (kritik)
+  brandId?: string;
+  categoryId?: string;
+  source?: string; // marka seçiliyse o markanın kayıtlı kaynağı (BrandSource.name); değilse serbest metin
 }
 
 const newLineKey = () =>
@@ -42,6 +45,9 @@ export const useBoM = (
       margin: item.marginPercentage,
       vendor: item.vendor || undefined,
       currency: item.currency || undefined,
+      brandId: item.brandId || undefined,
+      categoryId: item.categoryId || undefined,
+      source: item.source || undefined,
     }));
     setBomItems(real);
   }, [selectedOppId, opportunities]);
@@ -68,6 +74,9 @@ export const useBoM = (
         marginPercentage: item.margin,
         vendor: item.vendor,
         currency: item.currency,
+        brandId: item.brandId,
+        categoryId: item.categoryId,
+        source: item.source,
       }));
 
       await apiService.saveBoMItems(selectedOppId, properItems, { handoff: true });

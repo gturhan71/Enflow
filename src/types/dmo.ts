@@ -1,8 +1,8 @@
 // ── DMO Katalog & Kârlılık ────────────────────────────────────────────────────
 export interface DmoCatalogItem {
-  id: string; dmoCode: string; name: string; brand?: string | null; model?: string | null;
+  id: string; dmoCode: string; name: string; brandId?: string | null; brand?: { id: string; name: string } | null; model?: string | null;
   unit: string; listPrice: number; vatRate: number; currency: string;
-  unitCost: number; costCurrency: string; category?: string | null;
+  unitCost: number; costCurrency: string; categoryId?: string | null; category?: { id: string; name: string } | null;
   validFrom?: string | null; validTo?: string | null; status: string;
   frameworkAgreementId?: string | null; notes?: string | null;
 }

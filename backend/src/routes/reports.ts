@@ -13,7 +13,7 @@ import {
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
 import { subscribeDashboard } from '../services/dashboardStream';
-import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth, computeDmoAnalytics, computeArchiveAnalytics } from '../services/analyticsService';
+import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth, computeDmoAnalytics, computeArchiveAnalytics, computeBrandCategoryAnalytics } from '../services/analyticsService';
 
 const router: Router = Router();
 
@@ -87,6 +87,11 @@ router.get('/customer-health', tenantMiddleware, asyncHandler(async (req: Reques
 // DMO kanalı analitiği — büyüme analizine DMO operasyonu (ayrı lisanslı)
 router.get('/dmo-analytics', tenantMiddleware, requireEntitlement('DMO_MODULE'), asyncHandler(async (req: Request, res: Response) => {
   res.json(await computeDmoAnalytics(req.tenantId));
+}));
+
+// Marka & Ürün Grubu Analitiği (Faz 4) — BoM kalemi bazlı çalışılan/kazanılan iş hacmi + tedarikçi hacmi
+router.get('/brand-category-analytics', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  res.json(await computeBrandCategoryAnalytics(req.tenantId));
 }));
 
 // Birim bütçe absorpsiyonu (overhead Faz 3) — bütçe vs iştirak dağıtımı

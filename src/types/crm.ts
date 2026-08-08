@@ -27,12 +27,28 @@ export interface Opportunity {
   createdAt?: string;
   updatedAt?: string;
   updatedBy?: string;
+  lastProgressCheckAt?: string | null; // son ilerleme teyidi zamanı — bkz. OpportunityProgressLog
   customer?: Customer;
   assignedTo?: User;
   createdBy?: User;
   bomItems?: BoMItem[];
   costItems?: CostItem[];
   costConfig?: CostConfig;
+}
+
+// Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
+export interface OpportunityProgressLog {
+  id: string;
+  tenantId: string;
+  opportunityId: string;
+  recordedById: string;
+  previousStatus: string;
+  newStatus: string;
+  previousProbability: number;
+  newProbability: number;
+  changed: boolean;
+  note?: string | null;
+  createdAt: string;
 }
 export interface Customer {
   id: string;

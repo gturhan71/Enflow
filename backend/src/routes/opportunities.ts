@@ -6,15 +6,18 @@ import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 import { computeSalesCosting, getSalesMarginFloor, SalesBoMItemInput, SalesManualCostItemInput, SalesCostConfig } from '../services/salesCosting';
 import { buildBomEvaluationSnapshot, sumBomTotalsByCurrency } from '../services/bomHandoff';
+import { sweepOpportunityProgressReminders } from '../services/opportunityProgressReminders';
+import { recordProgressCheckIn, logAutoProgressChange, ProgressCheckInError } from '../services/opportunityProgressService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await sweepOpportunityProgressReminders(req.tenantId); // ilerleme teyidi zaman-eşiği hatırlatmaları (non-throwing)
   const opps = await prisma.opportunity.findMany({
     where: { tenantId: req.tenantId },
-    include: { customer: true, assignedTo: true, createdBy: true, bomItems: true, costItems: true }
+    include: { customer: true, assignedTo: true, createdBy: true, bomItems: { include: { brand: true, category: true } }, costItems: true }
   });
   // costConfig JSON string'ini parse ederek nesne olarak gönder
   const parsed = opps.map((o) => ({
@@ -152,6 +155,20 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     },
   });
 
+  // Fırsat ilerleme takibi — probability/status fiilen değiştiyse otomatik izle
+  // (kullanıcı zaten normal düzenlemeyle ilerleme kaydettiyse ayrıca "teyit et" istemiyoruz).
+  if (updated.probability !== oldOpp.probability || updated.status !== oldOpp.status) {
+    await logAutoProgressChange(
+      tenantId, opportunityId, updatedBy || updated.assignedToId,
+      { probability: oldOpp.probability, status: oldOpp.status },
+      { probability: updated.probability, status: updated.status },
+    ).catch(() => {});
+    // finalizeCheckIn DB'de lastProgressCheckAt/progressRemindersSent'i sıfırladı —
+    // yanıt nesnesi (`updated`) o update'ten ÖNCE alındığı için burada senkronla.
+    updated.lastProgressCheckAt = new Date();
+    updated.progressRemindersSent = null;
+  }
+
   // Faz 1 — kaybedilen fırsat otomatik arşivlenir (LOST'a yeni geçiş, tekrar tetiklenmesin)
   if (status === 'LOST' && oldOpp.status !== 'LOST') {
     await prisma.archiveItem.create({
@@ -209,7 +226,9 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
           ...(item.currency ? { currency: String(item.currency) } : {}),
           ...(item.vatRate !== undefined ? { vatRate: parseFloat(String(item.vatRate)) || 0 } : {}),
           ...(item.source ? { source: String(item.source) } : {}),
-          vendor: String(item.vendor || '')
+          vendor: String(item.vendor || ''),
+          ...(item.brandId ? { brandId: String(item.brandId) } : {}),
+          ...(item.categoryId ? { categoryId: String(item.categoryId) } : {}),
         }
       });
       created.push(newItem);
@@ -551,6 +570,36 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
   await completeApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, req.userId, note || 'Onaylandı.');
 
   res.json(updated);
+}));
+
+// ── Fırsat ilerleme teyidi (periyodik zorunlu check-in) ──────────────────────
+router.post('/:id/progress-checkin', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.params.id as string;
+  const tenantId = req.tenantId;
+  const { probability, status, note } = req.body as { probability?: number; status?: string; note?: string };
+
+  if (status !== undefined && !OPPORTUNITY_STATUSES.has(status)) {
+    return res.status(400).json({ error: `Geçersiz status: '${status}'. İzinli değerler: ${[...OPPORTUNITY_STATUSES].join(', ')}` });
+  }
+
+  try {
+    await recordProgressCheckIn(tenantId, opportunityId, req.userId, { probability, status, note });
+  } catch (e) {
+    if (e instanceof ProgressCheckInError) return res.status(400).json({ error: e.message });
+    throw e;
+  }
+
+  const updated = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId }, include: { customer: true, assignedTo: true, createdBy: true } });
+  res.json(updated);
+}));
+
+router.get('/:id/progress-log', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.params.id as string;
+  const logs = await prisma.opportunityProgressLog.findMany({
+    where: { tenantId: req.tenantId, opportunityId },
+    orderBy: { createdAt: 'desc' },
+  });
+  res.json(logs);
 }));
 
 router.post('/:id/revert-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

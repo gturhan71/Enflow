@@ -1,7 +1,8 @@
-import { useState, type FC, type ChangeEvent } from 'react';
-import { X, Plus } from 'lucide-react';
+import { useState, useEffect, type FC, type ChangeEvent } from 'react';
+import { X, Plus, Check } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Vendor } from '../../types';
+import { Vendor, Brand } from '../../types';
+import { apiService } from '../../services/apiService';
 
 interface VendorFormProps {
   initial?: Partial<Vendor>;
@@ -23,6 +24,10 @@ const VendorForm: FC<VendorFormProps> = ({ initial, onSave, onClose }) => {
     categories: (initial?.categories ? (typeof initial.categories === 'string' ? JSON.parse(initial.categories) : initial.categories) : []) as string[],
   });
   const [catInput, setCatInput] = useState('');
+  const [brandIds, setBrandIds] = useState<string[]>(initial?.brands?.map(b => b.id) ?? []);
+  const [brands, setBrands] = useState<Brand[]>([]);
+  useEffect(() => { apiService.getBrands().then(setBrands).catch(() => {}); }, []);
+  const toggleBrand = (id: string) => setBrandIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
 
   const addCat = () => {
     const t = catInput.trim();
@@ -81,6 +86,24 @@ const VendorForm: FC<VendorFormProps> = ({ initial, onSave, onClose }) => {
             </div>
           </div>
           <div>
+            <label className="block text-xs font-semibold text-slate-400 mb-1">Markalar (taşıdığı/yetkili satıcısı olduğu)</label>
+            {brands.length === 0 ? (
+              <p className="text-xs text-slate-400 italic">Henüz marka tanımlanmadı — Ayarlar → Marka &amp; Ürün Grubu'ndan ekleyin.</p>
+            ) : (
+              <div className="flex gap-2 flex-wrap">
+                {brands.map(b => {
+                  const selected = brandIds.includes(b.id);
+                  return (
+                    <button key={b.id} type="button" onClick={() => toggleBrand(b.id)}
+                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${selected ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'}`}>
+                      {selected && <Check size={11} />} {b.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div>
             <label className="block text-xs font-semibold text-slate-400 mb-1">Notlar</label>
             <textarea value={form.notes} onChange={f('notes')} rows={2}
               className="input-glass w-full px-3 py-2 text-sm rounded-xl resize-none" />
@@ -88,7 +111,7 @@ const VendorForm: FC<VendorFormProps> = ({ initial, onSave, onClose }) => {
         </div>
         <div className="p-5 border-t border-white/10 flex justify-end gap-3 shrink-0">
           <button onClick={onClose} className="btn-secondary px-5 py-2 text-sm rounded-xl">İptal</button>
-          <button onClick={() => onSave({ ...form, categories: form.categories })}
+          <button onClick={() => onSave({ ...form, categories: form.categories, brandIds })}
             disabled={!form.name.trim()}
             className="btn-primary px-5 py-2 text-sm rounded-xl disabled:opacity-50">
             Kaydet

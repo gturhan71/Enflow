@@ -48,6 +48,13 @@ const VendorsTab: FC<VendorsTabProps> = ({ vendors, loading, onEdit, onDelete })
               ))}
             </div>
           )}
+          {v.brands && v.brands.length > 0 && (
+            <div className="flex gap-1 flex-wrap">
+              {v.brands.map(b => (
+                <span key={b.id} className="text-[11px] px-2 py-0.5 bg-amber-900/30 text-amber-300 rounded-full font-medium">{b.name}</span>
+              ))}
+            </div>
+          )}
           {v.rating && (
             <div className="flex items-center gap-1">
               {Array.from({ length: 5 }, (_, i) => (

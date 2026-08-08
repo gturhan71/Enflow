@@ -52,6 +52,8 @@ class ApiService {
   async createOpportunity(data: Partial<Opportunity>) { return crmService.createOpportunity(data); }
   async updateOpportunity(id: string, data: Partial<Opportunity>) { return crmService.updateOpportunity(id, data); }
   async deleteOpportunity(id: string) { return crmService.deleteOpportunity(id); }
+  async checkInOpportunityProgress(id: string, data: { probability?: number; status?: string; note?: string }) { return crmService.checkInOpportunityProgress(id, data); }
+  async getOpportunityProgressLog(id: string) { return crmService.getOpportunityProgressLog(id); }
   async saveBoMItems(oppId: string, items: BoMItem[], opts?: { handoff?: boolean }) { return crmService.saveBoMItems(oppId, items, opts); }
   async saveCostItems(oppId: string, items: CostItem[]) { return crmService.saveCostItems(oppId, items); }
   async saveCostAnalysis(oppId: string, data: { bomItems: unknown[]; costItems: unknown[]; costConfig: unknown }) { return crmService.saveCostAnalysis(oppId, data); }
@@ -73,6 +75,12 @@ class ApiService {
   async saveDashboardLayout(layout: { widgets: { key: string; enabled: boolean }[]; order: string[] }): Promise<{ dashboardLayout: string }> {
     return apiClient.fetchWithAuth('/users/me/dashboard-layout', { method: 'PUT', body: JSON.stringify(layout) });
   }
+  async getDashboardRoleTemplates(): Promise<Record<string, string[]>> {
+    return apiClient.fetchWithAuth('/tenants/dashboard-role-templates');
+  }
+  async saveDashboardRoleTemplate(role: string, widgets: string[]): Promise<Record<string, string[]>> {
+    return apiClient.fetchWithAuth('/tenants/dashboard-role-templates', { method: 'PUT', body: JSON.stringify({ role, widgets }) });
+  }
   // Büyüme Analitiği Faz 1 — salt-okunur raporlar
   async getAging(): Promise<import('../types').AgingReport> { return apiClient.fetchWithAuth('/finance/aging'); }
   async getFunnel(): Promise<import('../types').FunnelReport> { return apiClient.fetchWithAuth('/reports/funnel'); }
@@ -86,6 +94,7 @@ class ApiService {
   async getArchiveAnalytics(): Promise<import('../types').ArchiveAnalytics> { return apiClient.fetchWithAuth('/reports/archive-analytics'); }
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
+  async getBrandCategoryAnalytics(): Promise<import('../types').BrandCategoryAnalytics> { return apiClient.fetchWithAuth('/reports/brand-category-analytics'); }
   // İşletme maliyeti (overhead) + birim bütçe
   async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
   async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }
@@ -300,6 +309,42 @@ class ApiService {
   }
   async deleteVendor(id: string) {
     return apiClient.fetchWithAuth(`/vendors/${id}`, { method: 'DELETE' });
+  }
+
+  // --- MARKA & ÜRÜN GRUBU TAKSONOMİSİ ---
+  async getBrands(): Promise<import('../types').Brand[]> { return apiClient.fetchWithAuth('/product-taxonomy/brands'); }
+  async createBrand(data: { name: string }): Promise<import('../types').Brand> {
+    return apiClient.fetchWithAuth('/product-taxonomy/brands', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateBrand(id: string, data: { name?: string; isActive?: boolean }): Promise<import('../types').Brand> {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brands/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteBrand(id: string) {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brands/${id}`, { method: 'DELETE' });
+  }
+
+  async getProductCategories(): Promise<import('../types').ProductCategory[]> { return apiClient.fetchWithAuth('/product-taxonomy/product-categories'); }
+  async createProductCategory(data: { name: string }): Promise<import('../types').ProductCategory> {
+    return apiClient.fetchWithAuth('/product-taxonomy/product-categories', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateProductCategory(id: string, data: { name?: string; isActive?: boolean }): Promise<import('../types').ProductCategory> {
+    return apiClient.fetchWithAuth(`/product-taxonomy/product-categories/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteProductCategory(id: string) {
+    return apiClient.fetchWithAuth(`/product-taxonomy/product-categories/${id}`, { method: 'DELETE' });
+  }
+
+  async getBrandSources(brandId: string): Promise<import('../types').BrandSource[]> {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brands/${brandId}/sources`);
+  }
+  async createBrandSource(brandId: string, data: { name: string; notes?: string }): Promise<import('../types').BrandSource> {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brands/${brandId}/sources`, { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateBrandSource(id: string, data: { name?: string; notes?: string; isActive?: boolean }): Promise<import('../types').BrandSource> {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brand-sources/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteBrandSource(id: string) {
+    return apiClient.fetchWithAuth(`/product-taxonomy/brand-sources/${id}`, { method: 'DELETE' });
   }
 
   async getPurchaseRequests(params?: { status?: string; sourceType?: string }) {

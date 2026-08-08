@@ -96,6 +96,11 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (progressNotes !== undefined) {
     data.progressNotes = typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes);
   }
+  // "Yapıldığı" zaman damgası — COMPLETED'e YENİ geçişte set edilir, geri açılırsa
+  // (reopen) temizlenir. updatedAt kullanılmadı: tamamlandıktan sonra başka bir alan
+  // (öncelik, açıklama vb.) düzenlenirse updatedAt yanıltıcı biçimde ilerlerdi.
+  if (rest.status === 'COMPLETED' && record.status !== 'COMPLETED') data.completedAt = new Date();
+  else if (rest.status && rest.status !== 'COMPLETED' && record.status === 'COMPLETED') data.completedAt = null;
   const task = await prisma.todoTask.update({ where: { id }, data });
   await logActivity({ tenantId, userId: req.userId, action: rest.status && rest.status !== record.status ? `STATUS_${rest.status}` : 'UPDATE', entityType: 'TASK', entityId: id, details: { title: task.title, status: task.status } });
   res.json(task);

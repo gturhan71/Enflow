@@ -25,6 +25,10 @@ export interface BoMItem {
   vatRate?: number; // kalem bazında KDV % — teklif KDV hesabında kullanılır (varsayılan 20)
   source?: string;
   status?: 'PENDING_MATCH' | 'MATCHED';
+  brandId?: string | null;
+  brand?: { id: string; name: string } | null;
+  categoryId?: string | null;
+  category?: { id: string; name: string } | null;
 }
 export type TechnicalCompliance = 'COMPLIANT' | 'PARTIAL' | 'NON_COMPLIANT';
 

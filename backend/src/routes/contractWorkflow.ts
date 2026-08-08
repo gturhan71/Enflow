@@ -498,6 +498,7 @@ router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: R
           refVendor: b.vendor || null,
           refSource: b.source || null,
           lineKey: b.lineKey || null, // BoM Maliyet Varyansı'nın satır-bazlı karşılaştırma bağı
+          brandId: b.brandId || null, // BoMItem.brandId'den taşınır (Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
         })),
       } : undefined,
     },

@@ -298,7 +298,12 @@ const Dashboard = ({
     if (!currentUser?.dashboardLayout) return null;
     try { return JSON.parse(currentUser.dashboardLayout); } catch { return null; }
   }, [currentUser?.dashboardLayout]);
-  const effectiveWidgets = useMemo(() => resolveEffectiveWidgets(currentUser?.role, savedLayout), [currentUser?.role, savedLayout]);
+  // Tenant GM'i rol bazlı varsayılan şablonu özelleştirmiş olabilir (Ayarlar → Kokpit
+  // Şablonları); kullanıcının kişisel seçimi (savedLayout) her zaman önceliklidir.
+  const [roleTemplates, setRoleTemplates] = useState<Record<string, WK[]>>({});
+  useEffect(() => { apiService.getDashboardRoleTemplates().then(t => setRoleTemplates(t as Record<string, WK[]>)).catch(() => {}); }, []);
+  const roleTemplateOverride = roleTemplates[currentUser?.role || ''] || null;
+  const effectiveWidgets = useMemo(() => resolveEffectiveWidgets(currentUser?.role, savedLayout, roleTemplateOverride), [currentUser?.role, savedLayout, roleTemplateOverride]);
 
   const handleSaveLayout = async (items: { key: WK; enabled: boolean }[]) => {
     setSavingLayout(true);
@@ -473,7 +478,8 @@ const Dashboard = ({
       {editingLayout && (
         <LayoutEditor
           role={currentUser?.role}
-          initial={buildEditableLayout(currentUser?.role, savedLayout)}
+          initial={buildEditableLayout(currentUser?.role, savedLayout, roleTemplateOverride)}
+          roleDefault={roleTemplateOverride || undefined}
           saving={savingLayout}
           onClose={() => setEditingLayout(false)}
           onSave={handleSaveLayout}

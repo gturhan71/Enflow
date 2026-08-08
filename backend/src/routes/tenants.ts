@@ -185,6 +185,40 @@ router.put('/ai-settings', tenantMiddleware, GM, asyncHandler(async (req: Reques
   res.json({ baseUrl: ai.baseUrl, model: ai.model, label: ai.label, hasKey: Boolean(ai.apiKey) });
 }));
 
+// ── Fırsat ilerleme teyidi — periyodik zorunlu check-in ayarları (GM only) ───
+// intervalDays: kaç günde bir teyit istenir; graceBusinessDays: teyit istenip
+// yönetime eskale edilene kadarki iş günü toleransı. bkz. opportunityProgressService.ts.
+router.get('/opportunity-progress-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const cfg = (ms.opportunityProgress as { intervalDays?: number; graceBusinessDays?: number } | undefined) || {};
+  res.json({
+    intervalDays: cfg.intervalDays && cfg.intervalDays > 0 ? cfg.intervalDays : 14,
+    graceBusinessDays: cfg.graceBusinessDays && cfg.graceBusinessDays > 0 ? cfg.graceBusinessDays : 3,
+  });
+}));
+
+router.put('/opportunity-progress-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const { intervalDays, graceBusinessDays } = req.body as { intervalDays?: number; graceBusinessDays?: number };
+  if (!Number.isFinite(intervalDays) || (intervalDays as number) <= 0) {
+    return res.status(400).json({ error: 'intervalDays pozitif bir sayı olmalı.' });
+  }
+  if (!Number.isFinite(graceBusinessDays) || (graceBusinessDays as number) <= 0) {
+    return res.status(400).json({ error: 'graceBusinessDays pozitif bir sayı olmalı.' });
+  }
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  ms.opportunityProgress = { intervalDays: Math.round(intervalDays as number), graceBusinessDays: Math.round(graceBusinessDays as number) };
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  await logActivity({
+    tenantId: req.tenantId, userId: req.userId, action: 'OPPORTUNITY_PROGRESS_SETTINGS_UPDATED',
+    entityType: 'TENANT', entityId: req.tenantId, details: ms.opportunityProgress as Record<string, unknown>,
+  });
+  res.json(ms.opportunityProgress);
+}));
+
 // ── Yönetişim ayarları — Görev Ayrılığı (SoD) toggle (GM only) ──────────────
 interface ApprovalTierBody { maxAmount: number; roles: string[] }
 router.get('/governance-settings', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
@@ -217,6 +251,39 @@ router.put('/governance-settings', tenantMiddleware, GM, asyncHandler(async (req
   await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'GOVERNANCE_SETTINGS_UPDATED', entityType: 'TENANT', entityId: req.tenantId, details: { enforceSoD: next.enforceSoD, hasMatrix: Boolean(next.approvalMatrix) } });
   res.json({ enforceSoD: next.enforceSoD, approvalMatrix: next.approvalMatrix ?? null });
+}));
+
+// ── Dashboard kokpit şablonları — rol bazlı varsayılan widget seçimi (GM düzenler,
+// herkes okur) ────────────────────────────────────────────────────────────
+// Hardcode edilmiş ROLE_DASHBOARD (frontend widgetCatalog.ts) her tenant için
+// aynıydı; artık tenant GM'i kendi organizasyonuna göre override edebilir.
+// Override edilmemiş roller frontend'de hardcode varsayılana düşer.
+router.get('/dashboard-role-templates', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  res.json((ms.dashboardRoleTemplates as Record<string, string[]>) || {});
+}));
+
+router.put('/dashboard-role-templates', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
+  const { role, widgets } = req.body as { role?: string; widgets?: string[] };
+  if (!role || typeof role !== 'string') return res.status(400).json({ error: 'role zorunludur.' });
+  if (!Array.isArray(widgets) || widgets.some(w => typeof w !== 'string')) {
+    return res.status(400).json({ error: 'widgets dizisi zorunludur.' });
+  }
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const templates = { ...(ms.dashboardRoleTemplates as Record<string, string[]> || {}) };
+  if (widgets.length === 0) delete templates[role];
+  else templates[role] = widgets;
+  ms.dashboardRoleTemplates = templates;
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  await logActivity({
+    tenantId: req.tenantId, userId: req.userId, action: 'DASHBOARD_ROLE_TEMPLATE_UPDATED',
+    entityType: 'TENANT', entityId: req.tenantId, details: { role, widgetCount: widgets.length },
+  });
+  res.json(templates);
 }));
 
 // ── Tenant adı güncelle (bare `/:id` — sabit segment rotalarından SONRA) ─────

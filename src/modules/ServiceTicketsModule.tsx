@@ -6,6 +6,7 @@ import { apiService } from '../services/apiService';
 import {
   Project, ServiceTicket, ServiceTicketCategory, ServiceTicketPriority, ServiceTicketStatus,
   SERVICE_TICKET_CATEGORY_LABEL, SERVICE_TICKET_PRIORITY_LABEL, SERVICE_TICKET_STATUS_LABEL,
+  Brand, ProductCategory,
 } from '../types';
 
 const STATUS_BADGE: Record<ServiceTicketStatus, string> = {
@@ -42,8 +43,17 @@ export function ServiceTicketsModule({ projects }: Props) {
   const [form, setForm] = useState({
     projectId: '', title: '', description: '', category: 'FAULT' as ServiceTicketCategory,
     priority: 'NORMAL' as ServiceTicketPriority, reportedByName: '', slaHours: '',
+    brandId: '', productCategoryId: '',
   });
   const [saving, setSaving] = useState(false);
+
+  // Marka & Ürün Grubu — Ayarlar'dan yönetilen ortak liste (Faz 3, opsiyonel tek etiket).
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  useEffect(() => {
+    apiService.getBrands().then(setBrands).catch(() => {});
+    apiService.getProductCategories().then(setProductCategories).catch(() => {});
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -56,7 +66,7 @@ export function ServiceTicketsModule({ projects }: Props) {
   }, [statusFilter, projectFilter]);
   useEffect(() => { load(); }, [load]);
 
-  const resetForm = () => setForm({ projectId: '', title: '', description: '', category: 'FAULT', priority: 'NORMAL', reportedByName: '', slaHours: '' });
+  const resetForm = () => setForm({ projectId: '', title: '', description: '', category: 'FAULT', priority: 'NORMAL', reportedByName: '', slaHours: '', brandId: '', productCategoryId: '' });
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,6 +77,7 @@ export function ServiceTicketsModule({ projects }: Props) {
         projectId: form.projectId, title: form.title, description: form.description || null,
         category: form.category, priority: form.priority, reportedByName: form.reportedByName || null,
         slaHours: form.slaHours ? Number(form.slaHours) : null,
+        brandId: form.brandId || null, productCategoryId: form.productCategoryId || null,
       });
       setShowNewModal(false);
       resetForm();
@@ -155,6 +166,12 @@ export function ServiceTicketsModule({ projects }: Props) {
                 <td className="px-4 py-3">
                   <div className="font-bold text-slate-800">{t.title}</div>
                   {t.reportedByName && <div className="text-xs text-slate-400">{t.reportedByName}</div>}
+                  {(t.brand || t.productCategory) && (
+                    <div className="flex gap-1 mt-1">
+                      {t.brand && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{t.brand.name}</span>}
+                      {t.productCategory && <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full">{t.productCategory.name}</span>}
+                    </div>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-slate-600">{t.project?.name || '—'}</td>
                 <td className="px-4 py-3 text-slate-600">{SERVICE_TICKET_CATEGORY_LABEL[t.category]}</td>
@@ -207,6 +224,16 @@ export function ServiceTicketsModule({ projects }: Props) {
                 <input type="text" placeholder="Bildiren kişi (opsiyonel)" value={form.reportedByName} onChange={e => setForm(f => ({ ...f, reportedByName: e.target.value }))} className="input-glass" />
                 <input type="number" min={1} placeholder="SLA (saat)" value={form.slaHours} onChange={e => setForm(f => ({ ...f, slaHours: e.target.value }))} className="input-glass" />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <select value={form.brandId} onChange={e => setForm(f => ({ ...f, brandId: e.target.value }))} className="input-glass" title="Marka (opsiyonel)">
+                  <option value="">Marka seçilmedi</option>
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <select value={form.productCategoryId} onChange={e => setForm(f => ({ ...f, productCategoryId: e.target.value }))} className="input-glass" title="Ürün Grubu (opsiyonel)">
+                  <option value="">Ürün grubu seçilmedi</option>
+                  {productCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowNewModal(false)} className="btn-secondary text-sm">İptal</button>
                 <button type="submit" disabled={saving} className="btn-primary text-sm flex items-center gap-2 disabled:opacity-50">
@@ -234,6 +261,8 @@ export function ServiceTicketsModule({ projects }: Props) {
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${STATUS_BADGE[detailTicket.status]}`}>{SERVICE_TICKET_STATUS_LABEL[detailTicket.status]}</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${PRIORITY_BADGE[detailTicket.priority]}`}>{SERVICE_TICKET_PRIORITY_LABEL[detailTicket.priority]}</span>
                 <span className="text-[10px] font-black uppercase text-slate-400">{SERVICE_TICKET_CATEGORY_LABEL[detailTicket.category]}</span>
+                {detailTicket.brand && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">{detailTicket.brand.name}</span>}
+                {detailTicket.productCategory && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">{detailTicket.productCategory.name}</span>}
               </div>
               {detailTicket.description && <p className="text-sm text-slate-600">{detailTicket.description}</p>}
               {detailTicket.dueAt && (

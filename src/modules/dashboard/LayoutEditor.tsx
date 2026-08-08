@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, ChevronUp, ChevronDown, Save, Info, RotateCcw } from 'lucide-react';
+import { X, ChevronUp, ChevronDown, Save, Info, RotateCcw, GripVertical } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { WK, WIDGET_META, WIDGET_TITLE, HORIZON_LABEL, HORIZON_COLOR, ROLE_DASHBOARD, DEFAULT_WIDGETS, ALL_WIDGET_KEYS } from './widgetCatalog';
+import { useDragReorder } from './useDragReorder';
 
 interface Props {
   role?: string;
@@ -9,10 +10,14 @@ interface Props {
   saving: boolean;
   onClose: () => void;
   onSave: (items: { key: WK; enabled: boolean }[]) => void;
+  // Tenant GM'i bu rol için özel şablon tanımladıysa "Rol varsayılanına dön" onu kullanır
+  // (yoksa hardcode ROLE_DASHBOARD).
+  roleDefault?: WK[];
 }
 
-const LayoutEditor: React.FC<Props> = ({ role, initial, saving, onClose, onSave }) => {
+const LayoutEditor: React.FC<Props> = ({ role, initial, saving, onClose, onSave, roleDefault }) => {
   const [items, setItems] = useState(initial);
+  const { dragIndex, onDragStart, onDragOver, onDragEnd } = useDragReorder(items, setItems);
 
   const toggle = (key: WK) => setItems(prev => prev.map(i => i.key === key ? { ...i, enabled: !i.enabled } : i));
   const move = (index: number, dir: -1 | 1) => setItems(prev => {
@@ -23,15 +28,16 @@ const LayoutEditor: React.FC<Props> = ({ role, initial, saving, onClose, onSave 
     return next;
   });
   const resetToDefault = () => {
-    const defaultOrder = ROLE_DASHBOARD[role || ''] || DEFAULT_WIDGETS;
+    const defaultOrder = roleDefault || ROLE_DASHBOARD[role || ''] || DEFAULT_WIDGETS;
     const rest = ALL_WIDGET_KEYS.filter(k => !defaultOrder.includes(k));
     setItems([...defaultOrder, ...rest].map(k => ({ key: k, enabled: defaultOrder.includes(k) })));
   };
 
   return (
     <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
+      <motion.div key="backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-black/30 z-40" onClick={onClose} />
       <motion.div
+        key="modal"
         initial={{ opacity: 0, scale: 0.96, y: 12 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.96, y: 12 }}
@@ -49,7 +55,18 @@ const LayoutEditor: React.FC<Props> = ({ role, initial, saving, onClose, onSave 
             {items.map((item, i) => {
               const meta = WIDGET_META[item.key];
               return (
-                <div key={item.key} className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${item.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
+                <div
+                  key={item.key}
+                  draggable
+                  onDragStart={() => onDragStart(i)}
+                  onDragOver={(e) => { e.preventDefault(); onDragOver(i); }}
+                  onDragEnd={onDragEnd}
+                  onDrop={(e) => e.preventDefault()}
+                  className={`flex items-center gap-3 p-3 rounded-2xl border transition-colors ${item.enabled ? 'bg-white border-slate-200' : 'bg-slate-50 border-slate-100 opacity-60'} ${dragIndex === i ? 'opacity-40 border-dashed border-emerald-400' : ''}`}
+                >
+                  <span className="shrink-0 cursor-grab active:cursor-grabbing text-slate-300 hover:text-slate-500 touch-none">
+                    <GripVertical size={14} />
+                  </span>
                   <input type="checkbox" checked={item.enabled} onChange={() => toggle(item.key)} className="w-4 h-4 shrink-0 accent-emerald-600" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5">

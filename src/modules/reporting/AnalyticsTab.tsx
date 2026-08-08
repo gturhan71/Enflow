@@ -4,7 +4,7 @@ import { ProjectHealthCard, CustomerHealthCard } from '../../components/HealthCa
 import type {
   FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard,
   DocumentPortfolio, BusinessHealth, ProjectHealthReport, CustomerHealthReport, DmoAnalytics,
-  UnitAbsorptionReport, ArchiveAnalytics,
+  UnitAbsorptionReport, ArchiveAnalytics, BrandCategoryAnalytics,
 } from '../../types';
 import BusinessHealthCard from './BusinessHealthCard';
 import DmoAnalyticsCard from './DmoAnalyticsCard';
@@ -17,6 +17,7 @@ import DocPortfolioCard from './DocPortfolioCard';
 import ArchiveCard from './ArchiveCard';
 import ConcentrationCard from './ConcentrationCard';
 import BomVarianceCard from './BomVarianceCard';
+import BrandCategoryCard from './BrandCategoryCard';
 
 // ── Büyüme Analitiği (Faz 1) ────────────────────────────────────────────────
 export default function AnalyticsTab() {
@@ -33,6 +34,7 @@ export default function AnalyticsTab() {
   const [scorecard, setScorecard] = useState<BidScorecard | null>(null);
   const [portfolio, setPortfolio] = useState<DocumentPortfolio | null>(null);
   const [archive, setArchive] = useState<ArchiveAnalytics | null>(null);
+  const [brandCat, setBrandCat] = useState<BrandCategoryAnalytics | null>(null);
   const [err, setErr] = useState(false);
   const load = useCallback(() => {
     let active = true;
@@ -45,6 +47,7 @@ export default function AnalyticsTab() {
   useEffect(() => { apiService.getDmoAnalytics().then(setDmo).catch(() => {}); }, []); // DMO opsiyonel/ayrı lisans — bloklamaz
   useEffect(() => { apiService.getUnitBudgetAbsorption().then(setAbsorption).catch(() => {}); }, []);
   useEffect(() => { apiService.getArchiveAnalytics().then(setArchive).catch(() => {}); }, []); // rol erişimi olmayabilir — bloklamaz
+  useEffect(() => { apiService.getBrandCategoryAnalytics().then(setBrandCat).catch(() => {}); }, []);
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
   if (!health || !projectHealth || !customerHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
@@ -63,6 +66,7 @@ export default function AnalyticsTab() {
       {archive && archive.summary.total > 0 && <ArchiveCard d={archive} />}
       <ConcentrationCard c={conc} />
       <BomVarianceCard v={variance} />
+      {brandCat && (brandCat.byBrand.length > 0 || brandCat.byCategory.length > 0 || brandCat.byVendor.length > 0) && <BrandCategoryCard d={brandCat} />}
     </div>
   );
 }

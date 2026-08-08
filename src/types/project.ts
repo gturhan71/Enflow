@@ -116,6 +116,10 @@ export interface ServiceTicket {
   resolutionNotes?: string | null;
   costAmount?: number | null;
   costCurrency?: string | null;
+  brandId?: string | null;
+  brand?: { id: string; name: string } | null;
+  productCategoryId?: string | null;
+  productCategory?: { id: string; name: string } | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -166,4 +170,5 @@ export interface TodoTask {
   agentRunId?: string | null;
   progressNotes?: { date: string; note: string; author: string }[];
   createdAt?: string;
+  completedAt?: string | null;
 }

@@ -56,6 +56,10 @@ model Tenant {
   dmoOrders             DmoOrder[]
   operatingCostPools    OperatingCostPool[]
   unitBudgets           UnitBudget[]
+  brands                Brand[]
+  productCategories     ProductCategory[]
+  brandSources          BrandSource[]
+  opportunityProgressLogs OpportunityProgressLog[]
 }
 
 enum SubscriptionPlan {
@@ -198,6 +202,8 @@ model Opportunity {
   description       String?
   lostReason        String?       // status='LOST' olduğunda kapanış nedeni
   agentTriage       String?       // JSON: { crm?:{recommendation,issues,at}, igpd?:{recommendation,expectedValue,valueTier,at} } — deterministik agent triyajı (annotation)
+  lastProgressCheckAt   DateTime? // son ilerleme teyidi zamanı (null ise createdAt baz alınır)
+  progressRemindersSent String?  // JSON dizi — mevcut check-in döngüsünde gönderilen eşikler (ör. ["DUE"]); her teyitte sıfırlanır
   procurementMethod String?       // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — fırsatın hangi satınalma usulüyle teklife dönüşeceği (Satış Destek tetikleyici)
   targetBidDate     DateTime?     // son teklif/dönüşüm tarihi — Satış Destek dosya hazırlık deadline'ı
   bomEvaluation     String?       // JSON — handoff anında alınan BoM tedarikçi teklif değerlendirme snapshot'ı
@@ -220,6 +226,26 @@ model Opportunity {
   workflowLogs      WorkflowLog[]
   contracts         Contract[]
   proposals         Proposal[]
+  progressLogs      OpportunityProgressLog[]
+}
+
+// Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
+model OpportunityProgressLog {
+  id                  String      @id @default(cuid())
+  tenantId            String
+  opportunityId       String
+  recordedById        String
+  previousStatus      String
+  newStatus           String
+  previousProbability Int
+  newProbability      Int
+  changed             Boolean     // status veya probability fiilen değişti mi
+  note                String?     // changed=false ise UI'da zorunlu
+  createdAt           DateTime    @default(now())
+  tenant              Tenant      @relation(fields: [tenantId], references: [id])
+  opportunity         Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@index([tenantId, opportunityId, createdAt])
 }
 
 model Proposal {
@@ -234,6 +260,56 @@ model Proposal {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   tenant        Tenant      @relation(fields: [tenantId], references: [id])
+}
+
+// ── Marka & Ürün Grubu Taksonomisi (2026-08-08, Faz 1) ───────────────────────
+// Tenant-yapılandırılabilir, yönetilebilir liste (serbest metin DEĞİL — analitik
+// bozulmasın diye). Presales BoM kalemi + DMO katalog kaydı bu ortak listelerden
+// seçim yapar. Ayarlar → Marka & Ürün Grubu (GM-only) ekranından yönetilir.
+model Brand {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  sources   BrandSource[]
+  bomItems  BoMItem[]
+  dmoCatalogItems DmoCatalogItem[]
+  vendors   Vendor[]
+  purchaseItems PurchaseItem[]
+  serviceTickets ServiceTicket[]
+  @@unique([tenantId, name])
+}
+
+model ProductCategory {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  bomItems  BoMItem[]
+  dmoCatalogItems DmoCatalogItem[]
+  serviceTickets ServiceTicket[]
+  @@unique([tenantId, name])
+}
+
+// Bir markanın kayıtlı kaynak/distribütörleri — BoMItem.source alanı marka
+// seçildikten sonra bu listeden doldurulur (serbest metin fallback korunur).
+model BrandSource {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name      String
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model BoMItem {
@@ -251,6 +327,10 @@ model BoMItem {
   source           String?
   vendor           String?
   paymentTermDays  Int?        // alış ödeme vadesi (referans tarihten gün) — finansman etkisi
+  brandId          String?
+  brand            Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   opportunityId    String
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
@@ -379,6 +459,10 @@ model ServiceTicket {
   resolutionNotes     String?
   costAmount          Float?    // çözüm maliyeti (yedek parça/işçilik) — opsiyonel
   costCurrency        String?   // costAmount girildiyse zorunlu anlamda kullanılır
+  brandId             String?   // ilgili ürünün markası (2026-08-09, Faz 3) — opsiyonel, tek etiket (satır granülaritesi yok)
+  brand               Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  productCategoryId   String?   // `category` alanı zaten arıza tipini taşıdığı için ayrı isim
+  productCategory     ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   @@index([tenantId, status])
@@ -477,6 +561,7 @@ model TodoTask {
   relatedItemId String?
   agentRunId    String?  // bu görevi üreten sanal agent çalıştırması (köken etiketi)
   escalatedAt   DateTime? // SLA aşımı bir üst role bildirildi mi (B-16, idempotent tekil eskalasyon)
+  completedAt   DateTime? // status COMPLETED'e geçtiği an (routes/tasks.ts PUT'ta set/clear edilir — reversible)
   tenantId      String
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -673,6 +758,7 @@ model Vendor {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   quotes       PurchaseQuote[]
+  brands       Brand[]  // taşıdığı/yetkili satıcısı olduğu markalar (2026-08-08, Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
 }
 
 model PurchaseRequest {
@@ -733,7 +819,10 @@ model PurchaseItem {
   refVendor         String?  // BoM kaynağı: üretici/distribütör adı (referans alış fiyatının kaynağı)
   refSource         String?  // BoM source — referans fiyat kaynağı türü
   lineKey           String?  // BoMItem.lineKey — BoM'dan devredildiyse satır-bazlı maliyet varyansı bağı
+  brandId           String?  // BoM handoff'ta BoMItem.brandId'den taşınır (2026-08-08, Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
+  brand             Brand?   @relation(fields: [brandId], references: [id], onDelete: SetNull)
   createdAt         DateTime @default(now())
+  quoteLines        PurchaseQuoteItem[]
 }
 
 model PurchaseQuote {
@@ -752,6 +841,23 @@ model PurchaseQuote {
   isSelected        Boolean @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+  items             PurchaseQuoteItem[]
+}
+
+// Kalem bazlı tedarikçi teklifi — her PurchaseQuote, talebin her PurchaseItem'ı
+// için ayrı miktar+birim fiyat taşır (2026-08-08). totalAmount bu satırların
+// toplamından backend'de otorite olarak yeniden hesaplanır (client'a güvenilmez).
+model PurchaseQuoteItem {
+  id              String        @id @default(cuid())
+  purchaseQuoteId String
+  purchaseQuote   PurchaseQuote @relation(fields: [purchaseQuoteId], references: [id], onDelete: Cascade)
+  purchaseItemId  String
+  purchaseItem    PurchaseItem  @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
+  quantity        Float
+  unitPrice       Float
+  createdAt       DateTime      @default(now())
+
+  @@unique([purchaseQuoteId, purchaseItemId])
 }
 
 // ── Onay Zinciri (Faz 0 — kalıcı ApprovalChain altyapısı) ──────────────────
@@ -1353,7 +1459,8 @@ model DmoCatalogItem {
   tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   dmoCode       String   // DMO stok/malzeme kodu
   name          String
-  brand         String?
+  brandId       String?
+  brand         Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
   model         String?
   unit          String   @default("ADET")
   listPrice     Float    @default(0)   // DMO katalog satış fiyatı (DMO kuru cinsinden, para birimi currency)
@@ -1361,7 +1468,8 @@ model DmoCatalogItem {
   currency      String   @default("TRY")
   unitCost      Float    @default(0)   // kendi alış maliyeti (costCurrency cinsinden)
   costCurrency  String   @default("TRY")
-  category      String?
+  categoryId    String?
+  category      ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   validFrom     DateTime?
   validTo       DateTime?
   status        String   @default("ACTIVE") // ACTIVE | PASSIVE | EXPIRED

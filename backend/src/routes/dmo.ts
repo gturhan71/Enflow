@@ -14,7 +14,12 @@ const num = (v: unknown, d = 0): number => { const n = Number(v); return Number.
 
 // ── Katalog ──────────────────────────────────────────────────────────────────
 router.get('/catalog', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const items = await prisma.dmoCatalogItem.findMany({ where: { tenantId: req.tenantId }, orderBy: { updatedAt: 'desc' } });
+  const { brandId, categoryId } = req.query as { brandId?: string; categoryId?: string };
+  const items = await prisma.dmoCatalogItem.findMany({
+    where: { tenantId: req.tenantId, ...(brandId ? { brandId } : {}), ...(categoryId ? { categoryId } : {}) },
+    include: { brand: true, category: true },
+    orderBy: { updatedAt: 'desc' },
+  });
   res.json(items);
 }));
 
@@ -24,16 +29,17 @@ router.post('/catalog', tenantMiddleware, editRoles, asyncHandler(async (req: Re
     data: {
       tenantId: req.tenantId,
       dmoCode: String(b.dmoCode || ''), name: String(b.name || ''),
-      brand: b.brand ? String(b.brand) : null, model: b.model ? String(b.model) : null,
+      brandId: b.brandId ? String(b.brandId) : null, model: b.model ? String(b.model) : null,
       unit: b.unit ? String(b.unit) : 'ADET',
       listPrice: num(b.listPrice), vatRate: num(b.vatRate, 20), currency: String(b.currency || 'TRY'),
       unitCost: num(b.unitCost), costCurrency: String(b.costCurrency || 'TRY'),
-      category: b.category ? String(b.category) : null,
+      categoryId: b.categoryId ? String(b.categoryId) : null,
       validFrom: toDate(b.validFrom), validTo: toDate(b.validTo),
       status: String(b.status || 'ACTIVE'),
       frameworkAgreementId: b.frameworkAgreementId ? String(b.frameworkAgreementId) : null,
       notes: b.notes ? String(b.notes) : null,
     },
+    include: { brand: true, category: true },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'DMO_CATALOG_ITEM', entityId: item.id, details: { name: item.name, dmoCode: item.dmoCode } });
   res.json(item);
@@ -45,10 +51,10 @@ router.put('/catalog/:id', tenantMiddleware, editRoles, asyncHandler(async (req:
   if (!rec) return res.status(404).json({ error: 'Kalem bulunamadı.' });
   const b = req.body as Record<string, unknown>;
   const data: Record<string, unknown> = {};
-  for (const k of ['dmoCode', 'name', 'brand', 'model', 'unit', 'currency', 'costCurrency', 'category', 'status', 'notes', 'frameworkAgreementId']) if (b[k] !== undefined) data[k] = b[k] === null ? null : String(b[k]);
+  for (const k of ['dmoCode', 'name', 'brandId', 'model', 'unit', 'currency', 'costCurrency', 'categoryId', 'status', 'notes', 'frameworkAgreementId']) if (b[k] !== undefined) data[k] = b[k] === null ? null : String(b[k]);
   for (const k of ['listPrice', 'vatRate', 'unitCost']) if (b[k] !== undefined) data[k] = num(b[k]);
   for (const k of ['validFrom', 'validTo']) if (b[k] !== undefined) data[k] = toDate(b[k]);
-  const item = await prisma.dmoCatalogItem.update({ where: { id }, data });
+  const item = await prisma.dmoCatalogItem.update({ where: { id }, data, include: { brand: true, category: true } });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'DMO_CATALOG_ITEM', entityId: id });
   res.json(item);
 }));

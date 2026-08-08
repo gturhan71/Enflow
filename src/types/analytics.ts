@@ -101,3 +101,10 @@ export interface DmoAnalytics {
   topInstitutions: { name: string; revenue: number; net: number }[];
   note: string;
 }
+export interface BrandCategoryGroup { key: string; label: string; workedValue: number; wonValue: number; workedCount: number; wonCount: number }
+export interface VendorVolumeGroup { key: string; totalValue: number; orderCount: number }
+export interface BrandCategoryAnalytics {
+  byBrand: BrandCategoryGroup[];
+  byCategory: BrandCategoryGroup[];
+  byVendor: VendorVolumeGroup[];
+}

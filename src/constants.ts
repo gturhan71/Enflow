@@ -142,6 +142,8 @@ export const NAV_ITEMS = [
       { id: 'settings-subscription',      label: 'Abonelik & Kullanım',       requiredPermission: 'SETTINGS_VIEW' },
       { id: 'settings-license-types',    label: 'Lisans Planları',            requiredPermission: 'SETTINGS_VIEW' },
       { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-dashboard-templates', label: 'Kokpit Şablonları',       requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-product-taxonomy', label: 'Marka & Ürün Grubu',         requiredPermission: 'GENERAL_MANAGER' },
     ],
   },
   { id: 'help', label: 'Yardım', icon: HelpCircle, requiredPermission: 'DASHBOARD_VIEW' },

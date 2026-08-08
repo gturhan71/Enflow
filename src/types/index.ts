@@ -17,3 +17,4 @@ export * from './overhead';
 export * from './plugin';
 export * from './backup';
 export * from './dmo';
+export * from './productTaxonomy';

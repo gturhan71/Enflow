@@ -27,6 +27,12 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
   const [showReject, setShowReject] = useState(false);
 
   const [quoteForm, setQuoteForm] = useState({ vendorId: '', vendorName: '', totalAmount: '', currency: 'TRY', totalAmountTRY: '', deliveryDays: '', validUntil: '', notes: '' });
+  // Kalem bazlı teklif satırları — talebin her PurchaseItem'ı için tedarikçinin
+  // teklif ettiği miktar + birim fiyat. Varsayılan miktar talep kalemindeki miktar.
+  const [quoteLines, setQuoteLines] = useState(() => pr.items.map(i => ({ purchaseItemId: i.id, quantity: String(i.quantity), unitPrice: '' })));
+  const setQuoteLine = (itemId: string, field: 'quantity' | 'unitPrice', value: string) =>
+    setQuoteLines(prev => prev.map(l => l.purchaseItemId === itemId ? { ...l, [field]: value } : l));
+  const computedQuoteTotal = quoteLines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
   const [deliveryForm, setDeliveryForm] = useState({ deliveredAt: new Date().toISOString().split('T')[0], receivedBy: '', quantityOrdered: '', quantityReceived: '', quantityDamaged: '', status: 'RECEIVED', notes: '' });
   const [invoiceForm, setInvoiceForm] = useState({ invoiceNo: pr.invoiceNo ?? '', invoiceAmount: pr.invoiceAmount?.toString() ?? '', invoiceDate: pr.invoiceDate?.split('T')[0] ?? '', invoicePaidAt: pr.invoicePaidAt?.split('T')[0] ?? '' });
 
@@ -62,16 +68,31 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
     } finally { setLoading(false); }
   };
 
+  // Talebin kalemlerinde geçen markalar — teklif ekranında bu markaları taşıyan
+  // tedarikçileri öne çıkarmak için (soft vurgu, seçimi kısıtlamaz — manuel/katalog
+  // dışı teklif her zaman mümkün).
+  const requestBrandIds = new Set(pr.items.map(i => i.brandId).filter((id): id is string => Boolean(id)));
+  const vendorCarriesRequestBrand = (v: Vendor) => requestBrandIds.size > 0 && (v.brands || []).some(b => requestBrandIds.has(b.id));
+  const sortedVendors = [...vendors].sort((a, b) => Number(vendorCarriesRequestBrand(b)) - Number(vendorCarriesRequestBrand(a)));
+
+  const activeQuoteLines = quoteLines
+    .filter(l => Number(l.quantity) > 0 && Number(l.unitPrice) > 0)
+    .map(l => ({ purchaseItemId: l.purchaseItemId, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) }));
+  const hasLineItems = pr.items.length > 0;
+  const quoteTotalValid = hasLineItems ? activeQuoteLines.length > 0 : Number(quoteForm.totalAmount) > 0;
+
   const handleAddQuote = async () => {
     setLoading(true);
     try {
       await apiService.addPurchaseQuote(pr.id, {
         ...quoteForm,
-        totalAmount: Number(quoteForm.totalAmount),
-        totalAmountTRY: quoteForm.totalAmountTRY ? Number(quoteForm.totalAmountTRY) : Number(quoteForm.totalAmount),
+        totalAmount: hasLineItems ? computedQuoteTotal : Number(quoteForm.totalAmount),
+        totalAmountTRY: quoteForm.totalAmountTRY ? Number(quoteForm.totalAmountTRY) : (hasLineItems ? computedQuoteTotal : Number(quoteForm.totalAmount)),
         deliveryDays: quoteForm.deliveryDays ? Number(quoteForm.deliveryDays) : undefined,
+        items: hasLineItems ? activeQuoteLines : undefined,
       });
       setQuoteForm({ vendorId: '', vendorName: '', totalAmount: '', currency: 'TRY', totalAmountTRY: '', deliveryDays: '', validUntil: '', notes: '' });
+      setQuoteLines(pr.items.map(i => ({ purchaseItemId: i.id, quantity: String(i.quantity), unitPrice: '' })));
       onRefresh();
     } finally { setLoading(false); }
   };
@@ -216,7 +237,10 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                   {pr.items.map((item: PurchaseItem) => (
                     <div key={item.id} className="bg-white/5 rounded-xl p-3 flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold">{item.name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold">{item.name}</p>
+                          {item.brand && <span className="text-[10px] font-bold text-amber-300 bg-amber-500/20 px-2 py-0.5 rounded-full shrink-0">{item.brand.name}</span>}
+                        </div>
                         {item.description && <p className="text-xs text-slate-400">{item.description}</p>}
                         {item.refVendor && (
                           <p className="text-[11px] text-emerald-400 mt-0.5">Referans kaynak: {item.refVendor}{item.refSource ? ` (${item.refSource})` : ''}</p>
@@ -267,6 +291,19 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                     {q.deliveryDays && <p className="text-xs text-slate-400 mt-0.5">{q.deliveryDays} gün teslimat</p>}
                     {q.validUntil && <p className="text-xs text-slate-400">Geçerlilik: {formatDate(q.validUntil)}</p>}
                     {q.notes && <p className="text-xs text-slate-400 mt-1 italic">{q.notes}</p>}
+                    {q.items && q.items.length > 0 && (
+                      <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
+                        {q.items.map(line => {
+                          const item = pr.items.find(i => i.id === line.purchaseItemId);
+                          return (
+                            <div key={line.id} className="flex items-center justify-between text-xs text-slate-400 gap-2">
+                              <span className="truncate">{item?.name ?? 'Kalem'}</span>
+                              <span className="shrink-0">{line.quantity} × {formatCurrency(line.unitPrice, q.currency)} = <span className="text-slate-200 font-semibold">{formatCurrency(line.quantity * line.unitPrice, q.currency)}</span></span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                   {!q.isSelected && ['PENDING_PROCUREMENT','PENDING_GM','PO_ISSUED'].includes(pr.status) && (
                     <button onClick={() => handleSelectQuote(q.id)} className="px-3 py-1.5 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-700 transition-colors shrink-0">
@@ -288,7 +325,7 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                 <p className="text-sm font-semibold text-slate-300">Yeni Teklif Ekle</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="text-xs text-slate-400">Tedarikçi</label>
+                    <label className="text-xs text-slate-400">Tedarikçi{requestBrandIds.size > 0 ? ' — ★ marka-uyumlu' : ''}</label>
                     <select value={quoteForm.vendorId}
                       onChange={e => {
                         const v = vendors.find(v => v.id === e.target.value);
@@ -296,7 +333,7 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                       }}
                       className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1">
                       <option value="">Listeden seç…</option>
-                      {vendors.map(v => <option key={v.id} value={v.id}>{v.name}</option>)}
+                      {sortedVendors.map(v => <option key={v.id} value={v.id}>{vendorCarriesRequestBrand(v) ? '★ ' : ''}{v.name}</option>)}
                     </select>
                   </div>
                   <div>
@@ -304,11 +341,13 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                     <input value={quoteForm.vendorName} onChange={e => setQuoteForm(f => ({ ...f, vendorName: e.target.value }))}
                       className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" placeholder="Manuel giriş" />
                   </div>
-                  <div>
-                    <label className="text-xs text-slate-400">Toplam Tutar</label>
-                    <input type="number" value={quoteForm.totalAmount} onChange={e => setQuoteForm(f => ({ ...f, totalAmount: e.target.value }))}
-                      className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
-                  </div>
+                  {!hasLineItems && (
+                    <div>
+                      <label className="text-xs text-slate-400">Toplam Tutar</label>
+                      <input type="number" value={quoteForm.totalAmount} onChange={e => setQuoteForm(f => ({ ...f, totalAmount: e.target.value }))}
+                        className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+                    </div>
+                  )}
                   <div>
                     <label className="text-xs text-slate-400">Döviz</label>
                     <select value={quoteForm.currency} onChange={e => setQuoteForm(f => ({ ...f, currency: e.target.value }))}
@@ -319,7 +358,7 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                   <div>
                     <label className="text-xs text-slate-400">TRY Karşılığı</label>
                     <input type="number" value={quoteForm.totalAmountTRY} onChange={e => setQuoteForm(f => ({ ...f, totalAmountTRY: e.target.value }))}
-                      className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+                      className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" placeholder={hasLineItems ? String(computedQuoteTotal || '') : ''} />
                   </div>
                   <div>
                     <label className="text-xs text-slate-400">Teslimat (gün)</label>
@@ -337,7 +376,31 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                       className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
                   </div>
                 </div>
-                <button onClick={handleAddQuote} disabled={!quoteForm.totalAmount || loading}
+
+                {hasLineItems && (
+                  <div className="space-y-2 pt-1">
+                    <p className="text-xs text-slate-400">Kalem Bazlı Teklif — talep edilen her kalem için tedarikçinin teklif ettiği miktar ve birim fiyatı girin</p>
+                    <div className="space-y-2">
+                      {pr.items.map((item: PurchaseItem) => {
+                        const line = quoteLines.find(l => l.purchaseItemId === item.id);
+                        const lineTotal = (Number(line?.quantity) || 0) * (Number(line?.unitPrice) || 0);
+                        return (
+                          <div key={item.id} className="grid grid-cols-12 gap-2 items-center bg-white/5 rounded-lg p-2">
+                            <span className="col-span-5 text-xs truncate" title={item.name}>{item.name}</span>
+                            <input type="number" value={line?.quantity ?? ''} onChange={e => setQuoteLine(item.id, 'quantity', e.target.value)}
+                              placeholder={`Miktar (${item.unit})`} className="input-glass col-span-3 px-2 py-1.5 text-xs rounded-lg" />
+                            <input type="number" value={line?.unitPrice ?? ''} onChange={e => setQuoteLine(item.id, 'unitPrice', e.target.value)}
+                              placeholder="Birim fiyat" className="input-glass col-span-3 px-2 py-1.5 text-xs rounded-lg" />
+                            <span className="col-span-1 text-[11px] text-slate-400 text-right truncate">{lineTotal > 0 ? lineTotal.toLocaleString('tr-TR') : ''}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <p className="text-right text-sm font-bold text-indigo-300">Toplam: {formatCurrency(computedQuoteTotal, quoteForm.currency)}</p>
+                  </div>
+                )}
+
+                <button onClick={handleAddQuote} disabled={!quoteTotalValid || loading}
                   className="btn-primary px-4 py-2 text-sm rounded-xl disabled:opacity-50">
                   Teklif Ekle
                 </button>

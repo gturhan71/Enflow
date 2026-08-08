@@ -29,8 +29,8 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
       ...(sourceType ? { sourceType: String(sourceType) } : {}),
     },
     include: {
-      items: true,
-      quotes: { include: { vendor: true } },
+      items: { include: { brand: true } },
+      quotes: { include: { vendor: true, items: true } },
       deliveries: true,
     },
     orderBy: { createdAt: 'desc' },
@@ -43,8 +43,8 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const pr = await prisma.purchaseRequest.findFirst({
     where: { id: String(req.params.id), tenantId: req.tenantId },
     include: {
-      items: true,
-      quotes: { include: { vendor: true }, orderBy: { totalAmountTRY: 'asc' } },
+      items: { include: { brand: true } },
+      quotes: { include: { vendor: true, items: true }, orderBy: { totalAmountTRY: 'asc' } },
       deliveries: { orderBy: { deliveredAt: 'desc' } },
     },
   });
@@ -85,7 +85,7 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
         create: items.map((item: {
           name: string; description?: string; quantity: number;
           unit?: string; estimatedUnitPrice?: number; currency?: string;
-          refVendor?: string; refSource?: string;
+          refVendor?: string; refSource?: string; brandId?: string;
         }) => ({
           name: item.name,
           description: item.description || null,
@@ -95,10 +95,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
           currency: item.currency || currency || 'TRY',
           refVendor: item.refVendor || null,
           refSource: item.refSource || null,
+          brandId: item.brandId || null,
         })),
       } : undefined,
     },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PURCHASE_REQUEST', entityId: pr.id, details: { title: pr.title, projectId: pr.projectId } });
   res.status(201).json(pr);
@@ -124,7 +125,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       unitId: unitId ?? null,
       unitName: unitName ?? null,
     },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
   res.json(pr);
 }));
@@ -173,7 +174,7 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
   const updated = await prisma.purchaseRequest.update({
     where: { id: String(req.params.id) },
     data: updateData,
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
 
   // PO kesilince maliyet kalemi oluştur
@@ -282,7 +283,7 @@ router.post('/:id/reject', asyncHandler(async (req: Request, res: Response) => {
       rejectedBy: rejectedBy || req.userId,
       rejectionNote: rejectionNote || null,
     },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_REJECTED', entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { rejectionNote: rejectionNote || null } });
   res.json(updated);
@@ -309,7 +310,7 @@ router.post('/:id/resubmit', asyncHandler(async (req: Request, res: Response) =>
       resubmitCount: { increment: 1 },
       ...(notes !== undefined && { notes }),
     },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'RESUBMIT', entityType: 'PURCHASE_REQUEST', entityId: id, details: { previousRejectionNote: pr.rejectionNote, resubmitCount: updated.resubmitCount } });
   res.json(updated);
@@ -339,41 +340,75 @@ router.delete('/:id/items/:itemId', asyncHandler(async (req: Request, res: Respo
 }));
 
 // ── QUOTES ────────────────────────────────────────────────────────────────
+// Kalem bazlı satırlar (items: {purchaseItemId, quantity, unitPrice}[]) verilirse
+// totalAmount CLIENT'tan gelen değere değil bu satırların toplamına göre backend'de
+// otorite olarak hesaplanır — teklif tutarı her zaman girilen miktar×fiyattan türer.
+type QuoteLineInput = { purchaseItemId: string; quantity: number; unitPrice: number };
+const sumQuoteLines = (items: QuoteLineInput[]) => items.reduce((s, i) => s + Number(i.quantity) * Number(i.unitPrice), 0);
+
 router.post('/:id/quotes', asyncHandler(async (req: Request, res: Response) => {
-  const owns = await prisma.purchaseRequest.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId }, select: { id: true } });
+  const prId = String(req.params.id);
+  const owns = await prisma.purchaseRequest.findFirst({ where: { id: prId, tenantId: req.tenantId }, select: { id: true } });
   if (!owns) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
-  const { vendorId, vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes } = req.body;
+  const { vendorId, vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes, items } = req.body as {
+    vendorId?: string; vendorName?: string; totalAmount?: number; currency?: string; totalAmountTRY?: number;
+    deliveryDays?: number; validUntil?: string; notes?: string; items?: QuoteLineInput[];
+  };
+  const lines = Array.isArray(items) ? items.filter(i => i.purchaseItemId && i.quantity > 0 && i.unitPrice >= 0) : [];
+  const resolvedTotal = lines.length > 0 ? sumQuoteLines(lines) : Number(totalAmount);
+  if (!resolvedTotal || resolvedTotal <= 0) return res.status(400).json({ error: 'Teklif tutarı zorunludur (kalem miktar/fiyat girin veya toplam tutar yazın).' });
+
   const quote = await prisma.purchaseQuote.create({
     data: {
-      purchaseRequestId: String(req.params.id),
+      purchaseRequestId: prId,
       vendorId: vendorId || null,
       vendorName: vendorName || 'Bilinmeyen',
-      totalAmount: Number(totalAmount),
+      totalAmount: resolvedTotal,
       currency: currency || 'TRY',
-      totalAmountTRY: totalAmountTRY ? Number(totalAmountTRY) : Number(totalAmount),
+      totalAmountTRY: totalAmountTRY ? Number(totalAmountTRY) : resolvedTotal,
       deliveryDays: deliveryDays ? Number(deliveryDays) : null,
       validUntil: validUntil ? new Date(validUntil) : null,
       notes: notes || null,
+      items: lines.length > 0 ? {
+        create: lines.map(l => ({ purchaseItemId: l.purchaseItemId, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) })),
+      } : undefined,
     },
-    include: { vendor: true },
+    include: { vendor: true, items: true },
   });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'QUOTE_ADD', entityType: 'PURCHASE_REQUEST', entityId: prId, details: { vendorName: quote.vendorName, totalAmount: quote.totalAmount, lineCount: lines.length } });
   res.status(201).json(quote);
 }));
 
 router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) => {
-  const { vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes } = req.body;
-  const upd = await prisma.purchaseQuote.updateMany({
-    where: { id: String(req.params.qid), purchaseRequest: { tenantId: req.tenantId } },
-    data: {
-      vendorName, totalAmount: Number(totalAmount), currency,
-      totalAmountTRY: totalAmountTRY ? Number(totalAmountTRY) : Number(totalAmount),
-      deliveryDays: deliveryDays ? Number(deliveryDays) : null,
-      validUntil: validUntil ? new Date(validUntil) : null,
-      notes: notes || null,
-    },
+  const qid = String(req.params.qid);
+  const owns = await prisma.purchaseQuote.findFirst({ where: { id: qid, purchaseRequest: { tenantId: req.tenantId } }, select: { id: true } });
+  if (!owns) return res.status(404).json({ error: 'Teklif bulunamadı.' });
+  const { vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes, items } = req.body as {
+    vendorName?: string; totalAmount?: number; currency?: string; totalAmountTRY?: number;
+    deliveryDays?: number; validUntil?: string; notes?: string; items?: QuoteLineInput[];
+  };
+  const lines = Array.isArray(items) ? items.filter(i => i.purchaseItemId && i.quantity > 0 && i.unitPrice >= 0) : null;
+  const resolvedTotal = lines && lines.length > 0 ? sumQuoteLines(lines) : Number(totalAmount);
+
+  await prisma.$transaction(async (tx) => {
+    if (lines) {
+      await tx.purchaseQuoteItem.deleteMany({ where: { purchaseQuoteId: qid } });
+      if (lines.length > 0) {
+        await tx.purchaseQuoteItem.createMany({ data: lines.map(l => ({ purchaseQuoteId: qid, purchaseItemId: l.purchaseItemId, quantity: Number(l.quantity), unitPrice: Number(l.unitPrice) })) });
+      }
+    }
+    await tx.purchaseQuote.update({
+      where: { id: qid },
+      data: {
+        vendorName, totalAmount: resolvedTotal, currency,
+        totalAmountTRY: totalAmountTRY ? Number(totalAmountTRY) : resolvedTotal,
+        deliveryDays: deliveryDays ? Number(deliveryDays) : null,
+        validUntil: validUntil ? new Date(validUntil) : null,
+        notes: notes || null,
+      },
+    });
   });
-  if (upd.count === 0) return res.status(404).json({ error: 'Teklif bulunamadı.' });
-  res.json(await prisma.purchaseQuote.findFirst({ where: { id: String(req.params.qid), purchaseRequest: { tenantId: req.tenantId } }, include: { vendor: true } }));
+  res.json(await prisma.purchaseQuote.findFirst({ where: { id: qid, purchaseRequest: { tenantId: req.tenantId } }, include: { vendor: true, items: true } }));
 }));
 
 router.delete('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) => {
@@ -390,7 +425,7 @@ router.post('/:id/quotes/:qid/select', asyncHandler(async (req: Request, res: Re
   const selected = await prisma.purchaseQuote.update({
     where: { id: qid },
     data: { isSelected: true },
-    include: { vendor: true },
+    include: { vendor: true, items: true },
   });
   // Satınalma talebine seçilen tedarikçiyi kaydet
   await prisma.purchaseRequest.update({
@@ -466,7 +501,7 @@ router.post('/:id/invoice', asyncHandler(async (req: Request, res: Response) => 
       invoicePaidAt: invoicePaidAt ? new Date(invoicePaidAt) : null,
       status: invoicePaidAt ? 'CLOSED' : 'INVOICED',
     },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
 
   // Satınalma faturası → Finans Invoice (type=PURCHASE). Idempotent: purchaseRequestId ile upsert.
@@ -507,7 +542,7 @@ router.post('/:id/close', asyncHandler(async (req: Request, res: Response) => {
   const updated = await prisma.purchaseRequest.update({
     where: { id: String(req.params.id), tenantId: req.tenantId },
     data: { status: 'CLOSED' },
-    include: { items: true, quotes: true, deliveries: true },
+    include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_CLOSED', entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id) });
   res.json(updated);

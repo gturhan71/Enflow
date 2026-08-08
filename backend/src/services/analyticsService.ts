@@ -757,3 +757,72 @@ export async function computeDmoAnalytics(tenantId: string): Promise<DmoAnalytic
     note: 'DMO kanalı: onaylanan+ siparişlerin gerçek cirosu/net kârı (risturn+komisyon sonrası), değerlendirmedeki fırsatlar ve kârsız sipariş uyarıları.',
   };
 }
+
+// ── Marka & Ürün Grubu Analitiği · Faz 4 (2026-08-09) ────────────────────────
+// Presales BoM kalemi bazında etiketlenen marka/ürün grubu (bkz. Brand/ProductCategory
+// taksonomisi) + Satınalma'da seçilen tedarikçi hacmi. "Çalışılan" = tüm etiketli BoM
+// kalemlerinin (fırsat durumu ne olursa olsun, LOST hariç değil — gerçek iş yükünü
+// yansıtır) toplam değeri; "Kazanılan" = yalnız WON fırsatların kalemleri.
+// Değer: satış fiyatı belliyse o, yoksa referans alış maliyeti (purchaseCost×adet) —
+// Presales aşamasında unitSalePrice çoğu zaman henüz hesaplanmamış olabilir.
+export interface BrandCategoryGroup { key: string; label: string; workedValue: number; wonValue: number; workedCount: number; wonCount: number }
+export interface VendorVolumeGroup { key: string; totalValue: number; orderCount: number }
+export interface BrandCategoryAnalytics {
+  byBrand: BrandCategoryGroup[];
+  byCategory: BrandCategoryGroup[];
+  byVendor: VendorVolumeGroup[];
+}
+
+export async function computeBrandCategoryAnalytics(tenantId: string): Promise<BrandCategoryAnalytics> {
+  const bomItems = await prisma.boMItem.findMany({
+    where: { opportunity: { tenantId }, OR: [{ brandId: { not: null } }, { categoryId: { not: null } }] },
+    select: {
+      quantity: true, purchaseCost: true, totalSalePrice: true, unitSalePrice: true,
+      brandId: true, brand: { select: { name: true } },
+      categoryId: true, category: { select: { name: true } },
+      opportunity: { select: { status: true } },
+    },
+  });
+
+  const itemValue = (i: (typeof bomItems)[number]) =>
+    i.totalSalePrice ?? (i.unitSalePrice != null ? i.unitSalePrice * i.quantity : i.purchaseCost * i.quantity);
+
+  const group = (
+    keyOf: (i: (typeof bomItems)[number]) => string | null,
+    labelOf: (i: (typeof bomItems)[number]) => string,
+  ): BrandCategoryGroup[] => {
+    const m = new Map<string, BrandCategoryGroup>();
+    for (const i of bomItems) {
+      const k = keyOf(i);
+      if (!k) continue;
+      const value = itemValue(i);
+      const isWon = i.opportunity.status === 'WON';
+      const g = m.get(k) ?? { key: k, label: labelOf(i), workedValue: 0, wonValue: 0, workedCount: 0, wonCount: 0 };
+      g.workedValue += value; g.workedCount += 1;
+      if (isWon) { g.wonValue += value; g.wonCount += 1; }
+      m.set(k, g);
+    }
+    return Array.from(m.values()).sort((a, b) => b.workedValue - a.workedValue);
+  };
+
+  // Tedarikçi hacmi: seçilmiş teklifi olan satınalma talepleri (gerçek iş yapılan tedarikçi).
+  const purchaseRequests = await prisma.purchaseRequest.findMany({
+    where: { tenantId, selectedVendorName: { not: null } },
+    select: { selectedVendorName: true, budgetAmountTRY: true, quotes: { where: { isSelected: true }, select: { totalAmountTRY: true } } },
+  });
+  const vendorMap = new Map<string, VendorVolumeGroup>();
+  for (const pr of purchaseRequests) {
+    const key = pr.selectedVendorName as string;
+    const amount = pr.quotes[0]?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0;
+    const g = vendorMap.get(key) ?? { key, totalValue: 0, orderCount: 0 };
+    g.totalValue += amount; g.orderCount += 1;
+    vendorMap.set(key, g);
+  }
+  const byVendor = Array.from(vendorMap.values()).sort((a, b) => b.totalValue - a.totalValue);
+
+  return {
+    byBrand: group(i => i.brandId, i => i.brand?.name ?? '—'),
+    byCategory: group(i => i.categoryId, i => i.category?.name ?? '—'),
+    byVendor,
+  };
+}

@@ -71,6 +71,17 @@ export const crmService = {
     });
   },
 
+  async checkInOpportunityProgress(id: string, data: { probability?: number; status?: string; note?: string }) {
+    return apiClient.fetchWithAuth(`/opportunities/${id}/progress-checkin`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  },
+
+  async getOpportunityProgressLog(id: string) {
+    return apiClient.fetchWithAuth(`/opportunities/${id}/progress-log`);
+  },
+
   async deleteOpportunity(id: string) {
     return apiClient.fetchWithAuth(`/opportunities/${id}`, {
       method: 'DELETE'

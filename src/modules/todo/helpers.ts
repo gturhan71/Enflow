@@ -63,6 +63,11 @@ export const CHAIN_ENTITY_LABEL: Record<string, string> = {
   DMO_ORDER: 'DMO Sipariş Onayı (kârsız)',
 };
 
+// Görevin tamamlandığı an — her zaman görünür olması gereken zaman damgası
+// (Tamamlanan Görevler bölümü). Tarih + saat, TR yerel biçimi.
+export const fmtCompletedAt = (d?: string | null) =>
+  d ? new Date(d).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+
 export const getPriorityColor = (priority: string) => {
   switch (priority) {
     case 'URGENT': return 'bg-red-100 text-red-700 border-red-200';

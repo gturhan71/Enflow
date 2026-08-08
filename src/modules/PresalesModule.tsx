@@ -20,7 +20,10 @@ import {
   Unit,
   User,
   BoMLineQuote,
-  BomHandoff
+  BomHandoff,
+  Brand,
+  ProductCategory,
+  BrandSource
 } from '../types';
 import SpecAnalysis from './SpecAnalysis';
 import { workflowService } from '../services/workflowService';
@@ -81,8 +84,24 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     qty: 1,
     cost: 0,
     margin: 15,
-    currency: 'TRY'
+    currency: 'TRY',
+    brandId: '',
+    categoryId: '',
+    source: ''
   });
+
+  // Marka & Ürün Grubu — Ayarlar'dan yönetilen ortak liste (Faz 1).
+  const [brands, setBrands] = useState<Brand[]>([]);
+  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
+  const [brandSources, setBrandSources] = useState<BrandSource[]>([]);
+  useEffect(() => {
+    apiService.getBrands().then(setBrands).catch(() => {});
+    apiService.getProductCategories().then(setProductCategories).catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!newItem.brandId) { setBrandSources([]); return; }
+    apiService.getBrandSources(newItem.brandId).then(setBrandSources).catch(() => setBrandSources([]));
+  }, [newItem.brandId]);
 
   const [showApprovalPreview, setShowApprovalPreview] = useState(false);
   const [quoteLine, setQuoteLine] = useState<{ lineKey: string; name: string } | null>(null);
@@ -283,12 +302,33 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                   className="col-span-1 bg-primary text-white rounded-lg flex items-center justify-center hover:bg-primary/90 transition-all"
                   onClick={() => {
                     if (!newItem.pn && !newItem.desc) return;
-                    addBoMItem(newItem);
-                    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15, currency: bomCurrency });
+                    addBoMItem({
+                      pn: newItem.pn, desc: newItem.desc, qty: newItem.qty, cost: newItem.cost, margin: newItem.margin, currency: newItem.currency,
+                      brandId: newItem.brandId || undefined, categoryId: newItem.categoryId || undefined, source: newItem.source || undefined,
+                    });
+                    setNewItem({ pn: '', desc: '', qty: 1, cost: 0, margin: 15, currency: bomCurrency, brandId: '', categoryId: '', source: '' });
                   }}
                 >
                   <Plus size={16} />
                 </button>
+                {/* Marka / Ürün Grubu / Kaynak — marka seçilince Kaynak o markanın kayıtlı listesinden dolar */}
+                <select value={newItem.brandId} onChange={(e) => setNewItem({ ...newItem, brandId: e.target.value, source: '' })} className="col-span-4 p-2 text-xs border rounded-lg bg-white" title="Marka">
+                  <option value="">Marka seçilmedi</option>
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+                <select value={newItem.categoryId} onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value })} className="col-span-4 p-2 text-xs border rounded-lg bg-white" title="Ürün Grubu">
+                  <option value="">Ürün grubu seçilmedi</option>
+                  {productCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+                {newItem.brandId ? (
+                  <select value={newItem.source} onChange={(e) => setNewItem({ ...newItem, source: e.target.value })} className="col-span-4 p-2 text-xs border rounded-lg bg-white" title="Kaynak / Distribütör">
+                    <option value="">Kaynak seçilmedi</option>
+                    {brandSources.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
+                  </select>
+                ) : (
+                  <input type="text" placeholder="Kaynak (serbest metin — marka seçilirse listeden seçilir)" className="col-span-4 p-2 text-xs border rounded-lg bg-white"
+                    value={newItem.source} onChange={(e) => setNewItem({ ...newItem, source: e.target.value })} />
+                )}
              </div>
 
              <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-white">
@@ -299,6 +339,13 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                       <span className="text-sm font-bold text-slate-800">{item.cost.toLocaleString('tr-TR')} {item.currency || 'TRY'} x {item.qty}</span>
                     </div>
                     <p className="text-sm text-slate-600 mt-1">{item.desc}</p>
+                    {(item.brandId || item.categoryId || item.source) && (
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                        {item.brandId && <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">{brands.find(b => b.id === item.brandId)?.name || 'Marka'}</span>}
+                        {item.categoryId && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">{productCategories.find(c => c.id === item.categoryId)?.name || 'Ürün Grubu'}</span>}
+                        {item.source && <span className="text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full">Kaynak: {item.source}</span>}
+                      </div>
+                    )}
                     <div className="flex items-center justify-between mt-2">
                       {item.vendor ? <span className="text-[11px] text-emerald-600 font-semibold">✓ {item.vendor}</span> : <span className="text-[11px] text-slate-400">Tedarikçi seçilmedi</span>}
                       <button onClick={() => setQuoteLine({ lineKey: item.lineKey || '', name: item.pn || item.desc })}

@@ -232,7 +232,15 @@ function CatalogTab({ items, canEdit, onNew, onEdit, onDelete }: { items: DmoCat
           <tbody>
             {items.map(it => (
               <tr key={it.id} className="border-t border-slate-100">
-                <td className="p-3"><b className="text-slate-700">{it.dmoCode}</b> · {it.name}</td>
+                <td className="p-3">
+                  <b className="text-slate-700">{it.dmoCode}</b> · {it.name}
+                  {(it.brand || it.category) && (
+                    <div className="flex gap-1 mt-1">
+                      {it.brand && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{it.brand.name}</span>}
+                      {it.category && <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full">{it.category.name}</span>}
+                    </div>
+                  )}
+                </td>
                 <td className="p-3 text-right">{fmt(it.listPrice, it.currency)}</td>
                 <td className="p-3 text-right text-slate-500">{fmt(it.unitCost, it.costCurrency)}</td>
                 <td className="p-3 text-center"><span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{it.status}</span></td>
@@ -353,14 +361,25 @@ const Field = ({ label, children }: { label: string; children: React.ReactNode }
 const inp = 'input-glass w-full mt-1 text-sm';
 
 function CatalogForm({ initial, agreements, rates, onClose, onSaved }: { initial?: DmoCatalogItem; agreements: DmoFrameworkAgreement[]; rates: DmoExchangeRate[]; onClose: () => void; onSaved: () => void }) {
-  const [f, setF] = useState({ dmoCode: initial?.dmoCode || '', name: initial?.name || '', unit: initial?.unit || 'ADET', listPrice: initial?.listPrice ?? 0, currency: initial?.currency || 'TRY', unitCost: initial?.unitCost ?? 0, costCurrency: initial?.costCurrency || 'TRY', category: initial?.category || '', frameworkAgreementId: initial?.frameworkAgreementId || '' });
+  const [f, setF] = useState({ dmoCode: initial?.dmoCode || '', name: initial?.name || '', unit: initial?.unit || 'ADET', listPrice: initial?.listPrice ?? 0, currency: initial?.currency || 'TRY', unitCost: initial?.unitCost ?? 0, costCurrency: initial?.costCurrency || 'TRY', brandId: initial?.brandId || '', model: initial?.model || '', categoryId: initial?.categoryId || '', frameworkAgreementId: initial?.frameworkAgreementId || '' });
+  const [brands, setBrands] = useState<import('../types').Brand[]>([]);
+  const [productCategories, setProductCategories] = useState<import('../types').ProductCategory[]>([]);
+  useEffect(() => {
+    apiService.getBrands().then(setBrands).catch(() => {});
+    apiService.getProductCategories().then(setProductCategories).catch(() => {});
+  }, []);
   // Satış (DMO kuru) + alış maliyeti için döviz seçenekleri: TRY + tanımlı DMO kurları
   const currencyOpts = [...new Set(['TRY', ...rates.map(r => r.currency), f.currency, f.costCurrency])].filter(Boolean);
-  const save = async () => { const d = { ...f, frameworkAgreementId: f.frameworkAgreementId || null }; if (initial) await apiService.updateDmoCatalog(initial.id, d); else await apiService.createDmoCatalog(d); onSaved(); };
+  const save = async () => { const d = { ...f, brandId: f.brandId || null, categoryId: f.categoryId || null, frameworkAgreementId: f.frameworkAgreementId || null }; if (initial) await apiService.updateDmoCatalog(initial.id, d); else await apiService.createDmoCatalog(d); onSaved(); };
   return (
     <Modal title={initial ? 'Katalog Kalemi Düzenle' : 'Yeni Katalog Kalemi'} onClose={onClose}>
       <Field label="DMO Kodu"><input className={inp} value={f.dmoCode} onChange={e => setF({ ...f, dmoCode: e.target.value })} /></Field>
       <Field label="Ad"><input className={inp} value={f.name} onChange={e => setF({ ...f, name: e.target.value })} /></Field>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Marka"><select className={inp} value={f.brandId} onChange={e => setF({ ...f, brandId: e.target.value })}><option value="">—</option>{brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}</select></Field>
+        <Field label="Model"><input className={inp} value={f.model} onChange={e => setF({ ...f, model: e.target.value })} /></Field>
+      </div>
+      <Field label="Ürün Grubu"><select className={inp} value={f.categoryId} onChange={e => setF({ ...f, categoryId: e.target.value })}><option value="">—</option>{productCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></Field>
       <div className="grid grid-cols-2 gap-3">
         <Field label="Satış Fiyatı (DMO)"><input type="number" className={inp} value={f.listPrice} onChange={e => setF({ ...f, listPrice: Number(e.target.value) })} /></Field>
         <Field label="Satış Dövizi"><select className={inp} value={f.currency} onChange={e => setF({ ...f, currency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
@@ -368,7 +387,7 @@ function CatalogForm({ initial, agreements, rates, onClose, onSaved }: { initial
         <Field label="Alış Dövizi"><select className={inp} value={f.costCurrency} onChange={e => setF({ ...f, costCurrency: e.target.value })}>{currencyOpts.map(c => <option key={c} value={c}>{c}</option>)}</select></Field>
       </div>
       <Field label="Çerçeve Anlaşma"><select className={inp} value={f.frameworkAgreementId} onChange={e => setF({ ...f, frameworkAgreementId: e.target.value })}><option value="">—</option>{agreements.map(a => <option key={a.id} value={a.id}>{a.agreementNo}</option>)}</select></Field>
-      <p className="text-[10px] text-slate-400 italic">Döviz seçenekleri Döviz Kurları sekmesinden gelir; yeni bir para birimi için önce oradan DMO kurunu ekleyin.</p>
+      <p className="text-[10px] text-slate-400 italic">Döviz seçenekleri Döviz Kurları sekmesinden gelir; yeni bir para birimi için önce oradan DMO kurunu ekleyin. Marka/Ürün Grubu listeleri Ayarlar → Marka &amp; Ürün Grubu'ndan yönetilir.</p>
       <button onClick={save} className="btn-primary w-full py-2 rounded-xl text-sm">Kaydet</button>
     </Modal>
   );

@@ -1,5 +1,5 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Plus, ArrowRight, Building, FileSignature, XCircle, GitBranch, Edit2, Target, Calendar, Printer, X } from 'lucide-react';
+import { Plus, ArrowRight, Building, FileSignature, XCircle, GitBranch, Edit2, Target, Calendar, Printer, X, ClipboardCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Opportunity, Customer, Proposal } from '../../types';
@@ -7,6 +7,14 @@ import { SaveButton } from '../../components/SaveButton';
 import { PermissionGate } from '../../components/PermissionGate';
 import { PIPELINE_STAGES, STATUS_LABEL, getStatusStyle } from './constants';
 import { printReportWindow, esc } from '../reporting/helpers';
+import { dleftBadge } from '../dashboard/helpers';
+
+const PROGRESS_CHECKIN_INTERVAL_DAYS = 14; // tenant ayarıyla senkron varsayılan — bkz. opportunityProgressService.ts
+const daysSinceCheckIn = (opp: Opportunity) => {
+  const baseline = opp.lastProgressCheckAt || opp.createdAt;
+  if (!baseline) return null;
+  return Math.floor((Date.now() - new Date(baseline).getTime()) / 86_400_000);
+};
 
 const isoDaysAgo = (n: number) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 const isoDaysAhead = (n: number) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
@@ -15,7 +23,7 @@ const fmtShortDate = (iso?: string) => iso ? new Date(iso).toLocaleDateString('t
 
 export default function OpportunitiesView({
   filteredOpportunities, customers, proposals, loading, onSaveAll, onNewOpportunity,
-  onProgressStatus, onMarkLost, onHandOff, onEdit,
+  onProgressStatus, onMarkLost, onHandOff, onEdit, onCheckIn,
 }: {
   filteredOpportunities: Opportunity[];
   customers: Customer[];
@@ -27,6 +35,7 @@ export default function OpportunitiesView({
   onMarkLost: (opp: Opportunity) => void;
   onHandOff: (opp: Opportunity) => void;
   onEdit: (opp: Opportunity) => void;
+  onCheckIn: (opp: Opportunity) => void;
 }) {
   // Açılış (createdAt — otomatik/mühürlenmiş) ve muhtemel kapanış (expectedCloseDate —
   // bilgi amaçlı) tarihlerine göre arama/listeleme + 30/60/90 günlük periyot raporu.
@@ -263,6 +272,18 @@ export default function OpportunitiesView({
                     </div>
                   )}
 
+                  {!['WON', 'LOST', 'WITHDRAWN'].includes(opp.status) && (() => {
+                    const daysSince = daysSinceCheckIn(opp);
+                    const daysLeft = daysSince == null ? null : PROGRESS_CHECKIN_INTERVAL_DAYS - daysSince;
+                    const badge = dleftBadge(daysLeft);
+                    return (
+                      <div className={cn("flex items-center gap-1 text-[10px] font-bold", badge.c)}>
+                        <ClipboardCheck size={11} />
+                        {daysLeft != null && daysLeft < 0 ? 'İlerleme teyidi gecikti' : `İlerleme teyidine ${badge.t}`}
+                      </div>
+                    );
+                  })()}
+
                   {latestProposal && (
                     <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-bold">
                       <FileSignature size={11} />
@@ -289,6 +310,14 @@ export default function OpportunitiesView({
                   )}
 
                   <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+                    {opp.status !== 'WON' && opp.status !== 'LOST' && (
+                      <button
+                        onClick={() => onCheckIn(opp)}
+                        className="flex items-center gap-1 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        <ClipboardCheck size={11} /> İlerleme Teyit Et
+                      </button>
+                    )}
                     {nextStage && opp.status !== 'WON' && opp.status !== 'LOST' && (
                       <button
                         onClick={() => onProgressStatus(opp, nextStage)}

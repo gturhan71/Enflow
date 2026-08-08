@@ -26,6 +26,7 @@ import CustomersView from './crm/CustomersView';
 import ProposalsView from './crm/ProposalsView';
 import CustomerReportModal from './crm/CustomerReportModal';
 import LostReasonModal from './crm/LostReasonModal';
+import ProgressCheckInModal from './crm/ProgressCheckInModal';
 import NewOpportunityModal from './crm/NewOpportunityModal';
 import NewCustomerModal from './crm/NewCustomerModal';
 import ContactsModal, { type ContactFormState } from './crm/ContactsModal';
@@ -69,6 +70,7 @@ const CRMModule = ({
   const [showOpportunitySelector, setShowOpportunitySelector] = useState(false);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
+  const [checkInTarget, setCheckInTarget] = useState<Opportunity | null>(null);
   const [customerReportTarget, setCustomerReportTarget] = useState<Customer | null>(null);
   const [customerHealth, setCustomerHealth] = useState<CustomerHealthReport | null>(null);
 
@@ -460,6 +462,10 @@ const CRMModule = ({
     setShowNewOpportunityModal(true);
   };
 
+  const handleProgressCheckInSaved = (updated: Opportunity) => {
+    setOpportunities(prev => prev.map(o => o.id === updated.id ? { ...o, ...updated } : o));
+  };
+
   const handleProgressStatus = async (opp: Opportunity, toStatus: Opportunity['status']) => {
     try {
       const updated = await apiService.updateOpportunity(opp.id, { status: toStatus });
@@ -538,6 +544,7 @@ const CRMModule = ({
           onMarkLost={(opp) => setLostReasonModal({ opp })}
           onHandOff={(opp) => { setHandOffTarget(opp); setShowHandOffModal(true); }}
           onEdit={openEditOpportunity}
+          onCheckIn={(opp) => setCheckInTarget(opp)}
         />
       ) : activeTab === 'crm-customers' ? (
         <CustomersView
@@ -602,6 +609,13 @@ const CRMModule = ({
             onClose={() => setShowHandOffModal(false)}
             onConfirm={handleHandOff}
             itemTitle={handOffTarget.title}
+          />
+        )}
+        {checkInTarget && (
+          <ProgressCheckInModal
+            opp={checkInTarget}
+            onClose={() => setCheckInTarget(null)}
+            onSaved={handleProgressCheckInSaved}
           />
         )}
         {lostReasonModal && (

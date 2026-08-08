@@ -191,19 +191,30 @@ export interface UserDashboardLayout {
   order: WK[];
 }
 
-// Kayıtlı kişiselleştirme varsa ondan, yoksa rol varsayılanından widget listesini üretir.
-export function resolveEffectiveWidgets(role: string | undefined, saved: UserDashboardLayout | null): WK[] {
-  if (saved) {
-    const enabledSet = new Set(saved.widgets.filter(w => w.enabled).map(w => w.key));
-    return saved.order.filter(k => ALL_WIDGET_KEYS.includes(k) && enabledSet.has(k));
+// Rolün geçerli varsayılanı: tenant GM'i bu rol için özel şablon tanımladıysa
+// (roleTemplateOverride, Tenant.moduleSettings.dashboardRoleTemplates'ten gelir) o
+// kullanılır, yoksa hardcode ROLE_DASHBOARD'a düşülür.
+export function resolveRoleDefault(role: string | undefined, roleTemplateOverride?: WK[] | null): WK[] {
+  if (roleTemplateOverride && roleTemplateOverride.length > 0) {
+    return roleTemplateOverride.filter(k => ALL_WIDGET_KEYS.includes(k));
   }
   return ROLE_DASHBOARD[role || ''] || DEFAULT_WIDGETS;
 }
 
+// Kayıtlı kişiselleştirme varsa ondan, yoksa rol varsayılanından (tenant override
+// öncelikli) widget listesini üretir.
+export function resolveEffectiveWidgets(role: string | undefined, saved: UserDashboardLayout | null, roleTemplateOverride?: WK[] | null): WK[] {
+  if (saved) {
+    const enabledSet = new Set(saved.widgets.filter(w => w.enabled).map(w => w.key));
+    return saved.order.filter(k => ALL_WIDGET_KEYS.includes(k) && enabledSet.has(k));
+  }
+  return resolveRoleDefault(role, roleTemplateOverride);
+}
+
 // Düzenle panelinin başlangıç durumu: tüm katalog widget'ları, kayıtlı sıra/seçim
 // (varsa) + eksik olanlar sona eklenir (yeni eklenen kataloğa göre geriye uyumlu).
-export function buildEditableLayout(role: string | undefined, saved: UserDashboardLayout | null): { key: WK; enabled: boolean }[] {
-  const defaultOrder = ROLE_DASHBOARD[role || ''] || DEFAULT_WIDGETS;
+export function buildEditableLayout(role: string | undefined, saved: UserDashboardLayout | null, roleTemplateOverride?: WK[] | null): { key: WK; enabled: boolean }[] {
+  const defaultOrder = resolveRoleDefault(role, roleTemplateOverride);
   if (saved) {
     const known = saved.order.filter(k => ALL_WIDGET_KEYS.includes(k));
     const seen = new Set(known);

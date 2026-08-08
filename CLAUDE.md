@@ -362,11 +362,13 @@ src/components/settings/UserManagement.tsx ← ../types, ../constants, ../servic
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
+src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
 src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
+src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
@@ -376,7 +378,7 @@ src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
-src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog
+src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, lib/utils, lib/format, contexts/AuthContext
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
@@ -408,13 +410,13 @@ backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
-src/modules/contract-workflow/AnalysisTab.tsx ← types
+src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
-src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/ContactsModal.tsx ← ../types
@@ -423,7 +425,10 @@ src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/Heal
 src/modules/crm/helpers.ts ← ../types
 src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
 src/modules/crm/NewCustomerModal.tsx ← ../types
+src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
+src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
+src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
@@ -431,13 +436,14 @@ src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/negotiation/ModeTabBar.tsx ← ../lib/utils
 src/modules/negotiation/ProposalSelectorHeader.tsx ← ../types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/constants.tsx ← ../types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/PRForm.tsx ← ../types, constants
 src/modules/procurement/RequestsTab.tsx ← ../types, ../lib/format, constants, StatusBadge
 src/modules/procurement/StatusBadge.tsx ← ../types, constants
 src/modules/procurement/SummaryTab.tsx ← ../types, constants
-src/modules/procurement/VendorForm.tsx ← ../types
+src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/project-mgmt/constants.tsx ← ../types
@@ -453,6 +459,7 @@ src/modules/project-mgmt/RiskPanel.tsx ← ../types, helpers
 src/modules/project-mgmt/StatusBadge.tsx ← ../types, constants
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, ../components/HealthCards, ../types, BusinessHealthCard, DmoAnalyticsCard
+src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/IncomingReportCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/IncomingReportsTab.tsx ← ../types, IncomingReportCard
@@ -461,21 +468,22 @@ src/modules/reporting/MyReportsTab.tsx ← ../types, helpers
 src/modules/reporting/ReportForm.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, types
+src/modules/ServiceTicketsModule.tsx ← services/apiService, types
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/NewTaskModal.tsx ← ../types, helpers
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
 src/modules/todo/PendingDeliveryNotifications.tsx ← ../types
-src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ProposalPreviewModal.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
-backend/src/services/agingReport.ts ← prismaClient
+src/types/crm.ts ← auth, presales
 backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/financeSummary.ts ← prismaClient
-backend/src/services/invoiceEngine.ts ← prismaClient
+backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
+backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -511,17 +519,19 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 65 minutes ago)
+## changes (last 10 commits — 4 hours ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx +kullan  +Kullan
 src/modules/ActivityLogModule.tsx             +fallbackSummary  +ArchivesTab  ~actionTone  ~ActivityLogModule
+src/modules/contract-workflow/AnalysisTab.tsx ~AnalysisTab
 src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
 src/modules/contract-workflow/helpers.ts      +computeDeadlineAlarm  ~bestProposalPrice
 src/modules/contract-workflow/LegalCaseForm.tsx +LegalCaseForm  ~LegalCaseForm
 src/modules/contract-workflow/LegalView.tsx   ~LegalView
 src/modules/contract-workflow/WorkflowListPanel.tsx +WorkflowCard
+src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/DashboardView.tsx             ~DashboardView
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/dashboard/criticalAlerts.ts       +buildCriticalAlerts
@@ -757,21 +767,48 @@ export interface UnitMetricsResult  :65-72
 export interface WorkflowBottleneck  :432-436
 ```
 
+### backend/prisma/migrations/20260808195334_add_purchase_quote_item/migration.sql
+```
+TABLE PurchaseQuoteItem
+INDEX PurchaseQuoteItem_purchaseQuoteId_purchaseItemId_key ON PurchaseQuoteItem
+```
+
+### backend/prisma/migrations/20260808203131_add_brand_product_category/migration.sql
+```
+TABLE Brand
+TABLE ProductCategory
+TABLE BrandSource
+TABLE new_BoMItem
+TABLE new_DmoCatalogItem
+INDEX DmoCatalogItem_tenantId_status_idx ON DmoCatalogItem
+INDEX Brand_tenantId_name_key ON Brand
+INDEX ProductCategory_tenantId_name_key ON ProductCategory
+```
+
+### backend/prisma/migrations/20260808205531_vendor_brands_purchaseitem_brand/migration.sql
+```
+TABLE _BrandToVendor
+TABLE new_PurchaseItem
+INDEX _BrandToVendor_AB_unique ON _BrandToVendor
+INDEX _BrandToVendor_B_index ON _BrandToVendor
+```
+
+### backend/prisma/migrations/20260808210931_service_ticket_brand_category/migration.sql
+```
+TABLE new_ServiceTicket
+INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
+INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
+```
+
+### backend/prisma/migrations/20260808215248_add_opportunity_progress_tracking/migration.sql
+```
+TABLE OpportunityProgressLog
+INDEX OpportunityProgressLog_tenantId_opportunityId_createdAt_idx ON OpportunityProgressLog
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
-```
-
-### backend/src/services/agingReport.ts
-```
-export interface AgingBuckets  :3-3
-  notDue: number  :3-3
-export interface AgingReportResult  :4-9
-  buckets: AgingBuckets  :5-5
-  dso: number  :6-6
-  totalReceivable: number  :7-7
-  byCurrency: Record<string, { totalReceivable: n  :8-8
-export async function computeAgingReport(tenantId) → Promise<AgingReportResult>  :58-61
 ```
 
 ### backend/src/services/analyticsService.ts
@@ -813,34 +850,6 @@ export async function resolveEffectiveApprover(tenantId, role, userId) → Promi
 export async function resetApprovalChain(tenantId, entityType, entityId)  :233-246  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
 ```
 
-### backend/src/services/bomHandoff.ts
-```
-export interface BomQuoteInput  :5-16
-  lineKey: string  :6-6
-  componentName: string | null  :7-7
-  vendorName: string  :8-8
-  unitPrice: number  :9-9
-  currency: string  :10-10
-  technicalCompliance: string  :11-11
-  specSummary: string | null  :12-12
-  fileName: string | null  :13-13
-  … +2 more members  :5-5
-export interface BomEvaluationLine  :18-27
-  lineKey: string  :19-19
-  componentName: string | null  :20-20
-  quoteCount: number  :21-21
-  selected: { vendorName: string  :22-23
-  specSummary: string | null  :24-24
-  alternatives: { vendorName: string  :26-26
-export interface BomEvaluationSnapshot  :29-33
-  evaluatedAt: string  :30-30
-  totalQuotes: number  :31-31
-  lines: BomEvaluationLine[]  :32-32
-export interface BomTotalItem  :62-62
-  currency: string | null  :62-62
-export function sumBomTotalsByCurrency(items) → Record<string, number>  :65-72  # BoM kalemlerinin para birimi bazında toplam maliyeti (purcha
-```
-
 ### backend/src/services/bootstrapTenant.ts
 ```
 export interface BootstrapInput  :36-43
@@ -856,98 +865,20 @@ export interface BootstrapResult  :44-49
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :51-127
 ```
 
-### backend/src/services/contractWorkflowState.ts
+### backend/src/services/opportunityProgressReminders.ts
 ```
-export interface ContractAnalysisExtract  :61-61
-  projectName: string | null  :61-61
-export interface ContractWorkflowFallback  :62-62
-  tenderName: string | null  :62-62
-export type TransitionCheckResult  :25-25
-export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :36-59  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
-export function buildAutoTitle(extracted, fallback) → string  :69-75  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
+export async function sweepOpportunityProgressReminders(tenantId) → Promise<void>  :22-73
 ```
 
-### backend/src/services/financeSummary.ts
+### backend/src/services/opportunityProgressService.ts
 ```
-export interface FinanceSummaryResult  :3-12
-  totalReceivable: number  :4-4
-  totalCollected: number  :5-5
-  overdue: number  :6-6
-  invoiceCount: number  :7-7
-  salesCount: number  :8-8
-  activeGuarantees: number  :9-9
-  expiringGuarantees: number  :10-10
-  pendingCostApprovals: number  :11-11
-export function summarizeFinance(invoices, guarantees, pendingCostApprovals,) → FinanceSummaryResult  :26-54  # Saf hesap — DB'den zaten çekilmiş fatura/teminat listeleri ü
-export async function computeFinanceSummary(tenantId) → Promise<FinanceSummaryResult>  :56-63
-```
-
-### backend/src/services/financingEffect.ts
-```
-export interface CashEvent  :7-13
-  kind: 'PAYMENT' | 'COLLECTION'  :8-8
-  label: string  :9-9
-  date: string  :10-10
-  amount: number  :11-11
-  currency: string  :12-12
-export interface FinancingResultLine  :15-17
-  effect: number  :16-16
-export interface FinancingResult  :19-24
-  closingDate: string  :20-20
-  byCurrency: Record<string, { cost: number  :21-21
-  events: FinancingResultLine[]  :22-22
-  cashFlowGap: { currency: string  :23-23
-export interface FinancingBomInput  :72-72
-  partNumber: string  :72-72
-export interface FinancingCostInput  :73-73
-  description: string  :73-73
-export interface FinancingInstallmentInput  :74-74
-  note: string | null  :74-74
-export function computeFinancingEffect(events, interestRates, number>, referenceStart?,) → FinancingResult  :32-64
-export function paymentDate(referenceStart, termDays) → string  :67-70  # referans tarihten gün vade ile ödeme tarihi (ISO)
-export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :82-108  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
-```
-
-### backend/src/services/invoiceEngine.ts
-```
-export function deriveInvoiceStatus(amount, paidAmount, dueDate, current) → string  :4-10  # Fatura statüsü tahsil edilen tutara + vadeye göre türetilir
-export async function recalcInvoice(invoiceId) → Promise<void>  :13-22  # Fatura toplam tahsilatını ve türetilmiş statüsünü yeniden he
-```
-
-### backend/src/services/projectProgress.ts
-```
-export interface MilestoneForProgress  :1-1
-  title: string  :1-1
-export interface ProjectProgressResult  :3-8
-  progress: number  :4-4
-  phase: string  :5-5
-  completed: boolean  :7-7
-export function computeProjectProgress(milestones) → ProjectProgressResult  :20-28  # Projenin milestone'larından türetilen ilerleme/aşama
-```
-
-### backend/src/services/projectSummary.ts
-```
-export interface ProjectCostItemForSummary  :1-1
-  plannedAmount: number  :1-1
-export interface ProjectMilestoneForSummary  :2-2
-  status: string  :2-2
-export interface ProjectForSummary  :4-18
-  id: string  :5-5
-  name: string  :6-6
-  type: string  :7-7
-  status: string  :8-8
-  phase: string  :9-9
-  customerName: string | null  :10-10
-  pmName: string | null  :11-11
-  totalValue: number  :12-12
-  … +5 more members  :4-4
-export interface ProjectSummaryLine  :20-27
-  id: string  :21-21
-  customerName: string | null  :22-22
-  totalValue: number  :23-23
-  totalPlanned: number  :24-24
-  progress: number  :25-25
-  milestoneCount: number  :26-26
+export interface OpportunityProgressSettings  :11-14
+  intervalDays: number  :12-12
+  graceBusinessDays: number  :13-13
+export class ProgressCheckInError  :35-35
+export async function getOpportunityProgressSettings(tenantId) → Promise<OpportunityProgressSet  :18-27
+export async function recordProgressCheckIn(tenantId, opportunityId, userId, input,) → Promise<void>  :78-110
+export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1083,6 +1014,13 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/contract-workflow/AnalysisTab.tsx
+```
+component AnalysisTab
+handler onChange
+handler onClick
+```
+
 ### src/modules/contract-workflow/DetailHeader.tsx
 ```
 component DetailHeader
@@ -1128,6 +1066,35 @@ component WorkflowCard
 export WorkflowFormState
 handler onChange
 handler onClick
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+hook useAuth
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onCreate
+handler onSelectWorkflow
+handler onTenderNameBlur
+handler onTenderNoBlur
+handler onContractValueBlur
+handler onDeadlineBlur
+handler onNotesBlur
+handler onSaveTexts
+handler onAnalyse
+handler onFileSelect
+handler onAddDoc
+handler onDeleteDoc
+handler onDocStatusChange
+handler onDocFieldUpdate
+handler onMarkReadyToSign
+handler onSendForApproval
+handler onRejectSignature
+handler onApproveSignature
 ```
 
 ### src/modules/CostAnalysisModule.tsx
@@ -1180,6 +1147,7 @@ handler onProgressStatus
 handler onMarkLost
 handler onHandOff
 handler onEdit
+handler onCheckIn
 handler onOpenReport
 handler onOpenContacts
 handler onCreateProposal
@@ -1191,7 +1159,6 @@ handler onGeneratePdf
 handler onMarkDelivered
 handler onWonProposal
 handler onLostProposal
-handler onImported
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -1236,8 +1203,12 @@ handler onClose
 ```
 props Props
 hook useState
+hook useDragReorder
 export LayoutEditor
 handler onClick
+handler onDragOver
+handler onDragEnd
+handler onDrop
 ```
 
 ### src/modules/dashboard/widgetCatalog.ts
@@ -1251,8 +1222,9 @@ export interface UserDashboardLayout  :189-192
   order: WK[]  :191-191
 export type WK  :6-6
 export type DecisionHorizon  :12-12
-export function resolveEffectiveWidgets(role, saved) → WK[]  :195-201
-export function buildEditableLayout(role, saved)  :205-205
+export function resolveRoleDefault(role, roleTemplateOverride?) → WK[]  :197-202
+export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → WK[]  :206-212
+export function buildEditableLayout(role, saved, roleTemplateOverride?)  :216-216
 ```
 
 ### src/modules/dashboard/WidgetDetailDrawer.tsx
@@ -1418,7 +1390,7 @@ class ApiClient  :3-100
 
 ### src/services/apiService.ts
 ```
-class ApiService  :14-69
+class ApiService  :14-68
   setAuth(tenantId, token)  :15-17
   async login(email, password)  :19-21
   async forgotPassword(email)  :23-25
@@ -1513,7 +1485,7 @@ export interface CostRequirement  :1-10
   costedBy?: string  :7-7
   estimatedCost?: number  :8-8
   status: 'IDENTIFIED' | 'COSTED' | 'APPROVED  :9-9
-export interface BoMItem  :11-28
+export interface BoMItem  :11-32
   id: string  :12-12
   lineKey?: string  :13-13
   opportunityId?: string  :14-14
@@ -1522,20 +1494,38 @@ export interface BoMItem  :11-28
   description: string  :17-17
   quantity: number  :18-18
   purchaseCost: number  :19-19
-  … +8 more members  :11-11
-export interface BomHandoff  :31-44
-  id: string  :32-32
-  opportunityId: string  :33-33
-  oppTitle: string  :34-34
-  customerName?: string | null  :35-35
-  handedOffById?: string | null  :36-36
+  … +12 more members  :11-11
+export interface BomHandoff  :35-48
+  id: string  :36-36
+  opportunityId: string  :37-37
+  oppTitle: string  :38-38
+  customerName?: string | null  :39-39
+  handedOffById?: string | null  :40-40
 ```
 
-### src/modules/contract-workflow/AnalysisTab.tsx
+### src/components/settings/ProductTaxonomyManagement.tsx
 ```
-component AnalysisTab
+hook useState
+hook useEffect
+export ProductTaxonomyManagement
 handler onChange
+handler onKeyDown
 handler onClick
+```
+
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :7-20
+  id?: string  :8-8
+  lineKey?: string  :9-9
+  pn: string  :10-10
+  desc: string  :11-11
+  qty: number  :12-12
+  cost: number  :13-13
+  margin: number  :14-14
+  vendor?: string  :15-15
+  … +4 more members  :7-7
+export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
 ```
 
 ### src/modules/contract-workflow/CancelModal.tsx
@@ -1607,35 +1597,6 @@ export interface AiAnalysis  :41-46
   contract_summary: { project_name?: string  :45-45
 ```
 
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-hook useAuth
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onCreate
-handler onSelectWorkflow
-handler onTenderNameBlur
-handler onTenderNoBlur
-handler onContractValueBlur
-handler onDeadlineBlur
-handler onNotesBlur
-handler onSaveTexts
-handler onAnalyse
-handler onFileSelect
-handler onAddDoc
-handler onDeleteDoc
-handler onDocStatusChange
-handler onDocFieldUpdate
-handler onMarkReadyToSign
-handler onSendForApproval
-handler onRejectSignature
-handler onApproveSignature
-```
-
 ### src/modules/CorporateGovernanceModule.tsx
 ```
 hook useAuth
@@ -1697,9 +1658,60 @@ handler onSubmit
 handler onChange
 ```
 
+### src/modules/crm/ProgressCheckInModal.tsx
+```
+component ProgressCheckInModal
+hook useState
+hook useEffect
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
+```
+
+### src/modules/dashboard/RoleTemplateEditor.tsx
+```
+hook useState
+hook useDragReorder
+hook useEffect
+export RoleTemplateEditor
+handler onChange
+handler onDragOver
+handler onDragEnd
+handler onDrop
+handler onClick
+```
+
+### src/modules/DmoModule.tsx
+```
+component DmoModule
+component OrdersTab
+component OrderDrawer
+component CatalogTab
+component AgreementsTab
+component RatesTab
+component ReconciliationTab
+component Modal
+component CatalogForm
+component AgreementForm
+component RateForm
+component OrderForm
+component ParamsModal
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export DmoModule
+handler onClick
+handler onSelect
+handler onEdit
+handler onDelete
+handler onSaved
+handler onClose
+handler onChange
 ```
 
 ### src/modules/negotiation/AccessDeniedPanel.tsx
@@ -1791,6 +1803,22 @@ handler onSubmitRound
 handler onLog
 ```
 
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useEffect
+hook useBoM
+hook useCallback
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+handler onSelected
+```
+
 ### src/modules/procurement/constants.tsx
 ```
 export STATUS_CONFIG
@@ -1840,6 +1868,7 @@ export SummaryTab
 ```
 props VendorFormProps
 hook useState
+hook useEffect
 export VendorForm
 handler onClick
 handler onChange
@@ -1996,6 +2025,11 @@ hook useEffect
 handler onSaved
 ```
 
+### src/modules/reporting/BrandCategoryCard.tsx
+```
+component BrandCategoryCard
+```
+
 ### src/modules/reporting/ConsolidationView.tsx
 ```
 component ConsolidationView
@@ -2070,35 +2104,58 @@ handler onKeyDown
 handler onClose
 ```
 
-### src/modules/todo/helpers.ts
+### src/modules/ServiceTicketsModule.tsx
 ```
-export interface ProposalDetailItem  :135-143
-  partNumber: string  :136-136
-  description: string  :137-137
-  quantity: number  :138-138
-  purchaseCost?: number  :139-139
-  unitSalePrice?: number  :140-140
-  totalSalePrice?: number  :141-141
-  marginPercentage?: number  :142-142
-export interface ProposalDetail  :145-154
-  price: string  :146-146
-  totalPrice: number  :147-147
-  totalCost: number  :148-148
-  items: ProposalDetailItem[]  :149-149
-  description: string  :150-150
-  terms: string  :151-151
-  version: number  :152-152
-  opportunityTitle: string  :153-153
-export const taskTargetTab = (t) =>  :49-58
-export const getPriorityColor = (priority) =>  :66-73
-export const composedTitle = (newTask, taskAction, ctx) =>  :86-97
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :99-133
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :156-202
+component ServiceTicketsModule
+props Props
+hook useState
+hook useEffect
+hook useCallback
+export ServiceTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
 ```
 
-### src/modules/todo/icons.tsx
+### src/modules/SettingsModule.tsx
 ```
-export ListTodo
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :140-148
+  partNumber: string  :141-141
+  description: string  :142-142
+  quantity: number  :143-143
+  purchaseCost?: number  :144-144
+  unitSalePrice?: number  :145-145
+  totalSalePrice?: number  :146-146
+  marginPercentage?: number  :147-147
+export interface ProposalDetail  :150-159
+  price: string  :151-151
+  totalPrice: number  :152-152
+  totalCost: number  :153-153
+  items: ProposalDetailItem[]  :154-154
+  description: string  :155-155
+  terms: string  :156-156
+  version: number  :157-157
+  opportunityTitle: string  :158-158
+export const taskTargetTab = (t) =>  :49-58
+export const fmtCompletedAt = (d?) =>  :68-69
+export const getPriorityColor = (priority) =>  :71-78
+export const composedTitle = (newTask, taskAction, ctx) =>  :91-102
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :104-138
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :161-207
 ```
 
 ### src/modules/todo/NewTaskModal.tsx
@@ -2118,11 +2175,6 @@ component PendingChainApprovals
 component PendingDeliveryNotifications
 ```
 
-### src/modules/todo/PendingProposalApprovals.tsx
-```
-component PendingProposalApprovals
-```
-
 ### src/modules/todo/ProposalPreviewModal.tsx
 ```
 component ProposalPreviewModal
@@ -2137,6 +2189,7 @@ component ResolvedApprovals
 ### src/modules/todo/TaskList.tsx
 ```
 component TaskList
+hook useState
 ```
 
 ### src/modules/TodoModule.tsx
@@ -2157,33 +2210,62 @@ handler onToggleStatus
 handler onSubmit
 ```
 
-### src/types/backup.ts
+### src/types/analytics.ts
 ```
-export interface BackupJob  :2-24
-  id: string  :3-3
-  tenantId: string  :4-4
-  scope: 'PLATFORM' | 'TENANT'  :5-5
-  kind: 'FULL' | 'STATE' | 'DATA'  :6-6
-  dbProvider: 'SQLITE' | 'POSTGRES'  :7-7
-  trigger: 'MANUAL' | 'SCHEDULED'  :8-8
-  targetType: 'LOCAL' | 'NEXTCLOUD' | 'S3'  :9-9
-  location?: string | null  :10-10
-  … +13 more members  :2-2
-export interface RestoreJob  :25-37
-  id: string  :26-26
-  tenantId: string  :27-27
-  backupId: string  :28-28
-  mode: 'LOGICAL' | 'STATE'  :29-29
-  status: 'ANALYZING' | 'AWAITING_CONFIRM' |   :30-30
-  diffReport?: string | null  :31-31
-  preRestoreBackupId?: string | null  :32-32
-  startedByName?: string | null  :33-33
-  … +3 more members  :25-25
-export interface BackupSettings  :38-47
-  enabled: boolean  :39-39
-  intervalHours: number  :40-40
-  scope: 'PLATFORM' | 'TENANT'  :41-41
-  kind: 'FULL' | 'STATE' | 'DATA'  :42-42
+export interface AgingBuckets  :2-2
+  notDue: number  :2-2
+export interface AgingReport  :3-8
+  buckets: AgingBuckets  :4-4
+  dso: number  :5-5
+  totalReceivable: number  :6-6
+  byCurrency: Record<string, { totalReceivable: n  :7-7
+export interface FunnelReport  :9-13
+  stages: { name: string  :10-10
+  lossByReason: { reason: string  :11-11
+  entered: number  :12-12
+export interface TenderGroup  :14-14
+  key: string  :14-14
+export interface TenderAnalytics  :15-19
+  byAuthority: TenderGroup[]  :16-16
+  byMethod: TenderGroup[]  :17-17
+  overall: { winRate: number  :18-18
+export interface BomVarianceLine  :20-20
+  name: string  :20-20
+export interface BomVarianceReport  :21-21
+  lines: BomVarianceLine[]  :21-21
+export interface ConcentrationReport  :22-26
+  topCustomers: { name: string  :23-23
+  hhi: number  :24-24
+  totalRevenue: number  :25-25
+```
+
+### src/types/crm.ts
+```
+export interface Opportunity  :4-37
+  id: string  :5-5
+  title: string  :6-6
+  value: number  :7-7
+  probability: number  :8-8
+  expectedCloseDate?: string  :9-9
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
+  description?: string  :11-11
+  lostReason?: string  :12-12
+  … +22 more members  :4-4
+export interface OpportunityProgressLog  :40-52
+  id: string  :41-41
+  tenantId: string  :42-42
+  opportunityId: string  :43-43
+  recordedById: string  :44-44
+  previousStatus: string  :45-45
+  newStatus: string  :46-46
+  previousProbability: number  :47-47
+  newProbability: number  :48-48
+  … +3 more members  :40-40
+export interface Customer  :53-81
+  id: string  :54-54
+  name: string  :55-55
+  shortName?: string  :56-56
+  industry?: string  :57-57
 ```
 
 ### src/types/dmo.ts
@@ -2215,33 +2297,89 @@ export interface DmoOrder  :21-31
   … +1 more members  :21-21
 ```
 
-### src/types/overhead.ts
+### src/types/procurement.ts
 ```
-export interface OperatingCostPool  :1-6
-  id: string  :2-2
-  personnelCost: number  :3-3
-  method: 'PCT_OF_VALUE' | 'PCT_OF_DIRECT_COS  :4-4
-  status: string  :5-5
-export interface UnitBudget  :7-10
-  id: string  :8-8
-  personnelBudget: number  :9-9
-export interface UnitLoadLine  :11-11
-  unitId: string  :11-11
-export interface OverheadResult  :12-17
-  directCost: number  :13-13
-  companyAmount: number  :14-14
-  unitBreakdown: UnitLoadLine[]  :15-15
-  contributionMargin: number  :16-16
-export interface ProjectUnitParticipation  :18-21
-  id: string  :19-19
-  role?: string | null  :20-20
-export interface UnitAbsorptionLine  :22-25
-  unitId: string  :23-23
-  allocated: number  :24-24
-export interface UnitAbsorptionReport  :26-30
-  units: UnitAbsorptionLine[]  :27-27
-  summary: { totalBudget: number  :28-28
-  note: string  :29-29
+export interface Vendor  :3-21
+  id: string  :4-4
+  tenantId: string  :5-5
+  name: string  :6-6
+  taxNo?: string | null  :7-7
+  address?: string | null  :8-8
+  phone?: string | null  :9-9
+  email?: string | null  :10-10
+  contactName?: string | null  :11-11
+  … +9 more members  :3-3
+export interface PurchaseItem  :34-50
+  id: string  :35-35
+  purchaseRequestId: string  :36-36
+  name: string  :37-37
+  description?: string | null  :38-38
+  quantity: number  :39-39
+  unit: string  :40-40
+  estimatedUnitPrice?: number | null  :41-41
+  currency: string  :42-42
+  … +7 more members  :34-34
+export interface PurchaseQuoteItem  :51-58
+  id: string  :52-52
+  purchaseQuoteId: string  :53-53
+  purchaseItemId: string  :54-54
+  quantity: number  :55-55
+```
+
+### src/types/productTaxonomy.ts
+```
+export interface Brand  :5-12
+  id: string  :6-6
+  tenantId: string  :7-7
+  name: string  :8-8
+  isActive: boolean  :9-9
+  createdAt: string  :10-10
+  updatedAt: string  :11-11
+export interface ProductCategory  :14-21
+  id: string  :15-15
+  tenantId: string  :16-16
+  name: string  :17-17
+  isActive: boolean  :18-18
+  createdAt: string  :19-19
+  updatedAt: string  :20-20
+export interface BrandSource  :23-32
+  id: string  :24-24
+  tenantId: string  :25-25
+  brandId: string  :26-26
+  name: string  :27-27
+  notes?: string | null  :28-28
+  isActive: boolean  :29-29
+  createdAt: string  :30-30
+  updatedAt: string  :31-31
+```
+
+### src/types/project.ts
+```
+export interface ProjectMilestone  :9-34
+  id: string  :10-10
+  projectId: string  :11-11
+  title: string  :12-12
+  description?: string | null  :13-13
+  milestoneType: MilestoneType  :14-14
+  status: MilestoneStatus  :15-15
+  progress: number  :16-16
+  assignedToId?: string | null  :17-17
+  … +16 more members  :9-9
+export interface ProjectCostItem  :35-52
+  id: string  :36-36
+  projectId: string  :37-37
+  category: CostCategory  :38-38
+  description: string  :39-39
+  plannedAmount: number  :40-40
+  actualAmount: number  :41-41
+  currency: string  :42-42
+  amountTRY: number  :43-43
+  … +8 more members  :35-35
+export interface Project  :53-83
+  id: string  :54-54
+  code?: string | null  :55-55
+  name: string  :56-56
+  type: ProjectType  :57-57
 ```
 
 ### src/types/tender.ts

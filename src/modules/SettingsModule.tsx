@@ -8,6 +8,8 @@ import { UserManagement } from '../components/settings/UserManagement';
 import { SubscriptionSettings } from '../components/settings/SubscriptionSettings';
 import { PermissionSettings } from '../components/settings/PermissionSettings';
 import LicenseTypesModule from './LicenseTypesModule';
+import RoleTemplateEditor from './dashboard/RoleTemplateEditor';
+import ProductTaxonomyManagement from '../components/settings/ProductTaxonomyManagement';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { useModuleSettings } from '../hooks/useEnflowQueries';
@@ -422,6 +424,10 @@ const SettingsModule = ({
         return <PermissionSettings users={users} setUsers={setUsers} />;
       case 'modules':
         return <ModuleManagement tenantId={activeTenantId} />;
+      case 'dashboard-templates':
+        return <RoleTemplateEditor />;
+      case 'product-taxonomy':
+        return <ProductTaxonomyManagement />;
       default:
         return null;
     }

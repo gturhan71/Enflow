@@ -17,6 +17,7 @@ export interface Vendor {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  brands?: { id: string; name: string }[]; // taşıdığı markalar (2026-08-08, Faz 2)
 }
 export type PurchaseStatus =
   | 'DRAFT'
@@ -42,6 +43,17 @@ export interface PurchaseItem {
   actualUnitPrice?: number | null;
   refVendor?: string | null;
   refSource?: string | null;
+  lineKey?: string | null;
+  brandId?: string | null;
+  brand?: { id: string; name: string } | null;
+  createdAt: string;
+}
+export interface PurchaseQuoteItem {
+  id: string;
+  purchaseQuoteId: string;
+  purchaseItemId: string;
+  quantity: number;
+  unitPrice: number;
   createdAt: string;
 }
 export interface PurchaseQuote {
@@ -58,6 +70,7 @@ export interface PurchaseQuote {
   notes?: string | null;
   isSelected: boolean;
   score?: number | null; // 0-1 ağırlıklı uygunluk skoru (fiyat/puan/teslim süresi) — backend hesaplar
+  items?: PurchaseQuoteItem[]; // kalem bazlı miktar × birim fiyat (2026-08-08); boşsa eski tek-toplam teklif
   createdAt: string;
   updatedAt: string;
 }

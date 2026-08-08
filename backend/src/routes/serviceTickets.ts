@@ -36,7 +36,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   if (priority) where.priority = priority;
   const tickets = await prisma.serviceTicket.findMany({
     where,
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
+    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
     orderBy: [{ status: 'asc' }, { dueAt: 'asc' }],
   });
   res.json(tickets);
@@ -45,7 +45,7 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const ticket = await prisma.serviceTicket.findFirst({
     where: { id: String(req.params.id), tenantId: req.tenantId },
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
+    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
   });
   if (!ticket) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
   res.json(ticket);
@@ -53,7 +53,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
 
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
-  const { projectId, title, description, category, priority, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours } = req.body;
+  const { projectId, title, description, category, priority, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours, brandId, productCategoryId } = req.body;
   if (!projectId || !title) return res.status(400).json({ error: 'Proje ve başlık zorunludur.' });
 
   const project = await prisma.project.findFirst({ where: { id: projectId, tenantId } });
@@ -72,8 +72,10 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
       unitId: unitId || null,
       slaHours: slaHours ? Number(slaHours) : null,
       dueAt,
+      brandId: brandId || null,
+      productCategoryId: productCategoryId || null,
     },
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
+    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
   });
   await logActivity({ tenantId, userId: req.userId, action: 'CREATE', entityType: 'SERVICE_TICKET', entityId: ticket.id, details: { title: ticket.title, projectId } });
   res.json(ticket);
@@ -85,7 +87,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   const record = await prisma.serviceTicket.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
 
-  const { title, description, category, priority, status, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours, resolutionNotes, costAmount, costCurrency } = req.body;
+  const { title, description, category, priority, status, reportedByContactId, reportedByName, assignedToUserId, unitId, slaHours, resolutionNotes, costAmount, costCurrency, brandId, productCategoryId } = req.body;
   const isResolving = status && (status === 'RESOLVED' || status === 'CLOSED') && record.status !== 'RESOLVED' && record.status !== 'CLOSED';
 
   const ticket = await prisma.serviceTicket.update({
@@ -104,9 +106,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       ...(resolutionNotes !== undefined && { resolutionNotes }),
       ...(costAmount !== undefined && { costAmount: costAmount != null ? Number(costAmount) : null }),
       ...(costCurrency !== undefined && { costCurrency }),
+      ...(brandId !== undefined && { brandId: brandId || null }),
+      ...(productCategoryId !== undefined && { productCategoryId: productCategoryId || null }),
       ...(isResolving && { resolvedAt: new Date() }),
     },
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
+    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
   });
   if (costAmount != null && Number(costAmount) > 0) {
     await upsertServiceCostItem(tenantId, ticket.projectId, id, ticket.title, Number(costAmount), costCurrency || 'TRY', req.userId);
@@ -131,7 +135,7 @@ router.post('/:id/resolve', asyncHandler(async (req: Request, res: Response) => 
       ...(costAmount != null && { costAmount: Number(costAmount) }),
       ...(costCurrency !== undefined && { costCurrency }),
     },
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } } },
+    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
   });
   if (costAmount != null && Number(costAmount) > 0) {
     await upsertServiceCostItem(tenantId, ticket.projectId, id, ticket.title, Number(costAmount), costCurrency || 'TRY', req.userId);
