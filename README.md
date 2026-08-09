@@ -144,7 +144,8 @@ pnpm dev --port 3000            # frontend (3000) — ayrı terminal
 ## 📄 Lisans
 
 Ticari — **© 2026 Gökhan Turhan. Tüm hakları saklıdır.** Proprietary & Confidential.
-İzinsiz kopyalama, değiştirme, dağıtma veya kullanım yasaktır. Bkz. [`LICENSE`](LICENSE).
+İzinsiz kopyalama, değiştirme, dağıtma veya kullanım yasaktır. Bkz. [`LICENSE`](LICENSE) ·
+tam son kullanıcı lisans sözleşmesi (taslak): [`docs/EULA.md`](docs/EULA.md).
 
 ---
 

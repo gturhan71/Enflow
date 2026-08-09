@@ -361,9 +361,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
-src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/modules/contract-workflow/AnalysisTab.tsx ← types
@@ -420,16 +418,17 @@ src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentT
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
-backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
-backend/src/services/personnelTransferService.ts ← prismaClient
+backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
+src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
@@ -480,10 +479,11 @@ src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag,
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
+backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
+backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -519,11 +519,10 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 5 hours ago)
+## changes (last 10 commits — 11 minutes ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
-src/components/settings/PersonnelTransferModal.tsx +kullan  +Kullan
 src/modules/contract-workflow/AnalysisTab.tsx ~AnalysisTab
 src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
 src/modules/contract-workflow/helpers.ts      +computeDeadlineAlarm  ~bestProposalPrice
@@ -566,7 +565,7 @@ backend/src/services/dashboardStream.ts       +pingDashboard  +subscribeDashboar
 backend/src/services/guaranteeReminders.ts    ~sweepGuaranteeReminders
 backend/src/services/opportunityProgressReminders.ts +sweepOpportunityProgressReminders  +safeParse
 backend/src/services/opportunityProgressService.ts +getOpportunityProgressSettings  +ProgressCheckInError  +finalizeCheckIn  +recordProgressCheckIn
-backend/src/services/personnelTransferService.ts +getOwnedItems  +transferOwnershipTx  +transferOwnership  +kullan
+backend/src/services/restoreService.ts        +orderModelsForInsert  +loadModelsIntoTarget  +zaten  ~applyLogicalRestore
 backend/src/services/tenderReminders.ts       ~sweepTenderReminders
 backend/src/services/unitReportingService.ts  +resolveUnitStaff  +getVisitTargetRate  +computeVisitPerformance  ~getUnitDefinition
 ```
@@ -637,18 +636,6 @@ export interface LogActivityParams  :13-22
 export async function logActivity(p) → Promise<void>  :24-52
 ```
 
-### backend/src/services/activityLogSummary.ts
-```
-export interface SummaryInput  :157-162
-  actorName: string  :158-158
-  action: string  :159-159
-  entityType: string  :160-160
-  entityLabel: string | null  :161-161
-export async function resolveActorName(userId, actorType?) → Promise<string>  :13-24
-export async function resolveEntityLabel(tenantId, entityType, entityId) → Promise<string | null>  :72-80
-export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
-```
-
 ### backend/src/services/analyticsService.ts
 ```
 export interface FunnelResult  :18-22
@@ -709,30 +696,13 @@ export async function recordProgressCheckIn(tenantId, opportunityId, userId, inp
 export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
-### backend/src/services/personnelTransferService.ts
+### backend/src/services/restoreService.ts
 ```
-export interface OwnedCategory  :23-28
-  key: string  :24-24
-  label: string  :25-25
-  count: number  :26-26
-  sample: { id: string  :27-27
-export interface OwnedItemsResult  :30-40
-  userId: string  :31-31
-  userName: string  :32-32
-  role: string  :33-33
-  status: string  :34-34
-  categories: OwnedCategory[]  :35-35
-  totalActive: number  :36-36
-  inboundDelegationCount: number  :37-37
-  createdOpportunityCount: number  :38-38
-  … +1 more members  :30-30
-export interface TransferResult  :42-45
-  transferred: Record<string, number>  :43-43
-  clearedInboundDelegations: number  :44-44
-export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResult>  :153-172
-export async function transferOwnership(params) → Promise<TransferResult>  :192-201
-export async function deactivateUser(tenantId, userId) → Promise<void>  :203-212
-export async function hardDeleteUser(tenantId, userId) → Promise<  :214-214
+export type LogicalPayloadData  :19-19
+export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :58-110  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
+export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
+export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
+export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
 ```
 
 ### backend/src/services/salesCosting.ts
@@ -837,6 +807,18 @@ export async function getArchiveSettings(tenantId) → Promise<ArchiveModuleSett
 export async function runArchive(opts) → Promise<  :56-56  # Bir arşivleme işini baştan sona çalıştırır; ActivityLogArchi
 ```
 
+### backend/src/services/activityLogSummary.ts
+```
+export interface SummaryInput  :157-162
+  actorName: string  :158-158
+  action: string  :159-159
+  entityType: string  :160-160
+  entityLabel: string | null  :161-161
+export async function resolveActorName(userId, actorType?) → Promise<string>  :13-24
+export async function resolveEntityLabel(tenantId, entityType, entityId) → Promise<string | null>  :72-80
+export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
+```
+
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :22-51  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
@@ -891,13 +873,30 @@ export interface BootstrapResult  :44-49
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :51-127
 ```
 
-### backend/src/services/restoreService.ts
+### backend/src/services/personnelTransferService.ts
 ```
-export type LogicalPayloadData  :19-19
-export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :58-110  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
-export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
-export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
-export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
+export interface OwnedCategory  :23-28
+  key: string  :24-24
+  label: string  :25-25
+  count: number  :26-26
+  sample: { id: string  :27-27
+export interface OwnedItemsResult  :30-40
+  userId: string  :31-31
+  userName: string  :32-32
+  role: string  :33-33
+  status: string  :34-34
+  categories: OwnedCategory[]  :35-35
+  totalActive: number  :36-36
+  inboundDelegationCount: number  :37-37
+  createdOpportunityCount: number  :38-38
+  … +1 more members  :30-30
+export interface TransferResult  :42-45
+  transferred: Record<string, number>  :43-43
+  clearedInboundDelegations: number  :44-44
+export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResult>  :153-172
+export async function transferOwnership(params) → Promise<TransferResult>  :192-201
+export async function deactivateUser(tenantId, userId) → Promise<void>  :203-212
+export async function hardDeleteUser(tenantId, userId) → Promise<  :214-214
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -959,17 +958,6 @@ export CustomerHealthCard
 component InfoTooltip
 ```
 
-### src/components/settings/PersonnelTransferModal.tsx
-```
-props PersonnelTransferModalProps
-hook useState
-hook useEffect
-export PersonnelTransferPayload
-export PersonnelTransferModal
-handler onClick
-handler onChange
-```
-
 ### src/components/settings/ProductTaxonomyManagement.tsx
 ```
 hook useState
@@ -978,15 +966,6 @@ export ProductTaxonomyManagement
 handler onChange
 handler onKeyDown
 handler onClick
-```
-
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-export UserManagement
-handler onSubmit
-handler onConfirm
 ```
 
 ### src/content/helpArticles.ts
@@ -1848,6 +1827,26 @@ export interface Project  :53-83
   code?: string | null  :55-55
   name: string  :56-56
   type: ProjectType  :57-57
+```
+
+### src/components/settings/PersonnelTransferModal.tsx
+```
+props PersonnelTransferModalProps
+hook useState
+hook useEffect
+export PersonnelTransferPayload
+export PersonnelTransferModal
+handler onClick
+handler onChange
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+export UserManagement
+handler onSubmit
+handler onConfirm
 ```
 
 ### src/layout/Sidebar.tsx

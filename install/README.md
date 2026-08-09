@@ -7,19 +7,13 @@ hazırlar ve başlatma adımlarını gösterir.
 
 ---
 
-## Minimum Sistem Gereksinimleri
+## Sistem Gereksinimleri
 
-| Bileşen | Minimum | Önerilen |
-|---|---|---|
-| İşletim sistemi | Windows 10 / Ubuntu 20.04 / macOS 12 | Windows 11 / Ubuntu 22.04+ / macOS 14 |
-| **Node.js** | 20 LTS (yoksa **otomatik kurulur**) | 22 LTS veya 24 |
-| **pnpm** | 10 (sihirbaz `corepack` ile kurar) | 10.33+ |
-| **git** | 2.30+ (yoksa otomatik denenir) | güncel |
-| RAM | 2 GB | 4 GB+ |
-| Disk | ~1.5 GB boş (node_modules dahil) | 3 GB+ |
-| Veritabanı | SQLite (gömülü, varsayılan) | PostgreSQL 14+ (üretim) |
-| Ağ | İlk kurulumda internet (Git + paketler) | — |
-| Açık portlar | 3000 (frontend), 3002 (backend) | yapılandırılabilir |
+Kurulum senaryosuna göre (geliştirme/pilot, küçük ölçek üretim SQLite, kurumsal üretim
+PostgreSQL) donanım/yazılım gereksinimlerinin tam dökümü artık tek kaynakta:
+**[`docs/SYSTEM_REQUIREMENTS.md`](../docs/SYSTEM_REQUIREMENTS.md)**. Sihirbaz, hangi
+senaryoyu önereceğine kurulum sırasında sorduğu kapasite teyidi sorularıyla (beklenen
+kullanıcı sayısı + yıllık veri hacmi) kendisi karar verir.
 
 > **Bağımlılıklar otomatik kurulur.** Node/git yoksa bootstrap **hibrit** sağlar:
 > önce sistem paket yöneticisi (Windows `winget`, macOS `brew`, Linux `apt`/`dnf`),
@@ -67,8 +61,9 @@ PowerShell ile elle:
 ## Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
 
 1. **Önkoşul denetimi** — Node ≥ 20, git, pnpm (yoksa corepack ile kurar).
-2. **Yapılandırma** — backend/frontend portu, veritabanı (SQLite/PostgreSQL),
-   `AUTH_JWT_SECRET` + `PLUGIN_LICENSE_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
+2. **Yapılandırma** — backend/frontend portu, kapasite teyidi (beklenen kullanıcı sayısı
+   + yıllık veri hacmi → eşik aşılırsa PostgreSQL önerilir), veritabanı (SQLite/PostgreSQL),
+   `AUTH_JWT_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
 3. **Ortam dosyaları** — `backend/.env` yazılır.
 4. **Bağımlılıklar** — `pnpm install` (frontend + backend).
 5. **Veritabanı** — `prisma generate` + `prisma migrate deploy`; opsiyonel
@@ -112,10 +107,11 @@ içinde `install.sh`, `install.ps1`, `wizard.mjs`, `README.md`, `.env.example`.
 
 ## PostgreSQL (Üretim) Notu
 
-Varsayılan SQLite'tır. PostgreSQL için sihirbazda "PostgreSQL kullanılsın mı?" →
-Evet seçin **ve** `backend/prisma/schema.prisma` içindeki
-`datasource db { provider = "sqlite" }` satırını `"postgresql"` yapın, ardından
-yeniden `pnpm prisma migrate deploy` çalıştırın.
+Varsayılan SQLite'tır. PostgreSQL için sihirbazda "PostgreSQL kullanılsın mı?" → Evet
+seçin (kapasite eşiği aşıldığında sihirbaz bunu zaten varsayılan öneri yapar) —
+`schema.prisma` provider'ı ve rol/DB provizyonu **otomatik** yapılır, elle düzenleme
+gerekmez. Mevcut bir SQLite kurulumunu sonradan taşımak için: `cd backend && pnpm
+migrate:to-postgres` (bkz. [`POSTGRES_MIGRATION_PLAN.md`](POSTGRES_MIGRATION_PLAN.md)).
 
 ---
 
@@ -127,7 +123,7 @@ yeniden `pnpm prisma migrate deploy` çalıştırın.
 | `pnpm bulunamadı` | `corepack enable` ya da `npm i -g pnpm`. |
 | Windows `... betik çalıştırılamıyor` | `Set-ExecutionPolicy -Scope Process Bypass`. |
 | Port kullanımda | Sihirbazda farklı port girin; backend portu değişirse `vite.config.ts` proxy hedefini de güncelleyin. |
-| `prisma migrate` hatası | `backend/.env` `DATABASE_URL` doğru mu? PostgreSQL'de provider'ı değiştirdiniz mi? |
+| `prisma migrate` hatası | `backend/.env` `DATABASE_URL` doğru mu? |
 | Migration sonrası backend çöküyor | `cd backend && pnpm prisma generate` + yeniden başlat. |
 | `git clone` reddedildi | HTTPS URL kullanın (varsayılan); SSH anahtarı gerekmez. |
 
@@ -135,8 +131,8 @@ yeniden `pnpm prisma migrate deploy` çalıştırın.
 
 ## Güvenlik
 
-- `AUTH_JWT_SECRET` (≥16 karakter) ve `PLUGIN_LICENSE_SECRET` üretimde **mutlaka** güçlü rastgele
-  olmalı — sihirbaz üretir; `.env` dosyasını gizli tutun, sürüm kontrolüne koymayın.
+- `AUTH_JWT_SECRET` (≥16 karakter) üretimde **mutlaka** güçlü rastgele olmalı — sihirbaz
+  üretir; `.env` dosyasını gizli tutun, sürüm kontrolüne koymayın.
 - API anahtarları (YZ, S3, Nextcloud) yalnız sunucuda/`.env`'de tutulur; uygulama
   içi YZ entegrasyonu tenant-bazlı ve maskelidir.
 - Yedek dosyaları web kökü dışındadır; indirme yalnız yetkili (Backup Admin/GM).
