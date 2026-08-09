@@ -57,7 +57,8 @@
       <a href="#s27-4">Akış motoru — birimler birbiriyle nasıl "konuşur"</a>
       <a href="#s27-5">Roller &amp; birimler</a>
       <a href="#s27-6">Modül kılavuzu (özet)</a>
-      <a href="#s27-7">Wiki kılavuzluk notu</a>
+      <a href="#s27-7">Kurulum ve İlk Yapılandırma (Yönetici İçin)</a>
+      <a href="#s27-8">Wiki kılavuzluk notu</a>
     </nav>
   </aside>
   <main>
@@ -131,7 +132,13 @@
 </section>
 
 <section id="s27-7">
-  <h2><span class="n">7</span>Wiki kılavuzluk notu</h2>
+  <h2><span class="n">7</span>Kurulum ve İlk Yapılandırma (Yönetici İçin)</h2>
+  <p>Enflow'u ilk kez kuran/yapılandıran bir yönetici için adım adım anlatım — işletim sistemine göre kurulum, lisans girişi, birim/kullanıcı oluşturma, iş akışı yapılandırma ve birim-bazlı kullanım kılavuzu dahil tam sürüm: <b><a href="https://github.com/gturhan71/Enflow/blob/main/install/ILK_KURULUM_KILAVUZU.md"><code>install/ILK_KURULUM_KILAVUZU.md</code></a></b> (kurulum paketiyle birlikte dağıtılır). Özet:</p>
+<p>1. <b>Kurulum</b> — Windows: <code>install\install.bat</code>'e çift tıklayın (veya PowerShell'de    <code>install.ps1</code>). macOS/Linux: <code>./install/install.sh</code>. Betik Node/git eksikse otomatik kurar,    ardından port + veritabanı (SQLite/PostgreSQL) + güvenlik anahtarları için birkaç soru    sorup <code>backend/.env</code>'i kendisi yazar. 2. <b>İlk açılış</b> — tarayıcıda uygulamayı ilk açtığınızda 5 adımlı bir sihirbaz (Sistem →    Şirket → Yönetici → Lisans → Tamamla) sizi karşılar; oluşturduğunuz ilk kullanıcı otomatik    <b>Genel Müdür (GENERAL_MANAGER)</b> olur. 3. <b>Lisans</b> — Şirket Ayarları → Lisans Planları'nda Tenant ID'nizi kopyalayıp lisans    anahtarınızı aktifleştirin (lisans yoksa 30 günlük deneme ile devam edilir). Sanal    agent/eklenti lisansları ayrıdır, Test Ortamı → Sanal Agentlar'dan girilir. 4. <b>Birimler &amp; kullanıcılar</b> — Şirket Ayarları → Birimler'de <b>"Varsayılan Şablonu Yükle"</b>    tek tıkla 8 standart onay-zinciri birimini + varsayılan iş akışını kurar; organizasyona    özgü ek birimler (Proje, Satın Alma, Hukuk vb.) elle eklenir. Kullanıcılar'da ekip    eklenirken rol + birim atanır — <b>rol otomatik izin vermez</b>, Yetkiler sekmesinden ayrıca    modül erişimi açılmalıdır. 5. <b>İş akışı</b> — birimlerden otomatik türeyen varsayılan şablon İş Akışı sekmesinde gözden    geçirilip adım bazında ince ayar yapılabilir; Simülasyon sekmesi canlı veri değiştirmeden    akışı test etmeye yarar.</p>
+</section>
+
+<section id="s27-8">
+  <h2><span class="n">8</span>Wiki kılavuzluk notu</h2>
   <p>Statik <b>enflow-wiki</b> (<code>wiki/index.html</code>) bu bölümden <b>otomatik üretilir</b> (<code>node wiki/build.mjs</code>). Akış değişince <b>önce §27 güncellenir, sonra generator yeniden çalıştırılır</b> — tek doğruluk kaynağı §27'dir. Hedef: <b>yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.</b></p>
 </section>
 

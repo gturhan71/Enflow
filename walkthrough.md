@@ -1438,7 +1438,33 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Şirket Ayarları | Birim/kullanıcı, RBAC, YZ & entegrasyonlar, abonelik, lisans, sanal-agent | ADMIN / GM |
 | Yardım | Uygulama-içi, bağlamsal kullanım kılavuzu — her modül için "nasıl kullanılır" | Herkes |
 
-### 27.7 Wiki kılavuzluk notu
+### 27.7 Kurulum ve İlk Yapılandırma (Yönetici İçin)
+
+Enflow'u ilk kez kuran/yapılandıran bir yönetici için adım adım anlatım — işletim sistemine
+göre kurulum, lisans girişi, birim/kullanıcı oluşturma, iş akışı yapılandırma ve birim-bazlı
+kullanım kılavuzu dahil tam sürüm: **[`install/ILK_KURULUM_KILAVUZU.md`](https://github.com/gturhan71/Enflow/blob/main/install/ILK_KURULUM_KILAVUZU.md)**
+(kurulum paketiyle birlikte dağıtılır). Özet:
+
+1. **Kurulum** — Windows: `install\install.bat`'e çift tıklayın (veya PowerShell'de
+   `install.ps1`). macOS/Linux: `./install/install.sh`. Betik Node/git eksikse otomatik kurar,
+   ardından port + veritabanı (SQLite/PostgreSQL) + güvenlik anahtarları için birkaç soru
+   sorup `backend/.env`'i kendisi yazar.
+2. **İlk açılış** — tarayıcıda uygulamayı ilk açtığınızda 5 adımlı bir sihirbaz (Sistem →
+   Şirket → Yönetici → Lisans → Tamamla) sizi karşılar; oluşturduğunuz ilk kullanıcı otomatik
+   **Genel Müdür (GENERAL_MANAGER)** olur.
+3. **Lisans** — Şirket Ayarları → Lisans Planları'nda Tenant ID'nizi kopyalayıp lisans
+   anahtarınızı aktifleştirin (lisans yoksa 30 günlük deneme ile devam edilir). Sanal
+   agent/eklenti lisansları ayrıdır, Test Ortamı → Sanal Agentlar'dan girilir.
+4. **Birimler & kullanıcılar** — Şirket Ayarları → Birimler'de **"Varsayılan Şablonu Yükle"**
+   tek tıkla 8 standart onay-zinciri birimini + varsayılan iş akışını kurar; organizasyona
+   özgü ek birimler (Proje, Satın Alma, Hukuk vb.) elle eklenir. Kullanıcılar'da ekip
+   eklenirken rol + birim atanır — **rol otomatik izin vermez**, Yetkiler sekmesinden ayrıca
+   modül erişimi açılmalıdır.
+5. **İş akışı** — birimlerden otomatik türeyen varsayılan şablon İş Akışı sekmesinde gözden
+   geçirilip adım bazında ince ayar yapılabilir; Simülasyon sekmesi canlı veri değiştirmeden
+   akışı test etmeye yarar.
+
+### 27.8 Wiki kılavuzluk notu
 
 Statik **enflow-wiki** (`wiki/index.html`) bu bölümden **otomatik üretilir** (`node wiki/build.mjs`). Akış değişince **önce §27 güncellenir, sonra generator yeniden çalıştırılır** — tek doğruluk kaynağı §27'dir. Hedef: **yazılımı hiç görmemiş birinin tek sayfadan uçtan uca anlayabilmesi.**
 

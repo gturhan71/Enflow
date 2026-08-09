@@ -333,6 +333,7 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 - [x] **Fırsat kartı — Teklif & Maliyet Analizi geçmişi** (2026-08-09, Faz 10, migration `add_cost_analysis_version`) — Daha önce maliyet analizi hiç versiyonlanmıyordu (her `POST /:id/cost-analysis` BoM/CostItem/costConfig'i silip yeniden yazıyordu, geçmiş kayboluyordu). Yeni `CostAnalysisVersion` modeli her kayıtta bir anlık görüntü (BoM+gider+costConfig+marj+teklif) tutar; `GET /:id/cost-analysis-versions` ile listelenir. Fırsat kartına (`OpportunitiesView.tsx`) eklenen `OpportunityHistoryPanel.tsx` genişletilebilir bölüm: **Teklifler** (zaten versiyonlu `Proposal` kayıtlarından, kronolojik + "Düzenle" — seçilen versiyonun içeriği editöre yüklenir, kaydedince mevcut mantıkla tutarlı şekilde yeni versiyon oluşturur) ve **Maliyet Analizleri** (yeni tablo, kronolojik, salt-okunur özet + "Güncel Analize Git" ile `crm-cost` sekmesine deep-link). `CRMModule` yeni `onNavigate` prop'u (App.tsx `navigate` fonksiyonu) ile itemId'li geçiş sağlar; `editingProposalId` state'i belirli bir teklif versiyonunu editöre yükler.
 - [x] **Enflow-Wiki — CANLI** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. `wiki/build.mjs` (bağımlılıksız üretici) `walkthrough.md §27`'den `wiki/index.html` üretir; GitHub Pages'e otomatik deploy edilir (`.github/workflows/wiki-pages.yml`) ve backend `GET /wiki` ile de sunulur (açılışta best-effort yeniden üretim). Akış değişince önce §27 güncellenir, sonra `node wiki/build.mjs` çalıştırılır.
 - [x] **Uygulama-içi Yardım modülü** (2026-08-03) — `HelpModule.tsx`, `Header`'daki (önceden ölü) Yardım ikonuyla açılır; içerik `src/content/helpArticles.ts`'te NAV_ITEMS'teki her modül için son-kullanıcı diliyle yazılmış "ne işe yarar / nasıl kullanılır" makaleleri. Rol-duyarlı (kullanıcı yalnız kendi sidebar'ında gördüğü modüllerin makalelerini görür), bağlamsal açılır (o an bulunulan sekmenin makalesiyle açılır). Backend değişikliği yok. Wiki'ye link verir — iki katman birbirini tekrar etmez: Wiki = "Enflow nedir / uçtan uca akış" (dışa dönük genel tanıtım), Yardım = "bu ekranı nasıl kullanırım" (içe dönük, oturum-içi).
+- [x] **İlk Kurulum ve Yönetici Başlangıç Kılavuzu** (2026-08-09) — `install/ILK_KURULUM_KILAVUZU.md`: hiç kurulum yapmamış biri için işletim sistemine göre (Windows/macOS/Linux) kurulum → ilk açılış sihirbazı (`SetupWizard.tsx`) → lisans girişi (abonelik/plan ayrı, sanal agent/eklenti lisansı ayrı) → birim oluşturma ("Varsayılan Şablonu Yükle" hızlı yolu + elle ek birim) → kullanıcı oluşturma + **kritik uyarı**: rol seçmek otomatik izin vermez, Yetkiler sekmesinden elle açılmalı → iş akışı (otomatik türeyen varsayılan şablon, Builder/Simülasyon sekmeleri) → birim-bazlı genel kullanım tablosu (8 varsayılan swimlane birimi + sık eklenen ek birimler + 20 rol referansı). Aynı içerik iki katmana daha özetlenerek eklendi: `walkthrough.md §27.7` (→ `node wiki/build.mjs` ile `wiki/index.html`'e yansıtıldı, eski §27.7 "Wiki kılavuzluk notu" §27.8'e kaydı) ve `src/content/helpArticles.ts` `settings` makalesine yeni "İlk kurulumda önerilen sıra" + "Lisans türleri" bölümleri. Üç katman aynı bilgiyi farklı derinlikte anlatır — tek doğruluk kaynağı bu kılavuz dosyasıdır, değişiklikte önce o güncellenir.
 - [x] **ActivityLog kapsamı — TAM** (2026-06-20) — merkezi `logActivity` helper (`backend/src/services/activityLog.ts`, non-throwing, actorType HUMAN|AGENT) + `GET /api/activity-logs?entityType=&entityId=&action=&limit=` (`activityLogs.ts`); **19 router**a denetim-izi (CREATE/UPDATE/DELETE + statü geçişleri): tüm süreç zinciri + admin (users/units) + approvalChains + corporateGovernance/visits/workflows. **Denetim İzi UI** (`ActivityLogModule.tsx`, GM-only Test Ortamı, `activity-log` sekmesi) — filtreli liste, agent köken etiketi (`agentProvenance`).
 - [x] **ContractWorkflow tam modüle terfi** (2026-06-20) — `ContractWorkflowTest`→`ContractWorkflowModule` rename; backend rol kapısı GM-only'den 7 yönetici role genişledi (GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL+FINANCE+İGPD; PRESALES/SALES_REP RBAC gereği deny); latent bug fix (gerçek `contract-workflow` sekmesinde opportunities/proposals yüklenmiyordu).
 - [x] **Agent otonomi genişlemesi — Faz 9 (recommend→act)** (2026-06-20) — Bugüne dek AUTONOMOUS mod yalnız auto-ratify ediyordu (etki-alanı mutasyonu yapmıyordu); artık döngü kapalı. Generic `autonomousAction` altyapısı: `AgentOutput` opsiyonel `{ kind, summary, reversible, execute }` döner; `runAgent` (`backend/src/services/virtualAgentService.ts`) bunu **yalnız** mod AUTONOMOUS + eklenti AUTONOMOUS'a izinli (`plugin.allowedModes`) + eylem `reversible` ise çalıştırır. İlk somut eylem **Procurement → en ucuz teklifi otomatik seç** (`SELECT_CHEAPEST_QUOTE`; deselect-all→select, idempotent/geri-alınabilir; sadece valid+öneri-var+seçilmemişse). Eylem `AgentRun.actionTaken`'a (migration `faz9_autonomous_action`) + ayrı `AGENT_ACTION` ActivityLog'a (actorType=AGENT, agentRunId) yazılır; handoff görevi "✅ … yapıldı, incele" olur. **Güvenlik:** ADVISORY modda eylem ASLA çalışmaz; `AGENT_FINANCE`/`AGENT_LEGAL` `allowedModes:['ADVISORY']` → AUTONOMOUS'a hiç geçemez (ikinci kemer `allowedAuto` guard). Frontend: `AgentRun.actionTaken` tipi + RunCard emerald rozeti + AgentTag drill-down satırı. Diğer handler'lar (tender/project/presales/igpd/crm) `autonomousAction` tanımlamaz → davranışları değişmez. `autoSkipOrphanStages` orphan-stage otonom dalı ayrı path, dokunulmadı.
@@ -414,6 +415,7 @@ src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentT
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
+backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
@@ -421,6 +423,7 @@ backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboard
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
+backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
@@ -478,12 +481,10 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
-backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
 backend/src/services/personnelTransferService.ts ← prismaClient
-backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -519,7 +520,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 48 minutes ago)
+## changes (last 10 commits — 40 minutes ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
@@ -554,6 +555,7 @@ src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
 backend/src/services/activityLog.ts           ~logActivity
+backend/src/services/aiClient.ts              ~getTenantAIConfig
 backend/src/services/analyticsService.ts      +computeBrandCategoryAnalytics  ~computeDmoAnalytics
 backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/dashboardStream.ts       +pingDashboard  +subscribeDashboard
@@ -561,6 +563,7 @@ backend/src/services/guaranteeReminders.ts    ~sweepGuaranteeReminders
 backend/src/services/opportunityProgressReminders.ts +sweepOpportunityProgressReminders  +safeParse
 backend/src/services/opportunityProgressService.ts +getOpportunityProgressSettings  +ProgressCheckInError  +finalizeCheckIn  +recordProgressCheckIn
 backend/src/services/restoreService.ts        +orderModelsForInsert  +loadModelsIntoTarget  +zaten  ~applyLogicalRestore
+backend/src/services/tenantEncryption.ts      +loadMasterKey  +aesEncrypt  +aesDecrypt  +getTenantDek
 backend/src/services/tenderReminders.ts       ~sweepTenderReminders
 backend/src/services/unitReportingService.ts  +resolveUnitStaff  +getVisitTargetRate  +computeVisitPerformance  ~getUnitDefinition
 ```
@@ -629,6 +632,19 @@ export interface LogActivityParams  :13-22
   actorType?: 'HUMAN' | 'AGENT'  :20-20
   agentRunId?: string | null  :21-21
 export async function logActivity(p) → Promise<void>  :24-52
+```
+
+### backend/src/services/aiClient.ts
+```
+export interface TenantAIConfig  :14-19
+  baseUrl: string  :15-15
+  apiKey: string  :16-16
+  model: string  :17-17
+  label?: string  :18-18
+export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | null>  :22-44  # moduleSettings
+export async function isAIConfigured(tenantId) → Promise<boolean>  :46-48
+export function assertSafeAiUrl(rawUrl) → void  :59-74  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
+export async function chatJSON(opts) → Promise<T | null>  :80-129  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
 ```
 
 ### backend/src/services/analyticsService.ts
@@ -729,6 +745,13 @@ export interface SalesBoMItemInput  :28-38
 export interface SalesManualCostItemInput  :40-45
 ```
 
+### backend/src/services/tenantEncryption.ts
+```
+export async function encryptForTenant(tenantId, plaintext) → Promise<string | null>  :85-89
+export async function decryptForTenant(tenantId, value) → Promise<string | null>  :91-96
+export function isEncrypted(value) → boolean  :98-100
+```
+
 ### backend/src/services/tenderReminders.ts
 ```
 export async function sweepTenderReminders(tenantId) → Promise<void>  :21-63
@@ -814,19 +837,6 @@ export async function resolveEntityLabel(tenantId, entityType, entityId) → Pro
 export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
 ```
 
-### backend/src/services/aiClient.ts
-```
-export interface TenantAIConfig  :14-19
-  baseUrl: string  :15-15
-  apiKey: string  :16-16
-  model: string  :17-17
-  label?: string  :18-18
-export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | null>  :22-44  # moduleSettings
-export async function isAIConfigured(tenantId) → Promise<boolean>  :46-48
-export function assertSafeAiUrl(rawUrl) → void  :59-74  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
-export async function chatJSON(opts) → Promise<T | null>  :80-129  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
-```
-
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :22-51  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
@@ -905,13 +915,6 @@ export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResu
 export async function transferOwnership(params) → Promise<TransferResult>  :192-201
 export async function deactivateUser(tenantId, userId) → Promise<void>  :203-212
 export async function hardDeleteUser(tenantId, userId) → Promise<  :214-214
-```
-
-### backend/src/services/tenantEncryption.ts
-```
-export async function encryptForTenant(tenantId, plaintext) → Promise<string | null>  :85-89
-export async function decryptForTenant(tenantId, value) → Promise<string | null>  :91-96
-export function isEncrypted(value) → boolean  :98-100
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -993,7 +996,7 @@ export interface HelpArticle  :13-18
   summary: string  :15-15
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
-export const getHelpArticle = (moduleId) =>  :179-179
+export const getHelpArticle = (moduleId) =>  :181-181
 ```
 
 ### src/hooks/useBoM.ts
