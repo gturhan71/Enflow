@@ -12,9 +12,102 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prismaClient';
 import { LocalTarget, NextcloudTarget, S3Target, BackupTarget, BACKUPS_ROOT, ensureDir } from './backupTargets';
-import { runBackup, getBackupSettings, listModels } from './backupService';
+import { runBackup, getBackupSettings, listModels, detectProvider, ModelMeta, DbProvider } from './backupService';
 
 const lowerFirst = (s: string) => s.charAt(0).toLowerCase() + s.slice(1);
+
+export type LogicalPayloadData = Record<string, Record<string, unknown>[]>;
+
+/** delete/createMany/update destekleyen herhangi bir Prisma bağlantısı (tx veya ayrı PrismaClient). */
+type TxLike = Record<string, {
+  deleteMany?: (a?: unknown) => Promise<unknown>;
+  createMany?: (a: unknown) => Promise<{ count: number }>;
+  update?: (a: unknown) => Promise<unknown>;
+}> & { $executeRawUnsafe: (query: string, ...values: unknown[]) => Promise<number> };
+
+// SQLite'ta PRAGMA defer_foreign_keys tüm döngüsel/ileri-referansları otomatik halleder.
+// Postgres'te karşılığı yok (superuser gerektirmeyen bir alternatif de yok) — bu yüzden
+// döngüsel/kendine-referans alanlar bilinen bir liste olarak null yüklenip ikinci geçişte
+// geri yazılır (backend/prisma/schema.prisma taranarak çıkarıldı: Unit↔User çapraz döngüsü
+// + Unit.parentId/User.delegateToUserId kendine-referans).
+const CIRCULAR_FK_FIELDS: Record<string, string[]> = {
+  Unit: ['managerId', 'parentId'],
+  User: ['delegateToUserId'],
+};
+// DmoCatalogItem.frameworkAgreementId → DmoFrameworkAgreement ileri-referanstır (döngü
+// değil) ama DmoFrameworkAgreement dosyada DAHA SONRA tanımlı → Postgres'te insert
+// sırasında öne alınması gerekir (SQLite'ta pragma sayesinde sıra önemsizdir).
+function orderModelsForInsert(models: ModelMeta[], provider: DbProvider): ModelMeta[] {
+  if (provider !== 'POSTGRES') return models;
+  const ordered = [...models];
+  const moverIdx = ordered.findIndex(m => m.name === 'DmoFrameworkAgreement');
+  const beforeIdx = ordered.findIndex(m => m.name === 'DmoCatalogItem');
+  if (moverIdx > beforeIdx && beforeIdx !== -1) {
+    const [mover] = ordered.splice(moverIdx, 1);
+    ordered.splice(ordered.findIndex(m => m.name === 'DmoCatalogItem'), 0, mover);
+  }
+  return ordered;
+}
+
+/**
+ * Tüm modelleri (sil +) yeniden yükler — hem in-place restore (applyLogicalRestore)
+ * hem de SQLite→Postgres geçiş aracı (migrateToPostgres.ts) tarafından paylaşılır.
+ * SQLite: PRAGMA defer_foreign_keys ile tek geçiş. Postgres: döngüsel FK alanları
+ * null yüklenir + ikinci geçişte geri yazılır (bkz. CIRCULAR_FK_FIELDS).
+ */
+export async function loadModelsIntoTarget(
+  tx: TxLike,
+  data: LogicalPayloadData,
+  provider: DbProvider,
+  scope?: 'PLATFORM' | 'TENANT',
+  scopeTenant?: string,
+): Promise<Record<string, number>> {
+  const restored: Record<string, number> = {};
+  if (provider === 'SQLITE') {
+    await tx.$executeRawUnsafe('PRAGMA defer_foreign_keys=ON');
+  }
+
+  // 1) Sil (hedef zaten boşsa no-op — geçiş aracında bu dal hep no-op çalışır)
+  for (const m of listModels()) {
+    if (!data[m.name]) continue;
+    const delegate = tx[m.delegateKey];
+    if (!delegate?.deleteMany) continue;
+    const where = scope === 'TENANT' && m.hasTenantId ? { where: { tenantId: scopeTenant } } : undefined;
+    await delegate.deleteMany(where);
+  }
+
+  // 2) Yeniden yükle
+  const deferredUpdates: { delegateKey: string; id: unknown; fields: Record<string, unknown> }[] = [];
+  for (const m of orderModelsForInsert(listModels(), provider)) {
+    const rows = data[m.name];
+    if (!rows || rows.length === 0) continue;
+    const delegate = tx[m.delegateKey];
+    if (!delegate?.createMany) continue;
+    const circularFields = provider === 'POSTGRES' ? CIRCULAR_FK_FIELDS[m.name] : undefined;
+    const coerced = rows.map(r => {
+      const row = coerceRow(m.name, r);
+      if (circularFields) {
+        const fields: Record<string, unknown> = {};
+        let hasDeferred = false;
+        for (const f of circularFields) {
+          if (row[f] != null) { fields[f] = row[f]; row[f] = null; hasDeferred = true; }
+        }
+        if (hasDeferred) deferredUpdates.push({ delegateKey: m.delegateKey, id: row.id, fields });
+      }
+      return row;
+    });
+    const res = await delegate.createMany({ data: coerced });
+    restored[m.name] = res.count;
+  }
+
+  // 3) Ertelenen döngüsel FK alanlarını geri yaz (yalnız Postgres — SQLite'ta boş kalır)
+  for (const u of deferredUpdates) {
+    const delegate = tx[u.delegateKey];
+    await delegate?.update?.({ where: { id: u.id }, data: u.fields });
+  }
+
+  return restored;
+}
 
 interface BackupPayload {
   meta: { version: number; scope: 'PLATFORM' | 'TENANT'; tenantId: string | null };
@@ -170,31 +263,13 @@ export async function applyLogicalRestore(restoreId: string, actor?: { id?: stri
     preId = pre.id;
   } catch { /* snapshot başarısızsa devam etme — güvenlik gereği fırlat */ throw new Error('Güvenlik snapshot alınamadı; geri yükleme iptal.'); }
 
-  const restored: Record<string, number> = {};
-  // Tek transaction (tek bağlantı) + defer_foreign_keys: FK kontrolü COMMIT'e ertelenir
-  // → sil/yeniden-yükle sırasından bağımsız çalışır. (foreign_keys=OFF havuzlu
-  // bağlantılarda insert bağlantısına uygulanmıyordu.)
-  await prisma.$transaction(async (tx) => {
-    await tx.$executeRawUnsafe('PRAGMA defer_foreign_keys=ON');
-    // 2) Sil
-    for (const m of listModels()) {
-      if (!payload.data[m.name]) continue;
-      const delegate = (tx as unknown as Record<string, { deleteMany: (a?: unknown) => Promise<unknown> }>)[m.delegateKey];
-      if (!delegate?.deleteMany) continue;
-      const where = scope === 'TENANT' && m.hasTenantId ? { where: { tenantId: scopeTenant } } : undefined;
-      await delegate.deleteMany(where);
-    }
-    // 3) Yeniden yükle
-    for (const m of listModels()) {
-      const rows = payload.data[m.name];
-      if (!rows || rows.length === 0) continue;
-      const delegate = (tx as unknown as Record<string, { createMany: (a: unknown) => Promise<{ count: number }> }>)[m.delegateKey];
-      if (!delegate?.createMany) continue;
-      const coerced = rows.map(r => coerceRow(m.name, r));
-      const res = await delegate.createMany({ data: coerced });
-      restored[m.name] = res.count;
-    }
-  }, { timeout: 120_000, maxWait: 15_000 });
+  // Tek transaction (tek bağlantı) — SQLite'ta defer_foreign_keys, Postgres'te
+  // döngüsel-alan-null+geri-yazma stratejisiyle sil/yeniden-yükle sırasından
+  // bağımsız çalışır (bkz. loadModelsIntoTarget, provider-farkında).
+  const restored = await prisma.$transaction(
+    (tx) => loadModelsIntoTarget(tx as unknown as TxLike, payload.data, detectProvider(), scope, scopeTenant),
+    { timeout: 120_000, maxWait: 15_000 },
+  );
 
   await prisma.restoreJob.update({
     where: { id: restoreId },

@@ -48,14 +48,31 @@ geçmişini taşıyamaz. İki yol var:
 1. **Şimdilik:** `db push` (interim) — çalışıyor; temiz kurulum için yeterli.
 2. **Üretim öncesi:** Yaklaşım A ile Postgres baseline üret + sonraki migration'ları çift-üret.
 3. **CI:** SQLite + Postgres (docker `postgres:16`) matrisinde `migrate deploy` + RBAC/izolasyon süiti.
-4. **Veri taşıma (SQLite→Postgres):** ayrı iş — `pg`/`csv` export-import veya Prisma seed;
-   şema `db push`/`migrate` ile hazırlandıktan sonra veriler aktarılır.
+4. **Veri taşıma (SQLite→Postgres):** ✅ **uygulandı** — `backend/src/scripts/migrateToPostgres.ts`
+   (`pnpm migrate:to-postgres`, backend/ içinde). Mevcut çalışan bir SQLite tenant'ını, kaynağa
+   dokunmadan (yalnız okur), hedefi `db push` ile kurup `backupService.exportLogicalData` +
+   `restoreService.loadModelsIntoTarget` (döngüsel FK'lar için Postgres-güvenli null+geri-yazma
+   stratejisi — Unit↔User çapraz döngüsü, Unit.parentId/User.delegateToUserId kendine-referans)
+   ile taşır, model-bazlı satır sayısı doğrulaması geçmeden `backend/.env`'e dokunmaz. Herhangi
+   bir adımda hata olursa `schema.prisma` otomatik sqlite'a geri alınır — repo her zaman
+   çalışır SQLite durumuna döner.
+
+## Kapasite teyidi (kurulum sihirbazı)
+
+`install/wizard.mjs` artık PostgreSQL sorusundan önce beklenen kullanıcı sayısı + yıllık veri
+büyümesi (GB) soruyor; eşik aşılırsa (>20 kullanıcı veya >5GB — asıl sınır SQLite'ın eşzamanlı
+YAZMA kısıtı, depolama ikincil sinyal) Postgres sorusunun varsayılanı `true`'ya çevrilir ve
+gerekçe basılır. Sert engel yok — kullanıcı SQLite ile devam ederse `migrate:to-postgres`'e
+işaret edilir. Ayrıca `backend/src/prismaClient.ts` artık SQLite yolunda `WAL` modu +
+`busy_timeout=5s` uygular (tek-dosya/tek-yazar kısıtını sertleştirir, motor seçiminden bağımsız).
 
 ## İlgili dosyalar
 
-- `install/wizard.mjs` — DB seçimi, provider switch, PG provizyon (winget/psql), `db push`.
-- `backend/src/prismaClient.ts` — `DATABASE_URL` şemasına göre adapter seçimi (libsql | pg).
-- `backend/prisma/schema.prisma` — `provider` (kurulumda yazılır).
+- `install/wizard.mjs` — DB seçimi, kapasite teyidi, provider switch, PG provizyon (winget/psql), `db push`.
+- `backend/src/prismaClient.ts` — `DATABASE_URL` şemasına göre adapter seçimi (libsql | pg) + WAL/busy_timeout.
+- `backend/src/scripts/migrateToPostgres.ts` — SQLite→Postgres canlı geçiş aracı (`pnpm migrate:to-postgres`).
+- `backend/src/services/restoreService.ts` — `loadModelsIntoTarget` (provider-farkında yükleyici, migrateToPostgres + applyLogicalRestore tarafından paylaşılır).
+- `backend/prisma/schema.prisma` — `provider` (kurulumda / geçişte yazılır).
 - `install/install.ps1` / `install.bat` — Windows kurulum akışı (Postgres notu).
 
 > **Not:** Postgres kurulum/provizyon yolu (winget + psql + servis) Windows'a özgüdür ve macOS/CI

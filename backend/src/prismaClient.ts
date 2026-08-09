@@ -11,9 +11,11 @@ dotenv.config({ quiet: true });
 // destekler; kurulum sihirbazı .env + schema provider'ını buna göre yazar.
 const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
 const isPostgres = /^postgres(ql)?:\/\//i.test(connectionString);
+// timeout=busy_timeout (ms, libsql Config) — SQLite varsayılanı 0 (anında SQLITE_BUSY);
+// eşzamanlı yazımda kısa bekleme ile hata oranını düşürür. Postgres'te karşılığı yok.
 const adapter = isPostgres
   ? new PrismaPg({ connectionString })
-  : new PrismaLibSql({ url: connectionString });
+  : new PrismaLibSql({ url: connectionString, timeout: 5000 });
 
 // Para temiz-yuvarlama: tüm yazımlarda para alanları 2 ondalığa (kuruş) yuvarlanır.
 // Tek noktadan global; hiçbir route'u değiştirmeden kirli-float depolamasını önler.
@@ -55,3 +57,9 @@ export const prisma = new PrismaClient({ adapter }).$extends({
     },
   },
 });
+
+// WAL modu dosya header'ına kalıcı yazılır (bir kerelik yeter) — rollback-journal
+// varsayılanının aksine yazım sırasında okumaları bloklamaz. Postgres'te anlamsız.
+if (!isPostgres) {
+  prisma.$executeRawUnsafe('PRAGMA journal_mode=WAL;').catch(() => { /* dosya kilitliyse bir sonraki bağlantıda tekrar denenir */ });
+}

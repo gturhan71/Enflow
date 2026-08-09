@@ -366,7 +366,6 @@ src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
@@ -375,9 +374,11 @@ src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
+src/modules/crm/constants.ts ← ../types
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
+src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/workflowService
 src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
@@ -419,11 +420,8 @@ src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentT
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
-backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/analyticsService.ts ← prismaClient
-backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
@@ -433,20 +431,19 @@ backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
+src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
-src/modules/crm/constants.ts ← ../types
 src/modules/crm/ContactsModal.tsx ← ../types
 src/modules/crm/CustomerReportModal.tsx ← ../lib/utils, ../types, helpers, constants
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, helpers
 src/modules/crm/helpers.ts ← ../types
 src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
 src/modules/crm/NewCustomerModal.tsx ← ../types
-src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
@@ -455,10 +452,8 @@ src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/negotiation/ModeTabBar.tsx ← ../lib/utils
 src/modules/negotiation/ProposalSelectorHeader.tsx ← ../types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
-src/modules/procurement/constants.tsx ← ../types
 src/modules/procurement/PRForm.tsx ← ../types, constants
 src/modules/procurement/RequestsTab.tsx ← ../types, ../lib/format, constants, StatusBadge
-src/modules/procurement/StatusBadge.tsx ← ../types, constants
 src/modules/procurement/SummaryTab.tsx ← ../types, constants
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/project-mgmt/constants.tsx ← ../types
@@ -481,12 +476,14 @@ src/modules/reporting/MyReportsTab.tsx ← ../types, helpers
 src/modules/reporting/ReportForm.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, types
-src/modules/todo/NewTaskModal.tsx ← ../types, helpers
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
-src/modules/todo/ProposalPreviewModal.tsx ← ../types, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
+backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
+backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -522,12 +519,11 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 15 hours ago)
+## changes (last 10 commits — 5 hours ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx +kullan  +Kullan
-src/modules/ActivityLogModule.tsx             +fallbackSummary  +ArchivesTab  ~actionTone  ~ActivityLogModule
 src/modules/contract-workflow/AnalysisTab.tsx ~AnalysisTab
 src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
 src/modules/contract-workflow/helpers.ts      +computeDeadlineAlarm  ~bestProposalPrice
@@ -537,6 +533,7 @@ src/modules/contract-workflow/WorkflowListPanel.tsx +WorkflowCard
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/DashboardView.tsx             ~DashboardView
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
+src/modules/crm/OpportunityHistoryPanel.tsx   +OpportunityHistoryPanel
 src/modules/crm/ProgressCheckInModal.tsx      +ProgressCheckInModal
 src/modules/dashboard/criticalAlerts.ts       +buildCriticalAlerts
 src/modules/dashboard/widgetCatalog.ts        +revizyonu  +resolveRoleDefault  +resolveEffectiveWidgets  +buildEditableLayout
@@ -563,11 +560,7 @@ src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
 backend/src/services/activityLog.ts           ~logActivity
-backend/src/services/activityLogArchiveScheduler.ts +tick  +startActivityLogArchiveScheduler
-backend/src/services/activityLogArchiveService.ts +getArchiveSettings  +runArchive
-backend/src/services/activityLogSummary.ts    +resolveActorName  +resolveEntityLabel  +humanizeEntityType  +resolveVerb
 backend/src/services/analyticsService.ts      +computeBrandCategoryAnalytics  ~computeDmoAnalytics
-backend/src/services/backupService.ts         ~getBackupSettings
 backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/dashboardStream.ts       +pingDashboard  +subscribeDashboard
 backend/src/services/guaranteeReminders.ts    ~sweepGuaranteeReminders
@@ -575,18 +568,10 @@ backend/src/services/opportunityProgressReminders.ts +sweepOpportunityProgressRe
 backend/src/services/opportunityProgressService.ts +getOpportunityProgressSettings  +ProgressCheckInError  +finalizeCheckIn  +recordProgressCheckIn
 backend/src/services/personnelTransferService.ts +getOwnedItems  +transferOwnershipTx  +transferOwnership  +kullan
 backend/src/services/tenderReminders.ts       ~sweepTenderReminders
-backend/src/services/unitReportingService.ts  ~crmMetrics  ~procurementMetrics  ~tenderMetrics
+backend/src/services/unitReportingService.ts  +resolveUnitStaff  +getVisitTargetRate  +computeVisitPerformance  ~getUnitDefinition
 ```
 
 ## backend
-
-### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
-```
-TABLE ActivityLogArchive
-INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
-INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
-INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
-```
 
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
 ```
@@ -632,6 +617,12 @@ TABLE OpportunityProgressLog
 INDEX OpportunityProgressLog_tenantId_opportunityId_createdAt_idx ON OpportunityProgressLog
 ```
 
+### backend/prisma/migrations/20260809115327_add_cost_analysis_version/migration.sql
+```
+TABLE CostAnalysisVersion
+INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
+```
+
 ### backend/src/services/activityLog.ts
 ```
 export interface LogActivityParams  :13-22
@@ -644,32 +635,6 @@ export interface LogActivityParams  :13-22
   actorType?: 'HUMAN' | 'AGENT'  :20-20
   agentRunId?: string | null  :21-21
 export async function logActivity(p) → Promise<void>  :24-52
-```
-
-### backend/src/services/activityLogArchiveScheduler.ts
-```
-export function startActivityLogArchiveScheduler() → void  :40-45
-```
-
-### backend/src/services/activityLogArchiveService.ts
-```
-export interface ArchiveModuleSettings  :19-27
-  enabled?: boolean  :20-20
-  intervalDays?: number  :21-21
-  retentionDays?: number  :22-22
-  targetType?: TargetType  :23-23
-  location?: string  :24-24
-  nextcloud?: { url?: string  :25-25
-  s3?: { endpoint?: string  :26-26
-export interface RunArchiveOpts  :46-53
-  tenantId: string  :47-47
-  trigger?: 'MANUAL' | 'SCHEDULED'  :48-48
-  retentionDays?: number  :49-49
-  targetType?: TargetType  :50-50
-  location?: string | null  :51-51
-  settings?: ArchiveModuleSettings | null  :52-52
-export async function getArchiveSettings(tenantId) → Promise<ArchiveModuleSettings>  :38-44  # moduleSettings
-export async function runArchive(opts) → Promise<  :56-56  # Bir arşivleme işini baştan sona çalıştırır; ActivityLogArchi
 ```
 
 ### backend/src/services/activityLogSummary.ts
@@ -711,35 +676,6 @@ export interface BidScoreLine  :230-236
   factors: { authorityWinRate: number  :234-234
   authorityWinPct: number | null  :235-235
 export interface BidScorecard  :237-241
-```
-
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :27-31
-  name: string  :28-28
-  delegateKey: string  :29-29
-  hasTenantId: boolean  :30-30
-export interface BackupModuleSettings  :98-107
-  enabled?: boolean  :99-99
-  intervalHours?: number  :100-100
-  scope?: BackupScope  :101-101
-  kind?: BackupKind  :102-102
-  targetType?: TargetType  :103-103
-  location?: string  :104-104
-  nextcloud?: { url?: string  :105-105
-  s3?: { endpoint?: string  :106-106
-export interface RunBackupOpts  :109-119
-  tenantId: string  :110-110
-  scope: BackupScope  :111-111
-  kind: BackupKind  :112-112
-  targetType: TargetType  :113-113
-  location?: string | null  :114-114
-  trigger?: 'MANUAL' | 'SCHEDULED'  :115-115
-  startedById?: string  :116-116
-  startedByName?: string  :117-117
-  … +1 more members  :109-109
-export type BackupScope  :17-17
-export type BackupKind  :18-18
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -862,15 +798,43 @@ export interface UnitMetricsResult  :90-97
 export interface WorkflowBottleneck  :457-461
 ```
 
-### backend/prisma/migrations/20260809115327_add_cost_analysis_version/migration.sql
+### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
 ```
-TABLE CostAnalysisVersion
-INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
+TABLE ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
+INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
+```
+
+### backend/src/services/activityLogArchiveScheduler.ts
+```
+export function startActivityLogArchiveScheduler() → void  :40-45
+```
+
+### backend/src/services/activityLogArchiveService.ts
+```
+export interface ArchiveModuleSettings  :19-27
+  enabled?: boolean  :20-20
+  intervalDays?: number  :21-21
+  retentionDays?: number  :22-22
+  targetType?: TargetType  :23-23
+  location?: string  :24-24
+  nextcloud?: { url?: string  :25-25
+  s3?: { endpoint?: string  :26-26
+export interface RunArchiveOpts  :46-53
+  tenantId: string  :47-47
+  trigger?: 'MANUAL' | 'SCHEDULED'  :48-48
+  retentionDays?: number  :49-49
+  targetType?: TargetType  :50-50
+  location?: string | null  :51-51
+  settings?: ArchiveModuleSettings | null  :52-52
+export async function getArchiveSettings(tenantId) → Promise<ArchiveModuleSettings>  :38-44  # moduleSettings
+export async function runArchive(opts) → Promise<  :56-56  # Bir arşivleme işini baştan sona çalıştırır; ActivityLogArchi
 ```
 
 ### backend/src/services/approvalChainService.ts
@@ -881,6 +845,35 @@ export async function autoSkipOrphanStages(tenantId, chainId)  :91-201  # Skip-l
 export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :209-221  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
 export async function resolveEffectiveApprover(tenantId, role, userId) → Promise<boolean>  :224-230  # Bir kullanıcı bir role ait onayı yapabilir mi
 export async function resetApprovalChain(tenantId, entityType, entityId)  :233-246  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+```
+
+### backend/src/services/backupService.ts
+```
+export interface ModelMeta  :27-31
+  name: string  :28-28
+  delegateKey: string  :29-29
+  hasTenantId: boolean  :30-30
+export interface BackupModuleSettings  :98-107
+  enabled?: boolean  :99-99
+  intervalHours?: number  :100-100
+  scope?: BackupScope  :101-101
+  kind?: BackupKind  :102-102
+  targetType?: TargetType  :103-103
+  location?: string  :104-104
+  nextcloud?: { url?: string  :105-105
+  s3?: { endpoint?: string  :106-106
+export interface RunBackupOpts  :109-119
+  tenantId: string  :110-110
+  scope: BackupScope  :111-111
+  kind: BackupKind  :112-112
+  targetType: TargetType  :113-113
+  location?: string | null  :114-114
+  trigger?: 'MANUAL' | 'SCHEDULED'  :115-115
+  startedById?: string  :116-116
+  startedByName?: string  :117-117
+  … +1 more members  :109-109
+export type BackupScope  :17-17
+export type BackupKind  :18-18
 ```
 
 ### backend/src/services/bootstrapTenant.ts
@@ -896,6 +889,15 @@ export interface BootstrapResult  :44-49
   user: { id: string  :47-47
   subscription: { plan: string  :48-48
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :51-127
+```
+
+### backend/src/services/restoreService.ts
+```
+export type LogicalPayloadData  :19-19
+export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :58-110  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
+export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
+export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
+export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1034,18 +1036,6 @@ handler onChange
 handler onKeyDown
 ```
 
-### src/modules/ActivityLogModule.tsx
-```
-component ArchivesTab
-component ActivityLogModule
-hook useState
-hook useCallback
-hook useEffect
-export ActivityLogModule
-handler onClick
-handler onChange
-```
-
 ### src/modules/contract-workflow/AnalysisTab.tsx
 ```
 component AnalysisTab
@@ -1140,6 +1130,12 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/crm/constants.ts
+```
+export const proposalStatusTone = (status) =>  :16-32
+export const getStatusStyle = (status) =>  :21-32
+```
+
 ### src/modules/crm/DashboardView.tsx
 ```
 component DashboardView
@@ -1164,6 +1160,13 @@ handler onClick
 handler onChange
 handler onEditProposal
 handler onGoToCostAnalysis
+```
+
+### src/modules/crm/OpportunityHistoryPanel.tsx
+```
+component OpportunityHistoryPanel
+hook useState
+handler onClick
 ```
 
 ### src/modules/crm/ProgressCheckInModal.tsx
@@ -1733,35 +1736,6 @@ export interface DmoOrder  :21-31
   … +1 more members  :21-21
 ```
 
-### src/types/plugin.ts
-```
-export interface PluginDefinition  :2-15
-  key: string  :3-3
-  name: string  :4-4
-  category: 'VIRTUAL_AGENT'  :5-5
-  description: string  :6-6
-  unitKey?: string  :7-7
-  role?: string  :8-8
-  defaultMode?: 'ADVISORY' | 'AUTONOMOUS'  :9-9
-  allowedModes?: ('ADVISORY' | 'AUTONOMOUS')[]  :10-10
-  … +4 more members  :2-2
-export interface PluginEntitlement  :16-29
-  id: string  :17-17
-  tenantId: string  :18-18
-  pluginKey: string  :19-19
-  status: 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'D  :20-20
-  licenseKey?: string | null  :21-21
-  mode: 'ADVISORY' | 'AUTONOMOUS'  :22-22
-  config?: string | null  :23-23
-  activatedById?: string | null  :24-24
-  … +4 more members  :16-16
-export interface EntitlementWithCatalog  :30-34
-  plugin: PluginDefinition  :31-31
-  entitlement: PluginEntitlement | null  :32-32
-  active: boolean  :33-33
-export interface AgentRun  :35-54
-```
-
 ### src/types/presales.ts
 ```
 export interface CostRequirement  :1-10
@@ -1886,6 +1860,18 @@ export Sidebar
 handler onClick
 ```
 
+### src/modules/ActivityLogModule.tsx
+```
+component ArchivesTab
+component ActivityLogModule
+hook useState
+hook useCallback
+hook useEffect
+export ActivityLogModule
+handler onClick
+handler onChange
+```
+
 ### src/modules/contract-workflow/CancelModal.tsx
 ```
 component CancelModal
@@ -1968,12 +1954,6 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/crm/constants.ts
-```
-export const proposalStatusTone = (status) =>  :16-32
-export const getStatusStyle = (status) =>  :21-32
-```
-
 ### src/modules/crm/ContactsModal.tsx
 ```
 component ContactsModal
@@ -2015,13 +1995,6 @@ component NewCustomerModal
 handler onClick
 handler onSubmit
 handler onChange
-```
-
-### src/modules/crm/OpportunityHistoryPanel.tsx
-```
-component OpportunityHistoryPanel
-hook useState
-handler onClick
 ```
 
 ### src/modules/crm/ProposalsView.tsx
@@ -2118,14 +2091,6 @@ handler onSubmitRound
 handler onLog
 ```
 
-### src/modules/procurement/constants.tsx
-```
-export STATUS_CONFIG
-export URGENCY_CONFIG
-export SOURCE_LABEL
-export CURRENCIES
-```
-
 ### src/modules/procurement/PRForm.tsx
 ```
 props PRFormProps
@@ -2141,11 +2106,6 @@ props RequestsTabProps
 export RequestsTab
 handler onChange
 handler onClick
-```
-
-### src/modules/procurement/StatusBadge.tsx
-```
-export StatusBadge
 ```
 
 ### src/modules/procurement/SummaryTab.tsx
@@ -2363,22 +2323,9 @@ handler onKeyDown
 handler onClose
 ```
 
-### src/modules/todo/NewTaskModal.tsx
-```
-component NewTaskModal
-handler onClick
-handler onChange
-```
-
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
-```
-
-### src/modules/todo/ProposalPreviewModal.tsx
-```
-component ProposalPreviewModal
-handler onClick
 ```
 
 ### src/modules/TodoModule.tsx
@@ -2397,6 +2344,35 @@ handler onMarkRead
 handler onNavigate
 handler onToggleStatus
 handler onSubmit
+```
+
+### src/types/plugin.ts
+```
+export interface PluginDefinition  :2-15
+  key: string  :3-3
+  name: string  :4-4
+  category: 'VIRTUAL_AGENT'  :5-5
+  description: string  :6-6
+  unitKey?: string  :7-7
+  role?: string  :8-8
+  defaultMode?: 'ADVISORY' | 'AUTONOMOUS'  :9-9
+  allowedModes?: ('ADVISORY' | 'AUTONOMOUS')[]  :10-10
+  … +4 more members  :2-2
+export interface PluginEntitlement  :16-29
+  id: string  :17-17
+  tenantId: string  :18-18
+  pluginKey: string  :19-19
+  status: 'ACTIVE' | 'TRIAL' | 'EXPIRED' | 'D  :20-20
+  licenseKey?: string | null  :21-21
+  mode: 'ADVISORY' | 'AUTONOMOUS'  :22-22
+  config?: string | null  :23-23
+  activatedById?: string | null  :24-24
+  … +4 more members  :16-16
+export interface EntitlementWithCatalog  :30-34
+  plugin: PluginDefinition  :31-31
+  entitlement: PluginEntitlement | null  :32-32
+  active: boolean  :33-33
+export interface AgentRun  :35-54
 ```
 
 ### src/types/tender.ts

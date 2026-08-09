@@ -152,8 +152,25 @@ async function main() {
   const backendPort = await ask('Backend portu', '3002');
   const frontendPort = await ask('Frontend portu', '3000');
 
+  // Kapasite teyidi — SQLite'ın asıl sınırı eşzamanlı YAZMA (tek-dosya/tek-yazar),
+  // ham depolama değil; ikinci soru ikincil bir sinyal olarak eklenir. Eşik aşılırsa
+  // aşağıdaki Postgres sorusunun varsayılanı true'ya çevrilir — sert engel YOK,
+  // yalnız gerekçeli öneri (kullanıcı yine de "hayır" diyebilir).
+  const SQLITE_MAX_USERS = 20;      // ~20 üzeri kullanıcıda eşzamanlı yazma çakışması belirginleşir
+  const SQLITE_MAX_STORAGE_GB = 5;  // ikincil sinyal
+  head('2b/6 · Kapasite teyidi');
+  const expectedUsers = Number(await ask('Beklenen toplam kullanıcı sayısı?', '10')) || 10;
+  const expectedStorageGB = Number(await ask('Yaklaşık 1 yıl içinde birikmesi beklenen veri (GB)?', '1')) || 1;
+  const overCapacity = expectedUsers > SQLITE_MAX_USERS || expectedStorageGB > SQLITE_MAX_STORAGE_GB;
+  if (overCapacity) {
+    warn(`Beklenen ölçek (${expectedUsers} kullanıcı, ${expectedStorageGB} GB) SQLite'ın rahat sınırını aşıyor (~${SQLITE_MAX_USERS} kullanıcı) — PostgreSQL öneriliyor.`);
+  }
+
   let dbUrl = 'file:./dev.db';
-  const usePg = await askYN('PostgreSQL kullanılsın mı? (Hayır = SQLite, varsayılan)', false);
+  const usePg = await askYN('PostgreSQL kullanılsın mı? (Hayır = SQLite)', overCapacity);
+  if (!usePg && overCapacity) {
+    warn('SQLite ile devam ediliyor. Büyüdüğünüzde sorunsuz geçiş için: `pnpm migrate:to-postgres` (backend/ içinde).');
+  }
   if (usePg) {
     const host = await ask('Postgres host', 'localhost');
     const port = await ask('Postgres port', '5432');
