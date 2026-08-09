@@ -7,7 +7,8 @@ export type WK =
   | 'kpiOverview' | 'costApprovals' | 'tenderDeadlines' | 'guaranteeExpiries' | 'guaranteeRequests'
   | 'financingGap' | 'tenderPipeline' | 'withdrawnTenders' | 'bomHandoffs' | 'invoicesDue'
   | 'milestonesDue' | 'purchaseRequests' | 'myOpportunities' | 'myTasks' | 'projects'
-  | 'contractDeadlines' | 'legalDeadlines' | 'approvalBottlenecks' | 'topRisks' | 'agentActivity';
+  | 'contractDeadlines' | 'legalDeadlines' | 'approvalBottlenecks' | 'topRisks' | 'agentActivity'
+  | 'visitPerformance';
 
 export type DecisionHorizon = 'operational' | 'near' | 'mid' | 'long';
 
@@ -132,14 +133,19 @@ export const WIDGET_META: Record<WK, WidgetMeta> = {
     philosophy: 'Bugün sanal agent\'ların aldığı otonom eylemler ve onay bekleyen (ratifikasyon) çalıştırmalar; otomasyonun nerede insan onayı beklediğini gösterir.',
     horizon: 'operational',
   },
+  visitPerformance: {
+    key: 'visitPerformance',
+    philosophy: 'Planlanan ziyaretlerin ne kadarı gerçekleşiyor ve gerçekleşen ziyaretler ne oranda fırsata dönüşüyor — satış ekibinin saha etkinliğinin somut göstergesi.',
+    horizon: 'mid',
+  },
 };
 
 // Rol → varsayılan widget listesi + sıralama. Kullanıcı kişiselleştirmesi
 // (Faz 3) yoksa bu varsayılana düşülür.
 export const ROLE_DASHBOARD: Record<string, WK[]> = {
-  GENERAL_MANAGER: ['kpiOverview', 'approvalBottlenecks', 'costApprovals', 'tenderDeadlines', 'contractDeadlines', 'guaranteeExpiries', 'legalDeadlines', 'financingGap', 'tenderPipeline', 'topRisks', 'agentActivity', 'withdrawnTenders', 'bomHandoffs'],
+  GENERAL_MANAGER: ['kpiOverview', 'approvalBottlenecks', 'costApprovals', 'tenderDeadlines', 'contractDeadlines', 'guaranteeExpiries', 'legalDeadlines', 'financingGap', 'tenderPipeline', 'visitPerformance', 'topRisks', 'agentActivity', 'withdrawnTenders', 'bomHandoffs'],
   OPERATIONS_MGR: ['kpiOverview', 'tenderDeadlines', 'tenderPipeline', 'projects'],
-  SALES_MGR: ['costApprovals', 'kpiOverview', 'tenderPipeline', 'myTasks'],
+  SALES_MGR: ['costApprovals', 'kpiOverview', 'tenderPipeline', 'visitPerformance', 'myTasks'],
   SALES_REP: ['myOpportunities', 'myTasks'],
   SALES_SUPPORT: ['tenderDeadlines', 'guaranteeRequests', 'tenderPipeline', 'myTasks'],
   ISAB_MGR: ['tenderDeadlines', 'tenderPipeline', 'guaranteeRequests', 'myTasks'],
@@ -184,6 +190,7 @@ export const WIDGET_TITLE: Record<WK, string> = {
   approvalBottlenecks: 'Onay Zinciri Darboğazı',
   topRisks: 'Öncelikli Riskler',
   agentActivity: 'Sanal Agent Aktivitesi',
+  visitPerformance: 'Ziyaret Performansı',
 };
 
 export interface UserDashboardLayout {
@@ -243,6 +250,7 @@ export const WIDGET_HAS_DETAIL: Partial<Record<WK, true>> = {
   legalDeadlines: true,
   approvalBottlenecks: true,
   topRisks: true,
+  visitPerformance: true,
 };
 
 // "Detay" panelinden ilgili modüle geçiş hedefi (Dashboard'daki go() ile aynı hedefler).
@@ -264,4 +272,5 @@ export const WIDGET_TARGET_TAB: Partial<Record<WK, string>> = {
   legalDeadlines: 'contract-workflow',
   topRisks: 'corporate-governance',
   agentActivity: 'virtual-agents-test',
+  visitPerformance: 'visit-plan',
 };

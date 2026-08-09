@@ -19,6 +19,16 @@ export interface DashboardPayload {
     projects: { active: number; avgMargin: number };
     topRisks: { id: string; title: string; type: string; score: number }[];
     agentActivityToday: { pendingRatification: number; actionsTaken: number; total: number };
+    visitPerformance: {
+      period: { start: string; end: string };
+      planned: number;
+      completed: number;
+      cancelled: number;
+      coveragePct: number;
+      targetRate: number;
+      conversion: { windowDays: number; lookbackDays: number; maturedVisits: number; convertedVisits: number; conversionRatePct: number };
+      topPerformers: { userId: string; name: string; completed: number; converted: number }[];
+    };
   };
   personal: { myOpportunities: { id: string; title: string; value: number; status: string; technicalStatus?: string }[]; myTasksPending: number; unreadNotifications: number };
 }

@@ -389,6 +389,33 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
 
   await prisma.opportunity.update({ where: { id: opportunityId }, data: { costConfig: JSON.stringify(costConfig), technicalStatus: 'PENDING_APPROVAL' } });
 
+  // Maliyet analizi versiyon geçmişi — canlı BoM/CostItem tabloları her kayıtta silinip
+  // yeniden oluşturulduğundan (yukarıda deleteMany+create), o anki anlık görüntü ayrı bir
+  // CostAnalysisVersion satırına yazılır. Kart üzerinde "kaç kez analiz yapıldı" bu tablodan.
+  const lastVersion = await prisma.costAnalysisVersion.findFirst({
+    where: { tenantId, opportunityId },
+    orderBy: { version: 'desc' },
+    select: { version: true },
+  });
+  const actor = req.userId ? await prisma.user.findUnique({ where: { id: req.userId }, select: { name: true } }) : null;
+  await prisma.costAnalysisVersion.create({
+    data: {
+      tenantId,
+      opportunityId,
+      version: (lastVersion?.version ?? 0) + 1,
+      bomItems: JSON.stringify(bomResult),
+      costItems: JSON.stringify(allCostItems),
+      costConfig: JSON.stringify(costConfig),
+      grandCost: result.grandCost,
+      offer: result.offer,
+      marginPct: result.marginPct,
+      belowFloor: result.belowFloor,
+      status: 'PENDING_APPROVAL',
+      createdById: req.userId ?? null,
+      createdByName: actor?.name ?? null,
+    },
+  });
+
   // Satış Müdürüne onay görevi + bildirim (submit-cost-approval ile aynı — tek çağrıda birleşti)
   const salesMgr = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_MGR' } });
   const salesUnit = salesMgr?.unitId || (await prisma.unit.findFirst({ where: { tenantId, name: { contains: 'Satış' } } }))?.id;
@@ -406,6 +433,26 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
   await logActivity({ tenantId, userId: req.userId, action: 'SUBMIT_COST_APPROVAL', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, marginPct: result.marginPct, belowFloor: result.belowFloor } });
 
   res.json({ ...result, bomItems: bomResult, costItems: allCostItems, technicalStatus: 'PENDING_APPROVAL' });
+}));
+
+// Fırsat kartı — "kaç kez maliyet analizi yapıldı" kronolojik geçmişi (salt-okunur snapshot'lar).
+router.get('/:id/cost-analysis-versions', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = String(req.params.id);
+  const tenantId = req.tenantId;
+  const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+  if (!opp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
+
+  const versions = await prisma.costAnalysisVersion.findMany({
+    where: { tenantId, opportunityId },
+    orderBy: { version: 'desc' },
+  });
+  const parsed = versions.map((v) => ({
+    ...v,
+    bomItems: (() => { try { return JSON.parse(v.bomItems); } catch { return []; } })(),
+    costItems: (() => { try { return JSON.parse(v.costItems); } catch { return []; } })(),
+    costConfig: (() => { try { return JSON.parse(v.costConfig); } catch { return {}; } })(),
+  }));
+  res.json(parsed);
 }));
 
 router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
@@ -533,6 +580,12 @@ router.post('/:id/approve-cost', tenantMiddleware, requireRole(['GENERAL_MANAGER
     where: { tenantId, relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, title: { startsWith: 'Maliyet analizi onayı' }, status: 'PENDING' },
     data: { status: 'COMPLETED' },
   }).catch(() => {});
+
+  // En güncel maliyet analizi versiyonuna kararı yansıt (geçmiş listesinde doğru statü görünsün)
+  const latestVersion = await prisma.costAnalysisVersion.findFirst({ where: { tenantId, opportunityId }, orderBy: { version: 'desc' } });
+  if (latestVersion) {
+    await prisma.costAnalysisVersion.update({ where: { id: latestVersion.id }, data: { status: newStatus } }).catch(() => {});
+  }
 
   // Fırsat sahibi satış temsilcisine sonuç bildirimi
   const msg = decision === 'APPROVE'

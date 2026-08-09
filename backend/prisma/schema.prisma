@@ -60,6 +60,7 @@ model Tenant {
   productCategories     ProductCategory[]
   brandSources          BrandSource[]
   opportunityProgressLogs OpportunityProgressLog[]
+  costAnalysisVersions    CostAnalysisVersion[]
 }
 
 enum SubscriptionPlan {
@@ -227,6 +228,7 @@ model Opportunity {
   contracts         Contract[]
   proposals         Proposal[]
   progressLogs      OpportunityProgressLog[]
+  costAnalysisVersions CostAnalysisVersion[]
 }
 
 // Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
@@ -260,6 +262,32 @@ model Proposal {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
   tenant        Tenant      @relation(fields: [tenantId], references: [id])
+}
+
+// Maliyet analizi versiyon geçmişi — her POST /:id/cost-analysis kaydında BoM/gider/
+// costConfig anlık görüntüsü ayrı bir satıra yazılır (Opportunity.bomItems/costItems
+// canlı tabloları her kayıtta silinip yeniden oluşturulduğu için geçmiş orada tutulmaz).
+// Fırsat kartından "kaç kez maliyet analizi yapıldı" + geçmiş rakamlara dönüp bakma bu tablodan.
+model CostAnalysisVersion {
+  id            String      @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  version       Int         // fırsat içinde 1'den başlayan sıra
+  bomItems      String      // JSON — o anki priced BoM satırları
+  costItems     String      // JSON — o anki (usul+manuel) gider kalemleri
+  costConfig    String      // JSON — o anki CostConfig (usul, kur, marj, vb.)
+  grandCost     Float
+  offer         Float
+  marginPct     Float
+  belowFloor    Boolean     @default(false)
+  status        String      @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED — sonradan approve-cost ile güncellenir
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime    @default(now())
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, opportunityId, version])
 }
 
 // ── Marka & Ürün Grubu Taksonomisi (2026-08-08, Faz 1) ───────────────────────

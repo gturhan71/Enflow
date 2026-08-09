@@ -4,7 +4,7 @@
 // Frontend role'e göre widget seçer. Tenant-scoped; kişisel alanlar userId ile.
 
 import { prisma } from '../prismaClient';
-import { computeWorkflowBottlenecks } from './unitReportingService';
+import { computeWorkflowBottlenecks, computeVisitPerformance } from './unitReportingService';
 
 const DAY = 86400000;
 const daysLeft = (d: Date | null) => (d ? Math.ceil((d.getTime() - Date.now()) / DAY) : null);
@@ -17,7 +17,7 @@ export async function computeDashboard(tenantId: string, userId?: string) {
   const soon30 = new Date(now + 30 * DAY);
   const startOfToday = new Date(new Date().setHours(0, 0, 0, 0));
 
-  const [opps, tenders, guarantees, invoices, milestones, prs, projects, bottlenecks, myTasks, unread, contracts, legalCases, risks, agentRunsToday] = await Promise.all([
+  const [opps, tenders, guarantees, invoices, milestones, prs, projects, bottlenecks, myTasks, unread, contracts, legalCases, risks, agentRunsToday, visitPerformance] = await Promise.all([
     prisma.opportunity.findMany({ where: { tenantId }, select: { id: true, title: true, value: true, status: true, technicalStatus: true, assignedToId: true, updatedAt: true } }),
     prisma.tender.findMany({ where: { tenantId } }),
     prisma.guaranteeLetter.findMany({ where: { tenantId } }),
@@ -32,6 +32,12 @@ export async function computeDashboard(tenantId: string, userId?: string) {
     prisma.legalCase.findMany({ where: { tenantId, status: { in: LEGAL_OPEN_STATUSES }, dueDate: { not: null } }, select: { id: true, title: true, dueDate: true, priority: true } }).catch(() => []),
     prisma.riskOpportunity.findMany({ where: { tenantId, status: 'OPEN' }, orderBy: { score: 'desc' }, take: 5, select: { id: true, title: true, score: true, type: true } }).catch(() => []),
     prisma.agentRun.findMany({ where: { tenantId, createdAt: { gte: startOfToday } }, select: { status: true, actionTaken: true } }).catch(() => []),
+    computeVisitPerformance(tenantId).catch(() => ({
+      period: { start: startOfToday.toISOString(), end: startOfToday.toISOString() },
+      planned: 0, completed: 0, cancelled: 0, coveragePct: 0, targetRate: 80,
+      conversion: { windowDays: 60, lookbackDays: 180, maturedVisits: 0, convertedVisits: 0, conversionRatePct: 0 },
+      topPerformers: [],
+    })),
   ]);
 
   // KPI — WITHDRAWN nötr
@@ -136,6 +142,7 @@ export async function computeDashboard(tenantId: string, userId?: string) {
       projects: { active: activeProjects.length, avgMargin: Math.round(avgMargin * 10) / 10 },
       topRisks,
       agentActivityToday,
+      visitPerformance,
     },
     personal: { myOpportunities, myTasksPending: myTasks, unreadNotifications: unread },
   };

@@ -42,6 +42,7 @@ const CRMModule = ({
   tasks = [],
   setTasks,
   setActiveTab,
+  onNavigate,
   initialItemId,
 }: {
   opportunities: Opportunity[],
@@ -54,6 +55,7 @@ const CRMModule = ({
   tasks?: TodoTask[],
   setTasks?: Dispatch<SetStateAction<TodoTask[]>>,
   setActiveTab?: (tab: string) => void,
+  onNavigate?: (tab: string, itemId?: string | null) => void,
   initialItemId?: string | null,
 }) => {
   const { currentUser } = useAuth();
@@ -67,6 +69,10 @@ const CRMModule = ({
   const [showNewOpportunityModal, setShowNewOpportunityModal] = useState(false);
   const [selectedOpp, setSelectedOpp] = useState<Opportunity | null>(null);
   const [showProposalEditor, setShowProposalEditor] = useState(false);
+  // Fırsat kartından/Teklifler sekmesinden geçmiş bir teklife tıklanınca o teklifin
+  // içeriği editöre yüklensin diye — kaydedince yine de (mevcut versiyonlama mantığıyla
+  // tutarlı) yeni bir versiyon olarak kaydedilir, seçilen kayıt üzerine yazılmaz.
+  const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
   const [showOpportunitySelector, setShowOpportunitySelector] = useState(false);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
@@ -151,6 +157,7 @@ const CRMModule = ({
 
       setShowProposalEditor(false);
       setSelectedOpp(null);
+      setEditingProposalId(null);
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Teklif kaydedilemedi.');
     } finally {
@@ -406,12 +413,20 @@ const CRMModule = ({
 
   const handleEditProposal = (proposal: Proposal) => {
     const o = opportunities.find(o => o.id === proposal.opportunityId);
-    if (o) { setSelectedOpp(o); setShowProposalEditor(true); }
+    if (o) { setSelectedOpp(o); setEditingProposalId(proposal.id); setShowProposalEditor(true); }
   };
 
   const handleCreateProposalForOpp = (opp: Opportunity) => {
     setSelectedOpp(opp);
+    setEditingProposalId(null);
     setShowProposalEditor(true);
+  };
+
+  // Fırsat kartı geçmiş panelinden "Güncel Analize Git" — maliyet analizi ekranına
+  // (crm-cost) o fırsat seçili olarak deep-link.
+  const handleGoToCostAnalysis = (opp: Opportunity) => {
+    if (onNavigate) onNavigate('crm-cost', opp.id);
+    else if (setActiveTab) setActiveTab('crm-cost');
   };
 
   const [isEditingOpp, setIsEditingOpp] = useState(false);
@@ -480,15 +495,18 @@ const CRMModule = ({
     const latestProposal = oppProposals.length > 0
       ? [...oppProposals].sort((a, b) => (b.version || 0) - (a.version || 0))[0]
       : null;
+    // Fırsat kartından/Teklifler sekmesinden geçmiş bir versiyona "Düzenle" ile gelindiyse
+    // içerik o versiyondan yüklenir; aksi halde (yeni teklif / genel "Düzenle") en güncel versiyon baz alınır.
+    const sourceProposal = (editingProposalId && oppProposals.find(p => p.id === editingProposalId)) || latestProposal;
 
     const nextVersion = latestProposal ? (latestProposal.version || 1) + 1 : 1;
     let initialData = undefined;
 
-    if (latestProposal && latestProposal.content) {
+    if (sourceProposal && sourceProposal.content) {
       try {
-        const content = typeof latestProposal.content === 'string'
-          ? JSON.parse(latestProposal.content)
-          : latestProposal.content;
+        const content = typeof sourceProposal.content === 'string'
+          ? JSON.parse(sourceProposal.content)
+          : sourceProposal.content;
 
         initialData = {
           items: content.items,
@@ -517,6 +535,7 @@ const CRMModule = ({
         onCancel={() => {
           setShowProposalEditor(false);
           setSelectedOpp(null);
+          setEditingProposalId(null);
         }}
       />
     );
@@ -545,6 +564,8 @@ const CRMModule = ({
           onHandOff={(opp) => { setHandOffTarget(opp); setShowHandOffModal(true); }}
           onEdit={openEditOpportunity}
           onCheckIn={(opp) => setCheckInTarget(opp)}
+          onEditProposal={handleEditProposal}
+          onGoToCostAnalysis={handleGoToCostAnalysis}
         />
       ) : activeTab === 'crm-customers' ? (
         <CustomersView

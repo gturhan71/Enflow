@@ -230,6 +230,17 @@ const RoleCockpit: React.FC<{ d: DashboardPayload; role?: string; widgets: WK[];
         <WCard key={w} widgetKey={w} onExpand={handleExpand} title="Sanal Agent Aktivitesi" count={d.management.agentActivityToday.total} tone="bg-sky-100 text-sky-700" onClick={() => go('virtual-agents-test')}>
           <p className="text-xs text-slate-500">{d.management.agentActivityToday.actionsTaken} otonom eylem · {d.management.agentActivityToday.pendingRatification} onay bekliyor</p>
         </WCard>);
+      case 'visitPerformance': { const vp = d.management.visitPerformance; return (
+        <WCard key={w} widgetKey={w} onExpand={handleExpand} title="Ziyaret Performansı" count={`%${vp.coveragePct}`} tone={vp.coveragePct >= vp.targetRate ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'} onClick={() => go('visit-plan')}>
+          <div className="grid grid-cols-2 gap-2 text-center text-xs">
+            <div><p className="font-black text-slate-900">{vp.planned}</p><p className="text-[10px] text-slate-400">Planlanan (bu ay)</p></div>
+            <div><p className="font-black text-emerald-600">{vp.completed}</p><p className="text-[10px] text-slate-400">Gerçekleşen (bu ay)</p></div>
+          </div>
+          <div className="mt-2 pt-2 border-t border-slate-100 flex justify-between items-center text-xs">
+            <span className="text-slate-400">Fırsata dönüşen (son 6 ay)</span>
+            <span className="font-black text-indigo-600">{vp.conversion.convertedVisits}/{vp.conversion.maturedVisits} · %{vp.conversion.conversionRatePct}</span>
+          </div>
+        </WCard>); }
       case 'myOpportunities': return (
         <WCard key={w} widgetKey={w} onExpand={handleExpand} title="Fırsatlarım" count={d.personal.myOpportunities.length} tone="bg-indigo-100 text-indigo-700" onClick={() => go('crm-opportunities')}>
           {d.personal.myOpportunities.length === 0 ? empty('Atanmış aktif fırsat yok.') :

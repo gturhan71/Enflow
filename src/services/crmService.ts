@@ -111,6 +111,11 @@ export const crmService = {
     });
   },
 
+  // Fırsat kartı — "kaç kez maliyet analizi yapıldı" kronolojik geçmişi.
+  async getCostAnalysisVersions(opportunityId: string) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/cost-analysis-versions`);
+  },
+
   async getSalesSettings() {
     return apiClient.fetchWithAuth('/sales-settings');
   },

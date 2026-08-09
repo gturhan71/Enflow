@@ -80,6 +80,31 @@ const DETAIL_BODY: Partial<Record<WK, (d: DashboardPayload) => React.ReactNode>>
       <Row key={r.id} left={r.title} sub={r.type === 'RISK' ? 'Risk' : 'Fırsat'} right={`Skor ${r.score}`} />
     )} />
   ),
+  visitPerformance: (d) => {
+    const vp = d.management.visitPerformance;
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-center">
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest">Bu Ay</p>
+            <p className="text-sm font-black text-slate-800">{vp.completed}/{vp.planned} ziyaret</p>
+            <p className="text-[10px] text-slate-400">Kapsam %{vp.coveragePct} · Hedef %{vp.targetRate}</p>
+          </div>
+          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-center">
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest">Son {Math.round(vp.conversion.lookbackDays / 30)} Ay — Dönüşüm</p>
+            <p className="text-sm font-black text-indigo-600">{vp.conversion.convertedVisits}/{vp.conversion.maturedVisits} ziyaret</p>
+            <p className="text-[10px] text-slate-400">%{vp.conversion.conversionRatePct} fırsata dönüştü ({vp.conversion.windowDays} gün pencere)</p>
+          </div>
+        </div>
+        <div>
+          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Temsilci Bazında (son {Math.round(vp.conversion.lookbackDays / 30)} ay)</p>
+          <Rows empty="Bu dönemde tamamlanmış ziyaret yok." items={vp.topPerformers} row={(p) => (
+            <Row key={p.userId} left={p.name} sub={`${p.converted} dönüşüm`} right={`${p.completed} ziyaret`} />
+          )} />
+        </div>
+      </div>
+    );
+  },
 };
 
 function Rows<T>({ items, empty, row }: { items: T[]; empty: string; row: (item: T) => React.ReactNode }) {

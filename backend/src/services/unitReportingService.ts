@@ -23,6 +23,31 @@ export function getUnitDefinition(unitKey: string): UnitDefinition | undefined {
   return UNIT_DEFINITIONS.find(u => u.key === unitKey);
 }
 
+// Birim yöneticisi (def.role) + o yöneticinin biriminde çalışan tüm kullanıcılar.
+// Yönetici tanımlı değilse veya henüz bir birime atanmamışsa yalnız yöneticinin
+// kendisi (varsa) döner. computeConsolidation ve computeVisitPerformance ortak kullanır.
+export async function resolveUnitStaff(tenantId: string, unitKey: string) {
+  const def = getUnitDefinition(unitKey);
+  if (!def) return { manager: null, unitId: null as string | null, users: [], userIds: [] as string[] };
+  const manager = await prisma.user.findFirst({ where: { tenantId, role: def.role } });
+  const unitId = manager?.unitId ?? null;
+  const staff = unitId
+    ? await prisma.user.findMany({ where: { tenantId, unitId } })
+    : (manager ? [manager] : []);
+  const userMap = new Map<string, (typeof staff)[number]>();
+  for (const u of staff) userMap.set(u.id, u);
+  if (manager) userMap.set(manager.id, manager);
+  const users = [...userMap.values()];
+  return { manager, unitId, users, userIds: users.map((u) => u.id) };
+}
+
+// tenant.moduleSettings.visitKpi.targetRate — birim geneli ziyaret-eşleşme hedefi (%), yoksa 80.
+export function getVisitTargetRate(tenant: { moduleSettings?: string | null } | null): number {
+  let targetRate = 80;
+  try { const ms = JSON.parse(tenant?.moduleSettings || '{}'); if (ms?.visitKpi?.targetRate) targetRate = Number(ms.visitKpi.targetRate); } catch { /* default */ }
+  return targetRate;
+}
+
 // ── Dönem yardımcıları ───────────────────────────────────────────────────────
 export interface Period {
   start: Date;
@@ -567,16 +592,8 @@ export async function computeConsolidation(
   if (!def) return null;
   const { start, end } = resolvePeriod(startStr, endStr);
 
-  const manager = await prisma.user.findFirst({ where: { tenantId, role: def.role } });
-  const unitId = manager?.unitId ?? null;
-  const staff = unitId
-    ? await prisma.user.findMany({ where: { tenantId, unitId } })
-    : (manager ? [manager] : []);
-  const userMap = new Map<string, typeof staff[number]>();
-  for (const u of staff) userMap.set(u.id, u);
-  if (manager) userMap.set(manager.id, manager);
-  const users = [...userMap.values()];
-  const userIds = users.map((u) => u.id);
+  const { manager, unitId, users, userIds } = await resolveUnitStaff(tenantId, unitKey);
+  const userMap = new Map(users.map((u) => [u.id, u]));
 
   const reports = userIds.length
     ? await prisma.dailyReport.findMany({ where: { tenantId, userId: { in: userIds }, date: { gte: start, lte: end } } })
@@ -600,8 +617,7 @@ export async function computeConsolidation(
   const plans = await prisma.visitPlan.findMany({ where: { tenantId, weekOf: { gte: start, lte: end } }, include: { visits: true } });
   // Birim geneli ziyaret-eşleşme hedefi (moduleSettings.visitKpi.targetRate)
   const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
-  let targetRate = 80;
-  try { const ms = JSON.parse(tenant?.moduleSettings || '{}'); if (ms?.visitKpi?.targetRate) targetRate = Number(ms.visitKpi.targetRate); } catch { /* default */ }
+  const targetRate = getVisitTargetRate(tenant);
 
   // Personelin rapor girdiği günler (YYYY-MM-DD) — eşleşme için
   const dayKey = (d: Date) => d.toISOString().slice(0, 10);
@@ -676,6 +692,122 @@ export async function computeConsolidation(
     period: { start: start.toISOString(), end: end.toISOString() },
     totalReports: reports.length, knownToSystem: known, newContacts: neu,
     people, matrix, reportEntries, visits, targetRate, visitReconciliation,
+  };
+}
+
+// ── Ziyaret Performansı (Dashboard widget) ───────────────────────────────────
+// computeConsolidation'ın hafif bir alt kümesi: DailyReport eşleştirme matrisini
+// hesaplamaz, yalnız VisitPlan/Visit + Opportunity sorgular — Dashboard'un sık
+// tazelemesine (45sn polling + SSE) uygun. Ziyaret↔Fırsat arasında FK olmadığından
+// "dönüşüm" heuristiktir: tamamlanmış bir ziyaretin müşterisine, ziyaretten sonraki
+// VISIT_CONVERSION_WINDOW_DAYS içinde yeni bir Opportunity açıldıysa dönüşüm sayılır.
+export interface VisitPerformanceSummary {
+  period: { start: string; end: string };
+  planned: number;
+  completed: number;
+  cancelled: number;
+  coveragePct: number;
+  targetRate: number;
+  conversion: {
+    windowDays: number;
+    lookbackDays: number;
+    maturedVisits: number;
+    convertedVisits: number;
+    conversionRatePct: number;
+  };
+  topPerformers: { userId: string; name: string; completed: number; converted: number }[];
+}
+
+const VISIT_CONVERSION_WINDOW_DAYS = 60;   // ziyaretten sonra fırsat bu süre içinde açılırsa "dönüşüm" sayılır
+const VISIT_CONVERSION_LOOKBACK_DAYS = 180; // dönüşüm oranı bu kadar geriye giden VE penceresi dolmuş (olgun)
+                                             // ziyaretler üzerinden hesaplanır — bu ayki taze tamamlanan ziyaretler
+                                             // henüz 60 günü doldurmadığından oranı yapay düşürmesin diye ayrı tutulur
+const DAY_MS = 86400000;
+
+export async function computeVisitPerformance(tenantId: string, startStr?: string, endStr?: string): Promise<VisitPerformanceSummary> {
+  const { start, end } = resolvePeriod(startStr, endStr); // yalnız planlanan/gerçekleşen/coveragePct için ("bu ay" varsayılan)
+  const { users, userIds } = await resolveUnitStaff(tenantId, 'CRM');
+
+  const tenant = await prisma.tenant.findUnique({ where: { id: tenantId } });
+  const targetRate = getVisitTargetRate(tenant);
+
+  // Dönem içi planlanan/gerçekleşen — computeConsolidation'daki visitReconciliation ile aynı mantık.
+  const periodPlans = userIds.length
+    ? await prisma.visitPlan.findMany({ where: { tenantId, preparedById: { in: userIds }, weekOf: { gte: start, lte: end } }, include: { visits: true } })
+    : [];
+  const periodVisits = periodPlans.flatMap((p) => p.visits);
+  const planned = periodVisits.length;
+  const completed = periodVisits.filter((v) => v.status === 'COMPLETED').length;
+  const cancelled = periodVisits.filter((v) => v.status === 'CANCELLED').length;
+  const coveragePct = planned ? Math.round((completed / planned) * 100) : 0;
+
+  // Dönüşüm kohortu — geniş, ayrı bir pencere (DB tarafında weekOf ile kaba filtre, JS'de tarih hassas filtre).
+  const now = Date.now();
+  const lookbackStart = new Date(now - VISIT_CONVERSION_LOOKBACK_DAYS * DAY_MS);
+  const maturedCutoff = new Date(now - VISIT_CONVERSION_WINDOW_DAYS * DAY_MS);
+  const cohortPlans = userIds.length
+    ? await prisma.visitPlan.findMany({ where: { tenantId, preparedById: { in: userIds }, weekOf: { gte: lookbackStart } }, include: { visits: true } })
+    : [];
+  const maturedVisits = cohortPlans
+    .flatMap((p) => p.visits.map((v) => ({ ...v, preparedById: p.preparedById })))
+    .filter((v) => v.status === 'COMPLETED' && v.customerId)
+    .map((v) => ({ ...v, effectiveDate: v.actualDate ?? v.plannedDate }))
+    .filter((v) => v.effectiveDate >= lookbackStart && v.effectiveDate <= maturedCutoff);
+
+  const customerIds = [...new Set(maturedVisits.map((v) => v.customerId as string))];
+  const opps = customerIds.length
+    ? await prisma.opportunity.findMany({ where: { tenantId, customerId: { in: customerIds } }, select: { customerId: true, createdAt: true } })
+    : [];
+  const oppDatesByCustomer = new Map<string, Date[]>();
+  for (const o of opps) {
+    const arr = oppDatesByCustomer.get(o.customerId) ?? [];
+    arr.push(o.createdAt);
+    oppDatesByCustomer.set(o.customerId, arr);
+  }
+
+  // Aynı müşteri için birden fazla olgun ziyaret varsa yalnız EN ERKEN eşleşene atıf yapılır —
+  // bir müşteri, dönem içinde en fazla bir kez "dönüşüm" olarak sayılır.
+  const byCustomer = new Map<string, typeof maturedVisits>();
+  for (const v of maturedVisits) {
+    const arr = byCustomer.get(v.customerId as string) ?? [];
+    arr.push(v);
+    byCustomer.set(v.customerId as string, arr);
+  }
+  const windowMs = VISIT_CONVERSION_WINDOW_DAYS * DAY_MS;
+  const convertedVisitIds = new Set<string>();
+  for (const [customerId, visits] of byCustomer) {
+    const sorted = [...visits].sort((a, b) => a.effectiveDate.getTime() - b.effectiveDate.getTime());
+    const oppDates = oppDatesByCustomer.get(customerId) ?? [];
+    for (const v of sorted) {
+      const matched = oppDates.some((d) => d.getTime() >= v.effectiveDate.getTime() && d.getTime() <= v.effectiveDate.getTime() + windowMs);
+      if (matched) { convertedVisitIds.add(v.id); break; }
+    }
+  }
+
+  const perUser = new Map(users.map((u) => [u.id, { completed: 0, converted: 0 }]));
+  for (const v of maturedVisits) {
+    const p = perUser.get(v.preparedById);
+    if (!p) continue;
+    p.completed++;
+    if (convertedVisitIds.has(v.id)) p.converted++;
+  }
+  const topPerformers = users
+    .map((u) => ({ userId: u.id, name: u.name ?? u.email, ...(perUser.get(u.id) ?? { completed: 0, converted: 0 }) }))
+    .filter((p) => p.completed > 0)
+    .sort((a, b) => b.completed - a.completed)
+    .slice(0, 8);
+
+  return {
+    period: { start: start.toISOString(), end: end.toISOString() },
+    planned, completed, cancelled, coveragePct, targetRate,
+    conversion: {
+      windowDays: VISIT_CONVERSION_WINDOW_DAYS,
+      lookbackDays: VISIT_CONVERSION_LOOKBACK_DAYS,
+      maturedVisits: maturedVisits.length,
+      convertedVisits: convertedVisitIds.size,
+      conversionRatePct: maturedVisits.length ? Math.round((convertedVisitIds.size / maturedVisits.length) * 100) : 0,
+    },
+    topPerformers,
   };
 }
 

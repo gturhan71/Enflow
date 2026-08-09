@@ -5,7 +5,8 @@ import { cn } from '../../lib/utils';
 import { Opportunity, Customer, Proposal } from '../../types';
 import { SaveButton } from '../../components/SaveButton';
 import { PermissionGate } from '../../components/PermissionGate';
-import { PIPELINE_STAGES, STATUS_LABEL, getStatusStyle } from './constants';
+import { PIPELINE_STAGES, STATUS_LABEL, getStatusStyle, PROPOSAL_STATUS_LABEL, proposalStatusTone } from './constants';
+import OpportunityHistoryPanel from './OpportunityHistoryPanel';
 import { printReportWindow, esc } from '../reporting/helpers';
 import { dleftBadge } from '../dashboard/helpers';
 
@@ -23,7 +24,7 @@ const fmtShortDate = (iso?: string) => iso ? new Date(iso).toLocaleDateString('t
 
 export default function OpportunitiesView({
   filteredOpportunities, customers, proposals, loading, onSaveAll, onNewOpportunity,
-  onProgressStatus, onMarkLost, onHandOff, onEdit, onCheckIn,
+  onProgressStatus, onMarkLost, onHandOff, onEdit, onCheckIn, onEditProposal, onGoToCostAnalysis,
 }: {
   filteredOpportunities: Opportunity[];
   customers: Customer[];
@@ -36,6 +37,8 @@ export default function OpportunitiesView({
   onHandOff: (opp: Opportunity) => void;
   onEdit: (opp: Opportunity) => void;
   onCheckIn: (opp: Opportunity) => void;
+  onEditProposal: (proposal: Proposal) => void;
+  onGoToCostAnalysis: (opp: Opportunity) => void;
 }) {
   // Açılış (createdAt — otomatik/mühürlenmiş) ve muhtemel kapanış (expectedCloseDate —
   // bilgi amaçlı) tarihlerine göre arama/listeleme + 30/60/90 günlük periyot raporu.
@@ -288,11 +291,18 @@ export default function OpportunitiesView({
                     <div className="text-[10px] text-slate-500 flex items-center gap-1.5 font-bold">
                       <FileSignature size={11} />
                       Teklif v{latestProposal.version} ·{' '}
-                      <span className={cn("font-black", latestProposal.status === 'APPROVED' ? 'text-emerald-600' : latestProposal.status === 'REJECTED' ? 'text-red-500' : 'text-slate-500')}>
-                        {latestProposal.status === 'DRAFT' ? 'Taslak' : latestProposal.status === 'PENDING_APPROVAL' ? 'Onay Bekliyor' : latestProposal.status === 'APPROVED' ? 'Onaylandı' : latestProposal.status === 'SENT' ? 'Gönderildi' : latestProposal.status === 'ACCEPTED' ? 'Kabul Edildi' : latestProposal.status === 'REJECTED' ? 'Reddedildi' : latestProposal.status}
+                      <span className={cn("font-black", proposalStatusTone(latestProposal.status))}>
+                        {PROPOSAL_STATUS_LABEL[latestProposal.status] || latestProposal.status}
                       </span>
                     </div>
                   )}
+
+                  <OpportunityHistoryPanel
+                    opportunity={opp}
+                    proposals={oppProposals}
+                    onEditProposal={onEditProposal}
+                    onGoToCostAnalysis={onGoToCostAnalysis}
+                  />
 
                   {(opp.agentTriage?.igpd || opp.agentTriage?.crm) && (
                     <div className="flex flex-col gap-1">

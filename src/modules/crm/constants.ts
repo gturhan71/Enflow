@@ -8,6 +8,16 @@ export const STATUS_LABEL: Record<string, string> = {
   WON: 'Kazanıldı', LOST: 'Kaybedildi',
 };
 
+// Teklif (Proposal) durum etiketi — fırsat kartı + geçmiş panelinde ortak kullanılır.
+export const PROPOSAL_STATUS_LABEL: Record<string, string> = {
+  DRAFT: 'Taslak', PENDING_APPROVAL: 'Onay Bekliyor', APPROVED: 'Onaylandı',
+  SENT: 'Gönderildi', ACCEPTED: 'Kabul Edildi', REJECTED: 'Reddedildi',
+};
+export const proposalStatusTone = (status: string) =>
+  status === 'APPROVED' || status === 'ACCEPTED' ? 'text-emerald-600'
+    : status === 'REJECTED' ? 'text-red-500'
+    : 'text-slate-500';
+
 export const getStatusStyle = (status: string) => {
   const styles: Record<string, string> = {
     'NEW': 'bg-blue-50 text-blue-600 border-blue-100',

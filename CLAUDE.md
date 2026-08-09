@@ -10,7 +10,7 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 ## Versiyonlama Kuralı
 
-**Güncel sürüm: Enflow v2.2.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
+**Güncel sürüm: Enflow v2.3.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
 
 Format `vMAJOR.MINOR.PATCH`:
 - **Feature eklemesi** → PATCH artar (`v2.1.0` → `v2.1.1` → `v2.1.2` → ...). Bir değişikliği PATCH'e yansıtmadan **önce**, eklenenin gerçekten bir feature olduğu (bugfix/refactor/dokümantasyon/chore/bakım değil) kullanıcıya sorularak doğrulanır — onay verilmeden versiyon numarası **değiştirilmez**.
@@ -19,7 +19,7 @@ Format `vMAJOR.MINOR.PATCH`:
 
 ## Sistem Durumu & Uçtan Uca Akış (Güncel — 2026-06-20)
 
-**Ölçek:** 51 Prisma modeli · 29 API alanı (`/api/*`) · 29 ekran modülü · 11 servis · 8 sanal agent · 7 katman.
+**Ölçek:** 74 Prisma modeli · 29 API alanı (`/api/*`) · 29 ekran modülü · 11 servis · 8 sanal agent · 7 katman.
 **Durum:** Faz 0–9 + bağımlılık/mobil/refactor tamamlandı. Tüm birimler-arası geçişler **otomatik** (zincir kapalı). RBAC süiti **69/69**.
 
 **Uçtan uca otomatik akış:**
@@ -86,7 +86,7 @@ cd backend && pnpm dev
 **Upload:** `multer` memoryStorage → lokal `backend/uploads/contracts/{folder}/` + opsiyonel Nextcloud WebDAV  
 **Static dosyalar:** `GET /uploads/...` → `backend/uploads/` dizini
 
-## Veritabanı Modelleri (Prisma) — 51 model, katmanlı
+## Veritabanı Modelleri (Prisma) — 74 model, katmanlı
 
 Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prisma/schema.prisma`.)
 
@@ -94,7 +94,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 **Kimlik/RBAC:** `User` (rol + izin JSON) · `Unit`
 **Akış motoru:** `Workflow` / `WorkflowStep` (default şablon + skip-logic) · `WorkflowLog` · `TodoTask` (birim görevi, relatedModule + relatedItemId, SLA) · `ApprovalChain` / `ApprovalStage` (Finans→İGPD→GM→KSU) · `Notification` · `ActivityLog` (provenance: actorType, agentRunId)
 **Domain — CRM/Satış:** `Customer` · `Opportunity` (costConfig, lostReason, updatedBy) · `Proposal` (versiyonlu)
-**Domain — Presales:** `BoMItem` · `CostItem`
+**Domain — Presales:** `BoMItem` · `CostItem` · `CostAnalysisVersion` (maliyet analizi versiyon geçmişi/snapshot — Faz 10)
 **Domain — Sözleşme:** `Contract` (eski) · `ContractWorkflow` (projectId — Faz 9 T4) · `ContractWorkflowDoc`
 **Domain — Proje:** `Project` · `ProjectMilestone` · `ProjectCostItem` (purchaseRequestId — Faz 9 T5) · `ProjectHandoverDoc` (11 zorunlu evrak)
 **Domain — Satınalma:** `Vendor` · `PurchaseRequest` (9 statü) · `PurchaseItem` · `PurchaseQuote` · `DeliveryRecord`
@@ -317,6 +317,8 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 9 (agent otonomi) | Generic `autonomousAction` altyapısı — otonom mod artık önerdiğini **uygular** (recommend→act); ilk eylem Procurement en-ucuz-teklif-seç | faz9_autonomous_action |
 | 9 (agent otonomi 2) | CRM + İGPD **deterministik triyaj** otonom (annotation): `Opportunity.agentTriage` JSON'a yazar (kritik alanlara dokunmaz); Tender/Project/Presales **tasarım gereği danışman** | faz9_agent_triage |
 | Bakım | as-any temizliği (no-any) · Vite 8/Rolldown + TS 6 + @types/react · mobil drawer/safe-area · stray express kaldırma | — |
+| 10 | Maliyet analizi versiyon geçmişi (`CostAnalysisVersion` — her `/cost-analysis` kaydında BoM/gider/costConfig snapshot'ı) + fırsat kartında kronolojik Teklif/Maliyet Analizi geçmiş paneli (`OpportunityHistoryPanel`) — geçmiş tekliften "Düzenle" ile yeni versiyon oluşturma, güncel maliyet analizine deep-link | add_cost_analysis_version |
+| 11 | Yönetim Dashboard'una **Ziyaret Performansı** widget'ı (`computeVisitPerformance`, `unitReportingService.ts`) — bu ayki planlanan/gerçekleşen ziyaret oranı + son 6 ay, penceresi (60 gün) dolmuş "olgun" ziyaretlerden heuristik ziyaret→fırsat dönüşüm oranı (aynı müşteri bir kez sayılır, en erken ziyarete atıf). GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi (`widgetCatalog.ts` `visitPerformance`), migration yok | — |
 
 Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -325,6 +327,8 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 **Kalan / gelecek iyileştirmeler (zemin):**
 
+- [x] **Yönetim Dashboard'u — Ziyaret Performansı widget'ı** (2026-08-09, Faz 11) — Satış ekibinin ziyaret planı/gerçekleşme performansı önceden yalnız Ziyaret Planı sekmesinde/rapor konsolidasyonunda görünüyordu; artık KURUMSAL KOKPİT'e taşındı. `computeVisitPerformance` (`unitReportingService.ts`) `computeConsolidation`'ın hafif bir alt kümesi (DailyReport matrisi hesaplamıyor, 45sn'lik Dashboard polling'ine uygun): bu ayki planlanan/gerçekleşen/coveragePct + son 180 günden, penceresi (60 gün) dolmuş "olgun" tamamlanmış ziyaretler üzerinden ziyaret→fırsat dönüşüm oranı (Visit↔Opportunity arasında FK yok, heuristik: ziyaretten sonraki 60 gün içinde aynı müşteriye açılan Opportunity "dönüşüm" sayılır; bir müşteri dönem içinde en fazla bir kez sayılır, en erken eşleşen ziyarete atıf yapılır — çifte sayım engellenir). `resolveUnitStaff`/`getVisitTargetRate` yardımcıları `computeConsolidation`'dan çıkarılıp paylaşıldı (davranış değişmedi). `GET /api/reports/dashboard` → `management.visitPerformance`; `widgetCatalog.ts` `visitPerformance` GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi, "Detay" temsilci bazlı dökümü gösterir. Yeni Prisma modeli/migration yok.
+- [x] **Fırsat kartı — Teklif & Maliyet Analizi geçmişi** (2026-08-09, Faz 10, migration `add_cost_analysis_version`) — Daha önce maliyet analizi hiç versiyonlanmıyordu (her `POST /:id/cost-analysis` BoM/CostItem/costConfig'i silip yeniden yazıyordu, geçmiş kayboluyordu). Yeni `CostAnalysisVersion` modeli her kayıtta bir anlık görüntü (BoM+gider+costConfig+marj+teklif) tutar; `GET /:id/cost-analysis-versions` ile listelenir. Fırsat kartına (`OpportunitiesView.tsx`) eklenen `OpportunityHistoryPanel.tsx` genişletilebilir bölüm: **Teklifler** (zaten versiyonlu `Proposal` kayıtlarından, kronolojik + "Düzenle" — seçilen versiyonun içeriği editöre yüklenir, kaydedince mevcut mantıkla tutarlı şekilde yeni versiyon oluşturur) ve **Maliyet Analizleri** (yeni tablo, kronolojik, salt-okunur özet + "Güncel Analize Git" ile `crm-cost` sekmesine deep-link). `CRMModule` yeni `onNavigate` prop'u (App.tsx `navigate` fonksiyonu) ile itemId'li geçiş sağlar; `editingProposalId` state'i belirli bir teklif versiyonunu editöre yükler.
 - [x] **Enflow-Wiki — CANLI** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. `wiki/build.mjs` (bağımlılıksız üretici) `walkthrough.md §27`'den `wiki/index.html` üretir; GitHub Pages'e otomatik deploy edilir (`.github/workflows/wiki-pages.yml`) ve backend `GET /wiki` ile de sunulur (açılışta best-effort yeniden üretim). Akış değişince önce §27 güncellenir, sonra `node wiki/build.mjs` çalıştırılır.
 - [x] **Uygulama-içi Yardım modülü** (2026-08-03) — `HelpModule.tsx`, `Header`'daki (önceden ölü) Yardım ikonuyla açılır; içerik `src/content/helpArticles.ts`'te NAV_ITEMS'teki her modül için son-kullanıcı diliyle yazılmış "ne işe yarar / nasıl kullanılır" makaleleri. Rol-duyarlı (kullanıcı yalnız kendi sidebar'ında gördüğü modüllerin makalelerini görür), bağlamsal açılır (o an bulunulan sekmenin makalesiyle açılır). Backend değişikliği yok. Wiki'ye link verir — iki katman birbirini tekrar etmez: Wiki = "Enflow nedir / uçtan uca akış" (dışa dönük genel tanıtım), Yardım = "bu ekranı nasıl kullanırım" (içe dönük, oturum-içi).
 - [x] **ActivityLog kapsamı — TAM** (2026-06-20) — merkezi `logActivity` helper (`backend/src/services/activityLog.ts`, non-throwing, actorType HUMAN|AGENT) + `GET /api/activity-logs?entityType=&entityId=&action=&limit=` (`activityLogs.ts`); **19 router**a denetim-izi (CREATE/UPDATE/DELETE + statü geçişleri): tüm süreç zinciri + admin (users/units) + approvalChains + corporateGovernance/visits/workflows. **Denetim İzi UI** (`ActivityLogModule.tsx`, GM-only Test Ortamı, `activity-log` sekmesi) — filtreli liste, agent köken etiketi (`agentProvenance`).
@@ -358,9 +362,10 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
+src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
+src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
@@ -373,20 +378,29 @@ src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, co
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
+src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/workflowService
 src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
+src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, lib/utils, lib/format, contexts/AuthContext
+src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
+src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
+src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
+src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
+src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, ../components/HealthCards, ../types, BusinessHealthCard, DmoAnalyticsCard
 src/modules/reporting/ArchiveCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/BomVarianceCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
+src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/BusinessHealthCard.tsx ← ../types, ../components/HealthCards, ../components/InfoTooltip
 src/modules/reporting/ChartBlock.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/ConcentrationCard.tsx ← ../types, helpers, ../components/InfoTooltip
@@ -398,20 +412,27 @@ src/modules/reporting/helpers.ts ← ../constants, ../types
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
+src/modules/ServiceTicketsModule.tsx ← services/apiService, types
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
+src/modules/todo/helpers.ts ← ../types
+src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
+backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
+backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
+backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
-src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
 src/modules/contract-workflow/SigningTab.tsx ← types
@@ -425,10 +446,8 @@ src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/Heal
 src/modules/crm/helpers.ts ← ../types
 src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
 src/modules/crm/NewCustomerModal.tsx ← ../types
-src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
+src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
-src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
@@ -436,15 +455,11 @@ src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/negotiation/ModeTabBar.tsx ← ../lib/utils
 src/modules/negotiation/ProposalSelectorHeader.tsx ← ../types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
-src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/constants.tsx ← ../types
-src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/PRForm.tsx ← ../types, constants
 src/modules/procurement/RequestsTab.tsx ← ../types, ../lib/format, constants, StatusBadge
 src/modules/procurement/StatusBadge.tsx ← ../types, constants
 src/modules/procurement/SummaryTab.tsx ← ../types, constants
-src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
-src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/project-mgmt/constants.tsx ← ../types
 src/modules/project-mgmt/CostForm.tsx ← ../types, constants
@@ -458,8 +473,6 @@ src/modules/project-mgmt/ProjectListView.tsx ← ../types, ../lib/format, consta
 src/modules/project-mgmt/RiskPanel.tsx ← ../types, helpers
 src/modules/project-mgmt/StatusBadge.tsx ← ../types, constants
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
-src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, ../components/HealthCards, ../types, BusinessHealthCard, DmoAnalyticsCard
-src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/IncomingReportCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/IncomingReportsTab.tsx ← ../types, IncomingReportCard
@@ -468,22 +481,12 @@ src/modules/reporting/MyReportsTab.tsx ← ../types, helpers
 src/modules/reporting/ReportForm.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, types
-src/modules/ServiceTicketsModule.tsx ← services/apiService, types
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/modules/todo/helpers.ts ← ../types
 src/modules/todo/NewTaskModal.tsx ← ../types, helpers
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
-src/modules/todo/PendingDeliveryNotifications.tsx ← ../types
 src/modules/todo/ProposalPreviewModal.tsx ← ../types, helpers
-src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
-src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
-src/types/crm.ts ← auth, presales
-backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
-backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
-backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -519,7 +522,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 4 hours ago)
+## changes (last 10 commits — 15 hours ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
@@ -534,14 +537,18 @@ src/modules/contract-workflow/WorkflowListPanel.tsx +WorkflowCard
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/DashboardView.tsx             ~DashboardView
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
+src/modules/crm/ProgressCheckInModal.tsx      +ProgressCheckInModal
 src/modules/dashboard/criticalAlerts.ts       +buildCriticalAlerts
-src/modules/dashboard/widgetCatalog.ts        +revizyonu  +resolveEffectiveWidgets  +buildEditableLayout
+src/modules/dashboard/widgetCatalog.ts        +revizyonu  +resolveRoleDefault  +resolveEffectiveWidgets  +buildEditableLayout
 src/modules/dashboard/WidgetDetailDrawer.tsx  +Rows  +Row
+src/modules/DmoModule.tsx                     ~CatalogTab  ~CatalogForm
 src/modules/ManagementReportingModule.tsx     +ManagementReportingModule  ~ManagementReportingModule
+src/modules/reporting/AnalyticsTab.tsx        ~AnalyticsTab
 src/modules/reporting/ArchiveCard.tsx         ~ArchiveCard
 src/modules/reporting/BidScorecardCard.tsx    ~BidScorecardCard
 src/modules/reporting/BomVarianceCard.tsx     ~BomVarianceCard
 src/modules/reporting/BottleneckPanel.tsx     ~BottleneckPanel
+src/modules/reporting/BrandCategoryCard.tsx   +BrandCategoryCard
 src/modules/reporting/BusinessHealthCard.tsx  ~BusinessHealthCard
 src/modules/reporting/ChartBlock.tsx          ~ChartBlock
 src/modules/reporting/ConcentrationCard.tsx   ~ConcentrationCard
@@ -552,16 +559,20 @@ src/modules/reporting/FunnelCard.tsx          ~FunnelCard
 src/modules/reporting/OverviewTab.tsx         ~OverviewTab
 src/modules/reporting/TenderCard.tsx          ~TenderCard
 src/modules/reporting/UnitAbsorptionCard.tsx  ~UnitAbsorptionCard
+src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 src/services/apiClient.ts                     ~ApiClient
 src/services/apiService.ts                    ~ApiService
 backend/src/services/activityLog.ts           ~logActivity
 backend/src/services/activityLogArchiveScheduler.ts +tick  +startActivityLogArchiveScheduler
 backend/src/services/activityLogArchiveService.ts +getArchiveSettings  +runArchive
 backend/src/services/activityLogSummary.ts    +resolveActorName  +resolveEntityLabel  +humanizeEntityType  +resolveVerb
+backend/src/services/analyticsService.ts      +computeBrandCategoryAnalytics  ~computeDmoAnalytics
 backend/src/services/backupService.ts         ~getBackupSettings
 backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/dashboardStream.ts       +pingDashboard  +subscribeDashboard
 backend/src/services/guaranteeReminders.ts    ~sweepGuaranteeReminders
+backend/src/services/opportunityProgressReminders.ts +sweepOpportunityProgressReminders  +safeParse
+backend/src/services/opportunityProgressService.ts +getOpportunityProgressSettings  +ProgressCheckInError  +finalizeCheckIn  +recordProgressCheckIn
 backend/src/services/personnelTransferService.ts +getOwnedItems  +transferOwnershipTx  +transferOwnership  +kullan
 backend/src/services/tenderReminders.ts       ~sweepTenderReminders
 backend/src/services/unitReportingService.ts  ~crmMetrics  ~procurementMetrics  ~tenderMetrics
@@ -580,6 +591,45 @@ INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
 ```
 TABLE new_BoMItem
+```
+
+### backend/prisma/migrations/20260808195334_add_purchase_quote_item/migration.sql
+```
+TABLE PurchaseQuoteItem
+INDEX PurchaseQuoteItem_purchaseQuoteId_purchaseItemId_key ON PurchaseQuoteItem
+```
+
+### backend/prisma/migrations/20260808203131_add_brand_product_category/migration.sql
+```
+TABLE Brand
+TABLE ProductCategory
+TABLE BrandSource
+TABLE new_BoMItem
+TABLE new_DmoCatalogItem
+INDEX DmoCatalogItem_tenantId_status_idx ON DmoCatalogItem
+INDEX Brand_tenantId_name_key ON Brand
+INDEX ProductCategory_tenantId_name_key ON ProductCategory
+```
+
+### backend/prisma/migrations/20260808205531_vendor_brands_purchaseitem_brand/migration.sql
+```
+TABLE _BrandToVendor
+TABLE new_PurchaseItem
+INDEX _BrandToVendor_AB_unique ON _BrandToVendor
+INDEX _BrandToVendor_B_index ON _BrandToVendor
+```
+
+### backend/prisma/migrations/20260808210931_service_ticket_brand_category/migration.sql
+```
+TABLE new_ServiceTicket
+INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
+INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
+```
+
+### backend/prisma/migrations/20260808215248_add_opportunity_progress_tracking/migration.sql
+```
+TABLE OpportunityProgressLog
+INDEX OpportunityProgressLog_tenantId_opportunityId_createdAt_idx ON OpportunityProgressLog
 ```
 
 ### backend/src/services/activityLog.ts
@@ -634,6 +684,35 @@ export async function resolveEntityLabel(tenantId, entityType, entityId) → Pro
 export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
 ```
 
+### backend/src/services/analyticsService.ts
+```
+export interface FunnelResult  :18-22
+  stages: { name: string  :19-19
+  lossByReason: { reason: string  :20-20
+  entered: number  :21-21
+export interface TenderGroup  :58-58
+  key: string  :58-58
+export interface TenderAnalytics  :59-63
+  byAuthority: TenderGroup[]  :60-60
+  byMethod: TenderGroup[]  :61-61
+  overall: { winRate: number  :62-62
+export interface BomVarianceLine  :114-114
+  name: string  :114-114
+export interface BomVarianceReport  :115-115
+  lines: BomVarianceLine[]  :115-115
+export interface ForecastReport  :194-198
+  rawPipeline: number  :195-195
+  target: number  :196-196
+  byStage: { status: string  :197-197
+export interface BidScoreLine  :230-236
+  id: string  :231-231
+  deadline: string | null  :232-232
+  score: number  :233-233
+  factors: { authorityWinRate: number  :234-234
+  authorityWinPct: number | null  :235-235
+export interface BidScorecard  :237-241
+```
+
 ### backend/src/services/backupService.ts
 ```
 export interface ModelMeta  :27-31
@@ -665,7 +744,7 @@ export type BackupKind  :18-18
 
 ### backend/src/services/dashboardService.ts
 ```
-export async function computeDashboard(tenantId, userId?)  :15-68
+export async function computeDashboard(tenantId, userId?)  :15-70
 ```
 
 ### backend/src/services/dashboardStream.ts
@@ -676,6 +755,22 @@ export function pingDashboard(tenantId) → void  :10-12
 ### backend/src/services/guaranteeReminders.ts
 ```
 export async function sweepGuaranteeReminders(tenantId) → Promise<void>  :20-63
+```
+
+### backend/src/services/opportunityProgressReminders.ts
+```
+export async function sweepOpportunityProgressReminders(tenantId) → Promise<void>  :22-73
+```
+
+### backend/src/services/opportunityProgressService.ts
+```
+export interface OpportunityProgressSettings  :11-14
+  intervalDays: number  :12-12
+  graceBusinessDays: number  :13-13
+export class ProgressCheckInError  :35-35
+export async function getOpportunityProgressSettings(tenantId) → Promise<OpportunityProgressSet  :18-27
+export async function recordProgressCheckIn(tenantId, opportunityId, userId, input,) → Promise<void>  :78-110
+export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
 ### backend/src/services/personnelTransferService.ts
@@ -744,100 +839,38 @@ export interface UnitDefinition  :6-10
   key: string  :7-7
   label: string  :8-8
   role: string  :9-9
-export interface Period  :27-30
-  start: Date  :28-28
-  end: Date  :29-29
-export interface Metric  :51-57
-  label: string  :52-52
-  value: number | string  :53-53
-  unit?: string  :54-54
-  hint?: string  :55-55
-  tone?: 'default' | 'positive' | 'warning'   :56-56
-export interface ChartSeries  :59-63
-  title: string  :60-60
-  type: 'bar' | 'pie' | 'line'  :61-61
-  data: { name: string  :62-62
-export interface UnitMetricsResult  :65-72
-  unitKey: string  :66-66
-  label: string  :67-67
-  role: string  :68-68
-  period: { start: string  :69-69
-  metrics: Metric[]  :70-70
-  charts: ChartSeries[]  :71-71
-export interface WorkflowBottleneck  :432-436
+export interface Period  :52-55
+  start: Date  :53-53
+  end: Date  :54-54
+export interface Metric  :76-82
+  label: string  :77-77
+  value: number | string  :78-78
+  unit?: string  :79-79
+  hint?: string  :80-80
+  tone?: 'default' | 'positive' | 'warning'   :81-81
+export interface ChartSeries  :84-88
+  title: string  :85-85
+  type: 'bar' | 'pie' | 'line'  :86-86
+  data: { name: string  :87-87
+export interface UnitMetricsResult  :90-97
+  unitKey: string  :91-91
+  label: string  :92-92
+  role: string  :93-93
+  period: { start: string  :94-94
+  metrics: Metric[]  :95-95
+  charts: ChartSeries[]  :96-96
+export interface WorkflowBottleneck  :457-461
 ```
 
-### backend/prisma/migrations/20260808195334_add_purchase_quote_item/migration.sql
+### backend/prisma/migrations/20260809115327_add_cost_analysis_version/migration.sql
 ```
-TABLE PurchaseQuoteItem
-INDEX PurchaseQuoteItem_purchaseQuoteId_purchaseItemId_key ON PurchaseQuoteItem
-```
-
-### backend/prisma/migrations/20260808203131_add_brand_product_category/migration.sql
-```
-TABLE Brand
-TABLE ProductCategory
-TABLE BrandSource
-TABLE new_BoMItem
-TABLE new_DmoCatalogItem
-INDEX DmoCatalogItem_tenantId_status_idx ON DmoCatalogItem
-INDEX Brand_tenantId_name_key ON Brand
-INDEX ProductCategory_tenantId_name_key ON ProductCategory
-```
-
-### backend/prisma/migrations/20260808205531_vendor_brands_purchaseitem_brand/migration.sql
-```
-TABLE _BrandToVendor
-TABLE new_PurchaseItem
-INDEX _BrandToVendor_AB_unique ON _BrandToVendor
-INDEX _BrandToVendor_B_index ON _BrandToVendor
-```
-
-### backend/prisma/migrations/20260808210931_service_ticket_brand_category/migration.sql
-```
-TABLE new_ServiceTicket
-INDEX ServiceTicket_tenantId_status_idx ON ServiceTicket
-INDEX ServiceTicket_tenantId_projectId_idx ON ServiceTicket
-```
-
-### backend/prisma/migrations/20260808215248_add_opportunity_progress_tracking/migration.sql
-```
-TABLE OpportunityProgressLog
-INDEX OpportunityProgressLog_tenantId_opportunityId_createdAt_idx ON OpportunityProgressLog
+TABLE CostAnalysisVersion
+INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
-```
-
-### backend/src/services/analyticsService.ts
-```
-export interface FunnelResult  :18-22
-  stages: { name: string  :19-19
-  lossByReason: { reason: string  :20-20
-  entered: number  :21-21
-export interface TenderGroup  :58-58
-  key: string  :58-58
-export interface TenderAnalytics  :59-63
-  byAuthority: TenderGroup[]  :60-60
-  byMethod: TenderGroup[]  :61-61
-  overall: { winRate: number  :62-62
-export interface BomVarianceLine  :114-114
-  name: string  :114-114
-export interface BomVarianceReport  :115-115
-  lines: BomVarianceLine[]  :115-115
-export interface ForecastReport  :194-198
-  rawPipeline: number  :195-195
-  target: number  :196-196
-  byStage: { status: string  :197-197
-export interface BidScoreLine  :230-236
-  id: string  :231-231
-  deadline: string | null  :232-232
-  score: number  :233-233
-  factors: { authorityWinRate: number  :234-234
-  authorityWinPct: number | null  :235-235
-export interface BidScorecard  :237-241
 ```
 
 ### backend/src/services/approvalChainService.ts
@@ -863,22 +896,6 @@ export interface BootstrapResult  :44-49
   user: { id: string  :47-47
   subscription: { plan: string  :48-48
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :51-127
-```
-
-### backend/src/services/opportunityProgressReminders.ts
-```
-export async function sweepOpportunityProgressReminders(tenantId) → Promise<void>  :22-73
-```
-
-### backend/src/services/opportunityProgressService.ts
-```
-export interface OpportunityProgressSettings  :11-14
-  intervalDays: number  :12-12
-  graceBusinessDays: number  :13-13
-export class ProgressCheckInError  :35-35
-export async function getOpportunityProgressSettings(tenantId) → Promise<OpportunityProgressSet  :18-27
-export async function recordProgressCheckIn(tenantId, opportunityId, userId, input,) → Promise<void>  :78-110
-export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -951,6 +968,16 @@ handler onClick
 handler onChange
 ```
 
+### src/components/settings/ProductTaxonomyManagement.tsx
+```
+hook useState
+hook useEffect
+export ProductTaxonomyManagement
+handler onChange
+handler onKeyDown
+handler onClick
+```
+
 ### src/components/settings/UserManagement.tsx
 ```
 props UserManagementProps
@@ -973,6 +1000,21 @@ export interface HelpArticle  :13-18
 export const getHelpArticle = (moduleId) =>  :179-179
 ```
 
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :7-20
+  id?: string  :8-8
+  lineKey?: string  :9-9
+  pn: string  :10-10
+  desc: string  :11-11
+  qty: number  :12-12
+  cost: number  :13-13
+  margin: number  :14-14
+  vendor?: string  :15-15
+  … +4 more members  :7-7
+export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
+```
+
 ### src/layout/Header.tsx
 ```
 hook useAuth
@@ -990,16 +1032,6 @@ handler onAccess
 handler onClick
 handler onChange
 handler onKeyDown
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
 ```
 
 ### src/modules/ActivityLogModule.tsx
@@ -1130,6 +1162,17 @@ hook useState
 hook useMemo
 handler onClick
 handler onChange
+handler onEditProposal
+handler onGoToCostAnalysis
+```
+
+### src/modules/crm/ProgressCheckInModal.tsx
+```
+component ProgressCheckInModal
+hook useState
+hook useEffect
+handler onChange
+handler onClick
 ```
 
 ### src/modules/CRMModule.tsx
@@ -1148,17 +1191,17 @@ handler onMarkLost
 handler onHandOff
 handler onEdit
 handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
 handler onOpenReport
 handler onOpenContacts
 handler onCreateProposal
 handler onWonOpportunity
 handler onLostOpportunity
-handler onEditProposal
 handler onSendForApproval
 handler onGeneratePdf
 handler onMarkDelivered
 handler onWonProposal
-handler onLostProposal
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -1211,20 +1254,33 @@ handler onDragEnd
 handler onDrop
 ```
 
+### src/modules/dashboard/RoleTemplateEditor.tsx
+```
+hook useState
+hook useDragReorder
+hook useEffect
+export RoleTemplateEditor
+handler onChange
+handler onDragOver
+handler onDragEnd
+handler onDrop
+handler onClick
+```
+
 ### src/modules/dashboard/widgetCatalog.ts
 ```
-export interface WidgetMeta  :14-18
-  key: WK  :15-15
-  philosophy: string  :16-16
-  horizon: DecisionHorizon  :17-17
-export interface UserDashboardLayout  :189-192
-  widgets: { key: WK  :190-190
-  order: WK[]  :191-191
+export interface WidgetMeta  :15-19
+  key: WK  :16-16
+  philosophy: string  :17-17
+  horizon: DecisionHorizon  :18-18
+export interface UserDashboardLayout  :196-199
+  widgets: { key: WK  :197-197
+  order: WK[]  :198-198
 export type WK  :6-6
-export type DecisionHorizon  :12-12
-export function resolveRoleDefault(role, roleTemplateOverride?) → WK[]  :197-202
-export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → WK[]  :206-212
-export function buildEditableLayout(role, saved, roleTemplateOverride?)  :216-216
+export type DecisionHorizon  :13-13
+export function resolveRoleDefault(role, roleTemplateOverride?) → WK[]  :204-209
+export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → WK[]  :213-219
+export function buildEditableLayout(role, saved, roleTemplateOverride?)  :223-223
 ```
 
 ### src/modules/dashboard/WidgetDetailDrawer.tsx
@@ -1254,6 +1310,35 @@ handler onCount
 handler onSave
 ```
 
+### src/modules/DmoModule.tsx
+```
+component DmoModule
+component OrdersTab
+component OrderDrawer
+component CatalogTab
+component AgreementsTab
+component RatesTab
+component ReconciliationTab
+component Modal
+component CatalogForm
+component AgreementForm
+component RateForm
+component OrderForm
+component ParamsModal
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export DmoModule
+handler onClick
+handler onSelect
+handler onEdit
+handler onDelete
+handler onSaved
+handler onClose
+handler onChange
+```
+
 ### src/modules/ManagementReportingModule.tsx
 ```
 component ManagementReportingModule
@@ -1269,6 +1354,48 @@ handler onDelete
 handler onReviewed
 ```
 
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useEffect
+hook useBoM
+hook useCallback
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+handler onSelected
+```
+
+### src/modules/procurement/PRDetailDrawer.tsx
+```
+props PRDetailDrawerProps
+hook useState
+export PRDetailDrawer
+handler onClick
+handler onChange
+```
+
+### src/modules/procurement/VendorForm.tsx
+```
+props VendorFormProps
+hook useState
+hook useEffect
+export VendorForm
+handler onClick
+handler onChange
+handler onKeyDown
+```
+
+### src/modules/procurement/VendorsTab.tsx
+```
+props VendorsTabProps
+export VendorsTab
+```
+
 ### src/modules/ProposalEditor.tsx
 ```
 props ProposalEditorProps
@@ -1278,6 +1405,15 @@ hook useEffect
 export ProposalEditor
 handler onClick
 handler onChange
+```
+
+### src/modules/reporting/AnalyticsTab.tsx
+```
+component AnalyticsTab
+hook useState
+hook useCallback
+hook useEffect
+handler onSaved
 ```
 
 ### src/modules/reporting/ArchiveCard.tsx
@@ -1298,6 +1434,11 @@ component BomVarianceCard
 ### src/modules/reporting/BottleneckPanel.tsx
 ```
 component BottleneckPanel
+```
+
+### src/modules/reporting/BrandCategoryCard.tsx
+```
+component BrandCategoryCard
 ```
 
 ### src/modules/reporting/BusinessHealthCard.tsx
@@ -1379,6 +1520,66 @@ component TenderCard
 component UnitAbsorptionCard
 ```
 
+### src/modules/ServiceTicketsModule.tsx
+```
+component ServiceTicketsModule
+props Props
+hook useState
+hook useEffect
+hook useCallback
+export ServiceTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :140-148
+  partNumber: string  :141-141
+  description: string  :142-142
+  quantity: number  :143-143
+  purchaseCost?: number  :144-144
+  unitSalePrice?: number  :145-145
+  totalSalePrice?: number  :146-146
+  marginPercentage?: number  :147-147
+export interface ProposalDetail  :150-159
+  price: string  :151-151
+  totalPrice: number  :152-152
+  totalCost: number  :153-153
+  items: ProposalDetailItem[]  :154-154
+  description: string  :155-155
+  terms: string  :156-156
+  version: number  :157-157
+  opportunityTitle: string  :158-158
+export const taskTargetTab = (t) =>  :49-58
+export const fmtCompletedAt = (d?) =>  :68-69
+export const getPriorityColor = (priority) =>  :71-78
+export const composedTitle = (newTask, taskAction, ctx) =>  :91-102
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :104-138
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :161-207
+```
+
+### src/modules/todo/TaskList.tsx
+```
+component TaskList
+hook useState
+```
+
 ### src/services/apiClient.ts
 ```
 class ApiClient  :3-100
@@ -1400,6 +1601,35 @@ class ApiService  :14-68
   async createCustomer(data)  :42-42
   async updateCustomer(id, data)  :43-43
   … +23 more methods  :14-14
+```
+
+### src/types/analytics.ts
+```
+export interface AgingBuckets  :2-2
+  notDue: number  :2-2
+export interface AgingReport  :3-8
+  buckets: AgingBuckets  :4-4
+  dso: number  :5-5
+  totalReceivable: number  :6-6
+  byCurrency: Record<string, { totalReceivable: n  :7-7
+export interface FunnelReport  :9-13
+  stages: { name: string  :10-10
+  lossByReason: { reason: string  :11-11
+  entered: number  :12-12
+export interface TenderGroup  :14-14
+  key: string  :14-14
+export interface TenderAnalytics  :15-19
+  byAuthority: TenderGroup[]  :16-16
+  byMethod: TenderGroup[]  :17-17
+  overall: { winRate: number  :18-18
+export interface BomVarianceLine  :20-20
+  name: string  :20-20
+export interface BomVarianceReport  :21-21
+  lines: BomVarianceLine[]  :21-21
+export interface ConcentrationReport  :22-26
+  topCustomers: { name: string  :23-23
+  hhi: number  :24-24
+  totalRevenue: number  :25-25
 ```
 
 ### src/types/auth.ts
@@ -1431,9 +1661,38 @@ export interface OwnedCategory  :29-34
   count: number  :32-32
 ```
 
+### src/types/crm.ts
+```
+export interface Opportunity  :4-37
+  id: string  :5-5
+  title: string  :6-6
+  value: number  :7-7
+  probability: number  :8-8
+  expectedCloseDate?: string  :9-9
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
+  description?: string  :11-11
+  lostReason?: string  :12-12
+  … +22 more members  :4-4
+export interface OpportunityProgressLog  :40-52
+  id: string  :41-41
+  tenantId: string  :42-42
+  opportunityId: string  :43-43
+  recordedById: string  :44-44
+  previousStatus: string  :45-45
+  newStatus: string  :46-46
+  previousProbability: number  :47-47
+  newProbability: number  :48-48
+  … +3 more members  :40-40
+export interface Customer  :53-81
+  id: string  :54-54
+  name: string  :55-55
+  shortName?: string  :56-56
+  industry?: string  :57-57
+```
+
 ### src/types/dashboard.ts
 ```
-export interface DashboardPayload  :1-24
+export interface DashboardPayload  :1-34
   kpis: { winRate: number  :2-2
   timeSensitive: { tenderDeadlines: { id: string  :3-4
   guaranteeExpiries: { id: string  :5-5
@@ -1442,7 +1701,36 @@ export interface DashboardPayload  :1-24
   invoicesDue: { id: string  :8-8
   milestonesDue: { id: string  :9-9
   contractDeadlines: { id: string  :10-10
-  … +10 more members  :1-1
+  … +18 more members  :1-1
+```
+
+### src/types/dmo.ts
+```
+export interface DmoCatalogItem  :2-8
+  id: string  :3-3
+  unit: string  :4-4
+  unitCost: number  :5-5
+  validFrom?: string | null  :6-6
+  frameworkAgreementId?: string | null  :7-7
+export interface DmoFrameworkAgreement  :9-12
+  id: string  :10-10
+  quotaTotal?: number | null  :11-11
+export interface DmoExchangeRate  :13-16
+  id: string  :14-14
+  source?: string | null  :15-15
+export interface DmoOrderItem  :17-20
+  id?: string  :18-18
+  unitCost: number  :19-19
+export interface DmoOrder  :21-31
+  id: string  :22-22
+  frameworkAgreementId?: string | null  :23-23
+  ownerId?: string | null  :24-24
+  revenueTotal: number  :25-25
+  rateValidFrom?: string | null  :26-26
+  risturnRateApplied: number  :27-27
+  commissionType: string  :28-28
+  grossProfit: number  :29-29
+  … +1 more members  :21-21
 ```
 
 ### src/types/plugin.ts
@@ -1503,29 +1791,99 @@ export interface BomHandoff  :35-48
   handedOffById?: string | null  :40-40
 ```
 
-### src/components/settings/ProductTaxonomyManagement.tsx
+### src/types/procurement.ts
 ```
-hook useState
-hook useEffect
-export ProductTaxonomyManagement
-handler onChange
-handler onKeyDown
-handler onClick
+export interface Vendor  :3-21
+  id: string  :4-4
+  tenantId: string  :5-5
+  name: string  :6-6
+  taxNo?: string | null  :7-7
+  address?: string | null  :8-8
+  phone?: string | null  :9-9
+  email?: string | null  :10-10
+  contactName?: string | null  :11-11
+  … +9 more members  :3-3
+export interface PurchaseItem  :34-50
+  id: string  :35-35
+  purchaseRequestId: string  :36-36
+  name: string  :37-37
+  description?: string | null  :38-38
+  quantity: number  :39-39
+  unit: string  :40-40
+  estimatedUnitPrice?: number | null  :41-41
+  currency: string  :42-42
+  … +7 more members  :34-34
+export interface PurchaseQuoteItem  :51-58
+  id: string  :52-52
+  purchaseQuoteId: string  :53-53
+  purchaseItemId: string  :54-54
+  quantity: number  :55-55
 ```
 
-### src/hooks/useBoM.ts
+### src/types/productTaxonomy.ts
 ```
-export interface AbbreviatedBoMItem  :7-20
-  id?: string  :8-8
-  lineKey?: string  :9-9
-  pn: string  :10-10
-  desc: string  :11-11
-  qty: number  :12-12
-  cost: number  :13-13
-  margin: number  :14-14
-  vendor?: string  :15-15
-  … +4 more members  :7-7
-export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
+export interface Brand  :5-12
+  id: string  :6-6
+  tenantId: string  :7-7
+  name: string  :8-8
+  isActive: boolean  :9-9
+  createdAt: string  :10-10
+  updatedAt: string  :11-11
+export interface ProductCategory  :14-21
+  id: string  :15-15
+  tenantId: string  :16-16
+  name: string  :17-17
+  isActive: boolean  :18-18
+  createdAt: string  :19-19
+  updatedAt: string  :20-20
+export interface BrandSource  :23-32
+  id: string  :24-24
+  tenantId: string  :25-25
+  brandId: string  :26-26
+  name: string  :27-27
+  notes?: string | null  :28-28
+  isActive: boolean  :29-29
+  createdAt: string  :30-30
+  updatedAt: string  :31-31
+```
+
+### src/types/project.ts
+```
+export interface ProjectMilestone  :9-34
+  id: string  :10-10
+  projectId: string  :11-11
+  title: string  :12-12
+  description?: string | null  :13-13
+  milestoneType: MilestoneType  :14-14
+  status: MilestoneStatus  :15-15
+  progress: number  :16-16
+  assignedToId?: string | null  :17-17
+  … +16 more members  :9-9
+export interface ProjectCostItem  :35-52
+  id: string  :36-36
+  projectId: string  :37-37
+  category: CostCategory  :38-38
+  description: string  :39-39
+  plannedAmount: number  :40-40
+  actualAmount: number  :41-41
+  currency: string  :42-42
+  amountTRY: number  :43-43
+  … +8 more members  :35-35
+export interface Project  :53-83
+  id: string  :54-54
+  code?: string | null  :55-55
+  name: string  :56-56
+  type: ProjectType  :57-57
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
 ```
 
 ### src/modules/contract-workflow/CancelModal.tsx
@@ -1612,7 +1970,8 @@ handler onChange
 
 ### src/modules/crm/constants.ts
 ```
-export const getStatusStyle = (status) =>  :11-22
+export const proposalStatusTone = (status) =>  :16-32
+export const getStatusStyle = (status) =>  :21-32
 ```
 
 ### src/modules/crm/ContactsModal.tsx
@@ -1658,60 +2017,16 @@ handler onSubmit
 handler onChange
 ```
 
-### src/modules/crm/ProgressCheckInModal.tsx
+### src/modules/crm/OpportunityHistoryPanel.tsx
 ```
-component ProgressCheckInModal
+component OpportunityHistoryPanel
 hook useState
-hook useEffect
-handler onChange
 handler onClick
 ```
 
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
-```
-
-### src/modules/dashboard/RoleTemplateEditor.tsx
-```
-hook useState
-hook useDragReorder
-hook useEffect
-export RoleTemplateEditor
-handler onChange
-handler onDragOver
-handler onDragEnd
-handler onDrop
-handler onClick
-```
-
-### src/modules/DmoModule.tsx
-```
-component DmoModule
-component OrdersTab
-component OrderDrawer
-component CatalogTab
-component AgreementsTab
-component RatesTab
-component ReconciliationTab
-component Modal
-component CatalogForm
-component AgreementForm
-component RateForm
-component OrderForm
-component ParamsModal
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export DmoModule
-handler onClick
-handler onSelect
-handler onEdit
-handler onDelete
-handler onSaved
-handler onClose
-handler onChange
 ```
 
 ### src/modules/negotiation/AccessDeniedPanel.tsx
@@ -1803,37 +2118,12 @@ handler onSubmitRound
 handler onLog
 ```
 
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useEffect
-hook useBoM
-hook useCallback
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
-handler onSelected
-```
-
 ### src/modules/procurement/constants.tsx
 ```
 export STATUS_CONFIG
 export URGENCY_CONFIG
 export SOURCE_LABEL
 export CURRENCIES
-```
-
-### src/modules/procurement/PRDetailDrawer.tsx
-```
-props PRDetailDrawerProps
-hook useState
-export PRDetailDrawer
-handler onClick
-handler onChange
 ```
 
 ### src/modules/procurement/PRForm.tsx
@@ -1862,23 +2152,6 @@ export StatusBadge
 ```
 props SummaryTabProps
 export SummaryTab
-```
-
-### src/modules/procurement/VendorForm.tsx
-```
-props VendorFormProps
-hook useState
-hook useEffect
-export VendorForm
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### src/modules/procurement/VendorsTab.tsx
-```
-props VendorsTabProps
-export VendorsTab
 ```
 
 ### src/modules/ProcurementModule.tsx
@@ -2016,20 +2289,6 @@ handler onPrintReport
 handler onSave
 ```
 
-### src/modules/reporting/AnalyticsTab.tsx
-```
-component AnalyticsTab
-hook useState
-hook useCallback
-hook useEffect
-handler onSaved
-```
-
-### src/modules/reporting/BrandCategoryCard.tsx
-```
-component BrandCategoryCard
-```
-
 ### src/modules/reporting/ConsolidationView.tsx
 ```
 component ConsolidationView
@@ -2104,60 +2363,6 @@ handler onKeyDown
 handler onClose
 ```
 
-### src/modules/ServiceTicketsModule.tsx
-```
-component ServiceTicketsModule
-props Props
-hook useState
-hook useEffect
-hook useCallback
-export ServiceTicketsModule
-handler onClick
-handler onChange
-handler onSubmit
-```
-
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
-```
-
-### src/modules/todo/helpers.ts
-```
-export interface ProposalDetailItem  :140-148
-  partNumber: string  :141-141
-  description: string  :142-142
-  quantity: number  :143-143
-  purchaseCost?: number  :144-144
-  unitSalePrice?: number  :145-145
-  totalSalePrice?: number  :146-146
-  marginPercentage?: number  :147-147
-export interface ProposalDetail  :150-159
-  price: string  :151-151
-  totalPrice: number  :152-152
-  totalCost: number  :153-153
-  items: ProposalDetailItem[]  :154-154
-  description: string  :155-155
-  terms: string  :156-156
-  version: number  :157-157
-  opportunityTitle: string  :158-158
-export const taskTargetTab = (t) =>  :49-58
-export const fmtCompletedAt = (d?) =>  :68-69
-export const getPriorityColor = (priority) =>  :71-78
-export const composedTitle = (newTask, taskAction, ctx) =>  :91-102
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :104-138
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :161-207
-```
-
 ### src/modules/todo/NewTaskModal.tsx
 ```
 component NewTaskModal
@@ -2170,26 +2375,10 @@ handler onChange
 component PendingChainApprovals
 ```
 
-### src/modules/todo/PendingDeliveryNotifications.tsx
-```
-component PendingDeliveryNotifications
-```
-
 ### src/modules/todo/ProposalPreviewModal.tsx
 ```
 component ProposalPreviewModal
 handler onClick
-```
-
-### src/modules/todo/ResolvedApprovals.tsx
-```
-component ResolvedApprovals
-```
-
-### src/modules/todo/TaskList.tsx
-```
-component TaskList
-hook useState
 ```
 
 ### src/modules/TodoModule.tsx
@@ -2208,178 +2397,6 @@ handler onMarkRead
 handler onNavigate
 handler onToggleStatus
 handler onSubmit
-```
-
-### src/types/analytics.ts
-```
-export interface AgingBuckets  :2-2
-  notDue: number  :2-2
-export interface AgingReport  :3-8
-  buckets: AgingBuckets  :4-4
-  dso: number  :5-5
-  totalReceivable: number  :6-6
-  byCurrency: Record<string, { totalReceivable: n  :7-7
-export interface FunnelReport  :9-13
-  stages: { name: string  :10-10
-  lossByReason: { reason: string  :11-11
-  entered: number  :12-12
-export interface TenderGroup  :14-14
-  key: string  :14-14
-export interface TenderAnalytics  :15-19
-  byAuthority: TenderGroup[]  :16-16
-  byMethod: TenderGroup[]  :17-17
-  overall: { winRate: number  :18-18
-export interface BomVarianceLine  :20-20
-  name: string  :20-20
-export interface BomVarianceReport  :21-21
-  lines: BomVarianceLine[]  :21-21
-export interface ConcentrationReport  :22-26
-  topCustomers: { name: string  :23-23
-  hhi: number  :24-24
-  totalRevenue: number  :25-25
-```
-
-### src/types/crm.ts
-```
-export interface Opportunity  :4-37
-  id: string  :5-5
-  title: string  :6-6
-  value: number  :7-7
-  probability: number  :8-8
-  expectedCloseDate?: string  :9-9
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
-  description?: string  :11-11
-  lostReason?: string  :12-12
-  … +22 more members  :4-4
-export interface OpportunityProgressLog  :40-52
-  id: string  :41-41
-  tenantId: string  :42-42
-  opportunityId: string  :43-43
-  recordedById: string  :44-44
-  previousStatus: string  :45-45
-  newStatus: string  :46-46
-  previousProbability: number  :47-47
-  newProbability: number  :48-48
-  … +3 more members  :40-40
-export interface Customer  :53-81
-  id: string  :54-54
-  name: string  :55-55
-  shortName?: string  :56-56
-  industry?: string  :57-57
-```
-
-### src/types/dmo.ts
-```
-export interface DmoCatalogItem  :2-8
-  id: string  :3-3
-  unit: string  :4-4
-  unitCost: number  :5-5
-  validFrom?: string | null  :6-6
-  frameworkAgreementId?: string | null  :7-7
-export interface DmoFrameworkAgreement  :9-12
-  id: string  :10-10
-  quotaTotal?: number | null  :11-11
-export interface DmoExchangeRate  :13-16
-  id: string  :14-14
-  source?: string | null  :15-15
-export interface DmoOrderItem  :17-20
-  id?: string  :18-18
-  unitCost: number  :19-19
-export interface DmoOrder  :21-31
-  id: string  :22-22
-  frameworkAgreementId?: string | null  :23-23
-  ownerId?: string | null  :24-24
-  revenueTotal: number  :25-25
-  rateValidFrom?: string | null  :26-26
-  risturnRateApplied: number  :27-27
-  commissionType: string  :28-28
-  grossProfit: number  :29-29
-  … +1 more members  :21-21
-```
-
-### src/types/procurement.ts
-```
-export interface Vendor  :3-21
-  id: string  :4-4
-  tenantId: string  :5-5
-  name: string  :6-6
-  taxNo?: string | null  :7-7
-  address?: string | null  :8-8
-  phone?: string | null  :9-9
-  email?: string | null  :10-10
-  contactName?: string | null  :11-11
-  … +9 more members  :3-3
-export interface PurchaseItem  :34-50
-  id: string  :35-35
-  purchaseRequestId: string  :36-36
-  name: string  :37-37
-  description?: string | null  :38-38
-  quantity: number  :39-39
-  unit: string  :40-40
-  estimatedUnitPrice?: number | null  :41-41
-  currency: string  :42-42
-  … +7 more members  :34-34
-export interface PurchaseQuoteItem  :51-58
-  id: string  :52-52
-  purchaseQuoteId: string  :53-53
-  purchaseItemId: string  :54-54
-  quantity: number  :55-55
-```
-
-### src/types/productTaxonomy.ts
-```
-export interface Brand  :5-12
-  id: string  :6-6
-  tenantId: string  :7-7
-  name: string  :8-8
-  isActive: boolean  :9-9
-  createdAt: string  :10-10
-  updatedAt: string  :11-11
-export interface ProductCategory  :14-21
-  id: string  :15-15
-  tenantId: string  :16-16
-  name: string  :17-17
-  isActive: boolean  :18-18
-  createdAt: string  :19-19
-  updatedAt: string  :20-20
-export interface BrandSource  :23-32
-  id: string  :24-24
-  tenantId: string  :25-25
-  brandId: string  :26-26
-  name: string  :27-27
-  notes?: string | null  :28-28
-  isActive: boolean  :29-29
-  createdAt: string  :30-30
-  updatedAt: string  :31-31
-```
-
-### src/types/project.ts
-```
-export interface ProjectMilestone  :9-34
-  id: string  :10-10
-  projectId: string  :11-11
-  title: string  :12-12
-  description?: string | null  :13-13
-  milestoneType: MilestoneType  :14-14
-  status: MilestoneStatus  :15-15
-  progress: number  :16-16
-  assignedToId?: string | null  :17-17
-  … +16 more members  :9-9
-export interface ProjectCostItem  :35-52
-  id: string  :36-36
-  projectId: string  :37-37
-  category: CostCategory  :38-38
-  description: string  :39-39
-  plannedAmount: number  :40-40
-  actualAmount: number  :41-41
-  currency: string  :42-42
-  amountTRY: number  :43-43
-  … +8 more members  :35-35
-export interface Project  :53-83
-  id: string  :54-54
-  code?: string | null  :55-55
-  name: string  :56-56
-  type: ProjectType  :57-57
 ```
 
 ### src/types/tender.ts

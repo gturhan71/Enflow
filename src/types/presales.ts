@@ -76,6 +76,27 @@ export interface CostItem {
   tenantId?: string;
   auto?: boolean;   // usule göre otomatik gelen masraf kalemi mi
 }
+// Maliyet analizi versiyon geçmişi — her "Kaydet ve Onaya Gönder" işlemi ayrı bir satır
+// olarak tutulur (backend/prisma/schema.prisma CostAnalysisVersion). Fırsat kartında
+// "kaç kez maliyet analizi yapıldı" bu listeden türetilir.
+export interface CostAnalysisVersion {
+  id: string;
+  tenantId: string;
+  opportunityId: string;
+  version: number;
+  bomItems: BoMItem[];
+  costItems: CostItem[];
+  costConfig: Record<string, unknown>;
+  grandCost: number;
+  offer: number;
+  marginPct: number;
+  belowFloor: boolean;
+  status: 'PENDING_APPROVAL' | 'APPROVED' | 'REJECTED';
+  createdById?: string | null;
+  createdByName?: string | null;
+  createdAt: string;
+}
+
 export interface AnalysisResultProduct {
   pn: string;
   description: string;

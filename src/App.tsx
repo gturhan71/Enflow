@@ -328,6 +328,7 @@ const TenantAppInner = ({
             tasks={tasks}
             setTasks={setTasks}
             setActiveTab={setActiveTab}
+            onNavigate={navigate}
             initialItemId={navItemId}
           />
         );
