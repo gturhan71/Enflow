@@ -10,6 +10,10 @@ model Tenant {
   id             String        @id @default(cuid())
   name           String
   moduleSettings String        @default("{}")
+  // Tenant-başına Data Encryption Key, master key (DATA_ENCRYPTION_MASTER_KEY) ile AES-256-GCM
+  // sarmalanmış (envelope encryption) — bkz. backend/src/services/tenantEncryption.ts +
+  // docs/TENANT_DATA_ENCRYPTION_PLAN.md
+  dekWrapped     String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   subscription  Subscription?

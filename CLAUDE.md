@@ -215,6 +215,7 @@ const STATUS_RANK = { APPROVED: 4, ACCEPTED: 3, SENT: 2, PENDING_APPROVAL: 1, DR
 - **Servis yeniden kullanımı** — proje oluşturma `backend/src/services/projectFactory.ts` `createProjectWithMilestones` (projects.ts POST + contractWorkflow `/transfer` ortak); create metod imzaları `Partial<X>`
 - **Denetim-izi** — mutasyon sonrası `logActivity({ tenantId, userId, action, entityType, entityId, details? })` (`backend/src/services/activityLog.ts`, **non-throwing** — ana akışı bozmaz); okuma `GET /api/activity-logs`. Agent işlemleri `actorType:'AGENT'`+`agentRunId` (Faz 8.3). Yeni mutasyon endpoint'i = logActivity çağrısı ekle.
 - **YZ entegrasyonu — sağlayıcıdan bağımsız** — Tüm YZ çağrıları `backend/src/services/aiClient.ts` (`chatJSON`, **OpenAI-uyumlu `/chat/completions`** `fetch`) üzerinden. Sağlayıcı **hard-code edilmez** ("istenilen YZ"): tenant kendi `{ baseUrl, apiKey, model }` değerini **Ayarlar→Entegrasyonlar**'dan girer → `Tenant.moduleSettings.ai`. Route: `GET/PUT /api/tenants/ai-settings` (GM-only; key **maskeli**, GET'te yalnız `hasKey`, **asla loglanmaz/echo edilmez**). Kullanan: `specAnalysis.analyzeSpec` (sözleşme/ihale) + `POST /api/presales/spec-extract` (şartname→ürün). Config yoksa/hata → deterministik **mock fallback**. **Client-side YZ çağrısı yasak** (eski Gemini/`@google/genai` kaldırıldı; `@anthropic-ai/sdk` de kaldırıldı).
+- **Tenant verisi şifreleme** (Faz 12) — `backend/src/services/tenantEncryption.ts`: `encryptForTenant`/`decryptForTenant`, AES-256-GCM, tenant-başına DEK (envelope, `Tenant.dekWrapped`, master key `DATA_ENCRYPTION_MASTER_KEY`). Şifreli değer öneki `enc:v1:` — önek yoksa düz metin kabul edilir (kademeli geçiş, decrypt kırılmaz). Kapsam: YZ `apiKey` + `Vendor.iban`/`bankName` + `Customer.taxNumber`/`taxOffice`. Yeni alan eklerken: route'ta `encryptForTenant` (yazım) / `decryptForTenant` (okuma) çağır, **genel Prisma `$extends`'e ekleme** (money-rounding hot path'i tüm modeller için uniform, alan şifreleme seçici — ayrı tutulmalı). `Tenant` döndüren route'larda `dekWrapped` **her zaman** `omit` edilmeli. bkz. `docs/TENANT_DATA_ENCRYPTION_PLAN.md`.
 
 ## Proje Yönetimi Modülü — Mimari
 
@@ -319,6 +320,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | Bakım | as-any temizliği (no-any) · Vite 8/Rolldown + TS 6 + @types/react · mobil drawer/safe-area · stray express kaldırma | — |
 | 10 | Maliyet analizi versiyon geçmişi (`CostAnalysisVersion` — her `/cost-analysis` kaydında BoM/gider/costConfig snapshot'ı) + fırsat kartında kronolojik Teklif/Maliyet Analizi geçmiş paneli (`OpportunityHistoryPanel`) — geçmiş tekliften "Düzenle" ile yeni versiyon oluşturma, güncel maliyet analizine deep-link | add_cost_analysis_version |
 | 11 | Yönetim Dashboard'una **Ziyaret Performansı** widget'ı (`computeVisitPerformance`, `unitReportingService.ts`) — bu ayki planlanan/gerçekleşen ziyaret oranı + son 6 ay, penceresi (60 gün) dolmuş "olgun" ziyaretlerden heuristik ziyaret→fırsat dönüşüm oranı (aynı müşteri bir kez sayılır, en erken ziyarete atıf). GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi (`widgetCatalog.ts` `visitPerformance`), migration yok | — |
+| 12 | **Tenant verisi alan-bazlı şifreleme** — envelope encryption, tenant-başına DEK (`Tenant.dekWrapped`, `AUTH_JWT_SECRET` deseniyle aynı `DATA_ENCRYPTION_MASTER_KEY` env var). Kapsam: Tenant YZ `apiKey`, `Vendor.iban`/`bankName`, `Customer.taxNumber`/`taxOffice` (AES-256-GCM, `enc:v1:` önekli, arama/filtrede kullanılmadığı doğrulandı). Yeni `backend/src/services/tenantEncryption.ts` (`encryptForTenant`/`decryptForTenant`) + backfill script (`backfill-tenant-encryption.ts`, idempotent) + `install/wizard.mjs` otomatik key üretimi. Route-bazlı çağrı (genel Prisma `$extends` hot path'ine eklenmedi — bkz. gerekçe `docs/TENANT_DATA_ENCRYPTION_PLAN.md`). Yan-etki: `GET/POST/PUT /api/tenants` artık `dekWrapped`'i `omit` ediyor (önceden hiçbir alan şifrelenmediği için bu risk yoktu). Key rotation + `backend/uploads/` dosya şifrelemesi + gerçek KMS entegrasyonu bilinçli olarak kapsam dışı bırakıldı. | add_tenant_dek |
 
 Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -365,16 +367,10 @@ src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/modules/contract-workflow/AnalysisTab.tsx ← types
-src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
-src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
-src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
-src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
-src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
-src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
@@ -432,10 +428,15 @@ src/components/settings/UserManagement.tsx ← ../types, ../constants, ../servic
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
+src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
 src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
+src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
+src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
+src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
+src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/crm/ContactsModal.tsx ← ../types
 src/modules/crm/CustomerReportModal.tsx ← ../lib/utils, ../types, helpers, constants
@@ -443,6 +444,7 @@ src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/Heal
 src/modules/crm/helpers.ts ← ../types
 src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
 src/modules/crm/NewCustomerModal.tsx ← ../types
+src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
@@ -451,10 +453,6 @@ src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/negotiation/ModeTabBar.tsx ← ../lib/utils
 src/modules/negotiation/ProposalSelectorHeader.tsx ← ../types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
-src/modules/procurement/PRForm.tsx ← ../types, constants
-src/modules/procurement/RequestsTab.tsx ← ../types, ../lib/format, constants, StatusBadge
-src/modules/procurement/SummaryTab.tsx ← ../types, constants
-src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/project-mgmt/constants.tsx ← ../types
 src/modules/project-mgmt/CostForm.tsx ← ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants
@@ -480,10 +478,12 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
+backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
 backend/src/services/personnelTransferService.ts ← prismaClient
+backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplateService.ts ← prismaClient
 ```
@@ -519,16 +519,11 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 11 minutes ago)
+## changes (last 10 commits — 48 minutes ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
 src/modules/contract-workflow/AnalysisTab.tsx ~AnalysisTab
-src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
-src/modules/contract-workflow/helpers.ts      +computeDeadlineAlarm  ~bestProposalPrice
-src/modules/contract-workflow/LegalCaseForm.tsx +LegalCaseForm  ~LegalCaseForm
-src/modules/contract-workflow/LegalView.tsx   ~LegalView
-src/modules/contract-workflow/WorkflowListPanel.tsx +WorkflowCard
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/DashboardView.tsx             ~DashboardView
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
@@ -819,6 +814,19 @@ export async function resolveEntityLabel(tenantId, entityType, entityId) → Pro
 export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
 ```
 
+### backend/src/services/aiClient.ts
+```
+export interface TenantAIConfig  :14-19
+  baseUrl: string  :15-15
+  apiKey: string  :16-16
+  model: string  :17-17
+  label?: string  :18-18
+export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | null>  :22-44  # moduleSettings
+export async function isAIConfigured(tenantId) → Promise<boolean>  :46-48
+export function assertSafeAiUrl(rawUrl) → void  :59-74  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
+export async function chatJSON(opts) → Promise<T | null>  :80-129  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
+```
+
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :22-51  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
@@ -897,6 +905,13 @@ export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResu
 export async function transferOwnership(params) → Promise<TransferResult>  :192-201
 export async function deactivateUser(tenantId, userId) → Promise<void>  :203-212
 export async function hardDeleteUser(tenantId, userId) → Promise<  :214-214
+```
+
+### backend/src/services/tenantEncryption.ts
+```
+export async function encryptForTenant(tenantId, plaintext) → Promise<string | null>  :85-89
+export async function decryptForTenant(tenantId, value) → Promise<string | null>  :91-96
+export function isEncrypted(value) → boolean  :98-100
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1022,53 +1037,6 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/contract-workflow/DetailHeader.tsx
-```
-component DetailHeader
-handler onClick
-```
-
-### src/modules/contract-workflow/helpers.ts
-```
-export interface DeadlineAlarm  :35-41
-  level: 'none' | 'warning' | 'critical'  :36-36
-  daysLeft: number | null  :37-37
-  missingRequired: number  :38-38
-  totalRequired: number  :39-39
-  label: string  :40-40
-export async function apiFetch(path, init?)  :8-10
-export function bestProposalPrice(opportunityId, proposals) → number | null  :14-25
-export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :43-57
-export const stepIndex = (status) =>  :27-41
-export const isDocsComplete = (wf, 'documents'>) =>  :59-59
-```
-
-### src/modules/contract-workflow/LegalCaseForm.tsx
-```
-component LegalCaseForm
-hook useState
-handler onClick
-handler onChange
-```
-
-### src/modules/contract-workflow/LegalView.tsx
-```
-component LegalView
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-```
-
-### src/modules/contract-workflow/WorkflowListPanel.tsx
-```
-component WorkflowListPanel
-component WorkflowCard
-export WorkflowFormState
-handler onChange
-handler onClick
-```
-
 ### src/modules/ContractWorkflowModule.tsx
 ```
 component ContractWorkflowModule
@@ -1120,14 +1088,6 @@ export const getStatusStyle = (status) =>  :21-32
 component DashboardView
 handler onOpps
 handler onValue
-```
-
-### src/modules/crm/NewOpportunityModal.tsx
-```
-component NewOpportunityModal
-handler onClick
-handler onSubmit
-handler onChange
 ```
 
 ### src/modules/crm/OpportunitiesView.tsx
@@ -1890,12 +1850,50 @@ handler onBlur
 handler onClick
 ```
 
+### src/modules/contract-workflow/DetailHeader.tsx
+```
+component DetailHeader
+handler onClick
+```
+
 ### src/modules/contract-workflow/DocumentsTab.tsx
 ```
 component DocumentsTab
 handler onClick
 handler onChange
 handler onBlur
+```
+
+### src/modules/contract-workflow/helpers.ts
+```
+export interface DeadlineAlarm  :35-41
+  level: 'none' | 'warning' | 'critical'  :36-36
+  daysLeft: number | null  :37-37
+  missingRequired: number  :38-38
+  totalRequired: number  :39-39
+  label: string  :40-40
+export async function apiFetch(path, init?)  :8-10
+export function bestProposalPrice(opportunityId, proposals) → number | null  :14-25
+export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :43-57
+export const stepIndex = (status) =>  :27-41
+export const isDocsComplete = (wf, 'documents'>) =>  :59-59
+```
+
+### src/modules/contract-workflow/LegalCaseForm.tsx
+```
+component LegalCaseForm
+hook useState
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/LegalView.tsx
+```
+component LegalView
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
 ```
 
 ### src/modules/contract-workflow/SigningTab.tsx
@@ -1938,6 +1936,15 @@ export interface AiAnalysis  :41-46
   tasks: { order: number  :43-43
   key_clauses: { clause: string  :44-44
   contract_summary: { project_name?: string  :45-45
+```
+
+### src/modules/contract-workflow/WorkflowListPanel.tsx
+```
+component WorkflowListPanel
+component WorkflowCard
+export WorkflowFormState
+handler onChange
+handler onClick
 ```
 
 ### src/modules/CorporateGovernanceModule.tsx
@@ -1991,6 +1998,14 @@ handler onClick
 ### src/modules/crm/NewCustomerModal.tsx
 ```
 component NewCustomerModal
+handler onClick
+handler onSubmit
+handler onChange
+```
+
+### src/modules/crm/NewOpportunityModal.tsx
+```
+component NewOpportunityModal
 handler onClick
 handler onSubmit
 handler onChange
@@ -2088,44 +2103,6 @@ handler onWinner
 handler onNewAuction
 handler onSubmitRound
 handler onLog
-```
-
-### src/modules/procurement/PRForm.tsx
-```
-props PRFormProps
-hook useState
-export PRForm
-handler onClick
-handler onChange
-```
-
-### src/modules/procurement/RequestsTab.tsx
-```
-props RequestsTabProps
-export RequestsTab
-handler onChange
-handler onClick
-```
-
-### src/modules/procurement/SummaryTab.tsx
-```
-props SummaryTabProps
-export SummaryTab
-```
-
-### src/modules/ProcurementModule.tsx
-```
-props ProcurementModuleProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export ProcurementModule
-handler onClick
-handler onDelete
-handler onEdit
-handler onRefresh
-handler onSave
 ```
 
 ### src/modules/project-mgmt/constants.tsx

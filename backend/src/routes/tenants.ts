@@ -4,13 +4,15 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { isAIConfigured, assertSafeAiUrl } from '../services/aiClient';
 import { verifyLicenseToken } from '../services/licenseVerify';
+import { encryptForTenant } from '../services/tenantEncryption';
 
 const router: Router = Router();
 
 // Tenant izolasyonu: yalnız çağıranın KENDİ tenant'ını döndür (tüm şirketleri
 // listelemek sızıntıydı). tenantMiddleware token↔tenant eşleşmesini doğrular.
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
+  // dekWrapped ASLA client'a çıkmaz — şifreleme anahtarı sarmalı, sunucu-içi sır.
+  const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId }, omit: { dekWrapped: true } });
   res.json(tenant ? [tenant] : []);
 }));
 
@@ -20,7 +22,8 @@ router.post('/', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandle
   if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Şirket adı zorunludur.' });
 
   const tenant = await prisma.$transaction(async (tx) => {
-    const newTenant = await tx.tenant.create({ data: { name } });
+    // dekWrapped ASLA client'a çıkmaz — şifreleme anahtarı sarmalı, sunucu-içi sır.
+    const newTenant = await tx.tenant.create({ data: { name }, omit: { dekWrapped: true } });
     await tx.subscription.create({ data: { tenantId: newTenant.id, plan: 'STARTER' } });
     return newTenant;
   });
@@ -166,12 +169,16 @@ router.put('/ai-settings', tenantMiddleware, GM, asyncHandler(async (req: Reques
     // SSRF azaltımı: kaydetmeden önce baseUrl'i doğrula.
     try { assertSafeAiUrl(baseUrl!.trim()); }
     catch (e) { return res.status(400).json({ error: (e as Error).message }); }
+    // apiKey boş gelirse mevcut (zaten şifreli) korunur — gereksiz decrypt/re-encrypt yok.
+    // Yeni değer geldiyse tenant'ın DEK'i ile şifrelenip saklanır (bkz. tenantEncryption.ts).
+    const encryptedApiKey = apiKey && apiKey.trim()
+      ? await encryptForTenant(req.tenantId, apiKey.trim())
+      : (prev.apiKey || '');
     ms.ai = {
       baseUrl: baseUrl!.trim(),
       model: (model || '').trim(),
       label: (label || '').trim(),
-      // apiKey boş gelirse mevcut korunur (UI maskeli gösterir, her kayıtta tekrar istemez)
-      apiKey: apiKey && apiKey.trim() ? apiKey.trim() : (prev.apiKey || ''),
+      apiKey: encryptedApiKey,
     };
   }
   await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
@@ -294,9 +301,11 @@ router.put('/:id', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHand
   }
   const { name } = req.body;
   if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Şirket adı zorunludur.' });
+  // dekWrapped ASLA client'a çıkmaz — şifreleme anahtarı sarmalı, sunucu-içi sır.
   const tenant = await prisma.tenant.update({
     where: { id: req.tenantId },
-    data: { name }
+    data: { name },
+    omit: { dekWrapped: true },
   });
   res.json(tenant);
 }));

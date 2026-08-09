@@ -2,10 +2,20 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { encryptForTenant, decryptForTenant } from '../services/tenantEncryption';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
 const router: Router = Router();
+
+// taxNumber/taxOffice DB'de şifreli saklanır (bkz. tenantEncryption.ts) — listede çözülüp dönülür.
+async function decryptCustomer<T extends { taxNumber: string | null; taxOffice: string | null }>(tenantId: string, customer: T): Promise<T> {
+  const [taxNumber, taxOffice] = await Promise.all([
+    decryptForTenant(tenantId, customer.taxNumber),
+    decryptForTenant(tenantId, customer.taxOffice),
+  ]);
+  return { ...customer, taxNumber, taxOffice };
+}
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const customers = await prisma.customer.findMany({
@@ -13,15 +23,18 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     orderBy: { name: 'asc' },
     include: { contacts: { orderBy: [{ isPrimary: 'desc' }, { name: 'asc' }] } },
   });
-  res.json(customers);
+  res.json(await Promise.all(customers.map((c) => decryptCustomer(req.tenantId, c))));
 }));
 
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
+  const body = { ...req.body };
+  if (body.taxNumber) body.taxNumber = await encryptForTenant(req.tenantId, body.taxNumber);
+  if (body.taxOffice) body.taxOffice = await encryptForTenant(req.tenantId, body.taxOffice);
   const customer = await prisma.customer.create({
-    data: { ...req.body, tenantId: req.tenantId }
+    data: { ...body, tenantId: req.tenantId }
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'CUSTOMER', entityId: customer.id, details: { name: customer.name } });
-  res.json(customer);
+  res.json(await decryptCustomer(req.tenantId, customer));
 }));
 
 router.put('/:id', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
@@ -31,9 +44,12 @@ router.put('/:id', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Reque
   const record = await prisma.customer.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
-  const customer = await prisma.customer.update({ where: { id }, data: req.body });
+  const body = { ...req.body };
+  if (body.taxNumber) body.taxNumber = await encryptForTenant(tenantId, body.taxNumber);
+  if (body.taxOffice) body.taxOffice = await encryptForTenant(tenantId, body.taxOffice);
+  const customer = await prisma.customer.update({ where: { id }, data: body });
   await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'CUSTOMER', entityId: id, details: { name: customer.name } });
-  res.json(customer);
+  res.json(await decryptCustomer(tenantId, customer));
 }));
 
 router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {

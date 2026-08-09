@@ -205,6 +205,11 @@ async function main() {
   const jwt = secret(48);
   ok('AUTH_JWT_SECRET güvenli rastgele üretildi');
 
+  // Tenant verisi şifreleme master key — tam 32 byte, base64 (base64url DEĞİL; backend
+  // tenantEncryption.ts 'base64' ile decode ediyor, encoding'ler tutarlı olmalı).
+  const dataEncryptionKey = randomBytes(32).toString('base64');
+  ok('DATA_ENCRYPTION_MASTER_KEY güvenli rastgele üretildi');
+
   const aiBase = await ask('YZ Base URL (ops. — boş geç, uygulamadan da girilebilir)', '');
   const aiKey = aiBase ? await ask('YZ API Key (ops.)', '') : '';
   const aiModel = aiBase ? await ask('YZ Model (ops.)', '') : '';
@@ -217,13 +222,16 @@ async function main() {
     // Kimlik doğrulama JWT imza anahtarı — backend (services/auth.ts) bunu okur;
     // üretimde (NODE_ENV=production) ZORUNLUdur, yoksa backend açılışta durur.
     `AUTH_JWT_SECRET=${jwt}`,
+    // Tenant verisi (YZ apiKey, IBAN, vergi no) alan-bazlı şifreleme master key'i —
+    // backend (services/tenantEncryption.ts) bunu okur; üretimde ZORUNLUdur.
+    `DATA_ENCRYPTION_MASTER_KEY=${dataEncryptionKey}`,
     `NODE_ENV=production`,
   ];
   if (aiBase) { envLines.push(`AI_BASE_URL=${aiBase}`, `AI_API_KEY=${aiKey}`, `AI_MODEL=${aiModel}`); }
   const backendEnv = join(REPO, 'backend', '.env');
   if (DRY) {
     warn('[dry-run] backend/.env yazılmayacak. İçerik önizlemesi:');
-    log(C.dim + envLines.map(l => '    ' + l.replace(/(SECRET=).*/, '$1********')).join('\n') + C.r);
+    log(C.dim + envLines.map(l => '    ' + l.replace(/(SECRET=|MASTER_KEY=).*/, '$1********')).join('\n') + C.r);
   } else if (existsSync(backendEnv) && !YES && !(await askYN('backend/.env zaten var — üzerine yazılsın mı?', false))) {
     warn('Mevcut backend/.env korundu.');
   } else {
@@ -302,7 +310,7 @@ ${C.b}İlk açılış:${C.r} tarayıcı → http://localhost:${frontendPort}
   ${C.dim}Veritabanı BOŞTUR → ekrana KURULUM SİHİRBAZI gelir:${C.r}
   ${C.dim}şirket + ilk yönetici (GM) + lisans (yoksa 30 günlük deneme). Tamamlanınca otomatik giriş.${C.r}
 ${C.dim}Ek kullanıcı (Yedek Yöneticisi vb.) · YZ entegrasyonu sonradan Ayarlar'dan eklenir.${C.r}
-${C.dim}Sırlar backend/.env içinde (AUTH_JWT_SECRET). Üretimde gizli tutun.${C.r}
+${C.dim}Sırlar backend/.env içinde (AUTH_JWT_SECRET, DATA_ENCRYPTION_MASTER_KEY). Üretimde gizli tutun.${C.r}
 ${C.dim}(Kabuk: ${py})${C.r}`);
 
   const pg = globalThis.__pgSummary;

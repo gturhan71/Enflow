@@ -9,6 +9,7 @@
 // çağıran deterministik mock'a düşer.
 
 import { prisma } from '../prismaClient';
+import { decryptForTenant } from './tenantEncryption';
 
 export interface TenantAIConfig {
   baseUrl: string;
@@ -28,7 +29,9 @@ export async function getTenantAIConfig(tenantId: string): Promise<TenantAIConfi
   }
   const ai = (ms.ai as Partial<TenantAIConfig> | undefined) || undefined;
   if (ai?.baseUrl && ai?.apiKey && ai?.model) {
-    return { baseUrl: ai.baseUrl, apiKey: ai.apiKey, model: ai.model, label: ai.label };
+    // apiKey DB'de şifreli saklanır (bkz. tenantEncryption.ts) — kullanmadan önce çözülür.
+    const apiKey = await decryptForTenant(tenantId, ai.apiKey);
+    if (apiKey) return { baseUrl: ai.baseUrl, apiKey, model: ai.model, label: ai.label };
   }
   // Dev fallback (opsiyonel): ortam değişkeni
   const envBase = process.env.AI_BASE_URL;

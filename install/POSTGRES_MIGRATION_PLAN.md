@@ -77,3 +77,14 @@ işaret edilir. Ayrıca `backend/src/prismaClient.ts` artık SQLite yolunda `WAL
 
 > **Not:** Postgres kurulum/provizyon yolu (winget + psql + servis) Windows'a özgüdür ve macOS/CI
 > geliştirme makinesinde runtime doğrulanamaz; Windows'ta test edilmelidir.
+
+## Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+
+Uygulama-katmanı alan-bazlı şifreleme (`docs/TENANT_DATA_ENCRYPTION_PLAN.md`) yalnız seçili
+hassas alanları kapsar; genel bir güvenlik taban katmanı için ayrıca:
+
+- **Taşımada:** Postgres bağlantı dizesine `?sslmode=require` (veya daha sıkısı) eklenmesi
+  önerilir — özellikle `DATABASE_URL` uzak bir sunucuya işaret ediyorsa.
+- **Durağan veri:** İşletim sistemi/disk düzeyinde şifreleme (BitLocker/FileVault veya bulut
+  sağlayıcısının disk encryption seçeneği) kurulum rehberliğinde önerilir; bu Enflow kod
+  tabanının kapsamı dışında, altyapı/işletim sorumluluğundadır.
