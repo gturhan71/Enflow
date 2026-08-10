@@ -77,8 +77,17 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     },
     include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
   });
-  await logActivity({ tenantId, userId: req.userId, action: 'CREATE', entityType: 'SERVICE_TICKET', entityId: ticket.id, details: { title: ticket.title, projectId } });
-  res.json(ticket);
+
+  // B-09 — garanti süresi bitişi kontrolü: projeye bağlı sözleşmenin garanti
+  // tarihi geçmişse görünür bir uyarı verilir (kayıt reddedilmez — mevcut
+  // uyarı desenleriyle aynı felsefe, ör. proposals.ts marginWarning).
+  const contract = await prisma.contract.findFirst({ where: { projectId, tenantId }, select: { guaranteeExpiry: true } });
+  const warrantyExpiredWarning = contract?.guaranteeExpiry && ticket.reportedAt.getTime() > contract.guaranteeExpiry.getTime()
+    ? { expiredAt: contract.guaranteeExpiry }
+    : null;
+
+  await logActivity({ tenantId, userId: req.userId, action: 'CREATE', entityType: 'SERVICE_TICKET', entityId: ticket.id, details: { title: ticket.title, projectId, warrantyExpired: warrantyExpiredWarning ? true : undefined } });
+  res.json({ ...ticket, warrantyExpiredWarning });
 }));
 
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {

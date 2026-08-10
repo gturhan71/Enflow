@@ -2,7 +2,7 @@
 
 **Amaç:** Bu belge, mimari backlog'daki 9 değişikliği (B-01…B-09) fazlara ayırarak, her fazın "kapı koşulu" geçilmeden bir sonrakine geçilmemesini sağlayan yürütülebilir bir plana çevirir. Backlog "ne değişmeli"yi anlatıyordu; bu manifesto "hangi sırayla ve hangi kapıdan geçerek" değişmeli sorusuna cevap verir.
 
-**Durum (2026-08-10):** Faz 0 (Keşif) tamamlandı — bkz. Bölüm 6. Faz 1 kapısı kapatılıyor (yalnız B-01/Proposal katmanı gerçek boşluktu). Faz 2-4 sıraları geldiğinde ayrı ayrı detaylandırılıp planlanacak.
+**Durum (2026-08-10):** **TÜM FAZLAR KAPANDI.** Faz 0 (Keşif) → Faz 1-4 tek oturumda, sırayla, her fazın kapı koşulu doğrulanarak yürütüldü — bkz. Bölüm 6 (keşif) ve dosya sonundaki "Manifesto Durumu" tablosu (commit'ler + kalıcı kapsam dışı kararlar).
 
 ---
 
@@ -60,7 +60,7 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 | **B-06** CRM/Proposal veri derinliği | Sıfırdan yapılacak | `Customer.source` + Levenshtein-bazlı mükerrer kayıt uyarısı eklendi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
 | **B-07** EKAP istihbaratı & ağırlıklı pipeline | Sıfırdan yapılacak | Ağırlıklı pipeline TAMAM (`analyticsService.ts` `computeForecast()` → `weightedPipeline`/`coverage`; `ForecastCard.tsx`). EKAP gerçek entegrasyonu yok — **kullanıcı kararıyla kapsam dışı.** | ✅ Ağırlıklı pipeline karşılandı / EKAP kapsam dışı |
 | **B-08** Tedarikçi/procurement entegrasyonu | Sıfırdan yapılacak | `syncProcurementMilestoneDate()` ile PO_ISSUED/teklif revizyonu/teslimat üç noktada `ProjectMilestone.plannedEnd`/`actualEnd`'e senkronize ediliyor + değişiklik/gecikme bildirimi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
-| **B-09** Warranty/Service modülü | Sıfırdan yapılacak | Büyük ölçüde tamam. `ServiceTicket.projectId` zorunlu; maliyet `ProjectCostItem`'a (category=SERVICE) idempotent yazılıyor → `netMargin`'e yansıyor. SLA sweep de var. Eksik (küçük/opsiyonel): garanti süresi bitişi kontrolü. | ✅ Büyük ölçüde karşılandı — Faz 4'te küçük ek |
+| **B-09** Warranty/Service modülü | Sıfırdan yapılacak | Maliyet zaten `ProjectCostItem`'a (category=SERVICE) idempotent yazılıyor → `netMargin`'e yansıyor. Garanti süresi bitişi kontrolü eklendi (bkz. Faz 4 Kapanışı). | ✅ Kapatıldı (Faz 4, bu oturum) |
 | Ek | `rbac.config.ts` tek-kaynak mı? | `tests/rbac/rbac.config.ts` Playwright test fixture'ı; gerçek tek-kaynak `governance/role-matrix.ts`. | Bilgi notu |
 
 ### Revize Faz Durumu
@@ -68,9 +68,9 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 - **Faz 1 (P0):** B-01 ✅ · B-02 ✅ · B-03 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 2 (P1):** B-04 ✅ · B-05 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 3 (P2):** B-06 ✅ · B-07 ✅ (EKAP hariç) · B-08 ✅ — **kapı geçildi** (2026-08-10).
-- **Faz 4 (P3):** B-09 büyük ölçüde ✅, küçük ek opsiyonel — sırada.
+- **Faz 4 (P3):** B-09 ✅ — **kapı geçildi** (2026-08-10).
 
-Faz 4, sırası geldiğinde bu manifestoya yeni bir bölüm olarak eklenip detaylandırılacak.
+**Tüm fazlar kapandı — bkz. aşağıdaki "Manifesto Durumu" tablosu.**
 
 ---
 
@@ -109,3 +109,29 @@ Delegasyon (B-05 adım 3) zaten çalışıyordu; eksik olan SLA süresi tanımla
 **Test sırasında bulunan, kapsam dışı bırakılan ön-var-olan hata:** `PUT /:id/quotes/:qid` yalnız `deliveryDays` (totalAmount olmadan) gönderilirse `resolvedTotal = Number(undefined) = NaN` oluşup SQLite yazımı 500 ile patlıyor — gerçek UI her zaman tam teklif formu gönderdiği için üretimde tetiklenmiyor, ama API doğrudan çağrılırsa kırılgan. Bu Faz 3'ün kapsamı dışında (B-08 ile ilgisiz, ayrı bir düzeltme).
 
 **Kapsam dışı bırakılan:** Milestone `status`/`progress` otomasyonu (insan kararı olarak kalıyor).
+
+---
+
+## Faz 4 Kapanışı — B-09 Garanti Bitiş Uyarısı (2026-08-10)
+
+B-09'un ana kabul kriteri (garanti/servis maliyetinin projenin finansal özetine yansıması) zaten karşılanıyordu (`upsertServiceCostItem` → `ProjectCostItem` → `netMargin`). Kalan tek küçük ek: garanti süresi bitmiş bir projede servis talebi açıldığında görünür bir uyarı.
+
+`backend/src/routes/serviceTickets.ts` `POST /`: yeni talep oluşturulduktan sonra projeye bağlı `Contract.guaranteeExpiry` kontrol edilir; `reportedAt > guaranteeExpiry` ise **kayıt reddedilmez** (bu oturumun tüm uyarı desenleriyle aynı felsefe) — response'a `warrantyExpiredWarning: { expiredAt }` eklenir, `logActivity` detayına yazılır. `ServiceTicketsModule.tsx` `handleCreate` bunu okuyup uyarı gösterir.
+
+**Doğrulama:** tsc 0 hata, `pnpm audit:roles` 0 ERROR/0 WARN, curl ile pozitif (garantisi geçmiş sözleşme → uyarı) ve negatif (sözleşme/garanti yok → `null`) senaryolar test edildi, test verisi temizlendi.
+
+---
+
+## Manifesto Durumu — TÜM FAZLAR KAPANDI (2026-08-10)
+
+| Faz | Kapsam | Commit |
+|---|---|---|
+| Faz 0 | Keşif | — |
+| Faz 1 (P0) | B-01 · B-02 · B-03 | `8e0988a` |
+| Faz 2 (P1) | B-04 · B-05 | `b4c5061` |
+| Faz 3 (P2) | B-06 · B-07 (EKAP hariç) · B-08 | `2c332ce` |
+| Faz 4 (P3) | B-09 | (bu commit) |
+
+**Kalıcı kapsam dışı bırakılanlar (kullanıcı kararı):** EKAP gerçek entegrasyonu (B-07'nin geri kalanı — dış API bağımlılığı), `Project.applyOverhead` varsayılanının açılması (geriye dönük marj sıçraması riski, opt-in olarak kalıyor), Proposal içeriğinin tamamen backend-hesaplı hale getirilmesi (mevcut pazarlık/manuel-override UX'i korunuyor), stage `role`'ünün kalıcı değiştirilmesi, milestone `status`/`progress` otomasyonu.
+
+**Faz 3'te bulunan, ayrı bir düzeltme gerektiren ön-var-olan hata:** `purchaseRequests.ts` `PUT /:id/quotes/:qid` yalnız `deliveryDays` (totalAmount'sız) gönderilirse NaN→500 veriyor (B-08 kapsamı dışı, gerçek UI etkilenmiyor).

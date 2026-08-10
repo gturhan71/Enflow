@@ -73,15 +73,18 @@ export function ServiceTicketsModule({ projects }: Props) {
     if (!form.projectId || !form.title.trim()) return;
     setSaving(true);
     try {
-      await apiService.createServiceTicket({
+      const saved = await apiService.createServiceTicket({
         projectId: form.projectId, title: form.title, description: form.description || null,
         category: form.category, priority: form.priority, reportedByName: form.reportedByName || null,
         slaHours: form.slaHours ? Number(form.slaHours) : null,
         brandId: form.brandId || null, productCategoryId: form.productCategoryId || null,
-      });
+      }) as { warrantyExpiredWarning?: { expiredAt: string } | null };
       setShowNewModal(false);
       resetForm();
       load();
+      if (saved?.warrantyExpiredWarning) {
+        alert(`⚠ Garanti süresi dolmuş: bu projenin garantisi ${new Date(saved.warrantyExpiredWarning.expiredAt).toLocaleDateString('tr-TR')} tarihinde sona erdi. Maliyet garanti kapsamında olmayabilir.`);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Servis talebi kaydedilemedi.');
     } finally {
