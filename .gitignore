@@ -29,6 +29,11 @@ backend/*.pre-upgrade-*
 backend/*.db
 backend/*.db-shm
 backend/*.db-wal
+# prisma migrate, schema dizini bazlı relative URL çözümlemesinde boş bir eş dosya
+# oluşturabiliyor (backend/prisma/dev.db) — gerçek çalışma zamanı DB'si backend/dev.db'dir.
+backend/prisma/*.db
+backend/prisma/*.db-shm
+backend/prisma/*.db-wal
 
 # Installer portatif Node indirme dizini (otomatik kurulum)
 install/.tools/

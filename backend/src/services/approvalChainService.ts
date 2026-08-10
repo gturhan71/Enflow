@@ -2,6 +2,8 @@ import { prisma } from '../prismaClient';
 import { getAgentPluginForRole } from './pluginCatalog';
 import { agentActorId } from './agentProvenance';
 import { resolveApproverRoles } from './governance';
+import { getApprovalSlaBusinessDays } from './approvalSlaEscalation';
+import { computeSlaDueDate } from '../utils/businessDays';
 
 // Faz 0 — diyagramdaki kurumsal onay sırası:
 // Presales hazırlar → Finans değerlendirir → İGB onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
@@ -39,12 +41,19 @@ export async function ensureApprovalChain(
     stageRoles = matrixRoles || APPROVAL_CHAIN_TEMPLATES[entityType] || ['GENERAL_MANAGER'];
   }
 
+  // B-05 — ilk aşamanın SLA süresi hemen atanır (sweep'i beklemeden); sonraki
+  // aşamalar sırası geldiğinde approvalSlaEscalation.ts sweep'i tarafından atanır.
+  const slaDays = await getApprovalSlaBusinessDays(tenantId);
+  const firstStageDueDate = computeSlaDueDate(slaDays) ?? undefined;
+
   return prisma.approvalChain.create({
     data: {
       tenantId,
       entityType,
       entityId,
-      stages: { create: stageRoles.map((role, i) => ({ role, order: i })) },
+      stages: {
+        create: stageRoles.map((role, i) => ({ role, order: i, dueDate: i === 0 ? firstStageDueDate : undefined })),
+      },
     },
     include: { stages: { orderBy: { order: 'asc' } } },
   });

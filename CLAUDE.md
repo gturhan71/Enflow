@@ -471,7 +471,6 @@ src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/IncomingReportCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/IncomingReportsTab.tsx ← ../types, IncomingReportCard
-src/modules/reporting/MetricCard.tsx ← ../types, helpers
 src/modules/reporting/MyReportsTab.tsx ← ../types, helpers
 src/modules/reporting/ReportForm.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
 src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
@@ -481,7 +480,8 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
+backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
 backend/src/services/personnelTransferService.ts ← prismaClient
@@ -520,7 +520,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 24 hours ago)
+## changes (last 10 commits — 30 minutes ago)
 ```
 src/components/HealthCards.tsx                ~ProjectHealthCard  ~CustomerHealthCard
 src/components/InfoTooltip.tsx                +InfoTooltip
@@ -563,6 +563,7 @@ backend/src/services/guaranteeReminders.ts    ~sweepGuaranteeReminders
 backend/src/services/opportunityProgressReminders.ts +sweepOpportunityProgressReminders  +safeParse
 backend/src/services/opportunityProgressService.ts +getOpportunityProgressSettings  +ProgressCheckInError  +finalizeCheckIn  +recordProgressCheckIn
 backend/src/services/restoreService.ts        +orderModelsForInsert  +loadModelsIntoTarget  +zaten  ~applyLogicalRestore
+backend/src/services/salesCosting.ts          +evaluateProposalMargin  ~computeSalesCosting
 backend/src/services/tenantEncryption.ts      +loadMasterKey  +aesEncrypt  +aesDecrypt  +getTenantDek
 backend/src/services/tenderReminders.ts       ~sweepTenderReminders
 backend/src/services/unitReportingService.ts  +resolveUnitStaff  +getVisitTargetRate  +computeVisitPerformance  ~getUnitDefinition
@@ -839,12 +840,18 @@ export function buildSummary({ actorName, action, entityType, entityLabel }) →
 
 ### backend/src/services/approvalChainService.ts
 ```
-export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :22-51  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
-export async function completeApprovalChain(tenantId, entityType, entityId, approverId?, note?)  :59-81  # Mevcut tek-tıkla onay UI'ları (Opportunity GM onayı, Contrac
-export async function autoSkipOrphanStages(tenantId, chainId)  :91-201  # Skip-logic: tenant'ta **hiçbir aktif kullanıcıya** karşılık 
-export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :209-221  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
-export async function resolveEffectiveApprover(tenantId, role, userId) → Promise<boolean>  :224-230  # Bir kullanıcı bir role ait onayı yapabilir mi
-export async function resetApprovalChain(tenantId, entityType, entityId)  :233-246  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :24-60  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
+export async function completeApprovalChain(tenantId, entityType, entityId, approverId?, note?)  :68-90  # Mevcut tek-tıkla onay UI'ları (Opportunity GM onayı, Contrac
+export async function autoSkipOrphanStages(tenantId, chainId)  :100-210  # Skip-logic: tenant'ta **hiçbir aktif kullanıcıya** karşılık 
+export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :218-230  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
+export async function resolveEffectiveApprover(tenantId, role, userId) → Promise<boolean>  :233-239  # Bir kullanıcı bir role ait onayı yapabilir mi
+export async function resetApprovalChain(tenantId, entityType, entityId)  :242-255  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+```
+
+### backend/src/services/approvalSlaEscalation.ts
+```
+export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
+export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-81
 ```
 
 ### backend/src/services/backupService.ts
@@ -2245,11 +2252,6 @@ handler onChange
 ```
 component IncomingReportsTab
 handler onReviewed
-```
-
-### src/modules/reporting/MetricCard.tsx
-```
-component MetricCard
 ```
 
 ### src/modules/reporting/MyReportsTab.tsx

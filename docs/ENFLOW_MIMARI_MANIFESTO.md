@@ -56,7 +56,7 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 | **B-02** Finance Engine (integer minor units + FX kilit) | Sıfırdan yapılacak | Şema hâlâ `Float` (bilinçli erteleme, `docs/MONEY_MIGRATION_PLAN.md`). `financeEngine.ts` iç hesapları kuruş-bazlı yapıyor, `moneyRounding.ts` + Prisma `$extends` ile depolama temizleniyor. FX kilidi zaten var: `POST /:id/cost-analysis` costConfig'i (spot+forward kur) kalıcı yazıyor + `CostAnalysisVersion`'a snapshot'lıyor; `POST /:id/approve-cost` yeniden hesap yapmıyor — kayıtlı tutar onay sonrası değişmiyor. | ✅ Karşılandı (BigInt storage migration kasıtlı olarak kapsam dışı) |
 | **B-03** Overhead Allocation / DMO | Sıfırdan yapılacak | Tamamı zaten var (2026-07-03). İki katmanlı dağıtım, `Project.netMargin` tam-yüklü hesap, DMO tarafında net<0 → otomatik alarm. Tek fark: `Project.applyOverhead` varsayılan `false` (opt-in) — **kullanıcı kararı: opt-in kalsın** (geriye dönük marj sıçraması riski). | ✅ Karşılandı (adım-1 kullanıcı kararıyla uygulanmadı) |
 | **B-04** Contract Execution state machine | Sıfırdan yapılacak | Tamam, test edilmiş. `backend/src/services/contractWorkflowState.ts:6-16` merkezi `STATUS_TRANSITIONS` guard tablosu + rol kısıtı + zorunlu gerekçe kontrolü; `contractWorkflow.ts:148-153` geçersiz geçişleri reddediyor. Test dosyası mevcut. Eski `Contract` modeli legacy, asıl akış `ContractWorkflow`. | ✅ Karşılandı |
-| **B-05** Onay delegasyonu & SLA eskalasyonu | Sıfırdan yapılacak | Delegasyon: TAMAM ve çalışıyor (`approvalChainService.ts` `getDelegatedRoles`/`resolveEffectiveApprover`). SLA eskalasyonu KISMİ: `slaEscalation.ts` süresi geçen TodoTask'ları bulup bildirim gönderiyor ama görevi devretmiyor; `ApprovalStage`'de SLA alanı yok. | ⚠️ Kısmi — Faz 2'de detaylandırılacak |
+| **B-05** Onay delegasyonu & SLA eskalasyonu | Sıfırdan yapılacak | Delegasyon: TAMAM ve çalışıyor (`approvalChainService.ts` `getDelegatedRoles`/`resolveEffectiveApprover`). SLA eskalasyonu artık `ApprovalStage.dueDate`/`escalatedAt`/`escalatedToRole` + `approvalSlaEscalation.ts` ile **gerçek yetki devri** yapıyor (bkz. Faz 2 Kapanışı). | ✅ Kapatıldı (Faz 2, bu oturum) |
 | **B-06** CRM/Proposal veri derinliği | Sıfırdan yapılacak | Customer modeli zengin ama "kaynak" (lead source) alanı yok, mükerrer kayıt uyarısı yok. | ❌ Açık — Faz 3'te |
 | **B-07** EKAP istihbaratı & ağırlıklı pipeline | Sıfırdan yapılacak | Ağırlıklı pipeline TAMAM (`analyticsService.ts` `computeForecast()` → `weightedPipeline`/`coverage`; `ForecastCard.tsx`). EKAP gerçek entegrasyonu yok — **kullanıcı kararıyla kapsam dışı.** | ✅ Ağırlıklı pipeline karşılandı / EKAP kapsam dışı |
 | **B-08** Tedarikçi/procurement entegrasyonu | Sıfırdan yapılacak | `PurchaseQuote.deliveryDays` yalnız teklif skorlamasında kullanılıyor, senkronize edilmiyor. `ProjectCostItem.purchaseRequestId` yalnız maliyet senkronize ediyor; `ProjectMilestone`'a teslim tarihi/takvim bağı yok. | ❌ Açık — Faz 3'te |
@@ -65,12 +65,12 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 
 ### Revize Faz Durumu
 
-- **Faz 1 (P0):** B-01 ✅ (bu oturum) · B-02 ✅ · B-03 ✅ — **kapı geçildi.**
-- **Faz 2 (P1):** B-04 ✅ · B-05 ⚠️ kısmi (onay-SLA otomatik devri eksik) — sırada.
+- **Faz 1 (P0):** B-01 ✅ · B-02 ✅ · B-03 ✅ — **kapı geçildi** (2026-08-10).
+- **Faz 2 (P1):** B-04 ✅ · B-05 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 3 (P2):** B-06 ❌ · B-07 ✅ (EKAP hariç) · B-08 ❌ — sırada.
 - **Faz 4 (P3):** B-09 büyük ölçüde ✅, küçük ek opsiyonel — sırada.
 
-Faz 2-4, sıraları geldiğinde bu manifestoya yeni bölümler olarak eklenip ayrı ayrı detaylandırılacak.
+Faz 3-4, sıraları geldiğinde bu manifestoya yeni bölümler olarak eklenip ayrı ayrı detaylandırılacak.
 
 ---
 
@@ -84,3 +84,16 @@ Faz 2-4, sıraları geldiğinde bu manifestoya yeni bölümler olarak eklenip ay
 - `CRMModule.tsx`, `creditWarning` ile aynı desende `marginWarning`'i okuyup uyarı gösteriyor.
 
 **Kapsam dışı bırakılan:** Proposal `content`'in tamamen backend-hesaplı hale getirilmesi (ham girdi → backend hesapla → UI sadece göster) — bu, mevcut manuel-override/pazarlık UX'ini kaldırır, ayrı bir UX kararı gerektirir.
+
+---
+
+## Faz 2 Kapanışı — B-05 Onay-SLA Eskalasyonu (2026-08-10)
+
+Delegasyon (B-05 adım 3) zaten çalışıyordu; eksik olan SLA süresi tanımlama + süre dolunca **gerçek yetki devri** (yalnız bildirim değil) eklendi — `slaEscalation.ts`'in (TodoTask) desenini `ApprovalStage`'e taşıyan yeni bir servis:
+
+- Migration `approval_stage_sla`: `ApprovalStage.dueDate`/`escalatedAt`/`escalatedToRole` eklendi.
+- Yeni `backend/src/services/approvalSlaEscalation.ts` — `sweepApprovalSlaEscalations()`: tenant-başına 60sn throttle, PENDING zincirlerin "current" (sıradaki ilk PENDING) stage'ine `dueDate` atar (tenant-yapılandırmalı `moduleSettings.approvals.slaBusinessDays`, varsayılan 2 iş günü); süresi geçip `escalatedAt` boşsa `escalatedToRole='GENERAL_MANAGER'` yazar + rol sahibi ve GM'e `Notification` üretir. `GET /api/approval-chains`'in başında tetiklenir (`tasks.ts`'teki `sweepSlaEscalations` çağrısıyla birebir aynı desen).
+- `approve`/`reject` endpoint'lerinde yetki kontrolü genişledi: orijinal rol sahibi **veya** `escalatedToRole` sahibi onaylayabilir/reddedebilir — orijinal yetki kaldırılmıyor, ilk işlem yapan geçerli oluyor (optimistic locking zaten vardı). `pendingForRole` "sırası gelmiş" filtresi de `escalatedToRole`'ü kapsayacak şekilde genişledi.
+- **Önemli düzeltme (test sırasında bulundu):** SLA saatinin başlangıcı `stage.createdAt` değil `now` olmalı — bir zincirin tüm aşamaları aynı anda create edildiği için `createdAt` yalnızca "zincir ne zaman açıldı"yı gösteriyor, "bu aşama ne zaman sıraya girdi"yi değil. `createdAt` kullanılsaydı, özellik ilk devreye girdiğinde haftalarca bekleyen eski zincirler anında "aşılmış" sayılıp toplu eskalasyon/bildirim patlaması yaratıyordu (test sırasında gözlendi, düzeltildi — artık her stage "ilk görüldüğü an"dan itibaren taze bir pencere alıyor).
+
+**Kapsam dışı bırakılan:** Stage'in `role` alanının kalıcı olarak değiştirilmesi (yalnız ek yetki tanımlanıyor); per-stage/per-role farklı SLA süreleri (tek tenant-geneli değer).

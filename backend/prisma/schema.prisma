@@ -924,6 +924,14 @@ model ApprovalStage {
   agentRunId String?       // bu aşamayı onaylayan sanal agent çalıştırması (köken etiketi)
   createdAt  DateTime      @default(now())
   updatedAt  DateTime      @updatedAt
+
+  // B-05 — SLA eskalasyonu (approvalSlaEscalation.ts): stage "current" (sıradaki
+  // ilk PENDING) olduğunda dueDate atanır; süresi geçip escalatedAt boşsa
+  // escalatedToRole (GENERAL_MANAGER) o stage için ek onay yetkisi kazanır —
+  // orijinal role sahibinin yetkisi kaldırılmaz, ikisinden ilk onaylayan geçerli olur.
+  dueDate         DateTime?
+  escalatedAt     DateTime?
+  escalatedToRole String?
 }
 
 // ── Ziyaret Planı & Günlük Rapor (Faz 2) ────────────────────────────────────

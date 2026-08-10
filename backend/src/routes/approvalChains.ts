@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { autoSkipOrphanStages, getDelegatedRoles, resolveEffectiveApprover } from '../services/approvalChainService';
+import { sweepApprovalSlaEscalations } from '../services/approvalSlaEscalation';
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 
@@ -12,6 +13,8 @@ const router: Router = Router();
 // "Sırası gelmiş" = kendinden önceki tüm aşamalar APPROVED olan ilk PENDING aşama bu role ait.
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const { entityType, entityId, pendingForRole } = req.query as { entityType?: string; entityId?: string; pendingForRole?: string };
+
+  await sweepApprovalSlaEscalations(req.tenantId); // B-05 — SLA aşımı eskalasyonu (non-throwing)
 
   if (pendingForRole) {
     const chains = await prisma.approvalChain.findMany({
@@ -29,7 +32,12 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     const myTurn = (healed.filter(Boolean) as NonNullable<typeof healed[number]>[]).filter(c => {
       if (c.status !== 'PENDING') return false;
       const firstPending = c.stages.find(s => s.status === 'PENDING');
-      return !!firstPending && effectiveRoles.has(firstPending.role);
+      // B-05 — SLA aşımıyla eskale edilmiş stage'ler, eskale edilen rolün de
+      // "sırası gelmiş" listesinde görünmesini sağlar (orijinal rol de görmeye devam eder).
+      return !!firstPending && (
+        effectiveRoles.has(firstPending.role) ||
+        (!!firstPending.escalatedToRole && effectiveRoles.has(firstPending.escalatedToRole))
+      );
     });
     return res.json(myTurn);
   }
@@ -98,7 +106,10 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
 
   // B-08 — yalnız aşamanın rolüne sahip kullanıcı ya da o role vekalet verilmiş kullanıcı onaylayabilir.
   // (approverId artık client body'den değil, kimliği doğrulanmış req.userId'den alınır.)
-  const canApprove = await resolveEffectiveApprover(req.tenantId, stage.role, req.userId);
+  // B-05 — SLA aşımıyla eskale edilmişse escalatedToRole de onaylayabilir (orijinal rolün
+  // yetkisi kaldırılmaz, ikisinden ilk onaylayan geçerli olur — optimistic locking zaten var).
+  const canApprove = (await resolveEffectiveApprover(req.tenantId, stage.role, req.userId))
+    || (!!stage.escalatedToRole && await resolveEffectiveApprover(req.tenantId, stage.escalatedToRole, req.userId));
   if (!canApprove) return res.status(403).json({ error: 'Bu aşamayı onaylama yetkiniz yok.' });
 
   // Görev Ayrılığı (SoD): oluşturan kendi kaydını onaylayamaz.
@@ -146,7 +157,9 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
   if (!stage) return res.status(404).json({ error: 'Onay aşaması bulunamadı.' });
 
   // B-08 — approve ile simetrik: yalnız rol sahibi ya da vekili reddedebilir.
-  const canReject = await resolveEffectiveApprover(req.tenantId, stage.role, req.userId);
+  // B-05 — eskalasyon durumunda escalatedToRole de reddedebilir (approve ile simetrik).
+  const canReject = (await resolveEffectiveApprover(req.tenantId, stage.role, req.userId))
+    || (!!stage.escalatedToRole && await resolveEffectiveApprover(req.tenantId, stage.escalatedToRole, req.userId));
   if (!canReject) return res.status(403).json({ error: 'Bu aşamayı reddetme yetkiniz yok.' });
 
   // Optimistic locking: yalnız PENDING aşama reddedilebilir (eşzamanlı yarış).
