@@ -521,6 +521,9 @@ const ProposalEditor = ({
                 content: JSON.stringify({
                   items: cleanItems,
                   totalPrice: manualTotalPrice,
+                  totalBoMCostBase,
+                  totalOpsCostBase,
+                  totalCostBase: grandCostBase,
                   vatRatePct: weightedVatRate,
                   vatAmount,
                   grandTotalWithVat,

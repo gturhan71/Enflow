@@ -2,8 +2,33 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
+import { evaluateProposalMargin, getSalesMarginFloor, ProposalMarginCheck } from '../services/salesCosting';
 
 const router: Router = Router();
+
+// content.totalCostBase/totalPrice varsa (bkz. ProposalEditor.tsx onSave) marjı
+// tenant eşiğine karşı değerlendirir; yoksa (eski kayıt/API'den doğrudan içerik) null döner.
+async function checkProposalMargin(tenantId: string, proposalContent: unknown): Promise<ProposalMarginCheck | null> {
+  if (!proposalContent || typeof proposalContent !== 'object') return null;
+  const c = proposalContent as { totalCostBase?: unknown; totalPrice?: unknown };
+  if (typeof c.totalCostBase !== 'number' || typeof c.totalPrice !== 'number') return null;
+  const marginFloorPct = await getSalesMarginFloor(tenantId);
+  return evaluateProposalMargin(c.totalPrice, c.totalCostBase, marginFloorPct);
+}
+
+async function notifyMarginWarning(tenantId: string, opportunityId: string, opportunityTitle: string, check: ProposalMarginCheck) {
+  const targets = await prisma.user.findMany({ where: { tenantId, role: { in: ['SALES_MGR', 'GENERAL_MANAGER'] }, status: 'ACTIVE' } });
+  for (const u of targets) {
+    await prisma.notification.create({
+      data: {
+        tenantId, userId: u.id, type: 'WARNING',
+        title: 'Teklif marjı eşiğin altında',
+        message: `${opportunityTitle} — teklif marjı %${check.marginPct.toFixed(1)}, eşiğin (%${check.marginFloorPct}) altında.`,
+        relatedModule: 'crm-opportunities', relatedItemId: opportunityId,
+      },
+    }).catch(() => {});
+  }
+}
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const proposals = await prisma.proposal.findMany({
@@ -81,8 +106,13 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     }
   }
 
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROPOSAL', entityId: proposal.id, details: { opportunityId: proposal.opportunityId, version: proposal.version, creditWarning: creditWarning ? true : undefined } });
-  res.json({ ...proposal, creditWarning });
+  const marginCheck = await checkProposalMargin(tenantId, proposalContent);
+  if (marginCheck?.belowFloor) {
+    await notifyMarginWarning(tenantId, opportunityId, proposal.opportunity?.title || opportunityId, marginCheck);
+  }
+
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROPOSAL', entityId: proposal.id, details: { opportunityId: proposal.opportunityId, version: proposal.version, creditWarning: creditWarning ? true : undefined, marginPct: marginCheck?.marginPct, belowMarginFloor: marginCheck?.belowFloor } });
+  res.json({ ...proposal, creditWarning, marginWarning: marginCheck?.belowFloor ? { marginPct: marginCheck.marginPct, marginFloorPct: marginCheck.marginFloorPct } : null });
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
@@ -104,8 +134,17 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     include: { opportunity: { include: { customer: true } } }
   });
 
-  await logActivity({ tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'PROPOSAL', entityId: id, details: { status: proposal.status, version: proposal.version } });
-  res.json(proposal);
+  let marginCheck: ProposalMarginCheck | null = null;
+  if (content) {
+    const parsedContent = typeof content === 'string' ? (() => { try { return JSON.parse(content); } catch { return null; } })() : content;
+    marginCheck = await checkProposalMargin(tenantId, parsedContent);
+    if (marginCheck?.belowFloor) {
+      await notifyMarginWarning(tenantId, proposal.opportunityId, proposal.opportunity?.title || proposal.opportunityId, marginCheck);
+    }
+  }
+
+  await logActivity({ tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'PROPOSAL', entityId: id, details: { status: proposal.status, version: proposal.version, marginPct: marginCheck?.marginPct, belowMarginFloor: marginCheck?.belowFloor } });
+  res.json({ ...proposal, marginWarning: marginCheck?.belowFloor ? { marginPct: marginCheck.marginPct, marginFloorPct: marginCheck.marginFloorPct } : null });
 }));
 
 router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

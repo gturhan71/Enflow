@@ -132,10 +132,16 @@ const CRMModule = ({
         customerId: selectedOpp.customerId,
         createdById: currentUser?.id
       });
-      const { creditWarning, ...savedProposal } = saved as Proposal & { creditWarning?: { exposure: number; creditLimit: number; currency: string } | null };
+      const { creditWarning, marginWarning, ...savedProposal } = saved as Proposal & {
+        creditWarning?: { exposure: number; creditLimit: number; currency: string } | null;
+        marginWarning?: { marginPct: number; marginFloorPct: number } | null;
+      };
       setProposals(prev => [...(prev || []), savedProposal]);
       if (creditWarning) {
         alert(`⚠ Kredi limiti uyarısı: ${selectedOpp.customer?.name || 'Müşteri'} için açık fırsat toplamı ${creditWarning.exposure.toLocaleString('tr-TR')} ${creditWarning.currency}, kredi limitini (${creditWarning.creditLimit.toLocaleString('tr-TR')} ${creditWarning.currency}) aşıyor. GM ve Satış Müdürü bilgilendirildi.`);
+      }
+      if (marginWarning) {
+        alert(`⚠ Marj uyarısı: Teklif marjı %${marginWarning.marginPct.toFixed(1)}, eşiğin (%${marginWarning.marginFloorPct}) altında. GM ve Satış Müdürü bilgilendirildi.`);
       }
 
       // Determine target status based on proposal content

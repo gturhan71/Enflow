@@ -159,6 +159,32 @@ export function computeSalesCosting(input: {
   };
 }
 
+// ── Proposal (Teklif) marj doğrulaması ───────────────────────────────────────
+// Proposal içeriği (kalem/proje-geneli marj modu + pazarlık için manuel toplam
+// fiyat override) kasıtlı olarak frontend'de hesaplanmaya devam ediyor — bu
+// negotiation UX'inin bir parçası. Ama kaydedilen totalPrice/totalCostBase
+// (bkz. ProposalEditor.tsx onSave) burada aynı marj-eşiği mantığıyla (belowFloor/
+// alarmReason, computeSalesCosting ile aynı format) doğrulanıp denetlenebilir
+// hâle getiriliyor — reddetmiyor, yalnız görünür + audit edilebilir kılıyor.
+export interface ProposalMarginCheck {
+  marginPct: number;
+  belowFloor: boolean;
+  marginFloorPct: number;
+  alarmReason: string | null;
+}
+
+export function evaluateProposalMargin(totalPrice: number, totalCostBase: number, marginFloorPct: number): ProposalMarginCheck {
+  const profit = totalPrice - totalCostBase;
+  const marginPct = totalPrice > 0 ? Math.round((profit / totalPrice) * 100 * 100) / 100 : 0;
+  const belowFloor = marginPct < marginFloorPct;
+  return {
+    marginPct,
+    belowFloor,
+    marginFloorPct,
+    alarmReason: belowFloor ? `Marj %${marginPct.toFixed(1)} < eşik %${marginFloorPct} — onaylayan bunu görecek.` : null,
+  };
+}
+
 // ── Yönetici-ayarlı marj eşiği (Tenant.moduleSettings.sales — DMO'daki getDmoParams/setDmoParams ile aynı desen) ──
 const DEFAULT_MARGIN_FLOOR_PCT = 10;
 
