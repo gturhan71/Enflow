@@ -11,6 +11,34 @@ router.use(tenantMiddleware);
 // %25 + teslim süresi %15 — bkz. virtualAgentService.scoreQuotes) ekler.
 // Skor daha önce yalnız sanal agent'ın arka-plan danışmanlığındaydı; kullanıcı
 // artık aynı hesabı ekranda da görüyor, seçim yine insan kararı.
+// B-08 — tedarikçi teslim taahhüdü → proje takvimi senkronu. Milestone.status/progress'e
+// dokunulmaz (insan kararı olarak kalır) — yalnız tarih alanları + görünür bir uyarı.
+async function syncProcurementMilestoneDate(tenantId: string, projectId: string, expectedDate: Date, reason: string) {
+  const milestone = await prisma.projectMilestone.findFirst({ where: { projectId, milestoneType: 'PROCUREMENT' } });
+  if (!milestone) return;
+  const wasAlreadySet = !!milestone.plannedEnd;
+  if (wasAlreadySet && milestone.plannedEnd!.getTime() === expectedDate.getTime()) return;
+
+  await prisma.projectMilestone.update({ where: { id: milestone.id }, data: { plannedEnd: expectedDate } }).catch(() => {});
+
+  if (wasAlreadySet) {
+    const project = await prisma.project.findFirst({ where: { id: projectId, tenantId } });
+    const targets = new Set<string>();
+    if (project?.pmId) targets.add(project.pmId);
+    if (project?.managerId) targets.add(project.managerId);
+    for (const userId of targets) {
+      await prisma.notification.create({
+        data: {
+          tenantId, userId, type: 'WARNING',
+          title: 'Tedarikçi teslim tarihi değişti',
+          message: `${project?.name || 'Proje'} — Satınalma aşaması planlanan bitiş tarihi ${reason}: ${expectedDate.toLocaleDateString('tr-TR')}.`,
+          relatedModule: 'project-mgmt', relatedItemId: projectId,
+        },
+      }).catch(() => {});
+    }
+  }
+}
+
 type ScorableQuote = { id: string; totalAmount: number; totalAmountTRY: number | null; deliveryDays: number | null; vendor?: { rating: number | null } | null };
 function withQuoteScores<Q extends ScorableQuote, T extends { quotes: Q[] }>(pr: T): T {
   if (!pr.quotes?.length) return pr;
@@ -182,6 +210,14 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     const selected = await prisma.purchaseQuote.findFirst({
       where: { purchaseRequestId: pr.id, isSelected: true },
     });
+
+    // B-08 — seçili tedarikçinin teslim taahhüdü proje takvimine (Satınalma milestone'u) senkronize edilir.
+    if (pr.projectId && selected?.deliveryDays && updated.poIssuedAt) {
+      const expectedDate = new Date(updated.poIssuedAt);
+      expectedDate.setDate(expectedDate.getDate() + selected.deliveryDays);
+      await syncProcurementMilestoneDate(req.tenantId, pr.projectId, expectedDate, 'PO kesildi');
+    }
+
     const amount = selected?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0;
     const itemsWithBomKey = updated.items.filter(i => i.lineKey);
     if (pr.projectId && itemsWithBomKey.length > 0 && amount > 0) {
@@ -381,7 +417,10 @@ router.post('/:id/quotes', asyncHandler(async (req: Request, res: Response) => {
 
 router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) => {
   const qid = String(req.params.qid);
-  const owns = await prisma.purchaseQuote.findFirst({ where: { id: qid, purchaseRequest: { tenantId: req.tenantId } }, select: { id: true } });
+  const owns = await prisma.purchaseQuote.findFirst({
+    where: { id: qid, purchaseRequest: { tenantId: req.tenantId } },
+    select: { id: true, isSelected: true, purchaseRequest: { select: { projectId: true, poIssuedAt: true } } },
+  });
   if (!owns) return res.status(404).json({ error: 'Teklif bulunamadı.' });
   const { vendorName, totalAmount, currency, totalAmountTRY, deliveryDays, validUntil, notes, items } = req.body as {
     vendorName?: string; totalAmount?: number; currency?: string; totalAmountTRY?: number;
@@ -408,6 +447,15 @@ router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) 
       },
     });
   });
+
+  // B-08 — PO zaten kesilmişken seçili teklifin teslim taahhüdü revize edilmişse
+  // ("taahhüt değişti") proje takvimi yeniden senkronize edilir.
+  if (deliveryDays && owns.isSelected && owns.purchaseRequest.projectId && owns.purchaseRequest.poIssuedAt) {
+    const expectedDate = new Date(owns.purchaseRequest.poIssuedAt);
+    expectedDate.setDate(expectedDate.getDate() + Number(deliveryDays));
+    await syncProcurementMilestoneDate(req.tenantId, owns.purchaseRequest.projectId, expectedDate, 'tedarikçi teklifinde güncellendi');
+  }
+
   res.json(await prisma.purchaseQuote.findFirst({ where: { id: qid, purchaseRequest: { tenantId: req.tenantId } }, include: { vendor: true, items: true } }));
 }));
 
@@ -467,6 +515,30 @@ router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) =>
       // totalOrdered bilinmiyorsa (eski/eksik veri) geriye dönük uyumluluk için kaydın kendi statüsüne güven.
       data: { status: totalOrdered > 0 ? (fullyReceived ? 'INVOICED' : 'IN_DELIVERY') : (status === 'RECEIVED' ? 'INVOICED' : 'IN_DELIVERY') },
     });
+
+    // B-08 — tam teslim alındığında Satınalma milestone'unun gerçek bitiş tarihi
+    // doldurulur; planlanandan geç kalınmışsa proje takvimine görünür bir uyarı düşer.
+    // Milestone.status/progress'e dokunulmaz (insan kararı olarak kalır).
+    if (fullyReceived && pr.projectId) {
+      const milestone = await prisma.projectMilestone.findFirst({ where: { projectId: pr.projectId, milestoneType: 'PROCUREMENT' } });
+      if (milestone && !milestone.actualEnd) {
+        await prisma.projectMilestone.update({ where: { id: milestone.id }, data: { actualEnd: delivery.deliveredAt } }).catch(() => {});
+        if (milestone.plannedEnd && delivery.deliveredAt.getTime() > milestone.plannedEnd.getTime()) {
+          const project = await prisma.project.findFirst({ where: { id: pr.projectId, tenantId: req.tenantId } });
+          const targets = new Set<string>([project?.pmId, project?.managerId].filter((v): v is string => !!v));
+          for (const userId of targets) {
+            await prisma.notification.create({
+              data: {
+                tenantId: req.tenantId, userId, type: 'WARNING',
+                title: 'Tedarikçi teslimatı gecikti',
+                message: `${project?.name || 'Proje'} — Satınalma teslimatı planlanandan (${milestone.plannedEnd.toLocaleDateString('tr-TR')}) geç geldi (${delivery.deliveredAt.toLocaleDateString('tr-TR')}).`,
+                relatedModule: 'project-mgmt', relatedItemId: pr.projectId,
+              },
+            }).catch(() => {});
+          }
+        }
+      }
+    }
 
     // B-13 — hasar/iade alt-akışı: hasarlı teslimat, kümülatif ilerlemeyi bloklamaz
     // (hasarsız kısım yine sayılır) ama Satınalma birimine ayrı bir takip görevi açar.

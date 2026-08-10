@@ -67,6 +67,7 @@ export interface Customer {
   taxNumber?: string;
   chamberOfCommerce?: string;
   tradeRegistryNo?: string;
+  source?: string;
   riskScore: number;
   creditLimit: number;
   currency: 'USD' | 'EUR' | 'TRY';

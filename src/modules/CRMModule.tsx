@@ -201,9 +201,14 @@ const CRMModule = ({
     setLoading(true);
     try {
       const saved = await apiService.createCustomer(customerForm.values);
-      setCustomers(prev => [...prev, saved]);
+      const { duplicateWarning, ...savedCustomer } = saved as Customer & { duplicateWarning?: { id: string; name: string; similarity: number }[] | null };
+      setCustomers(prev => [...prev, savedCustomer]);
       setShowNewCustomerModal(false);
       customerForm.resetForm();
+      if (duplicateWarning?.length) {
+        const list = duplicateWarning.map(d => `• ${d.name} (%${Math.round(d.similarity * 100)} benzer)`).join('\n');
+        alert(`⚠ Olası mükerrer kayıt: girilen isme benzer müşteri(ler) zaten var:\n${list}`);
+      }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Müşteri kaydedilemedi.');
     } finally {

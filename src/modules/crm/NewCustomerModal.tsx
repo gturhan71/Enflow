@@ -55,6 +55,21 @@ export default function NewCustomerModal({
                   placeholder="Sektör"
                   className="px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
                 />
+                <select
+                  name="source"
+                  value={values.source ?? ''}
+                  onChange={handleChange}
+                  className="col-span-2 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                >
+                  <option value="">Kaynak (opsiyonel)</option>
+                  <option value="REFERANS">Referans</option>
+                  <option value="WEB_SITESI">Web Sitesi</option>
+                  <option value="IHALE_DUYURUSU">İhale Duyurusu</option>
+                  <option value="SOGUK_ARAMA">Soğuk Arama</option>
+                  <option value="FUAR_ETKINLIK">Fuar / Etkinlik</option>
+                  <option value="SOSYAL_MEDYA">Sosyal Medya</option>
+                  <option value="DIGER">Diğer</option>
+                </select>
               </div>
             </div>
 

@@ -57,9 +57,9 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 | **B-03** Overhead Allocation / DMO | Sıfırdan yapılacak | Tamamı zaten var (2026-07-03). İki katmanlı dağıtım, `Project.netMargin` tam-yüklü hesap, DMO tarafında net<0 → otomatik alarm. Tek fark: `Project.applyOverhead` varsayılan `false` (opt-in) — **kullanıcı kararı: opt-in kalsın** (geriye dönük marj sıçraması riski). | ✅ Karşılandı (adım-1 kullanıcı kararıyla uygulanmadı) |
 | **B-04** Contract Execution state machine | Sıfırdan yapılacak | Tamam, test edilmiş. `backend/src/services/contractWorkflowState.ts:6-16` merkezi `STATUS_TRANSITIONS` guard tablosu + rol kısıtı + zorunlu gerekçe kontrolü; `contractWorkflow.ts:148-153` geçersiz geçişleri reddediyor. Test dosyası mevcut. Eski `Contract` modeli legacy, asıl akış `ContractWorkflow`. | ✅ Karşılandı |
 | **B-05** Onay delegasyonu & SLA eskalasyonu | Sıfırdan yapılacak | Delegasyon: TAMAM ve çalışıyor (`approvalChainService.ts` `getDelegatedRoles`/`resolveEffectiveApprover`). SLA eskalasyonu artık `ApprovalStage.dueDate`/`escalatedAt`/`escalatedToRole` + `approvalSlaEscalation.ts` ile **gerçek yetki devri** yapıyor (bkz. Faz 2 Kapanışı). | ✅ Kapatıldı (Faz 2, bu oturum) |
-| **B-06** CRM/Proposal veri derinliği | Sıfırdan yapılacak | Customer modeli zengin ama "kaynak" (lead source) alanı yok, mükerrer kayıt uyarısı yok. | ❌ Açık — Faz 3'te |
+| **B-06** CRM/Proposal veri derinliği | Sıfırdan yapılacak | `Customer.source` + Levenshtein-bazlı mükerrer kayıt uyarısı eklendi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
 | **B-07** EKAP istihbaratı & ağırlıklı pipeline | Sıfırdan yapılacak | Ağırlıklı pipeline TAMAM (`analyticsService.ts` `computeForecast()` → `weightedPipeline`/`coverage`; `ForecastCard.tsx`). EKAP gerçek entegrasyonu yok — **kullanıcı kararıyla kapsam dışı.** | ✅ Ağırlıklı pipeline karşılandı / EKAP kapsam dışı |
-| **B-08** Tedarikçi/procurement entegrasyonu | Sıfırdan yapılacak | `PurchaseQuote.deliveryDays` yalnız teklif skorlamasında kullanılıyor, senkronize edilmiyor. `ProjectCostItem.purchaseRequestId` yalnız maliyet senkronize ediyor; `ProjectMilestone`'a teslim tarihi/takvim bağı yok. | ❌ Açık — Faz 3'te |
+| **B-08** Tedarikçi/procurement entegrasyonu | Sıfırdan yapılacak | `syncProcurementMilestoneDate()` ile PO_ISSUED/teklif revizyonu/teslimat üç noktada `ProjectMilestone.plannedEnd`/`actualEnd`'e senkronize ediliyor + değişiklik/gecikme bildirimi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
 | **B-09** Warranty/Service modülü | Sıfırdan yapılacak | Büyük ölçüde tamam. `ServiceTicket.projectId` zorunlu; maliyet `ProjectCostItem`'a (category=SERVICE) idempotent yazılıyor → `netMargin`'e yansıyor. SLA sweep de var. Eksik (küçük/opsiyonel): garanti süresi bitişi kontrolü. | ✅ Büyük ölçüde karşılandı — Faz 4'te küçük ek |
 | Ek | `rbac.config.ts` tek-kaynak mı? | `tests/rbac/rbac.config.ts` Playwright test fixture'ı; gerçek tek-kaynak `governance/role-matrix.ts`. | Bilgi notu |
 
@@ -67,10 +67,10 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 
 - **Faz 1 (P0):** B-01 ✅ · B-02 ✅ · B-03 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 2 (P1):** B-04 ✅ · B-05 ✅ — **kapı geçildi** (2026-08-10).
-- **Faz 3 (P2):** B-06 ❌ · B-07 ✅ (EKAP hariç) · B-08 ❌ — sırada.
+- **Faz 3 (P2):** B-06 ✅ · B-07 ✅ (EKAP hariç) · B-08 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 4 (P3):** B-09 büyük ölçüde ✅, küçük ek opsiyonel — sırada.
 
-Faz 3-4, sıraları geldiğinde bu manifestoya yeni bölümler olarak eklenip ayrı ayrı detaylandırılacak.
+Faz 4, sırası geldiğinde bu manifestoya yeni bir bölüm olarak eklenip detaylandırılacak.
 
 ---
 
@@ -97,3 +97,15 @@ Delegasyon (B-05 adım 3) zaten çalışıyordu; eksik olan SLA süresi tanımla
 - **Önemli düzeltme (test sırasında bulundu):** SLA saatinin başlangıcı `stage.createdAt` değil `now` olmalı — bir zincirin tüm aşamaları aynı anda create edildiği için `createdAt` yalnızca "zincir ne zaman açıldı"yı gösteriyor, "bu aşama ne zaman sıraya girdi"yi değil. `createdAt` kullanılsaydı, özellik ilk devreye girdiğinde haftalarca bekleyen eski zincirler anında "aşılmış" sayılıp toplu eskalasyon/bildirim patlaması yaratıyordu (test sırasında gözlendi, düzeltildi — artık her stage "ilk görüldüğü an"dan itibaren taze bir pencere alıyor).
 
 **Kapsam dışı bırakılan:** Stage'in `role` alanının kalıcı olarak değiştirilmesi (yalnız ek yetki tanımlanıyor); per-stage/per-role farklı SLA süreleri (tek tenant-geneli değer).
+
+---
+
+## Faz 3 Kapanışı — B-06 CRM Derinliği + B-08 Tedarikçi/Proje Senkronu (2026-08-10)
+
+**B-06:** `Customer.source` (lead kaynağı) eklendi + mükerrer kurum kaydı uyarısı. Yeni `backend/src/utils/textSimilarity.ts` (harici bağımlılık yok — `normalizeCompanyName` şirket eki kelimelerini temizler, `levenshteinDistance`/`similarityRatio` standart DP). `customers.ts` `POST /`: create öncesi tenant'ın mevcut adlarıyla ≥0.82 benzerlik olanları bulur, **kayıt reddedilmez** (Faz 1/2'deki "uyar, engelleme" felsefesi), response'a `duplicateWarning` eklenir. `NewCustomerModal.tsx`'e `source` select'i, `CRMModule.tsx`'e `creditWarning`/`marginWarning` ile aynı desende uyarı gösterimi eklendi.
+
+**B-08:** `PurchaseQuote.deliveryDays` artık gerçekten kullanılıyor. `purchaseRequests.ts`'e yeni `syncProcurementMilestoneDate()` — Proje'nin `PROCUREMENT` milestone'unun `plannedEnd`'ini günceller, **ilk atama değilse** (taahhüt gerçekten değiştiyse) PM/proje yöneticisine `Notification` düşürür. Üç tetik noktası: PO_ISSUED anında (seçili teklifin `deliveryDays`'inden), teklif sonradan revize edildiğinde (`PUT /:id/quotes/:qid`, PO zaten kesilmişse), ve tam teslim alındığında (`actualEnd` doldurulur, plandan geç kalınmışsa "gecikti" uyarısı). Milestone'un `status`/`progress`'üne dokunulmuyor — insan kararı olarak kalıyor.
+
+**Test sırasında bulunan, kapsam dışı bırakılan ön-var-olan hata:** `PUT /:id/quotes/:qid` yalnız `deliveryDays` (totalAmount olmadan) gönderilirse `resolvedTotal = Number(undefined) = NaN` oluşup SQLite yazımı 500 ile patlıyor — gerçek UI her zaman tam teklif formu gönderdiği için üretimde tetiklenmiyor, ama API doğrudan çağrılırsa kırılgan. Bu Faz 3'ün kapsamı dışında (B-08 ile ilgisiz, ayrı bir düzeltme).
+
+**Kapsam dışı bırakılan:** Milestone `status`/`progress` otomasyonu (insan kararı olarak kalıyor).

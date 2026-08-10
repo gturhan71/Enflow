@@ -160,6 +160,7 @@ model Customer {
   taxNumber         String?
   chamberOfCommerce String?
   tradeRegistryNo   String?
+  source            String?       // B-06 — lead kaynağı (Referans/Web Sitesi/İhale Duyurusu/...)
   riskScore         Int           @default(0)
   creditLimit       Float         @default(0)
   currency          String        @default("USD")

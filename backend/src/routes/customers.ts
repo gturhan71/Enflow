@@ -3,6 +3,22 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { encryptForTenant, decryptForTenant } from '../services/tenantEncryption';
+import { normalizeCompanyName, similarityRatio } from '../utils/textSimilarity';
+
+const DUPLICATE_SIMILARITY_THRESHOLD = 0.82;
+
+// B-06 — mükerrer kurum kaydı uyarısı: kayıt reddedilmez (Faz 1/2'deki "uyar,
+// engelleme" felsefesiyle aynı), yalnız görünür + denetlenebilir hale gelir.
+async function findPossibleDuplicates(tenantId: string, name: string) {
+  if (!name) return [] as { id: string; name: string; similarity: number }[];
+  const normalizedNew = normalizeCompanyName(name);
+  const existing = await prisma.customer.findMany({ where: { tenantId }, select: { id: true, name: true } });
+  return existing
+    .map((c) => ({ id: c.id, name: c.name, similarity: Math.round(similarityRatio(normalizedNew, normalizeCompanyName(c.name)) * 100) / 100 }))
+    .filter((m) => m.similarity >= DUPLICATE_SIMILARITY_THRESHOLD)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, 3);
+}
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -28,13 +44,14 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
   const body = { ...req.body };
+  const duplicateWarning = await findPossibleDuplicates(req.tenantId, body.name);
   if (body.taxNumber) body.taxNumber = await encryptForTenant(req.tenantId, body.taxNumber);
   if (body.taxOffice) body.taxOffice = await encryptForTenant(req.tenantId, body.taxOffice);
   const customer = await prisma.customer.create({
     data: { ...body, tenantId: req.tenantId }
   });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'CUSTOMER', entityId: customer.id, details: { name: customer.name } });
-  res.json(await decryptCustomer(req.tenantId, customer));
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'CUSTOMER', entityId: customer.id, details: { name: customer.name, duplicateWarning: duplicateWarning.length ? duplicateWarning : undefined } });
+  res.json({ ...(await decryptCustomer(req.tenantId, customer)), duplicateWarning: duplicateWarning.length ? duplicateWarning : null });
 }));
 
 router.put('/:id', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
