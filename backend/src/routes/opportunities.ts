@@ -129,6 +129,15 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   if (procurementMethod !== undefined) updateData.procurementMethod = procurementMethod || null;
   if (targetBidDate !== undefined) updateData.targetBidDate = targetBidDate ? new Date(targetBidDate as string) : null;
 
+  // Kazanılan bir fırsatın olasılığı her zaman %100 olmalı: teklif üretilmiş (en az bir
+  // Proposal kaydı var) VE durum WON'a çekiliyorsa, istemcinin gönderdiği probability
+  // değeri (varsa) ezilerek 100'e sabitlenir. Teklifsiz "direkt kazanıldı" işaretlemesi
+  // bu kuralın dışında bırakılır — orada kullanıcının girdiği olasılık aynen kalır.
+  if (status === 'WON') {
+    const hasProposal = await prisma.proposal.findFirst({ where: { tenantId, opportunityId }, select: { id: true } });
+    if (hasProposal) updateData.probability = 100;
+  }
+
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },
     data: updateData,
