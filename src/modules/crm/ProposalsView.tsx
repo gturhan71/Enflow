@@ -183,6 +183,17 @@ export default function ProposalsView({
             {activeProposals.map(proposal => {
               const opp = opportunities.find(o => o.id === proposal.opportunityId);
               const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
+              const currency = customer?.currency ?? 'TRY';
+              const c = getContentJson(proposal);
+              const totalPrice = (c.totalPrice as number | undefined) ?? proposal.totalPrice;
+              // Revize edilecek teklif için bir önceki versiyonun tutarı+tarihi — PDF/teklife
+              // çevirmeden önce kıyaslama yapılabilsin diye kartta gösterilir.
+              const prevProposal = [...proposals]
+                .filter(p => p.opportunityId === proposal.opportunityId && (p.version || 1) < (proposal.version || 1))
+                .sort((a, b) => (b.version || 0) - (a.version || 0))[0];
+              const prevTotalPrice = prevProposal
+                ? ((getContentJson(prevProposal).totalPrice as number | undefined) ?? prevProposal.totalPrice)
+                : undefined;
               return (
                 <div key={proposal.id} className={cn(
                   "glass-panel p-6 rounded-2xl flex justify-between items-center",
@@ -197,7 +208,18 @@ export default function ProposalsView({
                       <span className={cn("ml-2 font-black uppercase text-[10px] px-2 py-0.5 rounded-full", statusCls(proposal.status))}>
                         {statusLabel(proposal.status)}
                       </span>
+                      {totalPrice != null && (
+                        <span className="ml-3 font-black text-slate-700">
+                          {Math.round(totalPrice).toLocaleString('tr-TR')} {currency}
+                        </span>
+                      )}
                     </p>
+                    {prevProposal && (
+                      <p className="text-[11px] text-slate-400 mt-1">
+                        Önceki (v{prevProposal.version || 1} · {prevProposal.createdAt ? new Date(prevProposal.createdAt).toLocaleDateString('tr-TR') : '-'}):{' '}
+                        {prevTotalPrice != null ? `${Math.round(prevTotalPrice).toLocaleString('tr-TR')} ${currency}` : '—'}
+                      </p>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     {(proposal.status === 'DRAFT' || proposal.status === 'REJECTED') && (

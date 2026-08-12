@@ -64,13 +64,21 @@ interface ProposalEditorProps {
     currency?: string;
     openForNegotiation?: boolean;
   };
+  // Revizyon senaryosunda (version > 1) bir önceki versiyonun tutarı+tarihi — kafa
+  // karışıklığını önlemek için Finansal Kokpit'te referans olarak gösterilir.
+  previousVersion?: { version: number; totalPrice?: number; createdAt?: string };
   onSave: (proposal: Omit<Proposal, 'id'>) => void;
   onCancel: () => void;
 }
 
-// BoM kalemleri çalışma zamanında maliyet analizinden türetilen salePrice/purchaseCostBase
-// alanlarıyla zenginleştirilir (bkz. items useMemo). Bu alanlar BoMItem'da yok.
-type PricedBoMItem = BoMItem & { salePrice: number; purchaseCostBase?: number };
+// pricedItems useMemo çıktısı — BoM maliyeti + dağıtılan operasyonel gider payı dahil
+// nihai satış fiyatını taşır (bkz. pricedItems tanımı).
+type FullyPricedItem = BoMItem & {
+  purchaseCostBase: number;
+  allocatedOpsCost: number;
+  fullCostBase: number;
+  salePrice: number;
+};
 
 // ── Component ─────────────────────────────────────────────────────────────────
 const ProposalEditor = ({
@@ -80,6 +88,7 @@ const ProposalEditor = ({
   customers,
   version,
   initialData,
+  previousVersion,
   onSave,
   onCancel,
 }: ProposalEditorProps) => {
@@ -210,12 +219,41 @@ const ProposalEditor = ({
 
   const grandCostBase = totalBoMCostBase + totalOpsCostBase;
 
-  // PER_ITEM: her kalemin salePrice'ından toplam
-  const perItemTotal = useMemo(() =>
-    items.reduce((s, i) => s + (i as PricedBoMItem).salePrice * i.quantity, 0),
-  [items]);
+  // BoM-dışı (operasyonel) maliyetler tek toplam olarak alınıp her BoM kalemine
+  // kendi maliyet payı oranında (ağırlıklı) dağıtılır — böylece birim fiyat hem
+  // PER_ITEM hem PROJECT_WIDE modunda gerçek yüklü maliyeti (BoM + gider payı) yansıtır.
+  const allocatedOpsByItemId = useMemo(() => {
+    const map: Record<string, number> = {}; // itemId -> kalem başına dağıtılan gider
+    if (totalBoMCostBase <= 0) return map;
+    for (const i of items) {
+      const it = i as BoMItem & { purchaseCostBase?: number };
+      const costBase = it.purchaseCostBase ?? i.purchaseCost;
+      const weight = (costBase * i.quantity) / totalBoMCostBase;
+      const allocatedTotal = totalOpsCostBase * weight;
+      map[i.id as string] = i.quantity > 0 ? allocatedTotal / i.quantity : 0;
+    }
+    return map;
+  }, [items, totalBoMCostBase, totalOpsCostBase]);
 
-  // PROJECT_WIDE: toplam maliyete tek marj
+  // Her kalemin yüklü maliyeti (kendi maliyeti + dağıtılan gider payı) üzerinden gerçek
+  // satış fiyatı — PER_ITEM'de kalemin kendi marjı, PROJECT_WIDE'da proje marjı uygulanır.
+  const pricedItems = useMemo<FullyPricedItem[]>(() => items.map(item => {
+    const it = item as BoMItem & { purchaseCostBase?: number };
+    const baseCost = it.purchaseCostBase ?? item.purchaseCost;
+    const allocated = allocatedOpsByItemId[item.id as string] ?? 0;
+    const fullCost = baseCost + allocated;
+    const margin = marginMode === 'PROJECT_WIDE' ? globalMargin : (item.marginPercentage ?? globalMargin);
+    const salePrice = Math.round(fullCost * (1 + margin / 100) * 100) / 100;
+    return { ...item, purchaseCostBase: baseCost, allocatedOpsCost: allocated, fullCostBase: fullCost, salePrice };
+  }), [items, allocatedOpsByItemId, marginMode, globalMargin]);
+
+  // Toplam tutar: kalemlerin (gider dağıtımı dahil) satış fiyatlarının toplamı — PROJECT_WIDE'da
+  // matematiksel olarak grandCostBase × (1 + globalMargin) ile birebir eşleşir.
+  const perItemTotal = useMemo(() =>
+    pricedItems.reduce((s, i) => s + i.salePrice * i.quantity, 0),
+  [pricedItems]);
+
+  // PROJECT_WIDE: toplam maliyete tek marj (perItemTotal ile matematiksel olarak eşleşir)
   const projectWideTotal = useMemo(
     () => grandCostBase * (1 + globalMargin / 100),
     [grandCostBase, globalMargin]
@@ -242,6 +280,20 @@ const ProposalEditor = ({
     }
   }, [marginMode, globalMargin]);
 
+  // "Son Teklif Tutarı" kalemlerden hesaplanan tutardan (pazarlık/yuvarlama amacıyla)
+  // manuel olarak farklı girildiğinde, farkı kalemlere geri yansıtan ölçek katsayısı —
+  // böylece PDF'teki kalem satırlarının toplamı her zaman Ara Toplam ile birebir tutar
+  // (aksi halde kalem toplamı ile Ara Toplam farklı çıkar, bkz. geçmiş PDF örneği).
+  const scaleFactor = calculatedTotalPrice > 0 ? manualTotalPrice / calculatedTotalPrice : 1;
+  const isScaled = Math.abs(scaleFactor - 1) > 0.0005;
+
+  // PDF/kayıt için nihai kalem satış fiyatları — maliyet alanları (purchaseCostBase,
+  // allocatedOpsCost, fullCostBase) ölçeklenmez, yalnızca satış fiyatı ölçeklenir.
+  const scaledPricedItems = useMemo<FullyPricedItem[]>(() => pricedItems.map(item => ({
+    ...item,
+    salePrice: Math.round(item.salePrice * scaleFactor * 100) / 100,
+  })), [pricedItems, scaleFactor]);
+
   const netProfit = manualTotalPrice - grandCostBase;
   const realMargin = manualTotalPrice > 0 ? (netProfit / manualTotalPrice) * 100 : 0;
 
@@ -255,53 +307,29 @@ const ProposalEditor = ({
   const weightedVatRate = useMemo(() => {
     let base = 0;
     let vat = 0;
-    if (marginMode === 'PROJECT_WIDE') {
-      items.forEach(i => {
-        const it = i as BoMItem & { purchaseCostBase?: number; vatRate?: number };
-        const rowCost = (it.purchaseCostBase ?? i.purchaseCost) * i.quantity;
-        base += rowCost;
-        vat += rowCost * ((it.vatRate ?? OPS_DEFAULT_VAT_RATE) / 100);
-      });
-      base += totalOpsCostBase;
-      vat += totalOpsCostBase * (OPS_DEFAULT_VAT_RATE / 100);
-    } else {
-      items.forEach(i => {
-        const it = i as PricedBoMItem & { vatRate?: number };
-        const rowSale = it.salePrice * i.quantity;
-        base += rowSale;
-        vat += rowSale * ((it.vatRate ?? OPS_DEFAULT_VAT_RATE) / 100);
-      });
-    }
+    // Dağıtılan gider payı artık her kalemin fullCostBase/salePrice'ına gömülü —
+    // ayrıca totalOpsCostBase eklemek çifte sayıma yol açar, bu yüzden yapılmaz.
+    pricedItems.forEach(i => {
+      const it = i as FullyPricedItem & { vatRate?: number };
+      const rowBase = marginMode === 'PROJECT_WIDE' ? it.fullCostBase * i.quantity : it.salePrice * i.quantity;
+      base += rowBase;
+      vat += rowBase * ((it.vatRate ?? OPS_DEFAULT_VAT_RATE) / 100);
+    });
     return base > 0 ? (vat / base) * 100 : OPS_DEFAULT_VAT_RATE;
-  }, [items, marginMode, totalOpsCostBase]);
+  }, [pricedItems, marginMode]);
 
   const vatAmount = Math.round(manualTotalPrice * (weightedVatRate / 100) * 100) / 100;
   const grandTotalWithVat = manualTotalPrice + vatAmount;
 
   // ── Item handlers ─────────────────────────────────────────────────────────
+  // salePrice artık pricedItems useMemo'sunda (fullCostBase + marj) türetiliyor —
+  // burada yalnız marginPercentage güncellenir.
   const applyGlobalMarginToItems = () => {
-    setItems(items.map(item => {
-      const it = item as BoMItem & { purchaseCostBase?: number; salePrice: number };
-      const costInBase = it.purchaseCostBase ?? item.purchaseCost;
-      return {
-        ...item,
-        marginPercentage: globalMargin,
-        salePrice: Math.round(costInBase * (1 + globalMargin / 100) * 100) / 100,
-      };
-    }));
+    setItems(items.map(item => ({ ...item, marginPercentage: globalMargin })));
   };
 
   const updateItemMargin = (id: string, margin: number) => {
-    setItems(items.map(item => {
-      if (item.id !== id) return item;
-      const it = item as BoMItem & { purchaseCostBase?: number; salePrice: number };
-      const costInBase = it.purchaseCostBase ?? item.purchaseCost;
-      return {
-        ...item,
-        marginPercentage: margin,
-        salePrice: Math.round(costInBase * (1 + margin / 100) * 100) / 100,
-      };
-    }));
+    setItems(items.map(item => item.id === id ? { ...item, marginPercentage: margin } : item));
   };
 
   // ── PDF ───────────────────────────────────────────────────────────────────
@@ -386,21 +414,14 @@ const ProposalEditor = ({
       // güvenilir şekilde render etmiyor; kod her fontta ve her dilde doğru basılır.
       const priceFmt = (n: number) => `${Math.round(n).toLocaleString('tr-TR')} ${baseCurrency}`;
 
-      const tableData = [
-        ...items.map((item, i) => {
-          const it = item as BoMItem & { salePrice: number; purchaseCostBase?: number };
-          // Müşteriye giden PDF'de iç maliyet asla görünmez — PROJECT_WIDE modunda
-          // da satır fiyatı proje marjı uygulanmış satış fiyatıdır (ham maliyet değil).
-          const unitPrice = marginMode === 'PROJECT_WIDE'
-            ? (it.purchaseCostBase ?? item.purchaseCost) * (1 + globalMargin / 100)
-            : it.salePrice;
-          return [i + 1, ct(item.partNumber), ct(item.description), item.quantity, priceFmt(unitPrice), priceFmt(unitPrice * item.quantity)];
-        }),
-        ...costItems.map((item, i) => {
-          const amtBase = toBase(Number(item.amount) || 0, item.currency);
-          return [items.length + i + 1, ct(item.category || 'DİĞER'), ct(item.description || 'Operasyonel Gider'), 1, priceFmt(amtBase), priceFmt(amtBase)];
-        }),
-      ];
+      // Müşteriye giden PDF'de yalnız BoM (malzeme) kalemleri görünür — operasyonel
+      // gider kalemleri ayrı satır olarak eklenmez; payları zaten her kalemin
+      // salePrice'ına ağırlıklı dağıtılmış durumda (bkz. pricedItems); scaledPricedItems
+      // ayrıca "Son Teklif Tutarı" elle değiştirilmişse farkı kalemlere orantılı yansıtır.
+      const tableData = scaledPricedItems.map((item, i) => [
+        i + 1, ct(item.partNumber), ct(item.description), item.quantity,
+        priceFmt(item.salePrice), priceFmt(item.salePrice * item.quantity),
+      ]);
 
       // autoTable: font ve bodyStyles açıkça belirtilmeli — aksi hâlde Türkçe karakterler kaybolabilir
       autoTable(doc, {
@@ -496,7 +517,7 @@ const ProposalEditor = ({
           </button>
           <button
             onClick={() => {
-              const cleanItems = items.map(item => ({
+              const cleanItems = scaledPricedItems.map(item => ({
                 id: item.id,
                 partNumber: item.partNumber,
                 description: item.description,
@@ -504,9 +525,10 @@ const ProposalEditor = ({
                 purchaseCost: item.purchaseCost,
                 marginPercentage: item.marginPercentage,
                 currency: item.currency,
-                unitSalePrice: (item as PricedBoMItem).salePrice ?? item.unitSalePrice,
-                totalSalePrice: ((item as PricedBoMItem).salePrice ?? item.unitSalePrice ?? item.purchaseCost) * item.quantity,
-                purchaseCostBase: (item as PricedBoMItem).purchaseCostBase,
+                unitSalePrice: item.salePrice,
+                totalSalePrice: item.salePrice * item.quantity,
+                purchaseCostBase: item.purchaseCostBase,
+                allocatedOpsCost: item.allocatedOpsCost,
                 vatRate: item.vatRate ?? 20,
                 vendor: item.vendor,
                 source: item.source,
@@ -653,12 +675,13 @@ const ProposalEditor = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-50">
-                    {items.map((item) => {
-                      const it = item as BoMItem & { salePrice: number; purchaseCostBase?: number };
-                      const costInBase = it.purchaseCostBase ?? item.purchaseCost;
+                    {scaledPricedItems.map((item) => {
+                      // PROJECT_WIDE'da bu kolon yüklü maliyet tabanını (BoM + dağıtılan gider payı,
+                      // ölçeklenmez) gösterir — marj tek seferde proje toplamına uygulanır; PER_ITEM'da
+                      // "Son Teklif Tutarı" elle değiştirilmişse orantılı ölçeklenmiş satış fiyatı.
                       const rowTotal = marginMode === 'PROJECT_WIDE'
-                        ? costInBase * item.quantity
-                        : it.salePrice * item.quantity;
+                        ? item.fullCostBase * item.quantity
+                        : item.salePrice * item.quantity;
                       return (
                         <tr key={item.id} className="hover:bg-white/60 transition-colors">
                           <td className="px-6 py-4">
@@ -674,7 +697,12 @@ const ProposalEditor = ({
                             />
                           </td>
                           <td className="px-6 py-4 text-right font-medium text-slate-500">
-                            {fmt(costInBase, baseCurrency)}
+                            {fmt(item.purchaseCostBase, baseCurrency)}
+                            {item.allocatedOpsCost > 0 && (
+                              <span className="block text-[9px] text-amber-500 font-bold normal-case tracking-normal">
+                                +{fmt(item.allocatedOpsCost, baseCurrency)} gider payı
+                              </span>
+                            )}
                           </td>
                           {marginMode === 'PER_ITEM' && (
                             <td className="px-6 py-4 text-center">
@@ -688,7 +716,7 @@ const ProposalEditor = ({
                           )}
                           {marginMode === 'PER_ITEM' && (
                             <td className="px-6 py-4 text-right font-bold text-slate-900">
-                              {fmt(it.salePrice, baseCurrency)}
+                              {fmt(item.salePrice, baseCurrency)}
                             </td>
                           )}
                           <td className="px-6 py-4 text-right font-black text-slate-900">
@@ -818,6 +846,20 @@ const ProposalEditor = ({
                     </label>
                   </div>
 
+                  {version > 1 && previousVersion && (
+                    <div className="flex items-center justify-between gap-3 text-[10px] bg-white/5 px-4 py-3 rounded-2xl border border-white/10 mb-4">
+                      <span className="font-black uppercase tracking-widest text-slate-400">
+                        Önceki Teklif (v{previousVersion.version}
+                        {previousVersion.createdAt ? ` · ${new Date(previousVersion.createdAt).toLocaleDateString('tr-TR')}` : ''})
+                      </span>
+                      <span className="font-mono font-bold text-slate-300">
+                        {previousVersion.totalPrice != null
+                          ? `${Math.round(previousVersion.totalPrice).toLocaleString('tr-TR')} ${baseCurrency}`
+                          : '—'}
+                      </span>
+                    </div>
+                  )}
+
                   <div className="pt-4">
                     <label className="text-[10px] font-black text-primary uppercase tracking-widest block mb-4">
                       SON TEKLİF TUTARI — {baseCurrency}
@@ -831,6 +873,13 @@ const ProposalEditor = ({
                         className="w-full bg-white/10 border-2 border-primary/30 rounded-[28px] py-6 pl-14 pr-8 text-4xl font-black italic tracking-tighter outline-none focus:border-primary transition-all text-white"
                       />
                     </div>
+                    {isScaled && (
+                      <p className="mt-2 text-[10px] text-amber-300/90 font-bold leading-relaxed px-1">
+                        Hesaplanan kalem toplamından ({fmt(calculatedTotalPrice, baseCurrency)}) farklı — kaydedilince
+                        her kalemin birim fiyatı bu tutara göre orantılı ölçeklenir, PDF'teki kalem toplamı bu tutarla
+                        birebir eşleşir.
+                      </p>
+                    )}
                     <div className="mt-3 flex items-center justify-between text-[11px] bg-white/5 px-4 py-3 rounded-2xl border border-white/10">
                       <span className="font-black uppercase tracking-widest text-slate-400">KDV (ağırlıklı ~%{weightedVatRate.toFixed(0)})</span>
                       <span className="font-mono font-bold text-amber-300">+ {fmt(vatAmount, baseCurrency)}</span>

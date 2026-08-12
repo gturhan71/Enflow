@@ -306,7 +306,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 1 | Aşama-bazlı onay swimlane, kayıp fırsat+arşiv, iş-günü SLA, proje kod üreticisi | faz1_lost_reason_project_code_sla |
 | 2 | Ziyaret Planı + Günlük Rapor, Proje Devir Paketi (11 evrak) | faz2_visit_plan_daily_report_project_handover |
 | 3 | Tenant-bazlı doküman kodlama + Genel Hususlar (dersler/risk/KPI/dış-doküman) | faz3_doc_coding_corporate_governance |
-| 4 | EKAP iskeleti (manuel İKN) + Hukuk talebi (TodoTask `relatedModule=LEGAL`) | — |
+| 4 | Hukuk talebi (TodoTask `relatedModule=LEGAL`) | — |
 | 5 | Varsayılan iş akışı şablonu + skip-logic + ApprovalChain deadlock fix | add_workflow_default_and_skip_logic |
 | 6a/6b/6c | Finans (fatura/tahsilat/teminat/maliyet-onayı) · Hukuk görünümü (LegalCase) · İhale/İSAB (Tender+checklist) | faz6a_finance / faz6b_legal / faz6c_tender |
 | 7.1–7.3 | Yönetim Raporları: birim metrik + iş-akışı darboğazı + UnitReport gönder/incele | faz7_unit_report |
@@ -340,7 +340,6 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
   - **Doğrulama:** curl — ADVISORY→actionTaken null/seçim yok; AUTONOMOUS→Beta seçildi+RATIFIED+AGENT_ACTION log; rerun(alreadySelected)→eylem yok; AGENT_FINANCE→AUTONOMOUS=400; yanlış tenant=404. Playwright (GM) RunCard "Otonom eylem" rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
 - [x] **Agent otonomi 2 — CRM + İGPD deterministik triyaj** (2026-06-21, migration `faz9_agent_triage`) — İlke: yalnız **insan eli değmeden deterministik üretilebilen** çıktı otonom olur. CRM (kural-bazlı `recommendation` + issues) ve İGPD (`expectedValue = round(probability/100 × value)` + `valueTier` + `recommendation`) otonom modda triyajlarını yeni nullable `Opportunity.agentTriage` JSON alanına **annotation** olarak yazar — `value/probability/status/lostReason` gibi kritik alanlara **asla dokunmaz**, geri-alınabilir + idempotent (`mergeTriage` her agentın kendi bölümünü günceller, diğerini korur). `runAgent` **değişmedi** (Faz 9.1 altyapısı kullanıldı); `actionTaken` + `AGENT_ACTION` log + handoff görevi. Frontend: `Opportunity.agentTriage` tipi + CRM fırsat kartında 🤖 triyaj rozeti; `opportunities` GET parse. **Tender/Project/Presales tasarım gereği danışman** — deterministik-güvenli mutasyonları yok (checklist/devir evrakı kanıt ister; BoM/milestone insan kararı). Para/Hukuk `allowedModes:['ADVISORY']` kapsam dışı.
   - **Doğrulama:** curl — ADVISORY→agentTriage null; AUTONOMOUS İGPD→`igpd.expectedValue=360000` (0.6×600k), value/prob/status değişmedi; CRM→`crm` yazıldı + `igpd` korundu (merge); rerun idempotent; WON fırsatta NO_ACTION→eylem yok; yanlış tenant=404. AGENT_ACTION logları actorType=AGENT. Playwright (GM) CRM kartında 🤖 BD/CRM rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
-- [ ] **Gerçek EKAP entegrasyonu** (şu an manuel İKN iskeleti).
 - [ ] **Entegrasyon katmanı doğrulaması** — Nextcloud DMS / Exchange e-posta / WhatsApp (denetimlerde kapsanmadı).
 
 ---
@@ -365,8 +364,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
-src/modules/contract-workflow/AnalysisTab.tsx ← types
-src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/NewCustomerModal.tsx ← ../types
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
@@ -383,7 +380,7 @@ src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/fo
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
-src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, ../components/HealthCards, ../types, BusinessHealthCard, DmoAnalyticsCard
+src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -408,9 +405,10 @@ src/components/settings/UserManagement.tsx ← ../types, ../constants, ../servic
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
+src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers
-src/modules/contract-workflow/DocumentsTab.tsx ← types, constants
+src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
 src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
@@ -418,6 +416,7 @@ src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
+src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/ContactsModal.tsx ← ../types
@@ -432,6 +431,8 @@ src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
+src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
@@ -459,20 +460,15 @@ src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../compone
 src/modules/reporting/BusinessHealthCard.tsx ← ../types, ../components/HealthCards, ../components/InfoTooltip
 src/modules/reporting/ChartBlock.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/ConcentrationCard.tsx ← ../types, helpers, ../components/InfoTooltip
-src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/DmoAnalyticsCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/DocPortfolioCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/ForecastCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ../lib/format
 src/modules/reporting/FunnelCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/helpers.ts ← ../constants, ../types
-src/modules/reporting/IncomingReportCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ConsolidationView
-src/modules/reporting/IncomingReportsTab.tsx ← ../types, IncomingReportCard
-src/modules/reporting/MyReportsTab.tsx ← ../types, helpers
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
-src/modules/reporting/UnitDetailTab.tsx ← ../types, helpers, MetricCard, ChartBlock
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, types
+src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
@@ -519,10 +515,8 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 5 minutes ago)
+## changes (last 10 commits — 2 days ago)
 ```
-src/modules/contract-workflow/AnalysisTab.tsx ~AnalysisTab
-src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/crm/OpportunityHistoryPanel.tsx   +OpportunityHistoryPanel
 src/modules/crm/ProgressCheckInModal.tsx      +ProgressCheckInModal
@@ -868,6 +862,17 @@ export interface BootstrapResult  :44-49
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :51-127
 ```
 
+### backend/src/services/contractWorkflowState.ts
+```
+export interface ContractAnalysisExtract  :69-69
+  projectName: string | null  :69-69
+export interface ContractWorkflowFallback  :70-70
+  tenderName: string | null  :70-70
+export type TransitionCheckResult  :33-33
+export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
+export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
+```
+
 ### backend/src/services/dashboardStream.ts
 ```
 export function pingDashboard(tenantId) → void  :10-12
@@ -991,42 +996,6 @@ export interface AbbreviatedBoMItem  :7-20
   vendor?: string  :15-15
   … +4 more members  :7-7
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
-```
-
-### src/modules/contract-workflow/AnalysisTab.tsx
-```
-component AnalysisTab
-handler onChange
-handler onClick
-```
-
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-hook useAuth
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onCreate
-handler onSelectWorkflow
-handler onTenderNameBlur
-handler onTenderNoBlur
-handler onContractValueBlur
-handler onDeadlineBlur
-handler onNotesBlur
-handler onSaveTexts
-handler onAnalyse
-handler onFileSelect
-handler onAddDoc
-handler onDeleteDoc
-handler onDocStatusChange
-handler onDocFieldUpdate
-handler onMarkReadyToSign
-handler onSendForApproval
-handler onRejectSignature
-handler onApproveSignature
 ```
 
 ### src/modules/crm/constants.ts
@@ -1255,6 +1224,7 @@ component AnalyticsTab
 hook useState
 hook useCallback
 hook useEffect
+hook useDashboardStream
 handler onSaved
 ```
 
@@ -1614,6 +1584,11 @@ export Sidebar
 handler onClick
 ```
 
+### src/lib/guaranteeText.ts
+```
+export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
+```
+
 ### src/modules/ActivityLogModule.tsx
 ```
 component ArchivesTab
@@ -1624,6 +1599,13 @@ hook useEffect
 export ActivityLogModule
 handler onClick
 handler onChange
+```
+
+### src/modules/contract-workflow/AnalysisTab.tsx
+```
+component AnalysisTab
+handler onChange
+handler onClick
 ```
 
 ### src/modules/contract-workflow/CancelModal.tsx
@@ -1653,7 +1635,11 @@ handler onClick
 
 ### src/modules/contract-workflow/DocumentsTab.tsx
 ```
+component GuaranteeRequestSection
 component DocumentsTab
+hook useState
+hook useCallback
+hook useEffect
 handler onClick
 handler onChange
 handler onBlur
@@ -1661,17 +1647,17 @@ handler onBlur
 
 ### src/modules/contract-workflow/helpers.ts
 ```
-export interface DeadlineAlarm  :35-41
-  level: 'none' | 'warning' | 'critical'  :36-36
-  daysLeft: number | null  :37-37
-  missingRequired: number  :38-38
-  totalRequired: number  :39-39
-  label: string  :40-40
+export interface DeadlineAlarm  :46-52
+  level: 'none' | 'warning' | 'critical'  :47-47
+  daysLeft: number | null  :48-48
+  missingRequired: number  :49-49
+  totalRequired: number  :50-50
+  label: string  :51-51
 export async function apiFetch(path, init?)  :8-10
-export function bestProposalPrice(opportunityId, proposals) → number | null  :14-25
-export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :43-57
-export const stepIndex = (status) =>  :27-41
-export const isDocsComplete = (wf, 'documents'>) =>  :59-59
+export function bestProposalPrice(opportunityId, proposals) → number | null  :14-36
+export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :54-68
+export const stepIndex = (status) =>  :38-52
+export const isDocsComplete = (wf, 'documents'>) =>  :70-70
 ```
 
 ### src/modules/contract-workflow/LegalCaseForm.tsx
@@ -1740,6 +1726,35 @@ component WorkflowCard
 export WorkflowFormState
 handler onChange
 handler onClick
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+hook useAuth
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onCreate
+handler onSelectWorkflow
+handler onTenderNameBlur
+handler onTenderNoBlur
+handler onContractValueBlur
+handler onDeadlineBlur
+handler onNotesBlur
+handler onSaveTexts
+handler onAnalyse
+handler onFileSelect
+handler onAddDoc
+handler onDeleteDoc
+handler onDocStatusChange
+handler onDocFieldUpdate
+handler onFetchFromArchive
+handler onMarkReadyToSign
+handler onSendForApproval
+handler onRejectSignature
 ```
 
 ### src/modules/CorporateGovernanceModule.tsx
@@ -1859,6 +1874,32 @@ export KpiDetailDrawer
 handler onClose
 ```
 
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
+```
+
+### src/modules/IntegrationWizard.tsx
+```
+hook useState
+export IntegrationWizard
+handler onClick
+handler onChange
+```
+
 ### src/modules/ManagementReportingModule.tsx
 ```
 component ManagementReportingModule
@@ -1872,12 +1913,6 @@ handler onEdit
 handler onSubmit
 handler onDelete
 handler onReviewed
-```
-
-### src/modules/negotiation/AccessDeniedPanel.tsx
-```
-component AccessDeniedPanel
-handler onClick
 ```
 
 ### src/modules/negotiation/AuctionBoard.tsx
@@ -1918,22 +1953,6 @@ handler onClick
 ```
 component ProposalSelectorHeader
 handler onChange
-```
-
-### src/modules/negotiation/types.ts
-```
-export interface Competitor  :2-9
-  id: string  :3-3
-  name: string  :4-4
-  lastBid: number  :5-5
-  isActive: boolean  :6-6
-  floorPrice: number  :7-7
-  avatarColor: string  :8-8
-export interface Message  :11-16
-  sender: 'customer' | 'manager' | 'system' |  :12-12
-  text: string  :13-13
-  time: string  :14-14
-  price?: number  :15-15
 ```
 
 ### src/modules/NegotiationModule.tsx
@@ -2118,11 +2137,6 @@ component ChartBlock
 component ConcentrationCard
 ```
 
-### src/modules/reporting/ConsolidationView.tsx
-```
-component ConsolidationView
-```
-
 ### src/modules/reporting/DmoAnalyticsCard.tsx
 ```
 component DmoAnalyticsCard
@@ -2172,26 +2186,6 @@ export const pct = (n) =>  :4-4
 export const esc = (s) =>  :69-69
 ```
 
-### src/modules/reporting/IncomingReportCard.tsx
-```
-component IncomingReportCard
-hook useAuth
-hook useState
-handler onChange
-```
-
-### src/modules/reporting/IncomingReportsTab.tsx
-```
-component IncomingReportsTab
-handler onReviewed
-```
-
-### src/modules/reporting/MyReportsTab.tsx
-```
-component MyReportsTab
-handler onClick
-```
-
 ### src/modules/reporting/OverviewTab.tsx
 ```
 component OverviewTab
@@ -2207,18 +2201,12 @@ component TenderCard
 component UnitAbsorptionCard
 ```
 
-### src/modules/reporting/UnitDetailTab.tsx
-```
-component UnitDetailTab
-```
-
 ### src/modules/SalesSupport.tsx
 ```
 component TenderList
 component TenderCalendar
 component ChecklistTab
 component GuaranteesTab
-component EkapTab
 component SubmittedTenders
 component TenderSelectorEmpty
 component Modal

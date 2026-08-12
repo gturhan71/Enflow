@@ -512,6 +512,7 @@ const CRMModule = ({
 
     const nextVersion = latestProposal ? (latestProposal.version || 1) + 1 : 1;
     let initialData = undefined;
+    let sourceProposalTotalPrice: number | undefined;
 
     if (sourceProposal && sourceProposal.content) {
       try {
@@ -519,6 +520,7 @@ const CRMModule = ({
           ? JSON.parse(sourceProposal.content)
           : sourceProposal.content;
 
+        sourceProposalTotalPrice = content.totalPrice ?? sourceProposal.totalPrice;
         initialData = {
           items: content.items,
           terms: content.terms,
@@ -534,6 +536,14 @@ const CRMModule = ({
       }
     }
 
+    // Revizyon senaryosunda (bu editörde nextVersion > 1 üretilecekse) bir önceki
+    // versiyonun tutarı+tarihi — editör "SON TEKLİF TUTARI" kutusunun üstünde gösterir.
+    const previousVersion = sourceProposal ? {
+      version: sourceProposal.version || 1,
+      totalPrice: sourceProposalTotalPrice,
+      createdAt: sourceProposal.createdAt,
+    } : undefined;
+
     return (
       <ProposalEditor
         opportunity={selectedOpp}
@@ -542,6 +552,7 @@ const CRMModule = ({
         customers={customers}
         version={nextVersion}
         initialData={initialData}
+        previousVersion={previousVersion}
         onSave={handleSaveProposal}
         onCancel={() => {
           setShowProposalEditor(false);
