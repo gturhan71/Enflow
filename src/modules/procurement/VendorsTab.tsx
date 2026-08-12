@@ -28,11 +28,11 @@ const VendorsTab: FC<VendorsTabProps> = ({ vendors, loading, onEdit, onDelete })
             </div>
             <div className="flex gap-1">
               <button onClick={() => onEdit(v)}
-                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors text-slate-400 hover:text-slate-200">
+                className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-primary">
                 <Edit2 size={14} />
               </button>
               <button onClick={() => onDelete(v.id)}
-                className="p-1.5 hover:bg-red-900/20 rounded-lg transition-colors text-slate-400 hover:text-red-400">
+                className="p-1.5 hover:bg-red-50 rounded-lg transition-colors text-slate-400 hover:text-red-500">
                 <Trash2 size={14} />
               </button>
             </div>
@@ -44,14 +44,14 @@ const VendorsTab: FC<VendorsTabProps> = ({ vendors, loading, onEdit, onDelete })
           {cats.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {cats.map(c => (
-                <span key={c} className="text-[11px] px-2 py-0.5 bg-indigo-900/30 text-indigo-300 rounded-full font-medium">{c}</span>
+                <span key={c} className="text-[11px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full font-medium">{c}</span>
               ))}
             </div>
           )}
           {v.brands && v.brands.length > 0 && (
             <div className="flex gap-1 flex-wrap">
               {v.brands.map(b => (
-                <span key={b.id} className="text-[11px] px-2 py-0.5 bg-amber-900/30 text-amber-300 rounded-full font-medium">{b.name}</span>
+                <span key={b.id} className="text-[11px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">{b.name}</span>
               ))}
             </div>
           )}
