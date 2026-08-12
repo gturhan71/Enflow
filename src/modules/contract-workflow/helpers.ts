@@ -14,11 +14,22 @@ export const STATUS_RANK: Record<string, number> = { APPROVED: 4, ACCEPTED: 3, S
 export function bestProposalPrice(opportunityId: string, proposals: Proposal[]): number | null {
   let best: { rank: number; version: number; price: number } | null = null;
   for (const p of proposals) {
-    if (p.opportunityId !== opportunityId || !p.totalPrice) continue;
+    if (p.opportunityId !== opportunityId) continue;
+    // Proposal.totalPrice backend'de kalıcı bir DB kolonu değil — API'den dönen kayıtlarda
+    // üst-seviye totalPrice her zaman undefined'dır. Asıl tutar content.totalPrice'ta
+    // (KDV hariç Ara Toplam / "Son Teklif Tutarı", bkz. ProposalEditor.tsx onSave).
+    let price = p.totalPrice;
+    if (price == null && p.content) {
+      try {
+        const c = typeof p.content === 'string' ? JSON.parse(p.content) : p.content;
+        if (typeof c?.totalPrice === 'number') price = c.totalPrice;
+      } catch { /* bozuk content — yok say */ }
+    }
+    if (!price) continue;
     const rank = STATUS_RANK[p.status] ?? 0;
     const version = p.version ?? 0;
     if (!best || rank > best.rank || (rank === best.rank && version > best.version)) {
-      best = { rank, version, price: p.totalPrice };
+      best = { rank, version, price };
     }
   }
   return best?.price ?? null;

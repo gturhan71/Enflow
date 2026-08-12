@@ -1275,7 +1275,7 @@ Sidebar'da **Finans** (Proje Yönetimi'nden sonra). FINANCE_MGR operasyonel biri
 
 ## 23. İhale / İYB Modülü
 
-Sidebar'da **Satış Destek** — backend destekli ihale yönetimi (ISAB_MGR). 5 sekme:
+Sidebar'da **Satış Destek** — backend destekli ihale yönetimi (ISAB_MGR). 4 sekme:
 
 | Sekme | Kullanım |
 |-------|----------|
@@ -1283,7 +1283,6 @@ Sidebar'da **Satış Destek** — backend destekli ihale yönetimi (ISAB_MGR). 5
 | İhale Takvimi | Aktif ihaleler son teslim tarihine göre sıralı |
 | Uygunluk Denetimi | Seçili ihalenin evrak checklist'i (otomatik 10 kalem); **Tamam / Muaf / Geri Al**, dosya yükle |
 | Teminat | Geçici teminat (Finans modülüyle paylaşımlı `BID_BOND`) |
-| EKAP | Manuel İKN öneki yer tutucu (gerçek EKAP servisi yok) |
 
 Durum: `DRAFT → PREPARING → SUBMITTED → EVALUATING → WON / LOST / CANCELLED`. Doküman no `ENF-IHL-YYYY-NNNNN`.
 
@@ -1393,7 +1392,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Contact/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter/FxAdjustment · LegalCase · ServiceTicket → ilgili modüller (+ Garanti & Servis) → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal`,`/service-tickets` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
 | **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/tenants/ai-settings` |
-| **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri + EKAP → `/sync`, `/admin/security-test` |
+| **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri → `/sync`, `/admin/security-test` |
 | **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt + kur farkı) → `/tenants/governance-settings`, `/finance/calc`. **İşletme maliyeti:** OperatingCostPool/UnitBudget/ProjectUnitParticipation → `overheadService` (şirket% + birim katsayı 2-katmanlı dağıtım, tam-yüklü net marj) → proje detayında Overhead paneli. **DMO Kataloğu (paralel kanal):** DmoCatalogItem/DmoFrameworkAgreement/DmoExchangeRate/DmoOrder/DmoOrderItem → `dmoCosting` (kur açığı+risturn+komisyon) → DmoModule → `/dmo`. **Uygulama-içi Yardım:** statik makale seti (`src/content/helpArticles.ts`) → HelpModule (Header'daki Yardım ikonu) → rol-duyarlı, bağlamsal kullanım kılavuzu; harici genel-tanıtım için bu wiki'ye link verir. |
 
 ### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"

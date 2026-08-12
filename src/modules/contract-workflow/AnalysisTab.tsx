@@ -57,7 +57,7 @@ export default function AnalysisTab({
           {analysing ? 'AI Analiz Yapıyor...' : 'AI ile Analiz Et'}
         </button>
         {aiConfigured === false && (
-          <span className="text-xs text-amber-400 flex items-center gap-1 ml-auto">
+          <span className="text-xs text-amber-600 flex items-center gap-1 ml-auto">
             <AlertCircle className="w-3 h-3" /> YZ yapılandırılmadı (Ayarlar → Entegrasyonlar) — örnek çıktı gösterilecek
           </span>
         )}
@@ -67,26 +67,26 @@ export default function AnalysisTab({
       {analysis && (
         <div className="space-y-4 mt-2">
           {analysisUsedAI === false && aiConfigured !== false && (
-            <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-2 text-xs text-amber-300">
+            <div className="p-3 rounded-xl bg-amber-100 border border-amber-200 flex items-center gap-2 text-xs text-amber-700">
               <AlertCircle className="w-3.5 h-3.5 shrink-0" />
               YZ yapılandırılmış ama bu analiz çağrısı başarısız oldu (sağlayıcıya ulaşılamadı, API anahtarı/model adı geçersiz olabilir ya da sağlayıcı hesabında bakiye/kota sorunu olabilir) — aşağıdaki liste örnek (standart) evrak listesidir, belgenizin gerçek içeriğini yansıtmaz. Ayarlar → Entegrasyonlar'ı kontrol edip tekrar deneyin.
             </div>
           )}
           {/* Summary card */}
-          <div className="p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-            <h3 className="text-sm font-semibold text-blue-300 mb-3 flex items-center gap-2">
+          <div className="p-4 rounded-xl bg-blue-100 border border-blue-200">
+            <h3 className="text-sm font-semibold text-blue-700 mb-3 flex items-center gap-2">
               <Star className="w-4 h-4" /> Sözleşme Özeti
             </h3>
             <div className="grid grid-cols-2 gap-3 text-xs">
               <div>
                 <span className="text-slate-400">Tür:</span>
-                <span className="text-slate-200 ml-2">{analysis.contract_summary?.type}</span>
+                <span className="text-slate-700 ml-2">{analysis.contract_summary?.type}</span>
               </div>
               {analysis.contract_summary?.tax_obligations?.length > 0 && (
                 <div>
                   <span className="text-slate-400 block mb-1">Vergi Yükümlülükleri:</span>
                   {analysis.contract_summary.tax_obligations.map((t, i) => (
-                    <span key={i} className="block text-amber-300">• {t}</span>
+                    <span key={i} className="block text-amber-700">• {t}</span>
                   ))}
                 </div>
               )}
@@ -94,7 +94,7 @@ export default function AnalysisTab({
                 <div className="col-span-2">
                   <span className="text-slate-400 block mb-1">Proje Etkileri:</span>
                   {analysis.contract_summary.project_impacts.map((p, i) => (
-                    <span key={i} className="block text-slate-300">• {p}</span>
+                    <span key={i} className="block text-slate-500">• {p}</span>
                   ))}
                 </div>
               )}
@@ -103,16 +103,16 @@ export default function AnalysisTab({
 
           {/* Key clauses */}
           {analysis.key_clauses?.length > 0 && (
-            <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/20">
-              <h3 className="text-sm font-semibold text-amber-300 mb-3 flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-amber-100 border border-amber-200">
+              <h3 className="text-sm font-semibold text-amber-700 mb-3 flex items-center gap-2">
                 <AlertCircle className="w-4 h-4" /> Önemli Maddeler
               </h3>
               <div className="space-y-2">
                 {analysis.key_clauses.map((c, i) => (
-                  <div key={i} className="text-xs border border-white/10 rounded-lg p-3">
-                    <div className="font-medium text-slate-200">{c.clause}</div>
+                  <div key={i} className="text-xs border border-slate-200/70 rounded-lg p-3">
+                    <div className="font-medium text-slate-700">{c.clause}</div>
                     <div className="text-slate-400 mt-1">Etki: {c.impact}</div>
-                    <div className="text-amber-300 mt-1">↗ {c.action_required}</div>
+                    <div className="text-amber-700 mt-1">↗ {c.action_required}</div>
                   </div>
                 ))}
               </div>
@@ -121,8 +121,8 @@ export default function AnalysisTab({
 
           {/* Tasks preview */}
           {analysis.tasks?.length > 0 && (
-            <div className="p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-              <h3 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
+            <div className="p-4 rounded-xl bg-purple-100 border border-purple-200">
+              <h3 className="text-sm font-semibold text-purple-700 mb-3 flex items-center gap-2">
                 <ClipboardList className="w-4 h-4" /> Yapılacaklar ({analysis.tasks.length} görev)
               </h3>
               <div className="space-y-1.5">
@@ -131,7 +131,7 @@ export default function AnalysisTab({
                     <span className={`mt-0.5 w-1.5 h-1.5 rounded-full flex-shrink-0 ${
                       t.priority === 'HIGH' ? 'bg-red-400' : t.priority === 'LOW' ? 'bg-slate-400' : 'bg-amber-400'
                     }`} />
-                    <span className="text-slate-300">{t.order}. {t.title}</span>
+                    <span className="text-slate-500">{t.order}. {t.title}</span>
                     <span className="ml-auto text-slate-500 whitespace-nowrap">~{t.estimated_days}g</span>
                   </div>
                 ))}

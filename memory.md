@@ -9,7 +9,7 @@
 - [x] **Faz 1** — Aşama-bazlı onay swimlane (Bekleyen Onaylarım), kayıp fırsat nedeni + otomatik arşivleme, iş günü SLA, proje kod üreticisi
 - [x] **Faz 2** — Ziyaret Planı + Günlük Rapor modülü, Proje Devir Paketi (11 zorunlu evrak)
 - [x] **Faz 3** — Tenant-bazlı özgün doküman kodlama + Genel Hususlar (Alınan Dersler / Risk & Fırsat / KPI / Dış Doküman Sicili)
-- [x] **Faz 4** — EKAP iskeleti (manuel İKN) + Hukuk talebi (`TodoTask.relatedModule='LEGAL'`)
+- [x] **Faz 4** — Hukuk talebi (`TodoTask.relatedModule='LEGAL'`)
 - [x] **Faz 5** — Varsayılan iş akışı şablonu + skip-logic (deadlock önleme) + devir uyarıları
 - [x] **Faz 6a/6b/6c** — Finans (fatura/tahsilat/teminat/maliyet onayı), Hukuk görünümü (LegalCase), İhale/İSAB (Tender + checklist)
 - [x] **Faz 7** — Yönetim Raporları: birim metrik servisi + konsolide dashboard + iş akışı darboğazı + UnitReport gönderim/inceleme

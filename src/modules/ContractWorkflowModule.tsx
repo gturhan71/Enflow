@@ -4,7 +4,7 @@ import { FileText, Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAIGate } from '../contexts/AIGateContext';
 import { useAuth } from '../contexts/AuthContext';
-import { ContractWorkflow, AiAnalysis, Props } from './contract-workflow/types';
+import { ContractWorkflow, ContractWorkflowDoc, AiAnalysis, Props } from './contract-workflow/types';
 import { TabId } from './contract-workflow/constants';
 import { BASE, apiFetch } from './contract-workflow/helpers';
 import WorkflowListPanel, { WorkflowFormState } from './contract-workflow/WorkflowListPanel';
@@ -251,6 +251,42 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
     } catch (e) { notify((e as Error).message, true); }
   };
 
+  // Faz — tüm zorunlu evraklar UPLOADED/VERIFIED/WAIVED olduğunda READY_TO_SIGN'a otomatik
+  // geçiş; hem manuel dosya yüklemesinden hem de arşivden otomatik alınan evraktan sonra
+  // aynı kural geçerli olmalı (bkz. handleFileUpload + handleFetchFromArchive).
+  const maybeAutoMarkReady = async (updatedDocs: ContractWorkflowDoc[]) => {
+    if (!selected) return;
+    const allDone = updatedDocs
+      .filter(d => d.isRequired)
+      .every(d => ['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status));
+    if (allDone && !['READY_TO_SIGN', 'SIGNED', 'TRANSFERRED'].includes(selected.status)) {
+      try {
+        const wf = await apiFetch(`${BASE}/${selected.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: 'READY_TO_SIGN' }),
+        });
+        setSelected(wf);
+        setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
+        notify('Tüm belgeler yüklendi — otomatik olarak İmzaya Hazır\'a alındı.');
+        setTab('signing');
+      } catch { /* ignore auto-mark failure */ }
+    }
+  };
+
+  const handleFetchFromArchive = async (docId: string) => {
+    if (!selected) return;
+    setUploadingDocId(docId);
+    try {
+      const doc = await apiFetch(`${BASE}/${selected.id}/documents/${docId}/from-archive`, { method: 'POST' });
+      const updatedDocs = selected.documents.map(d => d.id === doc.id ? doc : d);
+      setSelected(prev => prev ? { ...prev, documents: updatedDocs } : prev);
+      notify('Şirket Evrakları arşivinden otomatik alındı.');
+      await maybeAutoMarkReady(updatedDocs);
+    } catch (e) { notify((e as Error).message, true); }
+    finally { setUploadingDocId(null); }
+  };
+
   const handleFileUpload = async (docId: string, file: File) => {
     if (!selected) return;
     setUploadingDocId(docId);
@@ -284,23 +320,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
         : `Lokale kaydedildi (${result.folder})`;
       notify(`${file.name} — ${location}`);
 
-      // Auto-mark ready to sign when all required docs are uploaded
-      const allDone = updatedDocs
-        .filter(d => d.isRequired)
-        .every(d => ['UPLOADED', 'VERIFIED', 'WAIVED'].includes(d.status));
-      if (allDone && !['READY_TO_SIGN', 'SIGNED', 'TRANSFERRED'].includes(selected.status)) {
-        try {
-          const wf = await apiFetch(`${BASE}/${selected.id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ status: 'READY_TO_SIGN' }),
-          });
-          setSelected(wf);
-          setWorkflows(prev => prev.map(w => w.id === wf.id ? wf : w));
-          notify('Tüm belgeler yüklendi — otomatik olarak İmzaya Hazır\'a alındı.');
-          setTab('signing');
-        } catch { /* ignore auto-mark failure */ }
-      }
+      await maybeAutoMarkReady(updatedDocs);
     } catch (e) {
       notify((e as Error).message, true);
     } finally {
@@ -496,7 +516,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -12 }}
               className={`mb-3 px-4 py-2.5 rounded-lg text-sm flex items-center gap-2 border ${
-                error ? 'bg-red-500/15 border-red-500/30 text-red-300' : 'bg-emerald-500/15 border-emerald-500/30 text-emerald-300'
+                error ? 'bg-red-100 border-red-200 text-red-700' : 'bg-emerald-100 border-emerald-200 text-emerald-700'
               }`}
             >
               {error ? <AlertCircle className="w-4 h-4 flex-shrink-0" /> : <CheckCircle2 className="w-4 h-4 flex-shrink-0" />}
@@ -574,6 +594,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                       onDocStatusChange={handleDocStatus}
                       onDocFieldUpdate={handleDocFieldUpdate}
                       onMarkReadyAndSign={() => { setTab('signing'); handleMarkReadyToSign(); }}
+                      onFetchFromArchive={handleFetchFromArchive}
                     />
                   )}
 

@@ -254,7 +254,7 @@ const GuaranteesTab = ({ items, onDelete, onChanged }: { items: GuaranteeLetter[
 
   const exportExcel = () => {
     const rows = items.map(g => ({
-      İş: g.tenderId || g.projectId || '—',
+      İş: g.tenderId || g.contractId || g.projectId || '—',
       Tür: GTYPE_TR[g.type] || g.type,
       Tutar: g.amount, Döviz: g.currency,
       Vade: g.isIndefinite ? 'Süresiz' : (g.expiryDate ? new Date(g.expiryDate).toLocaleDateString('tr-TR') : '—'),

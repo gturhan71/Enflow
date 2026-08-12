@@ -16,15 +16,15 @@ export default function TransferTab({
 
       {/* Status banner */}
       {selected.status === 'TRANSFERRED' ? (
-        <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-center">
-          <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
-          <p className="text-sm text-emerald-300 font-medium">Süreç tamamlandı</p>
+        <div className="p-4 rounded-xl bg-emerald-100 border border-emerald-200 text-center">
+          <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+          <p className="text-sm text-emerald-700 font-medium">Süreç tamamlandı</p>
           <p className="text-xs text-slate-400 mt-1">
             Görevler Proje Yönetimi modülünde görünür.
             {selected.signedDate && ` · İmzalandı: ${new Date(selected.signedDate).toLocaleDateString('tr-TR')}`}
           </p>
           {selected.projectId && (
-            <p className="text-xs text-emerald-300 font-bold mt-2">
+            <p className="text-xs text-emerald-700 font-bold mt-2">
               ✓ Proje kaydı oluşturuldu{transferProject?.code ? `: ${transferProject.code}${transferProject.name ? ` — ${transferProject.name}` : ''}` : ''} (Proje Yönetimi modülünde)
             </p>
           )}
@@ -32,14 +32,14 @@ export default function TransferTab({
       ) : (
         <div className={`p-4 rounded-xl border ${
           selected.status === 'SIGNED'
-            ? 'border-amber-500/30 bg-amber-500/10'
-            : 'border-white/10 bg-white/5'
+            ? 'border-amber-200 bg-amber-100'
+            : 'border-slate-200/70 bg-slate-100/70'
         }`}>
           <div className="flex items-center gap-3">
             {selected.status === 'SIGNED'
-              ? <AlertCircle className="w-5 h-5 text-amber-400" />
+              ? <AlertCircle className="w-5 h-5 text-amber-600" />
               : <AlertCircle className="w-5 h-5 text-slate-500" />}
-            <span className="text-sm font-medium text-slate-200">
+            <span className="text-sm font-medium text-slate-700">
               {selected.status === 'SIGNED'
                 ? 'İmzalandı ama henüz aktarılmadı'
                 : 'Aktarım için önce sözleşmenin onaylanması gerekiyor'}
@@ -60,20 +60,20 @@ export default function TransferTab({
 
       {/* Satınalmaya Aktar — BoM + referans alış fiyatları */}
       {(selected.status === 'SIGNED' || selected.status === 'TRANSFERRED') && (
-        <div className="p-4 rounded-xl border border-white/10 bg-white/5">
+        <div className="p-4 rounded-xl border border-slate-200/70 bg-slate-100/70">
           {selected.procurementRequestId ? (
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
+              <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-emerald-300">Satınalmaya aktarıldı</p>
+                <p className="text-sm font-medium text-emerald-700">Satınalmaya aktarıldı</p>
                 <p className="text-xs text-slate-400 mt-0.5">BoM ve referans alış fiyatları Satınalma Talebi olarak iletildi (Satın Alma modülünde DRAFT).</p>
               </div>
             </div>
           ) : (
             <>
               <div className="flex items-center gap-3 mb-3">
-                <ShoppingCart className="w-5 h-5 text-blue-400" />
-                <span className="text-sm font-medium text-slate-200">İşi Satınalmaya devret — BoM + üretici/distribütör alış fiyatlarıyla</span>
+                <ShoppingCart className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium text-slate-700">İşi Satınalmaya devret — BoM + üretici/distribütör alış fiyatlarıyla</span>
               </div>
               <button onClick={onHandoffProcurement} disabled={transferring}
                 className="btn-primary w-full flex items-center justify-center gap-2">
@@ -88,20 +88,20 @@ export default function TransferTab({
       {/* Task list */}
       {analysis?.tasks && analysis.tasks.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-            <ClipboardList className="w-4 h-4 text-purple-400" />
+          <h3 className="text-sm font-semibold text-slate-500 mb-3 flex items-center gap-2">
+            <ClipboardList className="w-4 h-4 text-purple-600" />
             {selected.status === 'TRANSFERRED' ? 'Aktarılan Görevler' : 'Aktarılacak Görevler'} ({analysis.tasks.length})
           </h3>
           <div className="space-y-2">
             {analysis.tasks.map((t, i) => (
-              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-white/10 bg-white/3 text-sm">
+              <div key={i} className="flex items-start gap-3 p-3 rounded-lg border border-slate-200/70 bg-slate-50 text-sm">
                 <span className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                  t.priority === 'HIGH' ? 'bg-red-500/30 text-red-300' :
-                  t.priority === 'LOW' ? 'bg-slate-500/30 text-slate-400' :
-                  'bg-amber-500/30 text-amber-300'
+                  t.priority === 'HIGH' ? 'bg-red-200 text-red-700' :
+                  t.priority === 'LOW' ? 'bg-slate-200 text-slate-600' :
+                  'bg-amber-200 text-amber-700'
                 }`}>{t.order}</span>
                 <div className="flex-1">
-                  <div className="text-slate-200">[Sözleşme] {t.title}</div>
+                  <div className="text-slate-700">[Sözleşme] {t.title}</div>
                   <div className="text-xs text-slate-500 mt-0.5">{t.description}</div>
                 </div>
                 <span className="text-xs text-slate-500 whitespace-nowrap">~{t.estimated_days}g</span>

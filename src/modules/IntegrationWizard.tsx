@@ -13,7 +13,6 @@ import {
   ArrowUpRight,
   Clock,
   CheckCircle2,
-  AlertCircle,
   FileCheck,
   ChevronRight,
   Menu,
@@ -40,7 +39,6 @@ import {
   Target,
   Percent,
   FileSignature,
-  Gavel,
   Kanban,
   Wand2,
   Puzzle,
@@ -86,7 +84,6 @@ const IntegrationWizard = ({
   const [disablePrompt, setDisablePrompt] = useState<string | null>(null);
   const [adminPassword, setAdminPassword] = useState('');
   const [passwordError, setPasswordError] = useState(false);
-  const [ekapPrefix, setEkapPrefix] = useState('');
 
   const INTEGRATIONS = [
     { id: 'nextcloud', name: 'Nextcloud DMS', description: 'Dosya yönetimi ve paylaşım sistemi.', icon: History, color: 'text-blue-600', bg: 'bg-blue-50', isEnabled: ncConfig.isEnabled },
@@ -94,7 +91,6 @@ const IntegrationWizard = ({
     { id: 'exchange', name: 'MS Exchange', description: 'E-posta ve takvim senkronizasyonu.', icon: Mail, color: 'text-red-600', bg: 'bg-red-50', isEnabled: exConfig.isEnabled },
     { id: 'whatsapp', name: 'WhatsApp Business', description: 'Müşteri bildirimleri ve sohbet.', icon: MessageSquare, color: 'text-emerald-600', bg: 'bg-emerald-50', isEnabled: waConfig.isEnabled },
     { id: 'tr_erp_crm', name: 'Yerel ERP & CRM', description: 'Logo, Mikro, Netsis vb. yerel sistem entegrasyonu.', icon: Puzzle, color: 'text-indigo-600', bg: 'bg-indigo-50', isEnabled: false },
-    { id: 'ekap', name: 'Kamu İhale Platformu', description: 'İhale referans no (İKN) takibi — manuel giriş iskeleti.', icon: Gavel, color: 'text-amber-600', bg: 'bg-amber-50', isEnabled: false }
   ];
 
   const handleDisable = () => {
@@ -248,18 +244,14 @@ const IntegrationWizard = ({
             </button>
             <div>
               <h4 className="font-bold text-slate-900">{INTEGRATIONS.find(i => i.id === selectedIntegration)?.name} Kurulum Sihirbazı</h4>
-              {selectedIntegration !== 'ekap' && (
-                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Adım {wizardStep} / 3</p>
-              )}
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Adım {wizardStep} / 3</p>
             </div>
           </div>
-          {selectedIntegration !== 'ekap' && (
-            <div className="flex gap-1">
-              {[1, 2, 3].map(s => (
-                <div key={s} className={cn("h-1.5 w-8 rounded-full", wizardStep >= s ? "bg-indigo-600" : "bg-slate-200")} />
-              ))}
-            </div>
-          )}
+          <div className="flex gap-1">
+            {[1, 2, 3].map(s => (
+              <div key={s} className={cn("h-1.5 w-8 rounded-full", wizardStep >= s ? "bg-indigo-600" : "bg-slate-200")} />
+            ))}
+          </div>
         </div>
 
         <div className="p-8">
@@ -720,56 +712,7 @@ const IntegrationWizard = ({
               </motion.div>
             )}
 
-            {selectedIntegration === 'ekap' && (
-              <motion.div
-                key="ekap"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                className="space-y-6"
-              >
-                <div className="bg-amber-50 p-6 rounded-2xl border border-amber-100 flex items-start gap-4">
-                  <div className="p-2 bg-amber-100 text-amber-600 rounded-xl"><Gavel size={24} /></div>
-                  <div>
-                    <h5 className="font-bold text-amber-900">Kamu İhale Platformu — Manuel Referans Takibi</h5>
-                    <p className="text-sm text-amber-700">
-                      Otomatik API entegrasyonu henüz aktif değildir. Bu iskelet, ihale referans numaralarını (İKN)
-                      manuel takip etmek ve ileride otomatik senkronizasyona zemin hazırlamak içindir.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-400 uppercase">Varsayılan İKN Öneki (opsiyonel)</label>
-                    <input
-                      type="text"
-                      value={ekapPrefix}
-                      onChange={(e) => setEkapPrefix(e.target.value)}
-                      placeholder="Örn: 2026/"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:border-indigo-500"
-                    />
-                    <p className="text-[11px] text-slate-400">
-                      İhale referans numaraları (İKN) Sözleşme Süreç Yönetimi ve İhale Desteği modüllerinde manuel olarak girilir.
-                    </p>
-                  </div>
-
-                  <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
-                    <div className="flex items-center gap-2 text-slate-500">
-                      <AlertCircle size={16} />
-                      <span className="text-xs font-bold uppercase tracking-wider">İskelet Notu</span>
-                    </div>
-                    <ul className="text-xs text-slate-500 space-y-1.5 list-disc list-inside leading-relaxed">
-                      <li>Gerçek EKAP web servisi bağlantısı bu sürümde bulunmaz.</li>
-                      <li>İKN değerleri ContractWorkflow kayıtlarında halihazırda manuel tutulur.</li>
-                      <li>Bu kart, ileride eklenecek otomatik ihale senkronizasyonu için yer tutucudur.</li>
-                    </ul>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-
-            {selectedIntegration !== 'nextcloud' && selectedIntegration !== 'exchange' && selectedIntegration !== 'whatsapp' && selectedIntegration !== 'tr_erp_crm' && selectedIntegration !== 'ekap' && (
+            {selectedIntegration !== 'nextcloud' && selectedIntegration !== 'exchange' && selectedIntegration !== 'whatsapp' && selectedIntegration !== 'tr_erp_crm' && (
               <div className="py-12 text-center space-y-4">
                 <div className="w-20 h-20 bg-slate-50 rounded-3xl flex items-center justify-center text-slate-300 mx-auto">
                   <Cpu size={40} />
@@ -798,11 +741,6 @@ const IntegrationWizard = ({
             </button>
             <button
               onClick={() => {
-                if (selectedIntegration === 'ekap') {
-                  setSelectedIntegration(null);
-                  setWizardStep(1);
-                  return;
-                }
                 if (wizardStep < 3) setWizardStep(wizardStep + 1);
                 else {
                   if (selectedIntegration === 'nextcloud') {
@@ -826,7 +764,7 @@ const IntegrationWizard = ({
               }}
               className="px-8 py-2 bg-indigo-600 text-white rounded-xl text-sm font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all"
             >
-              {selectedIntegration === 'ekap' ? 'Tamam' : wizardStep === 3 ? 'Kurulumu Tamamla' : 'Devam Et'}
+              {wizardStep === 3 ? 'Kurulumu Tamamla' : 'Devam Et'}
             </button>
           </div>
         </div>

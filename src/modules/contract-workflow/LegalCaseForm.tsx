@@ -53,7 +53,7 @@ export default function LegalCaseForm({ workflows, onClose, onSaved }: { workflo
         <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Özet / durum" value={f.summary || ''} onChange={e => set('summary', e.target.value)} />
         <textarea className="input-glass w-full text-sm resize-none" rows={2} placeholder="Hukuki görüş (opsiyonel)" value={f.opinion || ''} onChange={e => set('opinion', e.target.value)} />
         <input className="input-glass w-full text-sm" placeholder="Doküman Kategori Kodu (vars. HUK)" value={f.categoryCode || ''} onChange={e => set('categoryCode', e.target.value.toUpperCase())} />
-        {err && <p className="text-xs text-red-400 font-bold">{err}</p>}
+        {err && <p className="text-xs text-red-600 font-bold">{err}</p>}
         <button onClick={save} disabled={saving} className="btn-primary w-full text-sm disabled:opacity-50">{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
       </motion.div>
     </motion.div>

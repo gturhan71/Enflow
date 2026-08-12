@@ -389,7 +389,6 @@ Backend destekli ihale yönetimi (ISAB_MGR operasyonel birimi). 5 sekme:
 | İhale Takvimi | Aktif ihaleler `submissionDeadline` sıralı, SLA renk tonu |
 | Uygunluk Denetimi | Seçili ihalenin checklist'i (auto-seed 10 kalem), zorunlu sayaç + progress, dosya yükleme |
 | Teminat | Geçici teminat (`GuaranteeLetter` `type=BID_BOND`+`tenderId` — Finans modülüyle paylaşımlı) |
-| EKAP | Manuel İKN öneki yer tutucu (gerçek EKAP web servisi yok) |
 
 **Durum Makinesi:** `DRAFT → PREPARING → SUBMITTED → EVALUATING → WON / LOST / CANCELLED`  
 **Doküman no:** opsiyonel `categoryCode='IHL'` → `ENF-IHL-YYYY-NNNNN`

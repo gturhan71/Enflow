@@ -133,7 +133,7 @@ export default function LegalView() {
                         <button onClick={() => closeCase(c)} className="text-xs text-emerald-600 hover:underline">Kapat</button>
                       )}
                       <button onClick={async () => { await apiService.deleteLegalCase(c.id); load(); }}
-                        className="text-slate-500 hover:text-red-400"><Trash2 className="w-4 h-4" /></button>
+                        className="text-slate-500 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 </div>

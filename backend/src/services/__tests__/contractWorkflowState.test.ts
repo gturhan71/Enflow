@@ -59,6 +59,20 @@ describe('contractWorkflowState — checkStatusTransition', () => {
     expect(checkStatusTransition('PENDING_SIGNATURE_APPROVAL', 'PREPARATION', 'SALES_MGR')).toEqual({ ok: true });
   });
 
+  // Regresyon: PREPARATION hiçbir handler tarafından fiilen set edilmiyor — gerçek akışta
+  // evrak yükleme tamamlandığında (maybeAutoMarkReady) ANALYSIS_DONE'dan doğrudan
+  // READY_TO_SIGN'a geçiliyor. Bu kenar eskiden tabloda yoktu ve her zaman
+  // "ANALYSIS_DONE → READY_TO_SIGN geçişine izin verilmiyor." (409) hatasına düşüyordu.
+  it('allows ANALYSIS_DONE → READY_TO_SIGN directly (auto-transition when all required docs are done)', () => {
+    expect(checkStatusTransition('ANALYSIS_DONE', 'READY_TO_SIGN', 'SALES_MGR')).toEqual({ ok: true });
+  });
+
+  // Regresyon: imza onayı reddedildiğinde (handleRejectSignature, ContractWorkflowModule.tsx)
+  // sözleşme PREPARATION'a değil doğrudan READY_TO_SIGN'a geri dönüyor.
+  it('allows PENDING_SIGNATURE_APPROVAL to bounce back to READY_TO_SIGN (reject-signature flow)', () => {
+    expect(checkStatusTransition('PENDING_SIGNATURE_APPROVAL', 'READY_TO_SIGN', 'SALES_MGR')).toEqual({ ok: true });
+  });
+
   it('has no outgoing transitions from any terminal state', () => {
     for (const terminal of ['TRANSFERRED', 'CANCELLED', 'TERMINATED']) {
       const r = checkStatusTransition(terminal, 'DRAFT', 'GENERAL_MANAGER');

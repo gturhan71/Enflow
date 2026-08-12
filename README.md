@@ -45,7 +45,7 @@ Farkı: süreçler birbirine **kopuk modüller** değil, **otomatik devir halkal
 | 🤝 **Satış & iş geliştirme ekipleri** | CRM, fırsat hijyeni, teklif versiyonlama, canlı pazarlık ve otomatik değer skorlaması. |
 | ⚙️ **Presales / teknik & satınalma** | BoM (malzeme listesi), maliyet analizi, tedarikçi teklif kıyaslama, PO ve teslimat takibi. |
 | 📑 **Sözleşme, hukuk & kalite birimleri** | Evrak/imza akışı, onay zincirleri, doküman kodlama, dersler & risk/fırsat yönetişimi. |
-| 🌐 **Kamu ihalesine giren firmalar** | İhale (EKAP iskeleti) + uygunluk checklist + teminat mektubu yönetimi. |
+| 🌐 **Kamu ihalesine giren firmalar** | İhale takibi + uygunluk checklist + teminat mektubu yönetimi. |
 
 Kısaca: **birden fazla birimin ortak bir süreçte koordine olması gereken** her kurum için.
 

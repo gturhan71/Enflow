@@ -564,7 +564,7 @@ class ApiService {
   }
 
   // --- FINANCE: Guarantee Letters ---
-  async getGuarantees(params?: { status?: string; type?: string; projectId?: string; tenderId?: string }) {
+  async getGuarantees(params?: { status?: string; type?: string; projectId?: string; tenderId?: string; contractId?: string }) {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiClient.fetchWithAuth(`/finance/guarantees${qs}`);
   }

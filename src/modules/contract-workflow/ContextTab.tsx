@@ -19,7 +19,7 @@ export default function ContextTab({
 
       {/* Fırsat bağlantısı */}
       {selected.opportunityId && (
-        <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-300 flex items-center gap-2">
+        <div className="p-3 rounded-lg bg-emerald-100 border border-emerald-200 text-sm text-emerald-700 flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
           <div>
             <span className="font-medium">Kazanılan Fırsat:</span>{' '}
@@ -29,8 +29,8 @@ export default function ContextTab({
       )}
 
       {/* İhale bilgileri */}
-      <div className="p-4 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-3">
-        <p className="text-xs font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+      <div className="p-4 rounded-xl border border-amber-200 bg-amber-50 space-y-3">
+        <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider flex items-center gap-2">
           <Layers className="w-3.5 h-3.5" /> İhale Bilgileri
         </p>
         <div className="grid grid-cols-2 gap-3">
@@ -57,8 +57,8 @@ export default function ContextTab({
         </div>
         {selected.projectName && (
           <div className="text-xs text-slate-400 flex items-center gap-1.5">
-            <Cpu className="w-3 h-3 text-purple-400" />
-            AI çıkardı: <span className="text-purple-300 font-medium">{selected.projectName}</span>
+            <Cpu className="w-3 h-3 text-purple-600" />
+            AI çıkardı: <span className="text-purple-700 font-medium">{selected.projectName}</span>
           </div>
         )}
       </div>
@@ -75,7 +75,7 @@ export default function ContextTab({
             onBlur={e => onContractValueBlur(e.target.value)}
           />
           {selected.contractValue > 0 && (
-            <p className="text-xs text-emerald-400 mt-1">
+            <p className="text-xs text-emerald-600 mt-1">
               ₺{selected.contractValue.toLocaleString('tr-TR')} — kazanılan tekliften
             </p>
           )}

@@ -3,12 +3,20 @@
 //       → SIGNED → TRANSFERRED
 // (CANCELLED/TERMINATED her aşamadan çıkış olabilir; sıradan geçiş yok.)
 
+// NOT: PREPARATION durumu hiçbir route/handler tarafından fiilen set edilmiyor —
+// evrak yükleme tamamlandığında otomatik geçiş (handleFileUpload/maybeAutoMarkReady,
+// ContractWorkflowModule.tsx) doğrudan ANALYSIS_DONE'dan READY_TO_SIGN'a atlıyor, ve
+// imza onayı reddedildiğinde (handleRejectSignature) PENDING_SIGNATURE_APPROVAL'dan
+// doğrudan READY_TO_SIGN'a dönüyor. Bu iki kenar eskiden tabloda yoktu — gerçek
+// akışta hep "ANALYSIS_DONE → READY_TO_SIGN geçişine izin verilmiyor." hatasına
+// düşülüyordu (evrakları tamamlanmış, PREPARATION'a hiç uğramamış her sözleşmede).
+// PREPARATION kenarları geriye dönük uyumluluk için (ileride kullanılabilir) korunuyor.
 export const STATUS_TRANSITIONS: Record<string, string[]> = {
   DRAFT: ['ANALYSIS_DONE', 'CANCELLED'],
-  ANALYSIS_DONE: ['PREPARATION', 'CANCELLED'],
+  ANALYSIS_DONE: ['PREPARATION', 'READY_TO_SIGN', 'CANCELLED'],
   PREPARATION: ['READY_TO_SIGN', 'CANCELLED'],
   READY_TO_SIGN: ['PENDING_SIGNATURE_APPROVAL', 'CANCELLED'],
-  PENDING_SIGNATURE_APPROVAL: ['SIGNED', 'PREPARATION', 'CANCELLED'],
+  PENDING_SIGNATURE_APPROVAL: ['SIGNED', 'READY_TO_SIGN', 'PREPARATION', 'CANCELLED'],
   SIGNED: ['TRANSFERRED', 'TERMINATED'],
   TRANSFERRED: [],
   CANCELLED: [],

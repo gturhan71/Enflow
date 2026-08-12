@@ -216,13 +216,14 @@ router.delete('/payments/:id', tenantMiddleware, asyncHandler(async (req: Reques
 
 router.get('/guarantees', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   await sweepGuaranteeReminders(req.tenantId); // sona erme hatırlatmaları (non-throwing)
-  const { status, type, projectId, tenderId } = req.query as
-    { status?: string; type?: string; projectId?: string; tenderId?: string };
+  const { status, type, projectId, tenderId, contractId } = req.query as
+    { status?: string; type?: string; projectId?: string; tenderId?: string; contractId?: string };
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (status) where.status = status;
   if (type) where.type = type;
   if (projectId) where.projectId = projectId;
   if (tenderId) where.tenderId = tenderId;
+  if (contractId) where.contractId = contractId;
   const items = await prisma.guaranteeLetter.findMany({ where, orderBy: { expiryDate: 'asc' } });
   res.json(items);
 }));

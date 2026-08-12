@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
-  Gavel, Plus, Calendar, ClipboardCheck, ShieldCheck, Landmark, Trash2,
+  Gavel, Plus, Calendar, ClipboardCheck, ShieldCheck, Trash2,
   CheckCircle2, Clock, AlertTriangle, Upload, FileText, X, ExternalLink,
   Sparkles, Building2, Loader2, FileSearch,
 } from 'lucide-react';
@@ -9,13 +9,14 @@ import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useAIGate } from '../contexts/AIGateContext';
 import { fmtCurrency as fmt } from '../lib/format';
+import { sampleGuaranteeText } from '../lib/guaranteeText';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
 interface SalesSupportProps {
   opportunities?: Opportunity[];
 }
 
-type TabKey = 'list' | 'calendar' | 'checklist' | 'guarantees' | 'submitted' | 'ekap';
+type TabKey = 'list' | 'calendar' | 'checklist' | 'guarantees' | 'submitted';
 
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'list', label: 'İhale Listesi', icon: Gavel },
@@ -23,7 +24,6 @@ const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
   { key: 'checklist', label: 'Uygunluk Denetimi', icon: ClipboardCheck },
   { key: 'guarantees', label: 'Teminat', icon: ShieldCheck },
   { key: 'submitted', label: 'Girilen İhaleler', icon: FileText },
-  { key: 'ekap', label: 'EKAP', icon: Landmark },
 ];
 
 const SUBMITTED_STATUSES = ['SUBMITTED', 'EVALUATING', 'WON', 'LOST'];
@@ -136,7 +136,6 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
       {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
       {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} />}
-      {tab === 'ekap' && <EkapTab />}
 
       <AnimatePresence>
         {withdrawTarget && (
@@ -473,12 +472,6 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
 // ── Teminat (Finans'a talep — geçici/kesin, süresiz, örnek metin) ─────────────────
 const GUARANTEE_STATUS_TR: Record<string, string> = { REQUESTED: 'Talep Edildi', ACTIVE: 'Aktif', RELEASED: 'İade', EXPIRED: 'Süresi Doldu', CALLED: 'Nakde Çevrildi' };
 
-function sampleGuaranteeText(tenderName: string, ikn: string | null | undefined, type: string, amount: string, currency: string, expiry: string, indefinite: boolean): string {
-  const tur = type === 'BID_BOND' ? 'GEÇİCİ' : 'KESİN';
-  const vade = indefinite ? 'SÜRESİZ' : (expiry ? new Date(expiry).toLocaleDateString('tr-TR') : '[VADE]');
-  return `${tur} TEMİNAT MEKTUBU\n\nİş: ${tenderName}${ikn ? ` (İKN: ${ikn})` : ''}\nTutar: ${amount || '[TUTAR]'} ${currency}\nVade: ${vade}\n\nİdaremize/işverene hitaben, yukarıda belirtilen iş için ${amount || '[TUTAR]'} ${currency} tutarında ${tur.toLowerCase()} teminat olarak işbu teminat mektubu düzenlenmiştir. Banka, ilk yazılı talepte protesto çekmeye gerek olmaksızın bedeli ödemeyi kabul ve taahhüt eder.`;
-}
-
 function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
   tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; userName?: string;
 }) {
@@ -567,29 +560,6 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
           </Modal>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-// ── EKAP ─────────────────────────────────────────────────────────────────────────
-// Bilinçli tasarım kararı: bu platform kamu ihale kurumu (EKAP) sistemiyle canlı
-// entegre değil ve şu an için böyle bir entegrasyon planlanmıyor — bu sekme bunu
-// açıkça belirtir. İKN ve diğer ihale bilgileri "Yeni İhale" formunda elle girilir.
-function EkapTab() {
-  return (
-    <div className="glass-card p-8 max-w-2xl space-y-4">
-      <div className="flex items-center gap-3">
-        <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><Landmark size={24} /></div>
-        <div>
-          <h4 className="font-black text-slate-900">EKAP — Kamu İhale Platformu</h4>
-          <p className="text-xs text-slate-500">Bu platform şu an EKAP ile canlı/otomatik bir bağlantı kurmuyor.</p>
-        </div>
-      </div>
-      <p className="text-sm text-slate-600 leading-relaxed">
-        İKN (İhale Kayıt Numarası) ve diğer ihale bilgileri, İhale Listesi'ndeki
-        <b> "Yeni İhale"</b> formunda elle girilir. EKAP web servisiyle otomatik
-        senkronizasyon şu an desteklenmiyor.
-      </p>
     </div>
   );
 }

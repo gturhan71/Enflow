@@ -5,8 +5,8 @@ import { TABS, TabId, WORKFLOW_STATUS_STEPS, CANCEL_TERMINATE_ROLES } from './co
 import { stepIndex, computeDeadlineAlarm } from './helpers';
 
 const ALARM_BANNER_STYLES: Record<'warning' | 'critical', string> = {
-  warning: 'bg-amber-500/10 border-amber-500/30 text-amber-300',
-  critical: 'bg-red-500/10 border-red-500/30 text-red-300',
+  warning: 'bg-amber-100 border-amber-200 text-amber-700',
+  critical: 'bg-red-100 border-red-200 text-red-700',
 };
 
 export default function DetailHeader({
@@ -20,7 +20,7 @@ export default function DetailHeader({
 }) {
   const alarm = computeDeadlineAlarm(selected);
   return (
-    <div className="p-4 border-b border-white/10">
+    <div className="p-4 border-b border-slate-200/70">
       {alarm.level !== 'none' && (
         <div className={`mb-3 px-3 py-2 rounded-lg border text-xs font-semibold flex items-center gap-2 ${ALARM_BANNER_STYLES[alarm.level]}`}>
           <AlertTriangle className="w-4 h-4 flex-shrink-0" />
@@ -29,10 +29,10 @@ export default function DetailHeader({
       )}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-lg font-semibold text-white">{selected.title}</h1>
+          <h1 className="text-lg font-semibold text-slate-900">{selected.title}</h1>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {selected.contractValue > 0 && (
-              <span className="text-sm text-emerald-400 font-medium">₺{selected.contractValue.toLocaleString('tr-TR')}</span>
+              <span className="text-sm text-emerald-600 font-medium">₺{selected.contractValue.toLocaleString('tr-TR')}</span>
             )}
             {selected.deadline && (
               <span className="text-xs text-slate-400 flex items-center gap-1">
@@ -47,7 +47,7 @@ export default function DetailHeader({
           !['TRANSFERRED', 'CANCELLED', 'TERMINATED'].includes(selected.status) && (
           <button
             onClick={onCancelClick}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-red-500/30 bg-red-500/10 text-red-300 hover:bg-red-500/20 transition-colors flex items-center gap-1.5 flex-shrink-0"
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-100 text-red-700 hover:bg-red-200 transition-colors flex items-center gap-1.5 flex-shrink-0"
           >
             <XCircle className="w-3.5 h-3.5" /> {selected.status === 'SIGNED' ? 'Feshet' : 'İptal Et'}
           </button>
@@ -60,10 +60,10 @@ export default function DetailHeader({
             return (
               <Fragment key={step.key}>
                 <div className={`text-xs px-2 py-1 rounded border transition-colors ${
-                  done ? 'bg-blue-500/20 border-blue-500/40 text-blue-300' : 'bg-white/5 border-white/10 text-slate-500'
+                  done ? 'bg-blue-100 border-blue-200 text-blue-700' : 'bg-slate-100/70 border-slate-200/70 text-slate-500'
                 }`}>{step.label}</div>
                 {i < WORKFLOW_STATUS_STEPS.length - 1 && (
-                  <ChevronRight className={`w-3 h-3 ${done && i < current ? 'text-blue-400' : 'text-slate-600'}`} />
+                  <ChevronRight className={`w-3 h-3 ${done && i < current ? 'text-blue-600' : 'text-slate-600'}`} />
                 )}
               </Fragment>
             );
@@ -79,8 +79,8 @@ export default function DetailHeader({
             onClick={() => setTab(t.id)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm transition-all ${
               tab === t.id
-                ? 'bg-blue-500/20 border border-blue-500/40 text-blue-300'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+                ? 'bg-blue-100 border border-blue-200 text-blue-700'
+                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100/70'
             }`}
           >
             <t.icon className="w-3.5 h-3.5" />

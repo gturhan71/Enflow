@@ -24,7 +24,7 @@ export default function CancelModal({
             onClick={e => e.stopPropagation()}
             className="glass-card w-full max-w-md p-5 space-y-4"
           >
-            <h3 className="text-sm font-semibold text-red-300 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-red-700 flex items-center gap-2">
               <XCircle className="w-4 h-4" />
               {target === 'CANCELLED' ? 'Süreci İptal Et' : 'Sözleşmeyi Feshet'}
             </h3>
@@ -48,7 +48,7 @@ export default function CancelModal({
               <button
                 onClick={onConfirm}
                 disabled={cancelling || !reasonInput.trim()}
-                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-red-500/40 bg-red-500/20 text-red-300 hover:bg-red-500/30 text-sm font-medium transition-colors disabled:opacity-50"
+                className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-red-200 bg-red-100 text-red-700 hover:bg-red-200 text-sm font-medium transition-colors disabled:opacity-50"
               >
                 {cancelling ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                 Onayla

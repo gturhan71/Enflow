@@ -35,7 +35,7 @@ Faz 2 (P1) — Süreç Bütünlüğü     B-04 Contract Execution state machine
    │
    ▼
 Faz 3 (P2) — Karar Kalitesi      B-06 CRM/Proposal veri derinliği
-                                  B-07 EKAP istihbaratı & ağırlıklı pipeline
+                                  B-07 Ağırlıklı pipeline
                                   B-08 Tedarikçi/procurement entegrasyonu
    │
    ▼
@@ -58,7 +58,7 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 | **B-04** Contract Execution state machine | Sıfırdan yapılacak | Tamam, test edilmiş. `backend/src/services/contractWorkflowState.ts:6-16` merkezi `STATUS_TRANSITIONS` guard tablosu + rol kısıtı + zorunlu gerekçe kontrolü; `contractWorkflow.ts:148-153` geçersiz geçişleri reddediyor. Test dosyası mevcut. Eski `Contract` modeli legacy, asıl akış `ContractWorkflow`. | ✅ Karşılandı |
 | **B-05** Onay delegasyonu & SLA eskalasyonu | Sıfırdan yapılacak | Delegasyon: TAMAM ve çalışıyor (`approvalChainService.ts` `getDelegatedRoles`/`resolveEffectiveApprover`). SLA eskalasyonu artık `ApprovalStage.dueDate`/`escalatedAt`/`escalatedToRole` + `approvalSlaEscalation.ts` ile **gerçek yetki devri** yapıyor (bkz. Faz 2 Kapanışı). | ✅ Kapatıldı (Faz 2, bu oturum) |
 | **B-06** CRM/Proposal veri derinliği | Sıfırdan yapılacak | `Customer.source` + Levenshtein-bazlı mükerrer kayıt uyarısı eklendi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
-| **B-07** EKAP istihbaratı & ağırlıklı pipeline | Sıfırdan yapılacak | Ağırlıklı pipeline TAMAM (`analyticsService.ts` `computeForecast()` → `weightedPipeline`/`coverage`; `ForecastCard.tsx`). EKAP gerçek entegrasyonu yok — **kullanıcı kararıyla kapsam dışı.** | ✅ Ağırlıklı pipeline karşılandı / EKAP kapsam dışı |
+| **B-07** Ağırlıklı pipeline | Sıfırdan yapılacak | Ağırlıklı pipeline TAMAM (`analyticsService.ts` `computeForecast()` → `weightedPipeline`/`coverage`; `ForecastCard.tsx`). | ✅ Karşılandı |
 | **B-08** Tedarikçi/procurement entegrasyonu | Sıfırdan yapılacak | `syncProcurementMilestoneDate()` ile PO_ISSUED/teklif revizyonu/teslimat üç noktada `ProjectMilestone.plannedEnd`/`actualEnd`'e senkronize ediliyor + değişiklik/gecikme bildirimi (bkz. Faz 3 Kapanışı). | ✅ Kapatıldı (Faz 3, bu oturum) |
 | **B-09** Warranty/Service modülü | Sıfırdan yapılacak | Maliyet zaten `ProjectCostItem`'a (category=SERVICE) idempotent yazılıyor → `netMargin`'e yansıyor. Garanti süresi bitişi kontrolü eklendi (bkz. Faz 4 Kapanışı). | ✅ Kapatıldı (Faz 4, bu oturum) |
 | Ek | `rbac.config.ts` tek-kaynak mı? | `tests/rbac/rbac.config.ts` Playwright test fixture'ı; gerçek tek-kaynak `governance/role-matrix.ts`. | Bilgi notu |
@@ -67,7 +67,7 @@ Aşağıdaki tablo, manifestin özgün varsayımlarını (backlog dosyasından t
 
 - **Faz 1 (P0):** B-01 ✅ · B-02 ✅ · B-03 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 2 (P1):** B-04 ✅ · B-05 ✅ — **kapı geçildi** (2026-08-10).
-- **Faz 3 (P2):** B-06 ✅ · B-07 ✅ (EKAP hariç) · B-08 ✅ — **kapı geçildi** (2026-08-10).
+- **Faz 3 (P2):** B-06 ✅ · B-07 ✅ · B-08 ✅ — **kapı geçildi** (2026-08-10).
 - **Faz 4 (P3):** B-09 ✅ — **kapı geçildi** (2026-08-10).
 
 **Tüm fazlar kapandı — bkz. aşağıdaki "Manifesto Durumu" tablosu.**
@@ -129,9 +129,9 @@ B-09'un ana kabul kriteri (garanti/servis maliyetinin projenin finansal özetine
 | Faz 0 | Keşif | — |
 | Faz 1 (P0) | B-01 · B-02 · B-03 | `8e0988a` |
 | Faz 2 (P1) | B-04 · B-05 | `b4c5061` |
-| Faz 3 (P2) | B-06 · B-07 (EKAP hariç) · B-08 | `2c332ce` |
+| Faz 3 (P2) | B-06 · B-07 · B-08 | `2c332ce` |
 | Faz 4 (P3) | B-09 | (bu commit) |
 
-**Kalıcı kapsam dışı bırakılanlar (kullanıcı kararı):** EKAP gerçek entegrasyonu (B-07'nin geri kalanı — dış API bağımlılığı), `Project.applyOverhead` varsayılanının açılması (geriye dönük marj sıçraması riski, opt-in olarak kalıyor), Proposal içeriğinin tamamen backend-hesaplı hale getirilmesi (mevcut pazarlık/manuel-override UX'i korunuyor), stage `role`'ünün kalıcı değiştirilmesi, milestone `status`/`progress` otomasyonu.
+**Kalıcı kapsam dışı bırakılanlar (kullanıcı kararı):** `Project.applyOverhead` varsayılanının açılması (geriye dönük marj sıçraması riski, opt-in olarak kalıyor), Proposal içeriğinin tamamen backend-hesaplı hale getirilmesi (mevcut pazarlık/manuel-override UX'i korunuyor), stage `role`'ünün kalıcı değiştirilmesi, milestone `status`/`progress` otomasyonu.
 
 **Faz 3'te bulunan, ayrı bir düzeltme gerektiren ön-var-olan hata:** `purchaseRequests.ts` `PUT /:id/quotes/:qid` yalnız `deliveryDays` (totalAmount'sız) gönderilirse NaN→500 veriyor (B-08 kapsamı dışı, gerçek UI etkilenmiyor).

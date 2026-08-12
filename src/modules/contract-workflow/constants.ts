@@ -25,11 +25,11 @@ export const DOC_TYPE_LABELS: Record<string, { label: string; icon: FC<{ classNa
 };
 
 export const DOC_STATUS_STYLES: Record<string, string> = {
-  PENDING:     'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  IN_PROGRESS: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-  UPLOADED:    'bg-purple-500/20 text-purple-300 border-purple-500/30',
-  VERIFIED:    'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  WAIVED:      'bg-slate-500/20 text-slate-400 border-slate-500/30',
+  PENDING:     'bg-amber-100 text-amber-700 border-amber-200',
+  IN_PROGRESS: 'bg-blue-100 text-blue-700 border-blue-200',
+  UPLOADED:    'bg-purple-100 text-purple-700 border-purple-200',
+  VERIFIED:    'bg-emerald-100 text-emerald-700 border-emerald-200',
+  WAIVED:      'bg-slate-100 text-slate-500 border-slate-300',
 };
 
 export const DOC_STATUS_LABELS: Record<string, string> = {

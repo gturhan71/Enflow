@@ -367,6 +367,7 @@ src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, componen
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
+src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/types/crm.ts ← auth, presales
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
@@ -441,7 +442,6 @@ src/modules/project-mgmt/ProjectListView.tsx ← ../types, ../lib/format, consta
 src/modules/project-mgmt/RiskPanel.tsx ← ../types, helpers
 src/modules/project-mgmt/StatusBadge.tsx ← ../types, constants
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
-src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/ArchiveCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/BomVarianceCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
@@ -515,7 +515,7 @@ vite@8.0.16
 xlsx@0.18.5
 ```
 
-## changes (last 10 commits — 14 seconds ago)
+## changes (last 10 commits — 34 seconds ago)
 ```
 src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 backend/src/services/aiClient.ts              ~getTenantAIConfig
@@ -1004,6 +1004,16 @@ hook useEffect
 export ProposalEditor
 handler onClick
 handler onChange
+```
+
+### src/modules/reporting/AnalyticsTab.tsx
+```
+component AnalyticsTab
+hook useState
+hook useCallback
+hook useEffect
+hook useDashboardStream
+handler onSaved
 ```
 
 ### src/modules/ServiceTicketsModule.tsx
@@ -1823,16 +1833,6 @@ handler onDelete
 handler onRefresh
 handler onPrintReport
 handler onSave
-```
-
-### src/modules/reporting/AnalyticsTab.tsx
-```
-component AnalyticsTab
-hook useState
-hook useCallback
-hook useEffect
-hook useDashboardStream
-handler onSaved
 ```
 
 ### src/modules/reporting/ArchiveCard.tsx

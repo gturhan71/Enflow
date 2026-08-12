@@ -12,6 +12,7 @@ import { ensureApprovalChain, completeApprovalChain } from '../services/approval
 import { createProjectWithMilestones } from '../services/projectFactory';
 import { logActivity } from '../services/activityLog';
 import { checkStatusTransition, buildAutoTitle } from '../services/contractWorkflowState';
+import { similarityRatio } from '../utils/textSimilarity';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -94,6 +95,38 @@ async function uploadToNextcloud(
 }
 
 const pid = (req: Request) => String(req.params.id);
+
+// ── Firma Belgesi → Şirket Evrakları arşivinden otomatik eşleme ────────────────
+// "FIRM_CERT" (Firma Belgesi) türündeki sözleşme evrakları — ticaret sicil gazetesi,
+// imza sirküleri, faaliyet/iş bitirme belgesi vb. — her sözleşmede aynıdır ve zaten
+// kurumsal "Şirket Evrakları" arşivinde (CorporateDocument) tutulur. Süresi geçmemiş
+// (geçerli) ve dosyası yüklü bir arşiv kaydı isim benzerliğiyle eşleşirse, kullanıcı
+// tekrar yüklemek zorunda kalmasın diye otomatik bağlanır.
+const ARCHIVE_MATCH_THRESHOLD = 0.55;
+
+async function resolveFirmCertFromArchive(tenantId: string, docName: string) {
+  if (!docName?.trim()) return null;
+  const candidates = await prisma.corporateDocument.findMany({
+    where: {
+      tenantId,
+      fileUrl: { not: null },
+      OR: [{ expiryDate: null }, { expiryDate: { gt: new Date() } }],
+    },
+    select: { name: true, fileUrl: true, docNumber: true },
+  });
+  if (candidates.length === 0) return null;
+
+  const target = docName.toLocaleLowerCase('tr-TR').trim();
+  let best: { fileUrl: string; name: string; docNumber: string | null; score: number } | null = null;
+  for (const c of candidates) {
+    const score = similarityRatio(target, c.name.toLocaleLowerCase('tr-TR').trim());
+    if (!best || score > best.score) best = { fileUrl: c.fileUrl as string, name: c.name, docNumber: c.docNumber, score };
+  }
+  return best && best.score >= ARCHIVE_MATCH_THRESHOLD ? best : null;
+}
+
+const archiveSourceNote = (match: { name: string; docNumber: string | null }) =>
+  `Şirket Evrakları arşivinden otomatik alındı: ${match.name}${match.docNumber ? ' · ' + match.docNumber : ''}.`;
 
 // ── LIST ─────────────────────────────────────────────────────────────────────
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
@@ -233,22 +266,29 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
   await prisma.contractWorkflowDoc.deleteMany({ where: { workflowId: id, isAiGenerated: true } });
 
   if (docs.length > 0) {
-    await prisma.contractWorkflowDoc.createMany({
-      data: docs.map((d, i) => ({
+    const docsData = await Promise.all(docs.map(async (d, i) => {
+      const base = {
         id: `${id}-ai-${i}-${Date.now()}`,
         workflowId: id,
         name: d.name,
         docType: d.docType || 'OTHER',
         description: d.description || '',
-        status: 'PENDING',
         isRequired: true,
         isAiGenerated: true,
         sortOrder: i,
         notes: d.notes || '',
         tenantId: req.tenantId,
         updatedAt: new Date(),
-      })),
-    });
+      };
+      if ((d.docType || '').toUpperCase() === 'FIRM_CERT') {
+        const match = await resolveFirmCertFromArchive(req.tenantId, d.name);
+        if (match) {
+          return { ...base, status: 'UPLOADED', fileUrl: match.fileUrl, notes: [base.notes, archiveSourceNote(match)].filter(Boolean).join(' ') };
+        }
+      }
+      return { ...base, status: 'PENDING' };
+    }));
+    await prisma.contractWorkflowDoc.createMany({ data: docsData });
   }
 
   const result = await prisma.contractWorkflow.findFirst({
@@ -272,6 +312,15 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 // ── DOCUMENTS CRUD ────────────────────────────────────────────────────────────
 router.post('/:id/documents', asyncHandler(async (req: Request, res: Response) => {
   const { name, docType, description, deadline, notes, isRequired, sortOrder } = req.body;
+
+  let fileUrl: string | undefined;
+  let status = 'PENDING';
+  let finalNotes = notes || '';
+  if ((docType || '').toUpperCase() === 'FIRM_CERT') {
+    const match = await resolveFirmCertFromArchive(req.tenantId, name);
+    if (match) { fileUrl = match.fileUrl; status = 'UPLOADED'; finalNotes = [finalNotes, archiveSourceNote(match)].filter(Boolean).join(' '); }
+  }
+
   const doc = await prisma.contractWorkflowDoc.create({
     data: {
       workflowId: pid(req),
@@ -279,7 +328,9 @@ router.post('/:id/documents', asyncHandler(async (req: Request, res: Response) =
       docType: docType || 'OTHER',
       description: description || '',
       deadline: deadline ? new Date(deadline) : null,
-      notes: notes || '',
+      notes: finalNotes,
+      status,
+      ...(fileUrl && { fileUrl }),
       isRequired: isRequired !== false,
       isAiGenerated: false,
       sortOrder: sortOrder || 0,
@@ -306,6 +357,30 @@ router.put('/:id/documents/:docId', asyncHandler(async (req: Request, res: Respo
     },
   });
   res.json(doc);
+}));
+
+// Evrak zaten oluşturulduktan sonra (ör. arşive belge sonradan eklendiyse ya da ilk
+// eşleme başarısız olduysa) yeniden dene — yalnız Firma Belgesi türü için anlamlı.
+router.post('/:id/documents/:docId/from-archive', asyncHandler(async (req: Request, res: Response) => {
+  const id = pid(req);
+  const docId = String(req.params.docId);
+  const doc = await prisma.contractWorkflowDoc.findFirst({ where: { id: docId, workflowId: id, tenantId: req.tenantId } });
+  if (!doc) return res.status(404).json({ error: 'Evrak bulunamadı.' });
+  if (doc.docType.toUpperCase() !== 'FIRM_CERT') {
+    return res.status(400).json({ error: 'Yalnız Firma Belgesi türündeki evraklar Şirket Evrakları arşivinden alınabilir.' });
+  }
+  const match = await resolveFirmCertFromArchive(req.tenantId, doc.name);
+  if (!match) return res.status(404).json({ error: 'Şirket Evrakları arşivinde geçerli ve eşleşen bir belge bulunamadı.' });
+  const updated = await prisma.contractWorkflowDoc.update({
+    where: { id: docId },
+    data: {
+      fileUrl: match.fileUrl,
+      status: 'UPLOADED',
+      notes: [doc.notes, archiveSourceNote(match)].filter(Boolean).join(' '),
+      updatedAt: new Date(),
+    },
+  });
+  res.json(updated);
 }));
 
 router.delete('/:id/documents/:docId', asyncHandler(async (req: Request, res: Response) => {
