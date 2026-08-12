@@ -364,13 +364,14 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 src/modules/crm/NewCustomerModal.tsx ← ../types
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/workflowService
+src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
+src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/types/crm.ts ← auth, presales
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
-backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenantEncryption.ts ← prismaClient
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
@@ -428,8 +429,6 @@ src/modules/negotiation/ProposalSelectorHeader.tsx ← ../types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, services/workflowService, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
-src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
-src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/project-mgmt/constants.tsx ← ../types
 src/modules/project-mgmt/CostForm.tsx ← ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants
@@ -478,6 +477,7 @@ backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/personnelTransferService.ts ← prismaClient
+backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
@@ -521,7 +521,6 @@ src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 backend/src/services/aiClient.ts              ~getTenantAIConfig
 backend/src/services/approvalChainService.ts  ~ensureApprovalChain
 backend/src/services/approvalSlaEscalation.ts +getApprovalSlaBusinessDays  +sweepApprovalSlaEscalations
-backend/src/services/restoreService.ts        +orderModelsForInsert  +loadModelsIntoTarget  +zaten  ~applyLogicalRestore
 backend/src/services/salesCosting.ts          +evaluateProposalMargin  ~computeSalesCosting
 backend/src/services/tenantEncryption.ts      +loadMasterKey  +aesEncrypt  +aesDecrypt  +getTenantDek
 backend/src/utils/textSimilarity.ts           +normalizeCompanyName  +levenshteinDistance  +similarityRatio
@@ -556,15 +555,6 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :242-2
 ```
 export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
 export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-81
-```
-
-### backend/src/services/restoreService.ts
-```
-export type LogicalPayloadData  :19-19
-export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :58-110  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
-export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
-export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
-export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
 ```
 
 ### backend/src/services/salesCosting.ts
@@ -866,6 +856,15 @@ export async function deactivateUser(tenantId, userId) → Promise<void>  :203-2
 export async function hardDeleteUser(tenantId, userId) → Promise<  :214-214
 ```
 
+### backend/src/services/restoreService.ts
+```
+export type LogicalPayloadData  :19-19
+export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :58-110  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
+export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
+export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
+export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
+```
+
 ### backend/src/services/tenderReminders.ts
 ```
 export async function sweepTenderReminders(tenantId) → Promise<void>  :21-63
@@ -977,6 +976,23 @@ handler onSendForApproval
 handler onGeneratePdf
 handler onMarkDelivered
 handler onWonProposal
+```
+
+### src/modules/procurement/VendorForm.tsx
+```
+props VendorFormProps
+hook useState
+hook useEffect
+export VendorForm
+handler onClick
+handler onChange
+handler onKeyDown
+```
+
+### src/modules/procurement/VendorsTab.tsx
+```
+props VendorsTabProps
+export VendorsTab
 ```
 
 ### src/modules/ProposalEditor.tsx
@@ -1687,23 +1703,6 @@ hook useState
 export PRDetailDrawer
 handler onClick
 handler onChange
-```
-
-### src/modules/procurement/VendorForm.tsx
-```
-props VendorFormProps
-hook useState
-hook useEffect
-export VendorForm
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### src/modules/procurement/VendorsTab.tsx
-```
-props VendorsTabProps
-export VendorsTab
 ```
 
 ### src/modules/project-mgmt/constants.tsx

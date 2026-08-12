@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiService } from '../../services/apiService';
+import { useDashboardStream } from '../dashboard/useDashboardStream';
 import { ProjectHealthCard, CustomerHealthCard } from '../../components/HealthCards';
 import type {
   FunnelReport, TenderAnalytics, BomVarianceReport, ConcentrationReport, ForecastReport, BidScorecard,
@@ -43,12 +44,30 @@ export default function AnalyticsTab() {
       .catch(() => { if (active) setErr(true); });
     return () => { active = false; };
   }, []);
+  const loadDmo = useCallback(() => { apiService.getDmoAnalytics().then(setDmo).catch(() => {}); }, []); // DMO opsiyonel/ayrı lisans — bloklamaz
+  const loadAbsorption = useCallback(() => { apiService.getUnitBudgetAbsorption().then(setAbsorption).catch(() => {}); }, []);
+  const loadArchive = useCallback(() => { apiService.getArchiveAnalytics().then(setArchive).catch(() => {}); }, []); // rol erişimi olmayabilir — bloklamaz
+  const loadBrandCat = useCallback(() => { apiService.getBrandCategoryAnalytics().then(setBrandCat).catch(() => {}); }, []);
   useEffect(() => load(), [load]);
-  useEffect(() => { apiService.getDmoAnalytics().then(setDmo).catch(() => {}); }, []); // DMO opsiyonel/ayrı lisans — bloklamaz
-  useEffect(() => { apiService.getUnitBudgetAbsorption().then(setAbsorption).catch(() => {}); }, []);
-  useEffect(() => { apiService.getArchiveAnalytics().then(setArchive).catch(() => {}); }, []); // rol erişimi olmayabilir — bloklamaz
-  useEffect(() => { apiService.getBrandCategoryAnalytics().then(setBrandCat).catch(() => {}); }, []);
+  useEffect(() => { loadDmo(); }, [loadDmo]);
+  useEffect(() => { loadAbsorption(); }, [loadAbsorption]);
+  useEffect(() => { loadArchive(); }, [loadArchive]);
+  useEffect(() => { loadBrandCat(); }, [loadBrandCat]);
   const reloadForecast = useCallback(() => { apiService.getForecast().then(setForecast).catch(() => {}); apiService.getBusinessHealth().then(setHealth).catch(() => {}); }, []);
+
+  // Canlı güncelleme: bir ihale kazanıldı işaretlendiğinde (veya tenant'ta başka bir
+  // mutasyon olduğunda) sunucudan gelen "bir şey değişti" sinyaliyle (bkz. Dashboard.tsx
+  // ile paylaşımlı SSE — pingDashboard/useDashboardStream) tüm raporlar anında yeniden
+  // çekilir; sekmeden çıkıp geri girmeye ya da sayfayı yenilemeye gerek kalmaz. Art arda
+  // gelen sinyalleri (toplu işlem) tek istek turuna toplamak için hafif debounce uygulanır.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const refreshAll = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      load(); loadDmo(); loadAbsorption(); loadArchive(); loadBrandCat();
+    }, 600);
+  }, [load, loadDmo, loadAbsorption, loadArchive, loadBrandCat]);
+  useDashboardStream(refreshAll);
   if (err) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik verisi alınamadı.</div>;
   if (!health || !projectHealth || !customerHealth || !funnel || !tender || !variance || !conc || !forecast || !scorecard || !portfolio) return <div className="glass-card p-8 text-center text-slate-400 italic">Analitik yükleniyor…</div>;
   return (
