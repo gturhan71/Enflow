@@ -95,4 +95,40 @@ OK "Kaynak hazir: $RepoDir"
 $wizardArgs = @("$RepoDir\install\wizard.mjs", "--repo", "$RepoDir")
 if ($Yes) { $wizardArgs += "--yes" }
 & node @wizardArgs
-exit $LASTEXITCODE
+$WizardExit = $LASTEXITCODE
+
+# --- guncelleme kontrolu: Windows Gorev Zamanlayici (Linux'taki cron ornegin karsiligi) ---
+# Bu kayit olmadan update-status.json hic uretilmez/tazelenmez ve backend'teki
+# updateNotifier (GM'lere zil bildirimi) asla tetiklenmez - kurulu sistem yeni bir
+# surumun cikip cikmadigini hicbir zaman fark etmez. bkz. upgrade-tool/README.md
+if ($WizardExit -eq 0) {
+  $TaskName = "EnflowUpdateCheck"
+  $HasTask = $false
+  try { schtasks /Query /TN $TaskName 2>$null | Out-Null; $HasTask = ($LASTEXITCODE -eq 0) } catch { $HasTask = $false }
+  if ($HasTask) {
+    OK "Guncelleme kontrolu gorevi zaten kayitli: $TaskName"
+  } else {
+    $DoSchedule = $true
+    if (-not $Yes) {
+      $Ans = Read-Host "Guncelleme kontrolu icin Windows Gorev Zamanlayici kaydi olusturulsun mu (6 saatte bir 'upgrade-tool check' calisir) [E/h]"
+      $DoSchedule = -not ($Ans -match '^(h|H|hayir|Hayir|n|N|no|No)$')
+    }
+    if ($DoSchedule) {
+      try {
+        $NodeExe = (Get-Command node).Source
+        $CliPath = Join-Path $RepoDir "upgrade-tool\cli.mjs"
+        $Action = "`"$NodeExe`" `"$CliPath`" check"
+        schtasks /Create /TN $TaskName /TR $Action /SC HOURLY /MO 6 /RL LIMITED /F | Out-Null
+        OK "Gorev Zamanlayici kaydi olusturuldu: $TaskName (6 saatte bir guncelleme kontrolu, oturum acikken calisir)"
+        # Ilk durumu hemen uret - ilk tetiklemeyi (6 saat) beklemeden bildirim altyapisi calisir hale gelsin
+        & $NodeExe $CliPath check 2>$null | Out-Null
+      } catch {
+        Say "Gorev Zamanlayici kaydi otomatik olusturulamadi - elle kurun (bkz. upgrade-tool/README.md)."
+      }
+    } else {
+      Say "Guncelleme kontrolu atlandi. Elle: node upgrade-tool\cli.mjs check (bkz. upgrade-tool/README.md)."
+    }
+  }
+}
+
+exit $WizardExit

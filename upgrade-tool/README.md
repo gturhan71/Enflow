@@ -36,6 +36,20 @@ node upgrade-tool/cli.mjs upgrade    # güvenli yükseltme (ön-yedek + rollback
 0 */6 * * *  cd /opt/enflow && node upgrade-tool/cli.mjs check >> /var/log/enflow-upgrade.log 2>&1
 ```
 
+**Windows karşılığı (Görev Zamanlayıcı):** `install/install.ps1` kurulum sonunda bunu
+otomatik önerir/kurar (`schtasks` ile `EnflowUpdateCheck` görevi, 6 saatte bir). Bu
+adım atlandıysa veya elle kurmak isterseniz:
+```powershell
+$node = (Get-Command node).Source
+schtasks /Create /TN "EnflowUpdateCheck" /TR "`"$node`" `"C:\Enflow\upgrade-tool\cli.mjs`" check" /SC HOURLY /MO 6 /RL LIMITED /F
+```
+Bu kayıt olmadan `update-status.json` hiç üretilmez/tazelenmez ve uygulamadaki
+`updateNotifier` (GM'lere zil bildirimi) hiçbir zaman tetiklenmez — kurulu sistem
+yeni bir sürümün çıktığını fark etmez. Not: varsayılan (parola saklamayan) görev yalnız
+kullanıcı oturum açıkken çalışır; sunucu-benzeri 7/24 kurulumlarda bunun yerine
+`node upgrade-tool/server.mjs`'i bir Windows servisi olarak çalıştırmak (ör. NSSM ile)
+daha uygundur — kendi periyodik döngüsü vardır (bkz. aşağıdaki "Web GUI").
+
 ### Web GUI (operatör)
 
 ```bash

@@ -239,7 +239,10 @@ export async function runUpgrade(home, opts = {}) {
     // 7) restart (aracın başlatmadığı süreç → ayarlanabilir komut)
     if (opts.restartCommand) {
       log(`restart: ${opts.restartCommand}`);
-      try { execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' }); } catch (e) { log('restart komutu hata verdi: ' + e.message); }
+      try {
+        if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', opts.restartCommand], { stdio: 'inherit' });
+        else execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' });
+      } catch (e) { log('restart komutu hata verdi: ' + e.message); }
     } else {
       log('NOT: restartCommand ayarlı değil — backend/frontend süreçlerini elle yeniden başlatın.');
     }

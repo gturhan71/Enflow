@@ -119,6 +119,11 @@ Hangi işletim sisteminde olursanız olun, kurulum betiği aynı soruları sıra
 3. **Veritabanı seçimi** — SQLite (varsayılan, ek kurulum gerektirmez) veya PostgreSQL.
 4. **YZ (yapay zekâ) entegrasyonu** — isteğe bağlıdır, atlayıp uygulamadan da (Ayarlar →
    Entegrasyonlar) sonradan girebilirsiniz.
+5. **(Yalnız Windows) Güncelleme kontrolü** — `install.ps1` kurulum sonunda bir Windows
+   Görev Zamanlayıcı kaydı (`EnflowUpdateCheck`, 6 saatte bir) oluşturmayı önerir. Bu kayıt
+   olmadan sistem yeni bir Enflow sürümü çıktığında bunu **hiç fark etmez** — bildirim zili
+   tetiklenmez (bkz. `upgrade-tool/README.md`). Linux/macOS'ta bunun karşılığı bir `cron`
+   girdisidir, kurulum betiği kendisi eklemez (elle: `upgrade-tool/README.md`).
 
 Betik ayrıca `AUTH_JWT_SECRET` ve `DATA_ENCRYPTION_MASTER_KEY` gibi güvenlik anahtarlarını
 **sizin için otomatik ve güvenli rastgele üretir** — bunlarla ilgili hiçbir şey girmeniz
