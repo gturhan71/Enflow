@@ -3,7 +3,6 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { DEFAULT_UNITS } from '../services/bootstrapTenant';
-import { ensureDefaultWorkflow } from '../services/workflowTemplateService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 // Birim listesi okuma — GM + Presales + Yedek Yöneticisi (salt-okunur akış dahli)
@@ -20,8 +19,13 @@ router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Reque
   res.json(units);
 }));
 
-// Varsayılan şablonu yükle (idempotent): eksik şablon birimlerini ekler + varsayılan
-// iş akışını oluşturur. Mevcut birimlere/iş akışına dokunmaz (isimle eşleşeni atlar).
+// Varsayılan şablonu yükle (idempotent): eksik şablon birimlerini ekler. Mevcut
+// birimlere dokunmaz (isimle eşleşeni atlar). Faz B öncesi burada ayrıca
+// "varsayılan iş akışı" da otomatik üretilirdi (ensureDefaultWorkflow) — bu,
+// Süreç Motoru'nun "tenant açıkça kurgulamadıkça hiçbir süreç yok" ilkesiyle
+// çelişen ölü/çelişkili koddu, kaldırıldı (bkz. workflowTemplateService.ts silme
+// gerekçesi). Birimler eklendikten sonra tenant kendi süreçlerini Ayarlar →
+// İş Akışı Tasarımcısı'ndan kurgular.
 router.post('/seed-defaults', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const existing = await prisma.unit.findMany({ where: { tenantId: req.tenantId }, select: { name: true } });
   const have = new Set(existing.map((u) => norm(u.name)));
@@ -33,11 +37,8 @@ router.post('/seed-defaults', tenantMiddleware, GM, asyncHandler(async (req: Req
     created.push({ id: unit.id, name: unit.name });
   }
 
-  // Varsayılan iş akışı (birimlerden türetilir; zaten varsa mevcudu döner).
-  const workflow = await ensureDefaultWorkflow(req.tenantId);
-
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SEED_TEMPLATE', entityType: 'UNIT', entityId: req.tenantId, details: { addedUnits: created.length, workflowId: workflow.id } });
-  res.json({ addedUnits: created, addedCount: created.length, workflowId: workflow.id, workflowName: workflow.name });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SEED_TEMPLATE', entityType: 'UNIT', entityId: req.tenantId, details: { addedUnits: created.length } });
+  res.json({ addedUnits: created, addedCount: created.length });
 }));
 
 router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {

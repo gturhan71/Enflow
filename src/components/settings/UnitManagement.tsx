@@ -26,7 +26,8 @@ export const UnitManagement = ({
   const [loading, setLoading] = useState(false);
   const [seeding, setSeeding] = useState(false);
 
-  // Varsayılan şablonu yükle: eksik birimler + varsayılan iş akışı (idempotent).
+  // Varsayılan şablonu yükle: eksik birimler eklenir (idempotent). İş akışları
+  // artık otomatik üretilmiyor — Ayarlar → İş Akışı Tasarımcısı'ndan elle kurgulanır.
   const handleSeedTemplate = async () => {
     setSeeding(true);
     try {
@@ -34,8 +35,8 @@ export const UnitManagement = ({
       const fresh = await apiService.getUnits() as Unit[];
       setUnits(fresh);
       alert(res.addedCount > 0
-        ? `${res.addedCount} şablon birim eklendi + varsayılan iş akışı hazır.`
-        : 'Tüm şablon birimler zaten mevcut — varsayılan iş akışı hazır.');
+        ? `${res.addedCount} şablon birim eklendi.`
+        : 'Tüm şablon birimler zaten mevcut.');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Şablon yüklenemedi.');
     } finally {

@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
-import { ensureApprovalChain, completeApprovalChain, resetApprovalChain } from '../services/approvalChainService';
+import { resetApprovalChain, resolveEffectiveApprover } from '../services/approvalChainService';
+import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 import { computeSalesCosting, getSalesMarginFloor, SalesBoMItemInput, SalesManualCostItemInput, SalesCostConfig } from '../services/salesCosting';
@@ -84,11 +85,15 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
     const label = METHOD_LABELS[procurementMethod] || procurementMethod;
     const dateStr = bidDate ? bidDate.toLocaleDateString('tr-TR') : 'belirtilmedi';
     await notify(tenantId, salesSupport?.id, 'Yeni fırsat takibi', `"${title}" — usul: ${label}, son teklif: ${dateStr}. İhale/dosya hazırlığını başlatın.`, 'INFO');
-    if (salesSupport?.unitId || tender) {
+    // Faz D düzeltmesi — eskiden SALES_SUPPORT rolünde aktif kimse yoksa görev
+    // yine de sahte bir unitId ('unit_sales_support') ile oluşuyordu, hiçbir
+    // gerçek birime karşılık gelmediği için kimseye görünmüyordu (T4 öncesi
+    // hatasıyla aynı sınıf). Artık yalnız gerçek bir birim çözülebiliyorsa oluşur.
+    if (salesSupport?.unitId) {
       await prisma.todoTask.create({ data: {
         title: `İhale dosyası: ${title}`,
         description: `Fırsat ${label} usulüyle teklife dönüşecek (son teklif: ${dateStr}). Dosya hazırlığını teklifle paralel yürütün.`,
-        unitId: salesSupport?.unitId || 'unit_sales_support', assignedBy: finalCreatedById, tenantId,
+        unitId: salesSupport.unitId, assignedBy: finalCreatedById, tenantId,
         relatedModule: 'OPPORTUNITY', relatedItemId: opp.id, priority: 'HIGH', status: 'PENDING',
         ...(bidDate ? { dueDate: bidDate } : {}),
       } }).catch(() => {});
@@ -425,14 +430,17 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
     },
   });
 
-  // Satış Müdürüne onay görevi + bildirim (submit-cost-approval ile aynı — tek çağrıda birleşti)
+  // Satış Müdürüne onay görevi + bildirim (submit-cost-approval ile aynı — tek çağrıda birleşti).
+  // Faz D düzeltmesi — eskiden SALES_MGR rolünde aktif kimse yoksa isim-eşleşmesiyle
+  // ('Satış' içeren birim) rastgele bir birime düşülüyordu; tenant birimi yeniden
+  // adlandırırsa çöken kırılgan bir fallback'ti. Artık yalnız gerçek bir SALES_MGR
+  // varsa görev oluşur.
   const salesMgr = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_MGR' } });
-  const salesUnit = salesMgr?.unitId || (await prisma.unit.findFirst({ where: { tenantId, name: { contains: 'Satış' } } }))?.id;
-  if (salesUnit) {
+  if (salesMgr?.unitId) {
     await prisma.todoTask.create({ data: {
       title: `Maliyet analizi onayı: ${opp.title}`,
       description: `Maliyet analizi tamamlandı, Satış Müdürü onayı bekleniyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ` (eşik %${result.marginFloorPct} ALTINDA)` : ''}.`,
-      unitId: salesUnit, assignedBy: opp.assignedToId, tenantId,
+      unitId: salesMgr.unitId, assignedBy: opp.assignedToId, tenantId,
       relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, priority: result.belowFloor ? 'URGENT' : 'HIGH', status: 'PENDING',
     } }).catch(() => {});
   }
@@ -467,49 +475,26 @@ router.get('/:id/cost-analysis-versions', tenantMiddleware, asyncHandler(async (
 router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const opportunityId = req.params.id as string;
   const tenantId = req.tenantId;
-  const { note, managerId } = req.body;
 
   const record = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
-  const opp = await prisma.opportunity.update({
+  // Süreç Motoru (Faz A) — durum kalıcı hale gelmeden ÖNCE kontrol edilir ki
+  // tenant OPPORTUNITY_APPROVAL sürecini Tasarımcı'da henüz kurgulamadıysa
+  // fırsat "WAITING_APPROVAL"da kilitli kalmasın (409 dönerse hiçbir şey yazılmaz).
+  try {
+    await advanceProcess(tenantId, 'OPPORTUNITY_APPROVAL', 'OPPORTUNITY', opportunityId, { actorUserId: req.userId });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: 'Fırsat onay süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Fırsat Onayı" sürecini kurgulayın.' });
+    }
+    throw e;
+  }
+
+  await prisma.opportunity.update({
     where: { id: opportunityId },
     data: { technicalStatus: 'WAITING_APPROVAL' }
   });
-
-  const managementUnit = await prisma.unit.findFirst({
-    where: { tenantId, name: { contains: 'Yönetim' } }
-  });
-
-  await prisma.todoTask.create({
-    data: {
-      title: `Teklif Onayı: ${opp.title}`,
-      description: note || 'Teklif incelenip onaylanmayı bekliyor.',
-      unitId: managementUnit?.id || 'system',
-      assignedBy: opp.assignedToId,
-      tenantId,
-      relatedModule: 'OPPORTUNITY',
-      relatedItemId: opportunityId,
-      priority: 'HIGH',
-      status: 'PENDING'
-    }
-  });
-
-  await prisma.workflowLog.create({
-    data: {
-      fromUnitId: 'u2',
-      toUnitId: managementUnit?.id || 'u4',
-      assignedBy: opp.assignedToId,
-      assignedTo: managerId || 'system',
-      note: note || 'Onaya sunuldu.',
-      opportunityId,
-      status: 'PENDING'
-    }
-  });
-
-  // Faz 0 — kalıcı onay zinciri: Finans → İGB → Üst Yönetim (GM) → KSU
-  // DoA: tenant onay matrisi tanımlıysa fırsat tutarına göre roller seçilir (opt-in).
-  await ensureApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, undefined, opp.value);
 
   res.json({ message: 'Teklif onay sürecine gönderildi.' });
 }));
@@ -542,14 +527,14 @@ router.post('/:id/submit-cost-approval', tenantMiddleware, asyncHandler(async (r
   await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'PENDING_APPROVAL' } });
 
   const salesMgr = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_MGR' } });
-  const salesUnit = salesMgr?.unitId || (await prisma.unit.findFirst({ where: { tenantId, name: { contains: 'Satış' } } }))?.id;
 
-  // Satış Müdürüne onay görevi + bildirim
-  if (salesUnit) {
+  // Satış Müdürüne onay görevi + bildirim. Faz D düzeltmesi — isim-eşleşmesi
+  // fallback'i kaldırıldı (yukarıdaki /cost-analysis'teki aynı düzeltmeyle tutarlı).
+  if (salesMgr?.unitId) {
     await prisma.todoTask.create({ data: {
       title: `Maliyet analizi onayı: ${opp.title}`,
       description: 'Maliyet analizi tamamlandı, Satış Müdürü onayı bekleniyor.',
-      unitId: salesUnit, assignedBy: opp.assignedToId, tenantId,
+      unitId: salesMgr.unitId, assignedBy: opp.assignedToId, tenantId,
       relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, priority: 'HIGH', status: 'PENDING',
     } }).catch(() => {});
   }
@@ -618,18 +603,37 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
   const sod = await sodViolation(tenantId, req.userId, 'OPPORTUNITY', opportunityId);
   if (sod) return res.status(403).json({ error: sod });
 
-  const updated = await prisma.opportunity.update({
-    where: { id: opportunityId },
-    data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' }
+  // Süreç Motoru (Faz A) — GM'nin bulunduğu belirli aşamayı (sırası GELMİŞSE)
+  // çözer; artık tüm zinciri rol kontrolü yapmadan toptan tamamlayan eski
+  // "tek-tık bypass" davranışı YOK. Önceki aşamalar hâlâ bekliyorsa 403 döner.
+  const chain = await prisma.approvalChain.findFirst({
+    where: { tenantId, entityType: 'OPPORTUNITY', entityId: opportunityId, status: 'PENDING' },
+    include: { stages: { orderBy: { order: 'asc' } } },
   });
+  if (!chain) return res.status(409).json({ error: 'Onay süreci başlatılmamış. Önce "Onaya Gönder" ile süreci başlatın.' });
 
-  await prisma.workflowLog.updateMany({
-    where: { opportunityId, status: 'PENDING' },
-    data: { status: 'APPROVED', note: note || 'Onaylandı.' }
-  });
+  const pending = chain.stages.filter(s => s.status === 'PENDING');
+  if (!pending.length) return res.status(409).json({ error: 'Onay bekleyen aşama yok.' });
+  const minOrder = Math.min(...pending.map(s => s.order));
+  let myStage: (typeof pending)[number] | undefined;
+  for (const s of pending.filter(s => s.order === minOrder)) {
+    if (await resolveEffectiveApprover(tenantId, { role: s.role, unitId: s.unitId, delegateUserId: s.delegateUserId }, req.userId)) { myStage = s; break; }
+  }
+  if (!myStage) return res.status(403).json({ error: 'Sırası gelmiş bir onay aşamanız yok — önceki aşamaların tamamlanması bekleniyor.' });
 
-  // Faz 0 — kalıcı zincirin tüm aşamalarını tamamlanmış işaretle (tek-tık GM onayı geriye uyumlu)
-  await completeApprovalChain(tenantId, 'OPPORTUNITY', opportunityId, req.userId, note || 'Onaylandı.');
+  let result;
+  try {
+    result = await advanceProcess(tenantId, 'OPPORTUNITY_APPROVAL', 'OPPORTUNITY', opportunityId, {
+      stageId: myStage.id, decision: 'APPROVE', actorUserId: req.userId, note: note || 'Onaylandı.',
+    });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) return res.status(409).json({ error: e.message });
+    throw e;
+  }
+
+  const updated = result.chain.status === 'COMPLETED'
+    ? await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' } })
+    : await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
 
   res.json(updated);
 }));
@@ -683,6 +687,33 @@ router.post('/:id/revert-approval', tenantMiddleware, asyncHandler(async (req: R
   });
 
   res.json(updated);
+}));
+
+// ── DEVİR (CRM/Presales handoff) — Faz C ─────────────────────────────────────
+// Değişmez kural: hedef birim/kişi artık serbestçe seçilmez (eski HandOffModal
+// öyle çalışıyordu) — tenant'ın İş Akışı Tasarımcısı'nda kurguladığı haritaya
+// göre motor çözer. Süreç kurgulanmadıysa 409 (sessiz fallback YOK).
+const HANDOFF_PROCESS_KEYS = ['CRM_HANDOFF', 'PRESALES_HANDOFF'];
+router.post('/:id/handoff', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = req.params.id as string;
+  const tenantId = req.tenantId;
+  const { processKey, note } = req.body as { processKey?: string; note?: string };
+
+  if (!processKey || !HANDOFF_PROCESS_KEYS.includes(processKey)) {
+    return res.status(400).json({ error: `processKey şunlardan biri olmalı: ${HANDOFF_PROCESS_KEYS.join(', ')}` });
+  }
+  const record = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+  if (!record) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
+
+  try {
+    const result = await advanceProcess(tenantId, processKey, 'OPPORTUNITY', opportunityId, { actorUserId: req.userId, note });
+    res.json({ ok: true, chain: result.chain });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: `Bu devir süreci henüz yapılandırılmamış (${processKey}). Ayarlar → İş Akışı Tasarımcısı'ndan kurgulayın.` });
+    }
+    throw e;
+  }
 }));
 
 export default router;

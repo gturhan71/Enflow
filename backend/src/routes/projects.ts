@@ -6,6 +6,7 @@ import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { createProjectWithMilestones } from '../services/projectFactory';
+import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 import { logActivity } from '../services/activityLog';
 import { computeProjectOverhead, applyProjectOverhead } from '../services/overheadService';
 import { computeProjectProgress } from '../services/projectProgress';
@@ -65,8 +66,50 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   res.json(project);
 }));
 
+// Faz B/C güvenlik düzeltmesi — tenders.ts'teki WON_TRANSITION_ROLES deseniyle
+// birebir aynı: bu, bir fırsattan proje AÇMA yetkisini kısıtlayan sabit bir
+// yetki katmanıdır (motorun kendisi değil). Eskiden bu dalda HİÇ rol kontrolü
+// yoktu — kimliği doğrulanmış herhangi bir kullanıcı herhangi bir WON fırsattan
+// proje açabiliyordu.
+const OPPORTUNITY_TO_PROJECT_ROLES = ['GENERAL_MANAGER', 'PROJECT_MGR', 'SALES_MGR'];
+
 // ── CREATE ────────────────────────────────────────────────────────────────────
+// Süreç Motoru (Faz B, T1) — bir fırsattan proje açılıyorsa (opportunityId
+// verilmişse) artık backend WON kontrolü + tenant'ın OPPORTUNITY_TO_PROJECT
+// için kurguladığı yapılandırma gerekir (eskiden hiç kontrol yoktu — herhangi
+// bir durumdaki fırsattan proje açılabiliyordu). opportunityId verilmemişse
+// (genel/bağımsız proje oluşturma) davranış değişmez.
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
+  const { opportunityId } = req.body as { opportunityId?: string };
+
+  if (opportunityId) {
+    if (!OPPORTUNITY_TO_PROJECT_ROLES.includes(req.userRole || '')) {
+      return res.status(403).json({ error: 'Fırsattan proje açma yetkiniz yok.' });
+    }
+    try {
+      await advanceProcess(req.tenantId, 'OPPORTUNITY_TO_PROJECT', 'OPPORTUNITY', opportunityId, {
+        actorUserId: req.userId,
+        input: req.body,
+      });
+    } catch (e) {
+      if (e instanceof ProcessNotConfiguredError) {
+        return res.status(409).json({ error: 'Fırsat → Proje süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Fırsat → Proje" sürecini kurgulayın.' });
+      }
+      if (e instanceof Error) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+    const full = await prisma.project.findFirst({ where: { tenantId: req.tenantId, opportunityId }, include: PROJECT_INCLUDE });
+    // OPPORTUNITY_TO_PROJECT bir MANUAL onay adımı içeriyorsa (tenant'ın seçimi),
+    // advanceProcess yalnız ApprovalChain'i başlatır — proje henüz OLUŞMAZ, onay
+    // sonrası AUTO adım tetiklenince oluşur. Bu durumda 201+proje yerine 202
+    // dönülür — çağıran "oluşturuldu" ile "onaya gönderildi"yi karıştırmasın.
+    if (!full) {
+      return res.status(202).json({ pending: true, message: 'Fırsat → Proje süreci onay bekliyor — proje, onay tamamlanınca oluşturulacak.' });
+    }
+    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROJECT', entityId: full.id, details: { code: full.code, name: full.name, opportunityId } });
+    return res.status(201).json(full);
+  }
+
   const full = await createProjectWithMilestones(req.tenantId, req.body, req.userId);
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'PROJECT', entityId: full?.id ?? '', details: { code: full?.code, name: full?.name } });
   res.status(201).json(full);
@@ -101,18 +144,22 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   const updated = await prisma.project.update({ where: { id }, data, include: PROJECT_INCLUDE });
 
-  // Kritik milestone geçişinde GM TodoTask
+  // Kritik milestone geçişinde GM TodoTask. Faz D düzeltmesi — eskiden
+  // `unitId: req.tenantId` yazılıyordu (Tenant id, gerçek bir Unit'e karşılık
+  // gelmiyor) — görev hiçbir birimin Todo ekranında görünmüyordu (T4 öncesi
+  // hatasıyla aynı sınıf). Artık GM rolündeki gerçek kullanıcının birimi çözülür.
   if (req.body.status === 'COMPLETED' || (req.body.phase && req.body.phase !== existing.phase)) {
     const criticalMs = await prisma.projectMilestone.findFirst({
       where: { projectId: id, status: 'IN_PROGRESS', requiresApproval: true },
     });
-    if (criticalMs) {
+    const gm = criticalMs ? await prisma.user.findFirst({ where: { tenantId: req.tenantId, role: 'GENERAL_MANAGER', status: 'ACTIVE' } }) : null;
+    if (criticalMs && gm?.unitId) {
       await prisma.todoTask.create({
         data: {
           tenantId: req.tenantId,
           title: `Proje Onayı: ${existing.name} — ${criticalMs.title}`,
           description: `"${criticalMs.title}" aşaması için genel müdür onayı gerekiyor.`,
-          unitId: req.tenantId,
+          unitId: gm.unitId,
           assignedBy: req.userId,
           priority: 'HIGH',
           status: 'PENDING',

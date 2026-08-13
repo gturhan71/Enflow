@@ -693,12 +693,15 @@ model Workflow {
   name        String
   description String?
   isActive    Boolean        @default(true)
-  isDefault   Boolean        @default(false) // tenant başına tek varsayılan şablon
+  isDefault   Boolean        @default(false) // tenant başına tek varsayılan şablon (legacy, processKey=null kayıtlar için)
+  processKey  String?        // süreç motoru anahtarı (OPPORTUNITY_APPROVAL, CONTRACT_SIGNING, ...) — bkz. processEngine.ts
   tenantId    String
   tenant      Tenant         @relation(fields: [tenantId], references: [id])
   steps       WorkflowStep[]
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  @@unique([tenantId, processKey])
 }
 
 model WorkflowStep {
@@ -707,8 +710,16 @@ model WorkflowStep {
   workflow           Workflow @relation(fields: [workflowId], references: [id])
   unitId             String
   unit               Unit     @relation(fields: [unitId], references: [id])
+  role               String?  // unitId içinde belirli bir role kısıtla; null = birimdeki herkes
+  delegateUserId     String?  // VEKİL — birimde aktif kullanıcı yoksa (boş koltuk) düşülecek kişi; resolveStepRecipients bunu unit üyeleri/yöneticisinden sonra dener
+  approvalMode       String   @default("ANY") // ANY|ALL — aynı (workflowId, order) değerini paylaşan satırlar için
+  actionKey          String?  // type=AUTO adımlarda çalıştırılacak kayıtlı eylem anahtarı (processEngine.ts STAGE_ACTIONS)
   order              Int
-  type               String   @default("AUTO") // AUTO, MANUAL
+  // Değişmez kural: bir adım yalnız tenant AÇIKÇA "otomatik devir" (AUTO) olarak
+  // işaretlerse insan onayı olmadan ilerler — varsayılan MANUAL'dır (bkz. memory
+  // process_engine_immutable_rule.md). AUTO'nun eski varsayılan olması bu kuralı
+  // ihlal ediyordu, Faz C'de düzeltildi.
+  type               String   @default("MANUAL") // AUTO, MANUAL
   description        String
   nextStepId         String?
   enabled            Boolean  @default(true)  // false = birim akıştan çıkarıldı, görevler sıradaki aktif birime yönlenir
@@ -903,6 +914,7 @@ model ApprovalChain {
   entityType String          // OPPORTUNITY | PROPOSAL | CONTRACT_WORKFLOW
   entityId   String
   status     String          @default("PENDING") // PENDING | COMPLETED | REJECTED
+  processKey String?         // processEngine.ts tarafından üretildiyse hangi processKey'den; null = legacy/DMO gibi motor-dışı zincir
   tenantId   String
   tenant     Tenant          @relation(fields: [tenantId], references: [id])
   stages     ApprovalStage[]
@@ -916,7 +928,10 @@ model ApprovalStage {
   id         String        @id @default(cuid())
   chainId    String
   chain      ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
-  role       String        // FINANCE_MGR | IGPD_MGR | GENERAL_MANAGER | KSU_MGR | ...
+  role       String?       // FINANCE_MGR | IGPD_MGR | GENERAL_MANAGER | KSU_MGR | ... — null = yalnız unitId (birimdeki herkes)
+  unitId     String?       // processEngine.ts tarafından üretilen aşamalarda: WorkflowStep.unitId (rol + birim ikilisi)
+  delegateUserId String?   // WorkflowStep.delegateUserId'den kopyalanır (aşama oluşturma anında) — boş koltukta vekil kimin onaylayabileceği
+  mode       String        @default("ANY") // ANY|ALL — aynı (chainId, order) değerini paylaşan satırlar için (çoklu onaylayıcı)
   order      Int           @default(0)
   status     String        @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
   approverId String?       // 'AGENT:<pluginKey>' ise sanal agent onayladı

@@ -400,7 +400,7 @@ const SettingsModule = ({
           </div>
         );
       case 'workflow':
-        return <WorkflowBuilder units={units} />;
+        return <WorkflowBuilder units={units} users={users} />;
       case 'integrations':
         return (
           <div className="space-y-6">

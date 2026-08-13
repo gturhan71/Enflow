@@ -7,14 +7,19 @@ import { CHAIN_ROLE_LABEL, CHAIN_ENTITY_LABEL } from './helpers';
 
 // Bekleyen Onaylarım — Onay Zinciri (Finans/İGB/Üst Yönetim/KSU swimlane'i).
 // Kullanıcının rolü zincirde hangi aşamadaysa, sırası gelmiş onaylar burada listelenir.
+// role null olan aşamalar (Süreç Motoru — yalnız-birim aşaması) için etiket.
+const stageLabel = (role: string | null | undefined) => (role ? (CHAIN_ROLE_LABEL[role] || role) : 'Birim onayı');
+
 export default function PendingChainApprovals({
   chains,
   currentUserRole,
+  currentUserUnitId,
   actionLoading,
   onAction,
 }: {
   chains: ApprovalChain[];
   currentUserRole?: string;
+  currentUserUnitId?: string;
   actionLoading: string | null;
   onAction: (chain: ApprovalChain, stageId: string, action: 'approve' | 'reject') => void;
 }) {
@@ -32,7 +37,11 @@ export default function PendingChainApprovals({
       </div>
       <div className="grid grid-cols-1 gap-4">
         {chains.map(chain => {
-          const myStage = chain.stages.find(s => s.role === currentUserRole && s.status === 'PENDING');
+          // Süreç Motoru (Faz A): rol-bazlı aşamalar role eşleşmesiyle, yalnız-birim
+          // aşamaları (role=null) kullanıcının kendi birimiyle (unitId) eşleşir.
+          const myStage = chain.stages.find(s => s.status === 'PENDING' && (
+            s.role === currentUserRole || (!s.role && !!s.unitId && s.unitId === currentUserUnitId)
+          ));
           if (!myStage) return null;
           return (
             <motion.div
@@ -45,13 +54,13 @@ export default function PendingChainApprovals({
                   {CHAIN_ENTITY_LABEL[chain.entityType || ''] || chain.entityType}
                 </span>
                 <p className="text-xs text-slate-500 font-bold mt-1">
-                  Zincir: {chain.stages.map(s => CHAIN_ROLE_LABEL[s.role] || s.role).join(' → ')}
+                  Zincir: {chain.stages.map(s => stageLabel(s.role)).join(' → ')}
                 </p>
                 {/* Köken etiketi — önceki aşamalardan sanal agent tarafından onaylananlar */}
                 {chain.stages.filter(s => isAgentActor(s.approverId)).map(s => (
                   <div key={s.id} className="mt-1.5 flex items-center gap-2 flex-wrap">
                     <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                      {CHAIN_ROLE_LABEL[s.role] || s.role} aşaması:
+                      {stageLabel(s.role)} aşaması:
                     </span>
                     <AgentTag actorId={s.approverId} agentRunId={s.agentRunId} />
                   </div>

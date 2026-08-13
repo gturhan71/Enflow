@@ -26,7 +26,6 @@ import {
   BrandSource
 } from '../types';
 import SpecAnalysis from './SpecAnalysis';
-import { workflowService } from '../services/workflowService';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
 import { useBoM } from '../hooks/useBoM';
@@ -61,10 +60,10 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [isHandingOff, setIsHandingOff] = useState(false);
 
-  // Workflow Hand-off state
-  const [targetUnitId, setTargetUnitId] = useState('');
-  const [targetUserId, setTargetUserId] = useState('');
+  // Devir (handoff) state — hedef birim/kişi artık Süreç Motoru'ndan çözüldüğü
+  // için burada yalnız bir not tutulur (bkz. handleHandOff).
   const [handOffNote, setHandOffNote] = useState('');
+  const [handOffError, setHandOffError] = useState<string | null>(null);
 
   // BoM Hook integration
   const {
@@ -107,31 +106,27 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   const [quoteLine, setQuoteLine] = useState<{ lineKey: string; name: string } | null>(null);
 
   const handleHandOff = async () => {
-    if (!selectedOppId || !targetUnitId || !targetUserId) return;
+    if (!selectedOppId) return;
     const opp = opportunities.find(o => o.id === selectedOppId);
     if (!opp) return;
 
     setIsHandingOff(true);
-    const targetUnit = units.find(u => u.id === targetUnitId);
-    const targetUser = users.find(u => u.id === targetUserId);
-
-    await workflowService.triggerHandOff({
-      itemId: opp.id,
-      itemTitle: opp.title,
-      fromUnit: 'PRESALES',
-      toUnit: targetUnit?.name || 'UNKNOWN',
-      fromUser: currentUser,
-      toUser: targetUser || currentUser,
-      note: handOffNote || 'Teknik analiz tamamlandı, iş devredildi.'
-    });
-    
-    setOpportunities(prev => prev.map(o => 
-      o.id === selectedOppId ? { ...o, technicalStatus: 'COMPLETED' } : o
-    ));
-    
-    setIsHandingOff(false);
-    setShowHandOffModal(false);
-    alert(`İş başarıyla ${targetUnit?.name} birimine (${targetUser?.name}) aktarıldı.`);
+    setHandOffError(null);
+    try {
+      // Süreç Motoru (Faz C) — hedef birim/kişi artık İş Akışı Tasarımcısı'ndaki
+      // PRESALES_HANDOFF haritasından çözülür (backend advanceProcess); serbest
+      // birim/personel seçimi kaldırıldı (değişmez kural — harita esastır).
+      await apiService.handoffOpportunity(opp.id, 'PRESALES_HANDOFF', handOffNote || 'Teknik analiz tamamlandı, iş devredildi.');
+      // technicalStatus artık backend'e kalıcı yazılıyor (eskiden yalnız local state'te tutulup sayfa yenilenince kayboluyordu).
+      const updated = await apiService.updateOpportunity(opp.id, { technicalStatus: 'COMPLETED' }) as Opportunity;
+      setOpportunities(prev => prev.map(o => o.id === selectedOppId ? { ...o, ...updated } : o));
+      setShowHandOffModal(false);
+      alert('İş başarıyla devredildi.');
+    } catch (e) {
+      setHandOffError(e instanceof Error ? e.message : 'Devir sırasında hata oluştu.');
+    } finally {
+      setIsHandingOff(false);
+    }
   };
 
   const handleRequestApproval = () => {
@@ -374,30 +369,24 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                 <button onClick={() => setShowHandOffModal(false)}><X size={20} /></button>
               </div>
               <div className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Hedef Birim</label>
-                  <select value={targetUnitId} onChange={(e) => setTargetUnitId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 bg-white">
-                    <option value="">Birim Seçin</option>
-                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-                  </select>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-slate-400 uppercase">Sorumlu Personel</label>
-                  <select value={targetUserId} onChange={(e) => setTargetUserId(e.target.value)} className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 bg-white">
-                    <option value="">Personel Seçin</option>
-                    {users.filter(u => !targetUnitId || u.unitId === targetUnitId).map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
-                  </select>
-                </div>
+                <p className="text-xs text-slate-500 leading-relaxed">
+                  Hedef birim/kişi, Ayarlar → İş Akışı Tasarımcısı'nda kurgulanan
+                  <span className="font-bold text-slate-700"> PRESALES_HANDOFF </span>
+                  haritasına göre otomatik belirlenir.
+                </p>
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-slate-400 uppercase">Not / Talimat</label>
                   <textarea value={handOffNote} onChange={(e) => setHandOffNote(e.target.value)} rows={3} placeholder="İşi devralacak kişiye notunuz..." className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500 resize-none bg-white" />
                 </div>
+                {handOffError && (
+                  <div className="p-3 bg-red-50 border border-red-100 rounded-xl text-xs text-red-600 font-medium">{handOffError}</div>
+                )}
               </div>
               <div className="flex justify-end gap-3 pt-6">
                 <button onClick={() => setShowHandOffModal(false)} className="px-6 py-2 text-sm font-bold text-slate-500">İptal</button>
-                <button 
+                <button
                   onClick={handleHandOff}
-                  disabled={!targetUserId || isHandingOff}
+                  disabled={isHandingOff}
                   className="bg-indigo-600 text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 disabled:opacity-50"
                 >
                   {isHandingOff ? <Loader2 size={18} className="animate-spin" /> : 'Devret ve Bildir'}

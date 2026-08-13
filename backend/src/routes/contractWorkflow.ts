@@ -8,8 +8,7 @@ import https from 'https';
 import http from 'http';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
-import { ensureApprovalChain, completeApprovalChain } from '../services/approvalChainService';
-import { createProjectWithMilestones } from '../services/projectFactory';
+import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 import { logActivity } from '../services/activityLog';
 import { checkStatusTransition, buildAutoTitle } from '../services/contractWorkflowState';
 import { similarityRatio } from '../utils/textSimilarity';
@@ -185,6 +184,20 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       const check = checkStatusTransition(current.status, status, req.userRole || '', cancelReason);
       if (!check.ok) return res.status(check.code).json({ error: check.error });
     }
+    // Süreç Motoru (Faz A) — durum kalıcı hale gelmeden ÖNCE kontrol edilir ki
+    // tenant CONTRACT_SIGNING sürecini Tasarımcı'da henüz kurgulamadıysa
+    // ContractWorkflow yarım-güncellenmiş (status değişti ama zincir yok) bir
+    // durumda kalmasın — 409 dönerse status hiç yazılmaz.
+    if (status === 'PENDING_SIGNATURE_APPROVAL' && status !== current.status) {
+      try {
+        await advanceProcess(req.tenantId, 'CONTRACT_SIGNING', 'CONTRACT_WORKFLOW_SIGNING', current.id, { actorUserId: req.userId });
+      } catch (e) {
+        if (e instanceof ProcessNotConfiguredError) {
+          return res.status(409).json({ error: 'Sözleşme imza süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Sözleşme İmza" sürecini kurgulayın.' });
+        }
+        throw e;
+      }
+    }
   }
 
   const isTerminalExit = status === 'CANCELLED' || status === 'TERMINATED';
@@ -208,12 +221,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
     include: { documents: { orderBy: { sortOrder: 'asc' } } },
   });
 
-  // Faz 0 — kalıcı onay zinciri: KSU (evrak kontrolü) → Üst Yönetim (imza onayı)
-  if (status === 'PENDING_SIGNATURE_APPROVAL') {
-    await ensureApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id);
-  } else if (status === 'SIGNED') {
-    await completeApprovalChain(req.tenantId, 'CONTRACT_WORKFLOW_SIGNING', wf.id, req.userId, 'Sözleşme imzalandı.');
-  }
+  // NOT: `SIGNED` durumuna geçiş için ayrı bir eylem YOK — imza onayı zincirin
+  // aşamaları (ör. KSU→GM) `/approval-chains/:id/stages/:sid/approve` üzerinden
+  // (PendingChainApprovals.tsx) bireysel onaylandıkça zaten ilerler; status
+  // burada yalnız ContractWorkflow'un kendi durum makinesini (checkStatusTransition,
+  // TRANSITION_ROLES — ayrı bir yetki katmanı) yansıtır.
 
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { title: wf.title, status: wf.status, ...(isTerminalExit && { cancelReason }) } });
   res.json(wf);
@@ -461,11 +473,28 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     include: { documents: true },
   });
   if (!wf) return res.status(404).json({ error: 'Not found' });
+  // Faz A düzeltmesi: eskiden bu uçta hiçbir durum ön-koşulu yoktu (yalnız
+  // `!wf.projectId` idempotency koruması vardı) — SIGNED olmayan bir sözleşme
+  // de aktarılabiliyordu. TRANSFERRED zaten aktarılmış olanın tekrar
+  // çağrılmasına (idempotent, örn. sayfa yenileme) izin verir.
+  if (wf.status !== 'SIGNED' && wf.status !== 'TRANSFERRED') {
+    return res.status(409).json({ error: 'Yalnız SIGNED durumundaki bir sözleşme Proje\'ye aktarılabilir.' });
+  }
 
   const analysis = wf.aiAnalysis ? JSON.parse(wf.aiAnalysis) : null;
   const tasks: { title: string; description: string; priority: string }[] = analysis?.tasks || [];
 
-  const { unitId, assignedById } = req.body;
+  // Faz A düzeltmesi: eskiden `unitId || 'default'` — 'default' hiçbir gerçek
+  // birime karşılık gelmediği için oluşan görevler kimseye görünmüyordu (bkz.
+  // tasks.ts'in unitId filtreleme mantığı). Artık gerçek bir birim zorunlu.
+  const { unitId, assignedById } = req.body as { unitId?: string; assignedById?: string };
+  let targetUnitId: string | null = null;
+  if (tasks.length) {
+    if (!unitId) return res.status(400).json({ error: 'Sözleşme görevlerinin atanacağı bir birim (unitId) seçilmelidir.' });
+    const unit = await prisma.unit.findFirst({ where: { id: unitId, tenantId: req.tenantId } });
+    if (!unit) return res.status(400).json({ error: 'Geçersiz birim.' });
+    targetUnitId = unit.id;
+  }
 
   const createdTasks = await Promise.all(
     tasks.map(t =>
@@ -473,8 +502,8 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
         data: {
           title: `[Sözleşme] ${t.title}`,
           description: `${t.description}\n\nKaynak: ${wf.title}`,
-          unitId: unitId || 'default',
-          assignedBy: assignedById || 'system',
+          unitId: targetUnitId as string,
+          assignedBy: assignedById || req.userId || 'system',
           priority: t.priority === 'HIGH' ? 'HIGH' : t.priority === 'LOW' ? 'LOW' : 'MEDIUM',
           status: 'PENDING',
           relatedModule: 'CONTRACT',
@@ -486,36 +515,43 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     )
   );
 
-  // Sözleşme → Proje: imzalı sözleşmeden Project kaydı oluştur (idempotent — projectId doluysa atla)
-  let project = null;
-  if (!wf.projectId) {
-    project = await createProjectWithMilestones(
-      req.tenantId,
-      {
-        name: wf.projectName || wf.title,
-        opportunityId: wf.opportunityId || undefined,
-        contractId: wf.contractId || undefined,
-        totalValue: wf.contractValue,
-        budgetTotal: wf.contractValue,
-        deadline: wf.deadline || undefined,
-        type: 'HARDWARE',
-      },
-      req.userId,
-    );
-  } else {
-    project = await prisma.project.findFirst({ where: { id: wf.projectId, tenantId: req.tenantId } });
+  // Süreç Motoru — CONTRACT_TO_PROJECT, CONTRACT_SIGNING'den bilerek AYRI,
+  // bağımsız kurgulanabilir bir süreçtir (imzayı onaylayan birim/rol ile
+  // projeyi devralan birim/rol farklı olabilir). Tenant burada bir
+  // CREATE_PROJECT_FROM_ENTITY (AUTO) adımı kurguladıysa çalışır ve Proje
+  // kaydını oluşturur; kurgulamadıysa proje OLUŞMAZ (sessiz varsayılan YOK) —
+  // yalnız görevler aktarılır.
+  let result;
+  try {
+    result = await advanceProcess(req.tenantId, 'CONTRACT_TO_PROJECT', 'CONTRACT_WORKFLOW_SIGNING', id, { actorUserId: req.userId });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: 'Sözleşme → Proje süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Sözleşme → Proje" sürecini kurgulayın.' });
+    }
+    throw e;
   }
 
-  await prisma.contractWorkflow.update({
-    where: { id },
-    data: { status: 'TRANSFERRED', projectId: project?.id ?? wf.projectId ?? null, updatedAt: new Date() },
-  });
+  const updatedWf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId: req.tenantId } });
+  const project = updatedWf?.projectId
+    ? await prisma.project.findFirst({ where: { id: updatedWf.projectId, tenantId: req.tenantId } })
+    : null;
 
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TRANSFER_TO_PROJECT', entityType: 'CONTRACT_WORKFLOW', entityId: id, details: { projectId: project?.id ?? null, projectCode: project?.code ?? null, tasksCreated: createdTasks.length } });
+  if (updatedWf && updatedWf.status !== 'TRANSFERRED') {
+    await prisma.contractWorkflow.update({ where: { id }, data: { status: 'TRANSFERRED', updatedAt: new Date() } });
+  }
+
+  await logActivity({
+    tenantId: req.tenantId, userId: req.userId, action: 'TRANSFER_TO_PROJECT', entityType: 'CONTRACT_WORKFLOW', entityId: id,
+    details: { projectId: project?.id ?? null, projectCode: project?.code ?? null, tasksCreated: createdTasks.length, actionsInvoked: result.actionsInvoked },
+  });
   res.json({ success: true, project, tasksCreated: createdTasks.length, tasks: createdTasks });
 }));
 
 // ── Sözleşme → Satınalma devri: BoM + referans alış fiyatlarıyla Satınalma Talebi (PR) ──
+// Süreç Motoru — eskiden bu route Satınalma alıcısını doğrudan
+// `prisma.user.findFirst({role:'PROCUREMENT_MGR'})` ile hardcoded buluyordu;
+// Designer'da hiç görünmeyen, tenant'ın kurgulayamadığı bir "olmayan süreç"ti
+// (Faz D). Artık CONTRACT_TO_PROCUREMENT processKey'i üzerinden ilerliyor.
 router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: Response) => {
   const id = pid(req);
   const tenantId = req.tenantId;
@@ -528,82 +564,22 @@ router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: R
     return res.status(409).json({ error: 'Bu sözleşme zaten Satınalmaya aktarıldı.', procurementRequestId: wf.procurementRequestId });
   }
 
-  // İş bilgisi + BoM (opportunity üzerinden)
-  const opp = wf.opportunityId
-    ? await prisma.opportunity.findFirst({ where: { id: wf.opportunityId, tenantId }, include: { bomItems: true, customer: true } })
+  try {
+    await advanceProcess(tenantId, 'CONTRACT_TO_PROCUREMENT', 'CONTRACT_WORKFLOW_SIGNING', id, { actorUserId: req.userId });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: 'Sözleşme → Satınalma süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Sözleşme → Satınalma" sürecini kurgulayın.' });
+    }
+    throw e;
+  }
+
+  const updatedWf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId } });
+  const pr = updatedWf?.procurementRequestId
+    ? await prisma.purchaseRequest.findFirst({ where: { id: updatedWf.procurementRequestId, tenantId }, include: { items: true } })
     : null;
-  const bomItems = opp?.bomItems ?? [];
-  const currency = bomItems[0]?.currency || 'TRY';
-
-  // Satınalma birimi (PROCUREMENT_MGR)
-  const procUser = await prisma.user.findFirst({ where: { tenantId, role: 'PROCUREMENT_MGR' } });
-
-  const descLines = [
-    `Sözleşme: ${wf.title}`,
-    wf.tenderNo ? `İKN: ${wf.tenderNo}` : '',
-    opp?.customer?.name ? `Müşteri: ${opp.customer.name}` : '',
-    `Sözleşme bedeli: ${wf.contractValue ?? 0} ${currency}`,
-    'Kaynak: imzalı sözleşme — BoM referans alış fiyatları üretici/distribütör ile yapılmıştır.',
-  ].filter(Boolean).join('\n');
-
-  const pr = await prisma.purchaseRequest.create({
-    data: {
-      tenantId,
-      title: `[Sözleşme] ${wf.projectName || wf.title}`,
-      description: descLines,
-      sourceType: 'BOM',
-      sourceBomId: wf.opportunityId || null,
-      projectId: wf.projectId || null,
-      requestedBy: req.userId || 'system',
-      requestedByName: null,
-      unitId: procUser?.unitId || null,
-      unitName: null,
-      status: 'DRAFT',
-      urgency: 'NORMAL',
-      budgetAmount: wf.contractValue || null,
-      currency,
-      items: bomItems.length ? {
-        create: bomItems.map(b => ({
-          name: b.partNumber || b.description || 'Kalem',
-          description: b.description || null,
-          quantity: b.quantity || 0,
-          unit: 'adet',
-          estimatedUnitPrice: b.purchaseCost ?? null, // referans ALIŞ fiyatı (satış fiyatı sızmaz)
-          currency: b.currency || currency,
-          refVendor: b.vendor || null,
-          refSource: b.source || null,
-          lineKey: b.lineKey || null, // BoM Maliyet Varyansı'nın satır-bazlı karşılaştırma bağı
-          brandId: b.brandId || null, // BoMItem.brandId'den taşınır (Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
-        })),
-      } : undefined,
-    },
-    include: { items: true },
-  });
-
-  await prisma.contractWorkflow.update({ where: { id }, data: { procurementRequestId: pr.id, updatedAt: new Date() } });
-
-  // Satınalma'yı bilgilendir + görev
-  if (procUser?.id) {
-    await prisma.notification.create({
-      data: {
-        tenantId, userId: procUser.id, type: 'INFO',
-        title: 'Sözleşme → Satınalma',
-        message: `"${wf.projectName || wf.title}" sözleşmesi imzalandı. ${bomItems.length} kalemlik BoM ve referans alış fiyatları Satınalma Talebi olarak iletildi.`,
-      },
-    }).catch(() => {});
+  if (!pr) {
+    return res.status(202).json({ pending: true, message: 'Sözleşme → Satınalma süreci onay bekliyor — talep, onay tamamlanınca oluşturulacak.' });
   }
-  if (procUser?.unitId) {
-    await prisma.todoTask.create({
-      data: {
-        tenantId, title: `Satınalma: ${wf.projectName || wf.title}`,
-        description: `İmzalı sözleşmeden ${bomItems.length} kalemlik satınalma talebi oluştu. Referans alış fiyatlarını (üretici/distribütör) inceleyip teklif toplayın.`,
-        unitId: procUser.unitId, assignedBy: req.userId || 'system',
-        relatedModule: 'PROCUREMENT', relatedItemId: pr.id, priority: 'HIGH', status: 'PENDING', updatedAt: new Date(),
-      },
-    }).catch(() => {});
-  }
-
-  await logActivity({ tenantId, userId: req.userId, action: 'CONTRACT_TO_PROCUREMENT', entityType: 'CONTRACT_WORKFLOW', entityId: id, details: { purchaseRequestId: pr.id, items: pr.items.length } });
   res.json({ success: true, purchaseRequest: pr });
 }));
 

@@ -5,15 +5,16 @@ import { resolveApproverRoles } from './governance';
 import { getApprovalSlaBusinessDays } from './approvalSlaEscalation';
 import { computeSlaDueDate } from '../utils/businessDays';
 
-// Faz 0 — diyagramdaki kurumsal onay sırası:
-// Presales hazırlar → Finans değerlendirir → İGB onaylar → Üst Yönetim (GMÜ) karar verir → KSU evrak kontrolü
-// Presales bir onay aşaması değil (hazırlayan taraf); zincir Finans'tan başlar.
-export const APPROVAL_CHAIN_TEMPLATES: Record<string, string[]> = {
-  OPPORTUNITY: ['FINANCE_MGR', 'IGPD_MGR', 'GENERAL_MANAGER', 'KSU_MGR'],
-  PROPOSAL: ['FINANCE_MGR', 'IGPD_MGR', 'GENERAL_MANAGER', 'KSU_MGR'],
-  // Sözleşme imzalama: evrak/sözleşme kontrolü (KSU) → yönetici imza onayı (GM)
-  CONTRACT_WORKFLOW_SIGNING: ['KSU_MGR', 'GENERAL_MANAGER'],
-};
+// Faz A (Süreç Motoru) — OPPORTUNITY/PROPOSAL/CONTRACT_WORKFLOW_SIGNING artık
+// burada sabit değil: bu üç entityType için chain artık processEngine.ts
+// tarafından, tenant'ın Ayarlar → İş Akışı Tasarımcısı'nda kurguladığı
+// WorkflowStep zincirinden üretiliyor (advanceProcess). Bu sabit şablon yalnız
+// `ensureApprovalChain`'in DIĞER (Tasarımcı'ya henüz taşınmamış) çağıranları
+// için bir son-çare fallback olarak kalır — bkz. dmo.ts (zaten kendi rolünü
+// açıkça geçiyor, bu şablona hiç düşmüyor). Yeni bir entityType eklerken bu
+// tabloya sabit rol yazmak yerine processEngine.ts'e bir processKey tanımlamak
+// tercih edilmeli (tenant-yapılandırılabilir).
+export const APPROVAL_CHAIN_TEMPLATES: Record<string, string[]> = {};
 
 /**
  * Mevcut PENDING bir zincir varsa onu döner; yoksa şablona göre yeni bir
@@ -90,10 +91,13 @@ export async function completeApprovalChain(
 }
 
 /**
- * Skip-logic: tenant'ta **hiçbir aktif kullanıcıya** karşılık gelmeyen role
- * sahip PENDING aşamaları `SKIPPED` işaretler ve geriye PENDING aşama
- * kalmadıysa zinciri COMPLETED yapar. Böylece akıştan çıkarılan bir
- * rol/birim onay zincirini tıkayamaz (deadlock önlenir). İdempotent.
+ * Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen PENDING aşamaları
+ * `SKIPPED` işaretler ve geriye PENDING aşama kalmadıysa zinciri COMPLETED
+ * yapar. Böylece akıştan çıkarılan bir rol/birim onay zincirini tıkayamaz
+ * (deadlock önlenir). Aşama `unitId` taşıyorsa (processEngine.ts'in ürettiği
+ * unit-scope'lu aşamalar) kontrol o birime, `role` taşıyorsa o role, ikisi de
+ * varsa ikisinin kesişimine daraltılır — legacy (yalnız-role, tenant-geneli)
+ * aşamalarla geriye dönük uyumlu. İdempotent.
  *
  * Güncellenmiş zinciri (stages dahil) döner.
  */
@@ -104,16 +108,25 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
   });
   if (!chain || chain.status !== 'PENDING') return chain;
 
-  const activeRoleRows = await prisma.user.findMany({
-    where: { tenantId, status: 'ACTIVE' },
-    select: { role: true },
-    distinct: ['role'],
-  });
-  const activeRoles = new Set(activeRoleRows.map(r => r.role));
-
-  const orphanStages = chain.stages.filter(
-    s => s.status === 'PENDING' && !activeRoles.has(s.role)
-  );
+  const pendingStages = chain.stages.filter(s => s.status === 'PENDING');
+  const orphanStages: typeof pendingStages = [];
+  for (const stage of pendingStages) {
+    if (!stage.role && !stage.unitId) continue; // kapsamsız aşama — savunma amaçlı, orphan sayılmaz
+    const where: { tenantId: string; status: string; unitId?: string; role?: string } = { tenantId, status: 'ACTIVE' };
+    if (stage.unitId) where.unitId = stage.unitId;
+    if (stage.role) where.role = stage.role;
+    const activeCount = await prisma.user.count({ where });
+    if (activeCount > 0) continue; // koltuk dolu — orphan değil
+    // Değişmez kural #2 — bir VEKİL atanmışsa ve aktifse, koltuk boş olsa da
+    // "orphan" sayılmaz: aşama PENDING kalır, vekil resolveEffectiveApprover
+    // üzerinden normal onay/red rotasıyla işlemi yapar (sessiz SKIP/agent
+    // devri yerine açıkça atanmış bir insanın devreye girmesi zorunlu).
+    if (stage.delegateUserId) {
+      const delegateActive = await prisma.user.count({ where: { id: stage.delegateUserId, tenantId, status: 'ACTIVE' } });
+      if (delegateActive > 0) continue;
+    }
+    orphanStages.push(stage);
+  }
 
   // Faz 8.2 — Sanal agent dalı: boş koltuğu (aktif kullanıcısı olmayan rol)
   // lisanslı bir sanal agent dolduruyorsa ve mod OTONOM ise, aşamayı atlamak
@@ -122,7 +135,7 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
   const agentApprovedIds: string[] = [];
   const skippedIds: string[] = [];
   for (const stage of orphanStages) {
-    const plugin = getAgentPluginForRole(stage.role);
+    const plugin = stage.role ? getAgentPluginForRole(stage.role) : null;
     let autonomousAgent = false;
     if (plugin) {
       const ent = await prisma.pluginEntitlement.findUnique({
@@ -138,7 +151,7 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
       // Köken etiketi: her agent-onaylı aşama için bir AgentRun (RATIFIED) oluştur,
       // aşamayı bu çalıştırmaya bağla → bir sonraki adım kimin onayladığını görür.
       const actorId = agentActorId(plugin.key);
-      const rationale = `Boş koltuk (${stage.role}) — ${plugin.name} otonom modda onayladı.`;
+      const rationale = `Boş koltuk (${stage.role || stage.unitId || 'birim'}) — ${plugin.name} otonom modda onayladı.`;
       const run = await prisma.agentRun.create({
         data: {
           tenantId,
@@ -229,13 +242,102 @@ export async function getDelegatedRoles(tenantId: string, userId: string): Promi
   return delegators.map(d => d.role);
 }
 
-/** Bir kullanıcı bir role ait onayı yapabilir mi? (kendi rolü ya da aktif vekalet). */
-export async function resolveEffectiveApprover(tenantId: string, role: string, userId: string): Promise<boolean> {
+/**
+ * Bir kullanıcı bir onay aşamasını çözümleyebilir mi? — önce VEKİL kontrolü
+ * (`stage.delegateUserId` — WorkflowStep/ApprovalStage üzerinde açıkça atanmış,
+ * boş koltuk için tanımlı kişi; her zaman geçerli bir onaylayıcıdır, koltuk o an
+ * dolu olsa bile). Sonra `stage.role` set ise kendi rolü (ya da o role aktif
+ * vekalet — `User.delegateToUserId`, farklı bir mekanizma: kişinin KENDİ
+ * onaylarını başkasına devretmesi) + `stage.unitId` set ise ayrıca o birime
+ * üye olması gerekir. `stage.role` null ise (yalnız-birim aşaması) yetki tek
+ * başına birim üyeliğinden gelir. `role` bir string olarak da geçilebilir
+ * (geriye dönük uyumluluk — DMO gibi yalnız role dayalı çağıranlar için).
+ */
+export async function resolveEffectiveApprover(
+  tenantId: string,
+  stage: { role: string | null; unitId?: string | null; delegateUserId?: string | null } | string,
+  userId: string,
+): Promise<boolean> {
+  const norm = typeof stage === 'string' ? { role: stage, unitId: null, delegateUserId: null } : stage;
+  if (norm.delegateUserId && norm.delegateUserId === userId) return true;
+
   const user = await prisma.user.findFirst({ where: { id: userId, tenantId } });
   if (!user) return false;
-  if (user.role === role) return true;
+
+  const unitOk = !norm.unitId || user.unitId === norm.unitId;
+  if (!norm.role) return unitOk; // yalnız-birim aşaması: tek koşul birim üyeliği
+
+  if (user.role === norm.role && unitOk) return true;
   const delegatedRoles = await getDelegatedRoles(tenantId, userId);
-  return delegatedRoles.includes(role);
+  // Vekalet role-bazlı çalışır, birim kısıtlaması vekalette uygulanmaz (bilinen sınır).
+  return delegatedRoles.includes(norm.role);
+}
+
+/**
+ * Bir onay kararından (approve/reject) sonra aynı `order`'ı paylaşan aşama
+ * grubunu (çoklu onaylayıcı) çözümler: ANY modunda ilk onay kardeş PENDING
+ * aşamaları otomatik SKIPPED yapar; ALL modunda grubun tamamı karar
+ * bekler. Grup tamamen çözülünce (PENDING kalmadıysa) bir sonraki grup
+ * "current" olur; hiç aşama kalmadıysa zincir COMPLETED olur. Herhangi bir
+ * aşama REJECTED ise (hangi moddan olursa olsun) zincir anında REJECTED olur.
+ */
+export async function resolveGroupAfterDecision(tenantId: string, chainId: string) {
+  const chain = await prisma.approvalChain.findFirst({
+    where: { id: chainId, tenantId },
+    include: { stages: { orderBy: { order: 'asc' } } },
+  });
+  if (!chain || chain.status !== 'PENDING') return chain;
+
+  if (chain.stages.some(s => s.status === 'REJECTED')) {
+    return prisma.approvalChain.update({
+      where: { id: chainId },
+      data: { status: 'REJECTED' },
+      include: { stages: { orderBy: { order: 'asc' } } },
+    });
+  }
+
+  const pending = chain.stages.filter(s => s.status === 'PENDING');
+  if (pending.length === 0) {
+    return prisma.approvalChain.update({
+      where: { id: chainId },
+      data: { status: 'COMPLETED' },
+      include: { stages: { orderBy: { order: 'asc' } } },
+    });
+  }
+
+  const minOrder = Math.min(...pending.map(s => s.order));
+  const group = chain.stages.filter(s => s.order === minOrder);
+  const mode = group[0]?.mode || 'ANY';
+  const approvedInGroup = group.filter(s => s.status === 'APPROVED');
+
+  if (mode === 'ANY' && approvedInGroup.length > 0) {
+    const siblingIds = group.filter(s => s.status === 'PENDING').map(s => s.id);
+    if (siblingIds.length) {
+      await prisma.approvalStage.updateMany({
+        where: { id: { in: siblingIds } },
+        data: { status: 'SKIPPED', note: 'Diğer onaycı onayladı (ANY modu)', approvedAt: new Date() },
+      });
+    }
+  }
+
+  const refreshed = await prisma.approvalChain.findFirst({
+    where: { id: chainId },
+    include: { stages: { orderBy: { order: 'asc' } } },
+  });
+  if (!refreshed) return null;
+
+  const groupStillPending = refreshed.stages.some(s => s.order === minOrder && s.status === 'PENDING');
+  if (!groupStillPending) {
+    const anyPending = refreshed.stages.some(s => s.status === 'PENDING');
+    if (!anyPending) {
+      return prisma.approvalChain.update({
+        where: { id: chainId },
+        data: { status: 'COMPLETED' },
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
+    }
+  }
+  return refreshed;
 }
 
 /** Onay geri çekildiğinde (revert-approval) en güncel zinciri PENDING'e döndürür. */

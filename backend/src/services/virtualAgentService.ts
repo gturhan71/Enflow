@@ -581,17 +581,24 @@ export async function runAgent(params: {
     });
   }
 
-  // Devir görevi (gerçek kişiye) — unit çözümlemesi: ilk birim, yoksa task atla
-  const unit = await prisma.unit.findFirst({ where: { tenantId } });
+  // Devir görevi (gerçek kişiye) — Faz B düzeltmesi: eskiden "tenant'taki ilk
+  // birim" (entity/role ile hiç ilgisi olmayan rastgele bir birim) kullanılıyordu.
+  // Artık plugin'in ilişkili olduğu role (PLUGIN_CATALOG'daki `role`) sahip aktif
+  // bir kullanıcı üzerinden gerçek birim çözülüyor; bulunamazsa (boş koltuk)
+  // görev oluşturulmaz — eskisi gibi sessizce yanlış birime düşmek yerine.
+  const targetUser = plugin.role
+    ? await prisma.user.findFirst({ where: { tenantId, role: plugin.role, status: 'ACTIVE' } })
+    : null;
   let handoffTaskId: string | null = null;
-  if (unit) {
+  if (targetUser?.unitId) {
     const task = await prisma.todoTask.create({
       data: {
         title: actionTaken ? `✅ ${actionTaken} — yapıldı, incele` : result.taskTitle,
         description: actionTaken
           ? `🤖 ${plugin.name} otonom modda uyguladı: ${actionTaken}\n\n${result.rationale}`
           : `🤖 ${plugin.name} tarafından hazırlandı.\n\n${result.rationale}`,
-        unitId: unit.id,
+        unitId: targetUser.unitId,
+        assignedToUserId: targetUser.id,
         assignedBy: actorId,
         priority: 'HIGH',
         relatedModule: plugin.entityType ?? 'GENERAL',

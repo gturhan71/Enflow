@@ -4,17 +4,45 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   GitBranch, ArrowRight, Plus, Settings2, Activity, CheckCircle2,
   AlertCircle, Save, Zap, Info, ChevronRight, Play, Pause, RefreshCw, ListTodo,
-  Building, Mail, Power, ShieldAlert, X
+  Building, Power, ShieldAlert, X, Users, Split, Trash2
 } from 'lucide-react';
 import { cn } from '../lib/utils';
-import { Unit, Workflow, WorkflowStep, ApprovalStage } from '../types';
+import { Unit, User, Workflow, WorkflowStep } from '../types';
+import {
+  PROCESS_KEYS, PROCESS_KEY_LABEL, LIVE_PROCESS_KEYS, ProcessKey,
+  STAGE_ACTION_KEYS, STAGE_ACTION_LABEL, LIVE_STAGE_ACTION_KEYS,
+} from '../types/workflow';
+import { ROLE_LABELS } from '../constants';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 
-const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
+const emptyWorkflowFor = (processKey: string, name: string): Workflow => ({
+  id: `wf-${Date.now()}`,
+  name,
+  description: '',
+  processKey,
+  steps: [],
+});
+
+// Türkçe bir süreç adından ("Proje Kapanış Onayı") tenant-özel bir processKey
+// üretir — sabit taksonomiden (PROCESS_KEYS) bağımsız. `CUSTOM_` öneki, sabit
+// listeyle asla çakışmamasını garantiler.
+const toCustomProcessKey = (name: string): string => {
+  const trMap: Record<string, string> = { 'ç': 'c', 'Ç': 'C', 'ğ': 'g', 'Ğ': 'G', 'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ş': 's', 'Ş': 'S', 'ü': 'u', 'Ü': 'U' };
+  const ascii = name.split('').map(ch => trMap[ch] ?? ch).join('');
+  const base = 'CUSTOM_' + ascii.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  return base.slice(0, 60) || `CUSTOM_${Date.now()}`;
+};
+
+const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: User[] }) => {
   const { setHasUnsavedChanges } = useUnsavedChanges();
-  const [workflows, setWorkflows] = useState<Workflow[]>([]);
+  const [processKey, setProcessKey] = useState<string>('OPPORTUNITY_APPROVAL');
+  // Tenant'ın kendi tanımladığı, sabit taksonomide (PROCESS_KEYS) olmayan
+  // süreçler — "+ Yeni Süreç" ile eklenenler + sunucudan (GET /workflows)
+  // keşfedilen daha önce oluşturulmuş özel süreçler.
+  const [customProcesses, setCustomProcesses] = useState<{ key: string; name: string }[]>([]);
   const [activeWorkflow, setActiveWorkflow] = useState<Workflow | null>(null);
+  const [notConfigured, setNotConfigured] = useState(false);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'builder' | 'simulation'>('builder');
@@ -49,8 +77,43 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
   }, [activeWorkflow, units]);
 
   useEffect(() => {
-    fetchWorkflows();
+    fetchWorkflowForProcessKey(processKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [processKey]);
+
+  // Tenant'ın daha önce oluşturduğu özel (sabit taksonomi dışı) süreçleri
+  // keşfet — sayfa her açıldığında sekme listesine eklensinler.
+  useEffect(() => {
+    apiService.getWorkflows().then((wfs) => {
+      const known = new Set<string>(PROCESS_KEYS as readonly string[]);
+      const discovered = (wfs || [])
+        .filter((w) => w.processKey && !known.has(w.processKey))
+        .map((w) => ({ key: w.processKey as string, name: w.name }));
+      if (discovered.length) {
+        setCustomProcesses((prev) => {
+          const existingKeys = new Set(prev.map((c) => c.key));
+          return [...prev, ...discovered.filter((d) => !existingKeys.has(d.key))];
+        });
+      }
+    }).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const labelForProcessKey = (key: string): string =>
+    (PROCESS_KEY_LABEL as Record<string, string>)[key] ?? customProcesses.find((c) => c.key === key)?.name ?? key;
+
+  const handleCreateCustomProcess = () => {
+    const name = window.prompt('Yeni sürecin adı (örn: "Proje Kapanış Onayı"):');
+    if (!name || !name.trim()) return;
+    const key = toCustomProcessKey(name.trim());
+    const allKeys = [...(PROCESS_KEYS as readonly string[]), ...customProcesses.map((c) => c.key)];
+    if (allKeys.includes(key)) {
+      alert('Bu isimde (veya çok benzer) bir süreç zaten var. Farklı bir ad deneyin.');
+      return;
+    }
+    setCustomProcesses((prev) => [...prev, { key, name: name.trim() }]);
+    setProcessKey(key);
+  };
 
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
@@ -62,93 +125,50 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     return () => clearInterval(interval);
   }, [isAutoPlaying, simSteps.length]);
 
-  const fetchWorkflows = async () => {
+  // Süreç Motoru (Faz A) — her processKey kendi WorkflowStep zincirine sahiptir
+  // (tenant başına süreç başına tek workflow, backend `@@unique([tenantId, processKey])`).
+  // Tenant bu süreci henüz kurgulamadıysa (404) boş bir taslak gösterilir — hiçbir
+  // eski/hardcoded şablon otomatik önerilmez (kaydedilene kadar hiçbir işlevi yok).
+  const fetchWorkflowForProcessKey = async (key: string) => {
     setLoading(true);
+    setCurrentSimStep(0);
     try {
-      const data = await apiService.getWorkflows();
-      const safeData = Array.isArray(data) ? data : [];
-      if (safeData.length > 0) {
-        setWorkflows(safeData);
-        // Tüm birimleri kapsayan varsayılan şablon varsa onu öne çıkar (seçici UI yok);
-        // yoksa ilk workflow'u göster.
-        const preferred = safeData.find(w => w.isDefault) ?? safeData[0];
-        setActiveWorkflow(preferred);
-      } else {
-        // Tüm birimleri kapsayan varsayılan şablonu getir (yoksa backend oluşturur)
-        const def = await apiService.getDefaultWorkflow();
-        if (def && def.id) {
-          setWorkflows([def]);
-          setActiveWorkflow(def);
-        } else {
-          setWorkflows([]);
-          setActiveWorkflow(null);
-        }
-      }
-    } catch (error) {
-      logger.error('Workflows could not be loaded', error);
-      setWorkflows([]);
-      setActiveWorkflow(null);
+      const wf = await apiService.getWorkflowByProcessKey(key);
+      setActiveWorkflow(wf);
+      setNotConfigured(false);
+    } catch {
+      setActiveWorkflow(emptyWorkflowFor(key, labelForProcessKey(key)));
+      setNotConfigured(true);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleAddApprovalStage = () => {
-    if (!activeWorkflow) return;
-    const newStage: ApprovalStage = { id: `stage-${Date.now()}`, role: 'Manager', status: 'PENDING' };
-    const updatedWorkflow = { 
-      ...activeWorkflow, 
-      stages: [...(activeWorkflow.stages || []), newStage] 
-    };
-    setActiveWorkflow(updatedWorkflow);
-  };
-
-  const renderApprovalBuilder = () => (
-    <div className="glass-panel p-6 rounded-2xl bg-white/50 space-y-4">
-      <h5 className="font-bold">Onay Zinciri</h5>
-      {activeWorkflow?.stages?.map((stage, i) => (
-        <div key={stage.id} className="flex items-center gap-2">
-          <span className="text-sm font-bold bg-slate-200 px-3 py-1 rounded-full">{i + 1}</span>
-          <input className="p-2 border rounded-lg text-sm" value={stage.role || ''} onChange={(e) => {
-            if (!activeWorkflow) return;
-            const updated = { ...activeWorkflow, stages: (activeWorkflow.stages || []).map((s) => s.id === stage.id ? { ...s, role: e.target.value } : s) };
-            setActiveWorkflow(updated as Workflow);
-          }} />
-        </div>
-      ))}
-      <button onClick={handleAddApprovalStage} className="text-xs bg-primary text-white px-4 py-2 rounded-lg">+ Aşama Ekle</button>
-    </div>
-  );
-
-  const handleAddStep = () => {
+  // parallel=true → yeni adım son adımla AYNI order'ı paylaşır (çoklu onaylayıcı/
+  // paralel aşama — Süreç Motoru ANY/ALL modunu bu şekilde ayırt eder).
+  const handleAddStep = (parallel = false) => {
+    const steps = activeWorkflow?.steps ?? [];
+    const maxOrder = steps.length ? Math.max(...steps.map(s => s.order)) : -1;
     const newStep: WorkflowStep = {
       id: `step-${Date.now()}`,
       unitId: units && units.length > 0 ? units[0].id : 'default-unit',
-      type: 'AUTO',
+      role: null,
+      delegateUserId: null,
+      approvalMode: 'ANY',
+      actionKey: null,
+      // Değişmez kural: bir adım yalnız açıkça "otomatik devir" işaretlenirse
+      // onaysız ilerler — varsayılan her zaman MANUAL (insan onayı gerektirir).
+      type: 'MANUAL',
       description: 'Yeni işlem adımı',
-      order: activeWorkflow ? (activeWorkflow.steps?.length || 0) : 0,
+      order: parallel && steps.length ? maxOrder : maxOrder + 1,
       nextStepId: null,
       enabled: true,
       requiresCompletion: false,
       completionNote: null
     };
 
-    if (!activeWorkflow) {
-      const newWorkflow: Workflow = {
-        id: `wf-${Date.now()}`,
-        name: 'Yeni İş Akışı',
-        description: 'Birimler arası süreç tanımı',
-        steps: [newStep],
-        stages: []
-      };
-      setActiveWorkflow(newWorkflow);
-    } else {
-      const updatedWorkflow = { 
-        ...activeWorkflow, 
-        steps: [...(activeWorkflow.steps || []), newStep] 
-      };
-      setActiveWorkflow(updatedWorkflow);
-    }
+    const base: Workflow = activeWorkflow ?? emptyWorkflowFor(processKey, labelForProcessKey(processKey));
+    setActiveWorkflow({ ...base, steps: [...steps, newStep] });
   };
 
   // Birim akıştan çıkarılınca step silinmez; enabled=false yapılır → sıra korunur,
@@ -167,10 +187,24 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     setActiveWorkflow({ ...activeWorkflow, steps: updatedSteps });
   };
 
+  // ANY/ALL modu mantıken bir tek adıma değil, aynı order'ı paylaşan TÜM
+  // paralel adımlara (çoklu onaylayıcı grubuna) ait — hepsinde senkron tutulur.
+  const handleSetGroupMode = (order: number, mode: 'ANY' | 'ALL') => {
+    if (!activeWorkflow) return;
+    const updatedSteps = (activeWorkflow.steps || []).map(s => s.order === order ? { ...s, approvalMode: mode } : s);
+    setActiveWorkflow({ ...activeWorkflow, steps: updatedSteps });
+  };
+
+  const handleRemoveStep = (id: string) => {
+    if (!activeWorkflow) return;
+    setActiveWorkflow({ ...activeWorkflow, steps: (activeWorkflow.steps || []).filter(s => s.id !== id) });
+  };
+
   const unitName = (id: string) => units.find(u => u.id === id)?.name ?? 'Bilinmeyen Birim';
 
-  // Skip-resolution (backend resolveNextStep ile aynı mantık — anlık UI için lokal hesap):
-  // bir adımdan sonra görevin aktarılacağı ilk AKTİF (enabled) adımı bulur.
+  // Skip-resolution (processEngine.ts'in walkForward'daki order/enabled mantığıyla
+  // aynı prensip — anlık UI önizlemesi için lokal hesap): bir adımdan sonra
+  // görevin aktarılacağı ilk AKTİF (enabled) adımı bulur.
   const getNextInfo = (step: WorkflowStep) => {
     const steps = activeWorkflow?.steps ?? [];
     const sorted = [...steps].sort((a, b) => a.order - b.order);
@@ -215,17 +249,40 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
     setSaving(true);
     try {
       if (activeWorkflow.id && !activeWorkflow.id.startsWith('wf-')) {
-        await apiService.updateWorkflow(activeWorkflow.id, activeWorkflow);
+        const saved = await apiService.updateWorkflow(activeWorkflow.id, activeWorkflow);
+        setActiveWorkflow(saved);
       } else {
         const saved = await apiService.createWorkflow(activeWorkflow);
-        setWorkflows(prev => [...prev, saved]);
         setActiveWorkflow(saved);
       }
+      setNotConfigured(false);
       alert('İş akışı başarıyla kaydedildi.');
     } catch (error) {
       alert((error instanceof Error ? error.message : '') || 'Kayıt sırasında hata oluştu.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const [deleting, setDeleting] = useState(false);
+  // Bir süreci tamamen silmek (yalnız adım silmek değil) — kaydedilmemiş taslak
+  // (id 'wf-' ile başlıyorsa) zaten sunucuda yok, doğrudan yerel boş taslağa döner.
+  const handleDeleteWorkflow = async () => {
+    if (!activeWorkflow) return;
+    if (!activeWorkflow.id || activeWorkflow.id.startsWith('wf-')) {
+      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey)));
+      return;
+    }
+    if (!confirm(`"${labelForProcessKey(processKey)}" sürecini tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
+    setDeleting(true);
+    try {
+      await apiService.deleteWorkflow(activeWorkflow.id);
+      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey)));
+      setNotConfigured(true);
+    } catch (error) {
+      alert((error instanceof Error ? error.message : '') || 'Silme sırasında hata oluştu.');
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -269,25 +326,33 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h4 className="text-xl font-black text-slate-900 tracking-tighter uppercase italic leading-none">
-                Akış Yönetimi & Simülasyon
+                İş Akışı Tasarımcısı
               </h4>
-              {activeWorkflow?.isDefault && (
-                <span className="px-2 py-0.5 bg-primary/10 text-primary rounded-full text-[9px] font-black uppercase tracking-tighter">Varsayılan Şablon</span>
+              {notConfigured && (
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[9px] font-black uppercase tracking-tighter">Henüz Yapılandırılmadı</span>
               )}
             </div>
-            <p className="text-xs text-slate-500 font-bold">Fırsattan teslimata uçtan uca tüm operasyonel süreci izleyin ve simüle edin.</p>
+            <p className="text-xs text-slate-500 font-bold">Şirketinizin gerçek süreç haritası — hangi birim/rol hangi sırada devralır ve onaylar, buradan kurgulanır.</p>
           </div>
         </div>
-        
+
         {activeTab === 'builder' && (
           <div className="flex items-center gap-3">
-            <button 
-              onClick={handleAddStep}
+            <button
+              onClick={() => handleAddStep(false)}
               className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm"
             >
               <Plus size={16} /> ADIM EKLE
             </button>
-            <button 
+            <button
+              onClick={() => handleAddStep(true)}
+              disabled={!activeWorkflow?.steps?.length}
+              title="Son adımla aynı sırada — çoklu onaylayıcı/paralel aşama"
+              className="px-6 py-3 bg-white border border-slate-200 text-slate-900 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:border-primary/40 hover:bg-slate-50 transition-all flex items-center gap-2 shadow-sm disabled:opacity-30"
+            >
+              <Split size={16} /> PARALEL ADIM EKLE
+            </button>
+            <button
               onClick={handleSave}
               disabled={saving}
               className="px-8 py-3 bg-primary text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
@@ -295,9 +360,57 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
               {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={16} />}
               AKIŞI KAYDET
             </button>
+            {activeWorkflow?.id && !activeWorkflow.id.startsWith('wf-') && (
+              <button
+                onClick={handleDeleteWorkflow}
+                disabled={deleting}
+                title="Bu süreci tamamen sil"
+                className="px-4 py-3 bg-white border border-red-100 text-red-500 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-red-50 transition-all flex items-center gap-2 shadow-sm"
+              >
+                {deleting ? <div className="w-4 h-4 border-2 border-red-200 border-t-red-500 rounded-full animate-spin" /> : <Trash2 size={16} />}
+              </button>
+            )}
           </div>
         )}
       </div>
+
+      {/* Süreç seçici — her processKey kendi bağımsız WorkflowStep zincirine sahiptir.
+          Sabit taksonomi (PROCESS_KEYS) + tenant'ın "+ Yeni Süreç" ile eklediği
+          özel süreçler (customProcesses) aynı listede, aynı şekilde davranır. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {[...PROCESS_KEYS, ...customProcesses.map((c) => c.key)].map((key) => {
+          const isLive = LIVE_PROCESS_KEYS.includes(key as typeof LIVE_PROCESS_KEYS[number]);
+          return (
+            <button
+              key={key}
+              onClick={() => setProcessKey(key)}
+              className={cn(
+                "px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 border",
+                processKey === key ? "bg-slate-900 text-white border-slate-900" : "bg-white text-slate-500 border-slate-100 hover:border-slate-300"
+              )}
+            >
+              {labelForProcessKey(key)}
+              {!isLive && <span className="text-[8px] opacity-70">(taslak)</span>}
+            </button>
+          );
+        })}
+        <button
+          onClick={handleCreateCustomProcess}
+          title="Sabit listede olmayan, kendi tanımladığınız yeni bir süreç ekleyin"
+          className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 border border-dashed border-primary/40 text-primary hover:bg-primary/5"
+        >
+          <Plus size={12} /> Yeni Süreç
+        </button>
+      </div>
+      {!LIVE_PROCESS_KEYS.includes(processKey as typeof LIVE_PROCESS_KEYS[number]) && (
+        <div className="p-4 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-3">
+          <AlertCircle size={16} className="text-amber-500 mt-0.5 shrink-0" />
+          <p className="text-xs font-bold text-amber-700 leading-relaxed">
+            Bu süreç henüz otomasyona bağlı değil — burada tasarlayıp kaydedebilirsiniz ama ilgili modül şu an bu akışı çağırmıyor
+            {customProcesses.some((c) => c.key === processKey) ? ' (kendi tanımladığınız bu özel süreci gerçek bir kayıtla tetiklemek için hangi ekrandan/hangi kayıt üzerinden başlatılmasını istediğinizi belirtin, oraya bağlayalım).' : ' (yol haritası).'}
+          </p>
+        </div>
+      )}
 
       <div className="flex items-center gap-4 border-b border-slate-100 pb-2">
         <button
@@ -307,7 +420,7 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
             activeTab === 'simulation' ? "bg-primary text-white shadow-lg shadow-primary/20" : "bg-white text-slate-500 border border-slate-100 hover:bg-slate-50"
           )}
         >
-          <Activity size={14} /> Akış Simülasyonu (CRM → Kapanış)
+          <Activity size={14} /> Önizleme (canlı akışı yansıtır)
         </button>
         <button
           onClick={() => setActiveTab('builder')}
@@ -316,20 +429,22 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
             activeTab === 'builder' ? "bg-slate-900 text-white" : "bg-white text-slate-500 border border-slate-100 hover:bg-slate-50"
           )}
         >
-          İş Akışı Tasarımcısı
+          Tasarımcı
         </button>
       </div>
 
       {activeTab === 'builder' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          <div className="lg:col-span-3">
-            {activeWorkflow ? (
+        <div className="grid grid-cols-1 gap-8">
+          <div>
+            {activeWorkflow && activeWorkflow.steps.length > 0 ? (
               <div className="relative min-h-[400px] flex flex-wrap gap-8 items-start justify-center lg:justify-start pt-4 pb-12 overflow-x-auto custom-scrollbar">
                 <AnimatePresence mode="popLayout">
                   {activeWorkflow.steps?.map((step, index) => {
                     const isDisabled = step.enabled === false;
                     const { nextActive, fallbackUsed, removedUnitName } = getNextInfo(step);
                     const simDone = simCompleted.has(step.id);
+                    const groupSiblings = activeWorkflow.steps.filter(s => s.order === step.order);
+                    const isParallelGroup = groupSiblings.length > 1;
                     return (
                     <motion.div key={step.id} layout initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative group">
                       <div className={cn(
@@ -338,14 +453,26 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                       )}>
                         <div className="flex items-center justify-between mb-6">
                           <div className="flex items-center gap-2">
-                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs", isDisabled ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary")}>{index + 1}</div>
+                            <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs", isDisabled ? "bg-slate-100 text-slate-400" : "bg-primary/10 text-primary")}>{step.order + 1}</div>
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{isDisabled ? 'Çıkarıldı' : 'Aşama'}</span>
+                            {isParallelGroup && (
+                              <span title="Bu sırada birden fazla onaylayıcı/birim var (çoklu onaylayıcı)" className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[9px] font-black uppercase tracking-tighter flex items-center gap-1">
+                                <Users size={10} /> {groupSiblings.length}
+                              </span>
+                            )}
                           </div>
-                          <button
-                            onClick={() => handleToggleEnabled(step.id)}
-                            title={isDisabled ? 'Akışa geri al' : 'Akıştan çıkar (görevler sıradaki birime yönlenir)'}
-                            className={cn("p-2 rounded-xl transition-all", isDisabled ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" : "text-slate-300 hover:text-red-500 hover:bg-red-50")}
-                          ><Power size={16} /></button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleToggleEnabled(step.id)}
+                              title={isDisabled ? 'Akışa geri al' : 'Akıştan çıkar (görevler sıradaki birime yönlenir)'}
+                              className={cn("p-2 rounded-xl transition-all", isDisabled ? "text-slate-400 hover:text-emerald-600 hover:bg-emerald-50" : "text-slate-300 hover:text-red-500 hover:bg-red-50")}
+                            ><Power size={16} /></button>
+                            <button
+                              onClick={() => handleRemoveStep(step.id)}
+                              title="Adımı sil"
+                              className="p-2 rounded-xl text-slate-300 hover:text-red-500 hover:bg-red-50 transition-all"
+                            ><X size={16} /></button>
+                          </div>
                         </div>
                         {isDisabled && (
                           <div className="mb-4 p-3 bg-amber-50 border border-amber-100 rounded-2xl flex items-start gap-2">
@@ -371,6 +498,81 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                             </div>
                             <button onClick={() => handleUpdateStep(step.id, { type: step.type === 'AUTO' ? 'MANUAL' : 'AUTO' })} className="p-2 hover:bg-slate-50 rounded-lg text-primary transition-all"><Settings2 size={16} /></button>
                           </div>
+
+                          {/* Onaylayacak rol: boş = birimdeki herkes/yöneticisi. Onay zincirinin
+                              hangi role gideceğini burada tanımlarsınız — sabit değil, tenant'a özgü. */}
+                          <div className="space-y-2">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Onaylayacak Rol (opsiyonel)</label>
+                            <select
+                              value={step.role || ''}
+                              onChange={(e) => handleUpdateStep(step.id, { role: e.target.value || null })}
+                              className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                            >
+                              <option value="">Birimdeki herkes</option>
+                              {Object.entries(ROLE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
+                            </select>
+                          </div>
+
+                          {/* Değişmez kural #2 — birim boşsa (aktif kimse yoksa/hiç açılmadıysa)
+                              modülün çalışabilmesi için bir VEKİL atanması zorunludur; sessiz
+                              atlama yok. Koltuk doluyken de vekil önceden atanabilir. */}
+                          {(() => {
+                            const seatEmpty = !users.some(u => u.unitId === step.unitId && u.status === 'ACTIVE' && (!step.role || u.role === step.role));
+                            return (
+                              <div className="space-y-2">
+                                <label className={cn("text-[10px] font-black uppercase tracking-widest px-1 flex items-center gap-1.5", seatEmpty ? "text-amber-600" : "text-slate-500")}>
+                                  {seatEmpty && <AlertCircle size={11} />} Vekil {seatEmpty ? '(bu koltuk şu an boş — zorunlu)' : '(opsiyonel)'}
+                                </label>
+                                <select
+                                  value={step.delegateUserId || ''}
+                                  onChange={(e) => handleUpdateStep(step.id, { delegateUserId: e.target.value || null })}
+                                  className={cn(
+                                    "w-full border rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white transition-all appearance-none cursor-pointer",
+                                    seatEmpty ? "bg-amber-50 border-amber-200 focus:border-amber-300" : "bg-slate-50 border-slate-100 focus:border-primary/20"
+                                  )}
+                                >
+                                  <option value="">Vekil atanmadı{seatEmpty ? ' — bu birim boşken kimse onaylayamaz' : ''}</option>
+                                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({ROLE_LABELS[u.role] || u.role})</option>)}
+                                </select>
+                              </div>
+                            );
+                          })()}
+
+                          {isParallelGroup && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Çoklu Onaylayıcı Modu</label>
+                              <div className="flex bg-slate-50 border border-slate-100 rounded-2xl p-1">
+                                {(['ANY', 'ALL'] as const).map(m => (
+                                  <button
+                                    key={m}
+                                    onClick={() => handleSetGroupMode(step.order, m)}
+                                    className={cn(
+                                      "flex-1 py-2 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all",
+                                      (step.approvalMode || 'ANY') === m ? "bg-indigo-500 text-white shadow" : "text-slate-500 hover:bg-slate-100"
+                                    )}
+                                  >
+                                    {m === 'ANY' ? 'Herhangi Biri' : 'Hepsi Onaylamalı'}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {step.type === 'AUTO' && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Otomatik Eylem (opsiyonel)</label>
+                              <select
+                                value={step.actionKey || ''}
+                                onChange={(e) => handleUpdateStep(step.id, { actionKey: e.target.value || null })}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="">Yok — yalnız devir</option>
+                                {STAGE_ACTION_KEYS.map(k => (
+                                  <option key={k} value={k} disabled={!LIVE_STAGE_ACTION_KEYS.includes(k)}>{STAGE_ACTION_LABEL[k]}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
 
                           {/* Devir gerekliliği: hazırlayan birim, devretmeden önce tamamlamalı mı? */}
                           <div className="space-y-2">
@@ -436,9 +638,6 @@ const WorkflowBuilder = ({ units = [] }: { units?: Unit[] }) => {
                 <p className="text-sm text-slate-400 font-bold max-w-xs mt-2 italic">Bu şirket için henüz bir operasyonel iş akışı yapılandırılmadı. Tasarıma başlamak için sağ üstteki butonu kullanın.</p>
               </div>
             )}
-          </div>
-          <div className="lg:col-span-1">
-            {activeWorkflow && renderApprovalBuilder()}
           </div>
         </div>
       ) : simSteps.length === 0 || !activeSimStep ? (

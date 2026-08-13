@@ -25,6 +25,7 @@ import TaskList from './todo/TaskList';
 import ResolvedApprovals from './todo/ResolvedApprovals';
 import ProposalPreviewModal from './todo/ProposalPreviewModal';
 import NewTaskModal from './todo/NewTaskModal';
+import UnifiedWorkQueue from './todo/UnifiedWorkQueue';
 
 const TodoModule = ({
   tasks,
@@ -181,37 +182,55 @@ const TodoModule = ({
         </button>
       </div>
 
-      <PendingChainApprovals
+      <UnifiedWorkQueue
         chains={pendingChainApprovals}
         currentUserRole={currentUser?.role}
-        actionLoading={chainActionLoading}
-        onAction={handleChainStageAction}
+        currentUserUnitId={currentUser?.unitId}
+        proposalTasks={pendingApprovals}
+        deliveryTasks={pendingDeliveries}
+        regularTasks={regularTasks}
       />
 
-      <PendingProposalApprovals
-        approvals={pendingApprovals}
-        getDetail={(todo) => getProposalDetail(todo, detailCtx)}
-        getRelatedItemName={(todo) => getRelatedItemName(todo, relatedItemCtx)}
-        onPreview={setPreviewTask}
-        onApprove={approveProposalTask}
-        onReject={rejectProposalTask}
-      />
+      <div id="todo-section-chains">
+        <PendingChainApprovals
+          chains={pendingChainApprovals}
+          currentUserRole={currentUser?.role}
+          currentUserUnitId={currentUser?.unitId}
+          actionLoading={chainActionLoading}
+          onAction={handleChainStageAction}
+        />
+      </div>
 
-      <PendingDeliveryNotifications
-        deliveries={pendingDeliveries}
-        onMarkRead={(taskId) => handleStatusChange(taskId, 'COMPLETED')}
-      />
+      <div id="todo-section-proposals">
+        <PendingProposalApprovals
+          approvals={pendingApprovals}
+          getDetail={(todo) => getProposalDetail(todo, detailCtx)}
+          getRelatedItemName={(todo) => getRelatedItemName(todo, relatedItemCtx)}
+          onPreview={setPreviewTask}
+          onApprove={approveProposalTask}
+          onReject={rejectProposalTask}
+        />
+      </div>
 
-      <TaskList
-        units={units}
-        filterUnit={filterUnit}
-        setFilterUnit={setFilterUnit}
-        filteredTodos={filteredTodos}
-        getRelatedItemName={(todo) => getRelatedItemName(todo, relatedItemCtx)}
-        users={users}
-        onNavigate={onNavigate}
-        onToggleStatus={handleStatusChange}
-      />
+      <div id="todo-section-deliveries">
+        <PendingDeliveryNotifications
+          deliveries={pendingDeliveries}
+          onMarkRead={(taskId) => handleStatusChange(taskId, 'COMPLETED')}
+        />
+      </div>
+
+      <div id="todo-section-tasks">
+        <TaskList
+          units={units}
+          filterUnit={filterUnit}
+          setFilterUnit={setFilterUnit}
+          filteredTodos={filteredTodos}
+          getRelatedItemName={(todo) => getRelatedItemName(todo, relatedItemCtx)}
+          users={users}
+          onNavigate={onNavigate}
+          onToggleStatus={handleStatusChange}
+        />
+      </div>
 
       <ResolvedApprovals
         approvals={resolvedApprovals}

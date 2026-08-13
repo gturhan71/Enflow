@@ -147,6 +147,16 @@ export const crmService = {
     });
   },
 
+  // Süreç Motoru (Faz C) — devir hedefi artık serbestçe seçilmez, tenant'ın İş
+  // Akışı Tasarımcısı'nda kurguladığı haritaya göre motor çözer. processKey:
+  // 'CRM_HANDOFF' | 'PRESALES_HANDOFF'. Süreç kurgulanmadıysa 409 fırlatır.
+  async handoffOpportunity(opportunityId: string, processKey: string, note?: string) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/handoff`, {
+      method: 'POST',
+      body: JSON.stringify({ processKey, note }),
+    });
+  },
+
   async submitCostApproval(opportunityId: string) {
     return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/submit-cost-approval`, {
       method: 'POST'

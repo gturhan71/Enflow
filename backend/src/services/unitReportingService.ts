@@ -480,6 +480,7 @@ export async function computeWorkflowBottlenecks(tenantId: string): Promise<Work
     if (!precedingDone) continue;
 
     const role = firstPending.role;
+    if (!role) continue; // yalnız-birim aşaması (Süreç Motoru) — rol-bazlı darboğaz raporunda sayılmaz
     const waitingFrom = new Date(firstPending.updatedAt || chain.createdAt).getTime();
     const days = Math.max(0, Math.floor((now - waitingFrom) / 86400000));
     if (!byRole[role]) byRole[role] = { count: 0, oldest: 0 };

@@ -23,6 +23,7 @@ import {
 import { motion } from 'motion/react';
 import { Opportunity, Project, TodoTask, Contract, Unit, Proposal, DashboardPayload } from '../types';
 import { ROLE_LABELS } from '../constants';
+import { LIVE_PROCESS_KEYS, PROCESS_KEY_LABEL } from '../types/workflow';
 
 interface KPI {
   key: KpiKey;
@@ -314,6 +315,25 @@ const Dashboard = ({
   const [roleTemplates, setRoleTemplates] = useState<Record<string, WK[]>>({});
   useEffect(() => { apiService.getDashboardRoleTemplates().then(t => setRoleTemplates(t as Record<string, WK[]>)).catch(() => {}); }, []);
   const roleTemplateOverride = roleTemplates[currentUser?.role || ''] || null;
+
+  // Süreç Motoru (Faz A) — GM'e, motorun canlı çağırdığı süreçlerden (Fırsat
+  // Onayı, Sözleşme İmza) henüz Tasarımcı'da kurgulanmamış olanları hatırlatır.
+  // Kurgulanana kadar ilgili modül 409 döner (bkz. processEngine.ts) — bu banner
+  // o durumu üretim sürprizi olmaktan çıkarır.
+  const [unconfiguredProcesses, setUnconfiguredProcesses] = useState<string[]>([]);
+  useEffect(() => {
+    if (currentUser?.role !== 'GENERAL_MANAGER') return;
+    let cancelled = false;
+    (async () => {
+      const missing: string[] = [];
+      for (const key of LIVE_PROCESS_KEYS) {
+        try { await apiService.getWorkflowByProcessKey(key); }
+        catch { missing.push(key); }
+      }
+      if (!cancelled) setUnconfiguredProcesses(missing);
+    })();
+    return () => { cancelled = true; };
+  }, [currentUser?.role]);
   const effectiveWidgets = useMemo(() => resolveEffectiveWidgets(currentUser?.role, savedLayout, roleTemplateOverride), [currentUser?.role, savedLayout, roleTemplateOverride]);
 
   const handleSaveLayout = async (items: { key: WK; enabled: boolean }[]) => {
@@ -482,6 +502,23 @@ const Dashboard = ({
           </div>
         </div>
       </div>
+
+      {unconfiguredProcesses.length > 0 && (
+        <div className="glass-panel p-5 rounded-[24px] bg-amber-50/60 border border-amber-200 flex flex-col md:flex-row md:items-center gap-4">
+          <div className="flex-1">
+            <p className="text-xs font-black text-amber-800 uppercase tracking-widest mb-1">İş Akışı Tasarımcısı yapılandırılmadı</p>
+            <p className="text-xs text-amber-700 font-medium">
+              {unconfiguredProcesses.map(k => PROCESS_KEY_LABEL[k as keyof typeof PROCESS_KEY_LABEL] || k).join(', ')} süreç(ler)i henüz kurgulanmadı — ilgili modül bu süreci tetiklediğinde hata verecektir.
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate?.('settings')}
+            className="px-5 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shrink-0"
+          >
+            Ayarlar'a Git
+          </button>
+        </div>
+      )}
 
       {/* Role-bazlı kokpit — zamana duyarlı işler + KPI */}
       {dash && <CriticalAlertsStrip d={dash} go={(t) => onNavigate?.(t)} />}

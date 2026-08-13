@@ -10,8 +10,14 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { analyzeSpec } from '../services/specAnalysis';
 import { sweepTenderReminders } from '../services/tenderReminders';
+import { advanceProcess } from '../services/processEngine';
 
 const router: Router = Router();
+
+// Faz B — hassas geçiş yetkisi (contractWorkflowState.ts'teki TRANSITION_ROLES
+// deseniyle aynı: yalnız bu belirli statü geçişi için sabit bir rol kısıtlaması;
+// dosyanın geri kalanı — checklist, evrak, diğer alan güncellemeleri — serbest kalır).
+const WON_TRANSITION_ROLES = ['GENERAL_MANAGER', 'ISAB_MGR', 'SALES_MGR'];
 
 const TENDER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/tenders');
 const tenderUpload = documentUpload(50);
@@ -100,6 +106,24 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     name, ikn, authority, method, status, submissionDeadline, estimatedValue, currency,
     opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes,
   } = req.body;
+
+  // Süreç Motoru (Faz B) — WON geçişi hem rol-kısıtlı hem de (artık) tenant'ın
+  // İş Akışı Tasarımcısı'nda kurguladığı TENDER_TO_CONTRACT sürecine bağlı.
+  // İkisi de durum kalıcı yazılmadan ÖNCE kontrol edilir (yarım-yazma riski yok).
+  const becomingWon = record.status !== 'WON' && status === 'WON' && !record.contractWorkflowId;
+  if (becomingWon) {
+    if (!WON_TRANSITION_ROLES.includes(req.userRole || '')) {
+      return res.status(403).json({ error: 'İhaleyi kazanıldı (WON) olarak işaretleme yetkiniz yok.' });
+    }
+    const wf = await prisma.workflow.findFirst({
+      where: { tenantId: req.tenantId, processKey: 'TENDER_TO_CONTRACT', isActive: true },
+      include: { steps: true },
+    });
+    if (!wf || wf.steps.length === 0) {
+      return res.status(409).json({ error: 'İhale→Sözleşme süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "İhale → Sözleşme" sürecini kurgulayın.' });
+    }
+  }
+
   let item = await prisma.tender.update({
     where: { id },
     data: {
@@ -110,22 +134,11 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     },
   });
 
-  // İhale WON → otomatik ContractWorkflow oluştur + bağla (idempotent: contractWorkflowId boşsa)
-  if (record.status !== 'WON' && status === 'WON' && !item.contractWorkflowId) {
-    const composedTitle = item.ikn ? `${item.name} — İKN: ${item.ikn}` : item.name;
-    const wf = await prisma.contractWorkflow.create({
-      data: {
-        title: composedTitle,
-        tenderName: item.name,
-        tenderNo: item.ikn || null,
-        contractValue: item.estimatedValue || 0,
-        opportunityId: item.opportunityId || null,
-        status: 'DRAFT',
-        tenantId: req.tenantId,
-      },
-    });
-    item = await prisma.tender.update({ where: { id }, data: { contractWorkflowId: wf.id } });
-    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CONTRACT_WORKFLOW_CREATED', entityType: 'TENDER', entityId: id, details: { contractWorkflowId: wf.id } });
+  // İhale WON → Süreç Motoru: TENDER_TO_CONTRACT'ı ilerletir (yapılandırılmış
+  // AUTO+CREATE_CONTRACT_FROM_TENDER adımı ContractWorkflow'u oluşturur ve bağlar).
+  if (becomingWon) {
+    await advanceProcess(req.tenantId, 'TENDER_TO_CONTRACT', 'TENDER', item.id, { actorUserId: req.userId });
+    item = (await prisma.tender.findFirst({ where: { id, tenantId: req.tenantId } })) ?? item;
   }
 
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'TENDER', entityId: id, details: { name: item.name, status: item.status } });

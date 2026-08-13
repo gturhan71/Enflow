@@ -12,7 +12,6 @@ import {
 import ProposalEditor from './ProposalEditor';
 import NegotiationModule from './NegotiationModule';
 import { HandOffModal } from '../components/HandOffModal';
-import { workflowService } from '../services/workflowService';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useSearch, useForm } from '../hooks/useShared';
@@ -92,17 +91,11 @@ const CRMModule = ({
     if (activeTab === 'crm-proposals') setShowProposalEditor(true);
   }, [initialItemId, opportunities, activeTab]);
 
-  const handleHandOff = async (data: { toUnit: string; toUser: { id: string; name: string }; note: string }) => {
+  const handleHandOff = async (data: { note: string }) => {
     if (!handOffTarget || !currentUser) return;
-    await workflowService.triggerHandOff({
-      itemId: handOffTarget.id,
-      itemTitle: handOffTarget.title,
-      fromUnit: 'unit_sales', // Demo: Satış birimi
-      toUnit: data.toUnit,
-      fromUser: { id: currentUser.id, name: currentUser.name },
-      toUser: data.toUser,
-      note: data.note
-    });
+    // Süreç Motoru (Faz C) — hedef birim/kişi artık İş Akışı Tasarımcısı'ndaki
+    // CRM_HANDOFF haritasından çözülür (backend advanceProcess); serbest seçim yok.
+    await apiService.handoffOpportunity(handOffTarget.id, 'CRM_HANDOFF', data.note);
     setShowHandOffModal(false);
     setHandOffTarget(null);
   };

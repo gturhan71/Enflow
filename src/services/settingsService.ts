@@ -130,7 +130,10 @@ export const settingsService = {
   },
 
   // --- WORKFLOWS ---
-  async getWorkflows() {
+  // Tenant'ın TÜM süreçlerini (sabit taksonomideki + tenant'ın Tasarımcı'da
+  // kendi tanımladığı özel/custom süreçler) listeler — Designer'ın "+ Yeni
+  // Süreç" sekmesi keşfi için.
+  async getWorkflows(): Promise<Workflow[]> {
     return apiClient.fetchWithAuth('/workflows');
   },
 
@@ -148,11 +151,13 @@ export const settingsService = {
     });
   },
 
-  async getDefaultWorkflow() {
-    return apiClient.fetchWithAuth('/workflows/default');
+  // Süreç Motoru (Faz A) — belirli bir processKey'e ait iş akışını getirir
+  // (yoksa 404 fırlatır — Tasarımcı UI bunu "henüz yapılandırılmadı" olarak yakalar).
+  async getWorkflowByProcessKey(processKey: string) {
+    return apiClient.fetchWithAuth(`/workflows/by-process/${processKey}`);
   },
 
-  async resolveNextStep(workflowId: string, stepId: string) {
-    return apiClient.fetchWithAuth(`/workflows/${workflowId}/steps/${stepId}/resolve-next`);
-  }
+  async deleteWorkflow(id: string) {
+    return apiClient.fetchWithAuth(`/workflows/${id}`, { method: 'DELETE' });
+  },
 };

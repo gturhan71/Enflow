@@ -38,41 +38,51 @@ export async function sweepApprovalSlaEscalations(tenantId: string): Promise<voi
     });
 
     for (const chain of chains) {
-      const current = chain.stages.find(s => s.status === 'PENDING');
-      if (!current) continue;
+      // Süreç Motoru (Faz A) çoklu-onaylayıcı desteği: aynı `order`'ı paylaşan
+      // birden çok satır tek mantıksal "current" grup olabilir — her satır
+      // kendi SLA/eskalasyon saatini bağımsız işletir (bkz. resolveGroupAfterDecision).
+      const pending = chain.stages.filter(s => s.status === 'PENDING');
+      if (!pending.length) continue;
+      const minOrder = Math.min(...pending.map(s => s.order));
+      const currentGroup = pending.filter(s => s.order === minOrder);
 
-      if (!current.dueDate) {
-        // Taban "şimdi" — stage.createdAt zincirin oluşturulma anıdır (tüm aşamalar
-        // birlikte create edilir), "bu aşamanın sıraya girdiği an" değil. "now" kullanmak
-        // hem yeni sıraya giren aşamalara taze bir SLA penceresi verir hem de bu özellik
-        // ilk devreye girdiğinde haftalarca eski bekleyen zincirlerin anında "aşılmış"
-        // sayılıp toplu eskalasyon bildirimi patlatmasını önler.
+      for (const current of currentGroup) {
+        if (!current.dueDate) {
+          // Taban "şimdi" — stage.createdAt zincirin oluşturulma anıdır (tüm aşamalar
+          // birlikte create edilir), "bu aşamanın sıraya girdiği an" değil. "now" kullanmak
+          // hem yeni sıraya giren aşamalara taze bir SLA penceresi verir hem de bu özellik
+          // ilk devreye girdiğinde haftalarca eski bekleyen zincirlerin anında "aşılmış"
+          // sayılıp toplu eskalasyon bildirimi patlatmasını önler.
+          await prisma.approvalStage.update({
+            where: { id: current.id },
+            data: { dueDate: computeSlaDueDate(slaDays) ?? undefined },
+          }).catch(() => {});
+          continue; // süre yeni belirlendi — bu turda aşım değerlendirilmez
+        }
+
+        if (current.escalatedAt || current.dueDate.getTime() >= now) continue;
+
         await prisma.approvalStage.update({
           where: { id: current.id },
-          data: { dueDate: computeSlaDueDate(slaDays) ?? undefined },
+          data: { escalatedAt: new Date(), escalatedToRole: ESCALATION_ROLE },
         }).catch(() => {});
-        continue; // süre yeni belirlendi — bu turda aşım değerlendirilmez
-      }
 
-      if (current.escalatedAt || current.dueDate.getTime() >= now) continue;
-
-      await prisma.approvalStage.update({
-        where: { id: current.id },
-        data: { escalatedAt: new Date(), escalatedToRole: ESCALATION_ROLE },
-      }).catch(() => {});
-
-      const targets = await prisma.user.findMany({
-        where: { tenantId, role: { in: [current.role, ESCALATION_ROLE] }, status: 'ACTIVE' },
-      });
-      for (const u of targets) {
-        await prisma.notification.create({
-          data: {
-            tenantId, userId: u.id, type: 'WARNING',
-            title: 'Onay SLA aşıldı — üst yönetime eskale edildi',
-            message: `${chain.entityType} onayı (${current.role}) SLA süresini aştı, Genel Müdür'e eskale edildi.`,
-            relatedModule: 'todo', relatedItemId: chain.entityId,
-          },
-        }).catch(() => {});
+        // role set ise: orijinal rol + eskalasyon rolü. Yalnız-birim aşamasında
+        // (role=null, processEngine.ts'in ürettiği unit-scope'lu aşamalar):
+        // birim üyeleri + eskalasyon rolündeki herkes hedeflenir.
+        const targets = current.role
+          ? await prisma.user.findMany({ where: { tenantId, status: 'ACTIVE', role: { in: [current.role, ESCALATION_ROLE] } } })
+          : await prisma.user.findMany({ where: { tenantId, status: 'ACTIVE', OR: [{ unitId: current.unitId ?? undefined }, { role: ESCALATION_ROLE }] } });
+        for (const u of targets) {
+          await prisma.notification.create({
+            data: {
+              tenantId, userId: u.id, type: 'WARNING',
+              title: 'Onay SLA aşıldı — üst yönetime eskale edildi',
+              message: `${chain.entityType} onayı${current.role ? ` (${current.role})` : ''} SLA süresini aştı, Genel Müdür'e eskale edildi.`,
+              relatedModule: 'todo', relatedItemId: chain.entityId,
+            },
+          }).catch(() => {});
+        }
       }
     }
   } catch {

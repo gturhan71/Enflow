@@ -63,6 +63,7 @@ class ApiService {
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }
   async revertOpportunityApproval(oppId: string) { return crmService.revertOpportunityApproval(oppId); }
+  async handoffOpportunity(oppId: string, processKey: string, note?: string) { return crmService.handoffOpportunity(oppId, processKey, note); }
   async getBomQuotes(oppId: string) { return apiClient.fetchWithAuth(`/bom-quotes?opportunityId=${encodeURIComponent(oppId)}`); }
   async addBomQuote(data: Record<string, unknown>) { return apiClient.fetchWithAuth('/bom-quotes', { method: 'POST', body: JSON.stringify(data) }); }
   async updateBomQuote(qid: string, data: Record<string, unknown>) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'PUT', body: JSON.stringify(data) }); }
@@ -210,8 +211,8 @@ class ApiService {
     return apiClient.fetchWithAuth(`/units/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   }
   async deleteUnit(id: string, transferId?: string) { return settingsService.deleteUnit(id, transferId); }
-  // Varsayılan şablonu yükle: eksik birimleri ekler + varsayılan iş akışını oluşturur (idempotent).
-  async seedDefaultTemplate(): Promise<{ addedUnits: { id: string; name: string }[]; addedCount: number; workflowId: string; workflowName: string }> {
+  // Varsayılan şablonu yükle: eksik birimleri ekler (idempotent).
+  async seedDefaultTemplate(): Promise<{ addedUnits: { id: string; name: string }[]; addedCount: number }> {
     return apiClient.fetchWithAuth('/units/seed-defaults', { method: 'POST', body: JSON.stringify({}) });
   }
 
@@ -242,11 +243,11 @@ class ApiService {
   async getNotificationLogs() { return settingsService.getNotificationLogs(); }
 
   // --- WORKFLOWS ---
-  async getWorkflows() { return settingsService.getWorkflows(); }
   async createWorkflow(data: Omit<Workflow, 'id'>) { return settingsService.createWorkflow(data); }
   async updateWorkflow(id: string, data: Partial<Workflow>) { return settingsService.updateWorkflow(id, data); }
-  async getDefaultWorkflow() { return settingsService.getDefaultWorkflow(); }
-  async resolveNextStep(workflowId: string, stepId: string) { return settingsService.resolveNextStep(workflowId, stepId); }
+  async getWorkflowByProcessKey(processKey: string) { return settingsService.getWorkflowByProcessKey(processKey); }
+  async deleteWorkflow(id: string) { return settingsService.deleteWorkflow(id); }
+  async getWorkflows() { return settingsService.getWorkflows(); }
 
   // --- MODULE SETTINGS ---
   async getModuleSettings(): Promise<{ promotedModules: string[] }> {

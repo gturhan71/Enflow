@@ -3,6 +3,8 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { scoreQuotes } from '../services/virtualAgentService';
+import { advanceProcess, isAuthorizedForStep, ProcessNotConfiguredError } from '../services/processEngine';
+import { resolveEffectiveApprover } from '../services/approvalChainService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -167,8 +169,13 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 // ── ONAY / RET ────────────────────────────────────────────────────────────
+// Süreç Motoru (Faz B) — DRAFT→PENDING_UNIT (ilk "onaya gönder") PURCHASE_APPROVAL
+// zincirini kurar; sonraki her onay çağıranın mevcut PENDING aşamayla eşleşen
+// role/birime sahip olmasını gerektirir (opportunities.ts'in GM /approve'undaki
+// desenle birebir aynı). Yetki kontrolü/zincir ilerletme, `pr.status` kalıcı
+// yazılmadan ÖNCE yapılır — başarısızsa (403/409) hiçbir statü değişmez.
 router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => {
-  const { approverRole, approverId } = req.body;
+  const { approverId } = req.body;
   const pr = await prisma.purchaseRequest.findFirst({
     where: { id: String(req.params.id), tenantId: req.tenantId },
   });
@@ -190,6 +197,33 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
   const next = nextStatus[pr.status];
   if (!next) return res.status(400).json({ error: `${pr.status} durumundan onay verilemez.` });
 
+  const NOT_CONFIGURED_MSG = 'Satınalma onay süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Satınalma Onayı" sürecini kurgulayın.';
+  try {
+    if (pr.status === 'DRAFT') {
+      await advanceProcess(req.tenantId, 'PURCHASE_APPROVAL', 'PURCHASE_REQUEST', pr.id, { actorUserId: req.userId });
+    } else {
+      const chain = await prisma.approvalChain.findFirst({
+        where: { tenantId: req.tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id, status: 'PENDING' },
+        include: { stages: { orderBy: { order: 'asc' } } },
+      });
+      if (!chain) return res.status(409).json({ error: 'Onay süreci başlatılmamış. Önce talebi onaya gönderin.' });
+      const pending = chain.stages.filter(s => s.status === 'PENDING');
+      if (!pending.length) return res.status(409).json({ error: 'Onay bekleyen aşama yok.' });
+      const minOrder = Math.min(...pending.map(s => s.order));
+      let myStage: (typeof pending)[number] | undefined;
+      for (const s of pending.filter(s => s.order === minOrder)) {
+        if (await resolveEffectiveApprover(req.tenantId, { role: s.role, unitId: s.unitId, delegateUserId: s.delegateUserId }, req.userId)) { myStage = s; break; }
+      }
+      if (!myStage) return res.status(403).json({ error: 'Sırası gelmiş bir onay aşamanız yok — önceki aşamaların tamamlanması bekleniyor.' });
+      await advanceProcess(req.tenantId, 'PURCHASE_APPROVAL', 'PURCHASE_REQUEST', pr.id, {
+        stageId: myStage.id, decision: 'APPROVE', actorUserId: req.userId,
+      });
+    }
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) return res.status(409).json({ error: NOT_CONFIGURED_MSG });
+    throw e;
+  }
+
   const updateData: Record<string, unknown> = { status: next };
   if (fieldMap[pr.status]) updateData[fieldMap[pr.status]] = approverId || req.userId;
   if (next === 'PO_ISSUED') {
@@ -205,105 +239,26 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
 
-  // PO kesilince maliyet kalemi oluştur
+  // PO kesilince maliyet kalemi oluştur. PURCHASE_TO_COST_ITEM, PURCHASE_APPROVAL'dan
+  // bilerek AYRI, bağımsız kurgulanabilir bir süreçtir (PO onayını veren ile
+  // maliyet kalemini bütçeye işleyen birim/rol farklı olabilir — örn. Finans
+  // ek onay isteyebilir). PO_ISSUED durum geçişinin kendisi zaten PURCHASE_APPROVAL
+  // zincirinin GM aşamasıyla gerçek onaya bağlı — bu ikinci, opsiyonel süreç
+  // yapılandırılmamışsa PO_ISSUED'u GERİ ALMAYIZ (zaten onaylanmış bir geçiş),
+  // yalnız maliyet kalemi bu talep için oluşmaz (sessiz varsayılan AUTO yok).
   if (next === 'PO_ISSUED') {
-    const selected = await prisma.purchaseQuote.findFirst({
-      where: { purchaseRequestId: pr.id, isSelected: true },
-    });
-
+    const selected = await prisma.purchaseQuote.findFirst({ where: { purchaseRequestId: pr.id, isSelected: true } });
     // B-08 — seçili tedarikçinin teslim taahhüdü proje takvimine (Satınalma milestone'u) senkronize edilir.
     if (pr.projectId && selected?.deliveryDays && updated.poIssuedAt) {
       const expectedDate = new Date(updated.poIssuedAt);
       expectedDate.setDate(expectedDate.getDate() + selected.deliveryDays);
       await syncProcurementMilestoneDate(req.tenantId, pr.projectId, expectedDate, 'PO kesildi');
     }
-
-    const amount = selected?.totalAmountTRY ?? pr.budgetAmountTRY ?? 0;
-    const itemsWithBomKey = updated.items.filter(i => i.lineKey);
-    if (pr.projectId && itemsWithBomKey.length > 0 && amount > 0) {
-      // BoM'dan devredilmiş satırları taşıyan bir talep — BoM Maliyet Varyansı'nın
-      // satır-bazlı karşılaştırma yapabilmesi için tek toplamı (PO tek tedarikçi
-      // teklifi taşır) satırlara tahmini tutar (birim fiyat × miktar) ağırlığıyla
-      // ORANTILI dağıt — gerçek satır-bazlı fatura yoksa en iyi kestirim budur.
-      // lineKey'i olmayan (BoM dışı, elle eklenmiş) kalemler tek bir "diğer
-      // kalemler" satırında toplanır (idempotent anahtar çakışmasın diye).
-      const weight = (it: (typeof updated.items)[number]) => (it.estimatedUnitPrice ?? 0) * it.quantity;
-      const totalWeight = updated.items.reduce((s, it) => s + weight(it), 0);
-      const otherItems = updated.items.filter(i => !i.lineKey);
-
-      const upsertLineCost = async (bomLineKey: string | null, description: string, itemAmount: number) => {
-        const data = {
-          category: 'PROCUREMENT', description, actualAmount: itemAmount, amountTRY: itemAmount,
-          currency: pr.currency, purchaseRequestId: pr.id, bomLineKey,
-        };
-        const existing = await prisma.projectCostItem.findFirst({
-          where: { projectId: pr.projectId!, purchaseRequestId: pr.id, bomLineKey },
-        });
-        if (existing) await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
-        else await prisma.projectCostItem.create({ data: { projectId: pr.projectId!, createdById: req.userId, ...data } }).catch(() => {});
-      };
-
-      for (const it of itemsWithBomKey) {
-        const share = totalWeight > 0 ? weight(it) / totalWeight : 1 / updated.items.length;
-        await upsertLineCost(it.lineKey as string, `PO: ${it.name} (${updated.poNumber ?? ''})`, amount * share);
-      }
-      if (otherItems.length > 0) {
-        const otherWeight = otherItems.reduce((s, it) => s + weight(it), 0);
-        const share = totalWeight > 0 ? otherWeight / totalWeight : otherItems.length / updated.items.length;
-        await upsertLineCost(null, `PO: ${pr.title} — diğer kalemler (${updated.poNumber ?? ''})`, amount * share);
-      }
-    } else if (pr.projectId) {
-      // Proje → Satınalma (BoM bağı yok — mevcut davranış): talep başına tek
-      // maliyet kalemi (idempotent: purchaseRequestId)
-      const data = {
-        category: 'PROCUREMENT',
-        description: `PO: ${pr.title} (${updated.poNumber ?? ''})`,
-        actualAmount: amount,
-        amountTRY: amount,
-        currency: pr.currency,
-        purchaseRequestId: pr.id,
-      };
-      const existing = await prisma.projectCostItem.findFirst({
-        where: { projectId: pr.projectId, purchaseRequestId: pr.id },
-      });
-      if (existing) {
-        await prisma.projectCostItem.update({ where: { id: existing.id }, data }).catch(() => {});
-      } else {
-        await prisma.projectCostItem.create({
-          data: { projectId: pr.projectId, createdById: req.userId, ...data },
-        }).catch(() => {});
-      }
-    } else if (pr.sourceBomId) {
-      // BoM kaynaklı satınalma → opportunity CostItem (mevcut davranış korunur)
-      await prisma.costItem.create({
-        data: {
-          tenantId: req.tenantId,
-          description: `PO: ${pr.title} (${updated.poNumber ?? ''})`,
-          category: 'OTHER',
-          amount,
-          currency: pr.currency,
-          opportunityId: pr.sourceBomId,
-        },
-      }).catch(() => {});
+    try {
+      await advanceProcess(req.tenantId, 'PURCHASE_TO_COST_ITEM', 'PURCHASE_REQUEST', pr.id, { actorUserId: req.userId });
+    } catch (e) {
+      if (!(e instanceof ProcessNotConfiguredError)) throw e;
     }
-  }
-
-  // TodoTask oluştur
-  if (next === 'PENDING_UNIT') {
-    await prisma.todoTask.create({
-      data: {
-        tenantId: req.tenantId,
-        title: `Satınalma Onayı: ${pr.title}`,
-        description: 'Birim yöneticisi onayı bekliyor.',
-        status: 'PENDING',
-        priority: pr.urgency === 'URGENT' ? 'HIGH' : 'MEDIUM',
-        relatedModule: 'PROCUREMENT',
-        relatedItemId: pr.id,
-        unitId: pr.unitId ?? req.tenantId,
-        assignedBy: req.userId,
-        dueDate: pr.neededBy ?? null,
-      },
-    }).catch(() => {});
   }
 
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `STATUS_${next}`, entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { title: updated.title, status: updated.status } });
@@ -543,17 +498,23 @@ router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) =>
     // B-13 — hasar/iade alt-akışı: hasarlı teslimat, kümülatif ilerlemeyi bloklamaz
     // (hasarsız kısım yine sayılır) ama Satınalma birimine ayrı bir takip görevi açar.
     if ((status === 'DAMAGED' || (quantityDamaged && Number(quantityDamaged) > 0))) {
-      const procurementUnit = await prisma.unit.findFirst({ where: { tenantId: req.tenantId, name: { contains: 'Satın Alma' } } });
-      await prisma.todoTask.create({
-        data: {
-          title: `Hasarlı teslimat — iade/tekrar sipariş: ${pr.title}`,
-          description: `Teslimat kaydında hasar bildirildi (${quantityDamaged ? Number(quantityDamaged).toLocaleString('tr-TR') : '?'} adet). Tedarikçiyle iade/tekrar sipariş süreci başlatılmalı.`,
-          unitId: procurementUnit?.id || pr.unitId || 'system',
-          assignedBy: req.userId || 'system',
-          tenantId: req.tenantId,
-          relatedModule: 'PROCUREMENT', relatedItemId: prId, priority: 'HIGH', status: 'PENDING',
-        },
-      }).catch(() => {});
+      // Faz B düzeltmesi: birim-adı eşleştirmesi (name.contains) yerine role-bazlı
+      // arama — tenant birimi yeniden adlandırırsa/özelleştirirse çökmez.
+      const procurementUser = await prisma.user.findFirst({ where: { tenantId: req.tenantId, role: 'PROCUREMENT_MGR', status: 'ACTIVE' } });
+      const targetUnitId = procurementUser?.unitId || pr.unitId;
+      if (targetUnitId) {
+        await prisma.todoTask.create({
+          data: {
+            title: `Hasarlı teslimat — iade/tekrar sipariş: ${pr.title}`,
+            description: `Teslimat kaydında hasar bildirildi (${quantityDamaged ? Number(quantityDamaged).toLocaleString('tr-TR') : '?'} adet). Tedarikçiyle iade/tekrar sipariş süreci başlatılmalı.`,
+            unitId: targetUnitId,
+            assignedToUserId: procurementUser?.id,
+            assignedBy: req.userId || 'system',
+            tenantId: req.tenantId,
+            relatedModule: 'PROCUREMENT', relatedItemId: prId, priority: 'HIGH', status: 'PENDING',
+          },
+        }).catch(() => {});
+      }
     }
   }
 
@@ -562,8 +523,26 @@ router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) =>
 }));
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
+// Süreç Motoru (Faz B) — tek-aktörlü yetkilendirme (isAuthorizedForStep):
+// tam bir onay zinciri gerekmiyor, yalnız tenant'ın PURCHASE_TO_INVOICE için
+// kurguladığı role/birime sahip kullanıcılar fatura işleyebilir.
 router.post('/:id/invoice', asyncHandler(async (req: Request, res: Response) => {
   const { invoiceNo, invoiceAmount, invoiceDate, invoicePaidAt } = req.body;
+  const pr = await prisma.purchaseRequest.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId } });
+  if (!pr) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
+  if (pr.status !== 'PO_ISSUED' && pr.status !== 'IN_DELIVERY') {
+    return res.status(409).json({ error: 'Yalnız PO kesilmiş veya teslimat aşamasındaki bir talebe fatura işlenebilir.' });
+  }
+  try {
+    const authorized = await isAuthorizedForStep(req.tenantId, 'PURCHASE_TO_INVOICE', req.userId);
+    if (!authorized) return res.status(403).json({ error: 'Fatura işleme yetkiniz yok.' });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: 'Satınalma fatura yetkilendirmesi henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Satınalma → Fatura" sürecini kurgulayın.' });
+    }
+    throw e;
+  }
+
   const updated = await prisma.purchaseRequest.update({
     where: { id: String(req.params.id), tenantId: req.tenantId },
     data: {
