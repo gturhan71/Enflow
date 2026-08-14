@@ -1,7 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { logger } from '../utils/logger';
 import { analyzeSpec } from '../services/specAnalysis';
-import { documentUpload } from '../utils/secureUpload';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
+import { checkLimit, incrementUsage } from '../usageService';
 import path from 'path';
 import fs from 'fs';
 import https from 'https';
@@ -405,6 +406,7 @@ router.delete('/:id/documents/:docId', asyncHandler(async (req: Request, res: Re
 router.post(
   '/:id/documents/:docId/upload',
   upload.single('file'),
+  enforceStorageLimit(),
   asyncHandler(async (req: Request, res: Response) => {
     const id = pid(req);
     const docId = String(req.params.docId);
@@ -439,11 +441,12 @@ router.post(
     const NC_USER = process.env.NEXTCLOUD_USER;
     const NC_PASS = process.env.NEXTCLOUD_PASS;
 
-    if (NC_URL && NC_USER && NC_PASS) {
+    if (NC_URL && NC_USER && NC_PASS && await checkLimit(req.tenantId, 'INTEGRATION_SYNC')) {
       try {
         const remotePath = `/ENFLOW_DMS/Sozlesmeler/${folder}`;
         ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
         fileUrl = ncUrl;
+        await incrementUsage(req.tenantId, 'INTEGRATION_SYNC');
       } catch (e) {
         logger.warn('[Nextcloud] Upload failed, using local:', (e as Error).message);
         fileUrl = localUrl;

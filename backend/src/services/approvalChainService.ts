@@ -61,36 +61,6 @@ export async function ensureApprovalChain(
 }
 
 /**
- * Mevcut tek-tıkla onay UI'ları (Opportunity GM onayı, ContractWorkflow imza
- * onayı) tüm zinciri tek seferde tamamlanmış olarak işaretler. Aşama bazlı
- * onay akışı (Finans → İGB → GM → KSU) ileride Finans swimlane UI'sından
- * `/approval-chains/:id/stages/:stageId/approve` ile devreye girer.
- */
-export async function completeApprovalChain(
-  tenantId: string,
-  entityType: string,
-  entityId: string,
-  approverId?: string,
-  note?: string
-) {
-  const chain = await prisma.approvalChain.findFirst({
-    where: { tenantId, entityType, entityId, status: 'PENDING' },
-  });
-  if (!chain) return null;
-
-  await prisma.approvalStage.updateMany({
-    where: { chainId: chain.id, status: 'PENDING' },
-    data: { status: 'APPROVED', approverId, note, approvedAt: new Date() },
-  });
-
-  return prisma.approvalChain.update({
-    where: { id: chain.id },
-    data: { status: 'COMPLETED' },
-    include: { stages: { orderBy: { order: 'asc' } } },
-  });
-}
-
-/**
  * Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen PENDING aşamaları
  * `SKIPPED` işaretler ve geriye PENDING aşama kalmadıysa zinciri COMPLETED
  * yapar. Böylece akıştan çıkarılan bir rol/birim onay zincirini tıkayamaz

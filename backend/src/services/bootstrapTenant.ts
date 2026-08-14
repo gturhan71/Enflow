@@ -16,6 +16,11 @@ export const DEFAULT_UNITS: { key: string; name: string; description: string }[]
   { key: 'ksu', name: 'KSU — Kontrat & Sözleşme Uzmanlığı', description: 'Sözleşme evrak kontrolü ve imza süreci doğrulaması.' },
   { key: 'kgd', name: 'KY — Kalite Yönetimi', description: 'Öğrenilmiş dersler, risk/fırsat ve kurumsal metrik raporlaması.' },
   { key: 'isab', name: 'İYB — İhale Yönetim Birimi', description: 'İhale takip ve EKAP süreçleri.' },
+  // Faz H — uçtan uca süreç şablonunun (workflowTemplate.ts) ihtiyaç duyduğu,
+  // önceden eksik olan 3 birim: satınalma, proje yönetimi, hukuk.
+  { key: 'procurement', name: 'Satın Alma', description: 'Tedarikçi teklifleri ve satınalma talebi yönetimi.' },
+  { key: 'project', name: 'Proje Yönetimi', description: 'Sözleşme sonrası proje devri ve yürütme.' },
+  { key: 'legal', name: 'Hukuk', description: 'Sözleşme hukuki incelemesi.' },
 ];
 
 // İlk GM kullanıcısı için geniş görünüm izinleri (GM zaten superuser; tutarlılık için).

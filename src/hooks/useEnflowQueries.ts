@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { apiService } from '../services/apiService';
 
 // --- QUERY HOOKS ---
@@ -99,18 +99,5 @@ export const useModuleSettings = (tenantId: string) => {
     queryFn: () => apiService.getModuleSettings(),
     staleTime: 60 * 1000,
     enabled: !!tenantId,
-  });
-};
-
-// --- MUTATION HOOKS ---
-
-export const useApproveProposalMutation = () => {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ oppId, note }: { oppId: string; note: string }) => 
-      apiService.approveProposal(oppId, { note }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunities'] });
-    }
   });
 };

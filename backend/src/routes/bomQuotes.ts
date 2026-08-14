@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
-import { documentUpload } from '../utils/secureUpload';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
-import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -110,7 +109,7 @@ router.post('/:qid/select', asyncHandler(async (req: Request, res: Response) => 
 
 // Orijinal teklif dosyası yükle (xls/xlsx/xml/doc/docx/pdf) — seçim kanıtı
 const ALLOWED_EXT = ['.pdf', '.xls', '.xlsx', '.xml', '.doc', '.docx', '.csv'];
-router.post('/:qid/upload', quoteUpload.single('file'), asyncHandler(async (req: Request, res: Response) => {
+router.post('/:qid/upload', quoteUpload.single('file'), enforceStorageLimit(), asyncHandler(async (req: Request, res: Response) => {
   const qid = String(req.params.qid);
   const tenantId = req.tenantId;
   if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
@@ -126,19 +125,8 @@ router.post('/:qid/upload', quoteUpload.single('file'), asyncHandler(async (req:
   const safeName = `${qid.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
   fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
   const localUrl = `/uploads/bom-quotes/${folder}/${safeName}`;
-  let fileUrl = localUrl;
-  let ncUrl: string | null = null;
-
-  const NC_URL = process.env.NEXTCLOUD_URL, NC_USER = process.env.NEXTCLOUD_USER, NC_PASS = process.env.NEXTCLOUD_PASS;
-  if (NC_URL && NC_USER && NC_PASS) {
-    try {
-      ncUrl = await uploadToNextcloud(req.file.buffer, safeName, `/ENFLOW_DMS/BoM_Teklifleri/${folder}`, NC_URL, NC_USER, NC_PASS);
-      fileUrl = ncUrl;
-    } catch (e) {
-      logger.warn('[Nextcloud] BoM quote upload failed, using local:', (e as Error).message);
-      fileUrl = localUrl;
-    }
-  }
+  const ncUrl = await tryUploadToNextcloud(tenantId, req.file.buffer, safeName, `/ENFLOW_DMS/BoM_Teklifleri/${folder}`);
+  const fileUrl = ncUrl || localUrl;
 
   const updated = await prisma.boMLineQuote.update({ where: { id: qid }, data: { fileUrl, fileName: req.file.originalname } });
   await logActivity({ tenantId, userId: req.userId, action: 'UPLOAD_BOM_QUOTE_FILE', entityType: 'BOM_QUOTE', entityId: qid, details: { fileName: req.file.originalname } });

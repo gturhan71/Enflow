@@ -1,12 +1,11 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
-import { documentUpload } from '../utils/secureUpload';
-import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
+import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
 const DOCUMENT_UPLOADS_ROOT = path.join(__dirname, '../../uploads/documents');
@@ -53,6 +52,7 @@ router.post(
   '/:id/upload',
   tenantMiddleware,
   corporateDocUpload.single('file'),
+  enforceStorageLimit(),
   asyncHandler(async (req: Request, res: Response) => {
     const id = String(req.params.id);
     if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
@@ -67,22 +67,9 @@ router.post(
     fs.writeFileSync(localPath, req.file.buffer);
 
     const localUrl = `/uploads/documents/${folder}/${safeName}`;
-    let fileUrl = localUrl;
-    let ncUrl: string | null = null;
-
-    const NC_URL = process.env.NEXTCLOUD_URL;
-    const NC_USER = process.env.NEXTCLOUD_USER;
-    const NC_PASS = process.env.NEXTCLOUD_PASS;
-    if (NC_URL && NC_USER && NC_PASS) {
-      try {
-        const remotePath = `/ENFLOW_DMS/SirketEvraklari/${folder}`;
-        ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
-        fileUrl = ncUrl;
-      } catch (e) {
-        logger.warn('[Nextcloud] Document upload failed, using local:', (e as Error).message);
-        fileUrl = localUrl;
-      }
-    }
+    const remotePath = `/ENFLOW_DMS/SirketEvraklari/${folder}`;
+    const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
+    const fileUrl = ncUrl || localUrl;
 
     const updated = await prisma.corporateDocument.update({ where: { id }, data: { fileUrl } });
     await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPLOAD', entityType: 'DOCUMENT', entityId: id, details: { fileUrl } });

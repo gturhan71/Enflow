@@ -165,6 +165,12 @@ export const settingsService = {
     });
   },
 
+  // Varsayılan Süreç Şablonu — 13 süreç + gerekli birimleri tek çağrıyla
+  // uygular; tenant'ın zaten kurguladığı süreçlere dokunmaz.
+  async applyDefaultWorkflowTemplate(): Promise<{ addedUnits: string[]; createdProcesses: string[]; skippedProcesses: string[] }> {
+    return apiClient.fetchWithAuth('/workflows/apply-default-template', { method: 'POST' });
+  },
+
   async deleteWorkflow(id: string) {
     return apiClient.fetchWithAuth(`/workflows/${id}`, { method: 'DELETE' });
   },

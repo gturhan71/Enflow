@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import {
   GitBranch, ArrowRight, Plus, Settings2, Activity, CheckCircle2,
   AlertCircle, Save, Zap, Info, ChevronRight, Play, Pause, RefreshCw, ListTodo,
-  Building, Power, ShieldAlert, X, Users, Split, Trash2
+  Building, Power, ShieldAlert, X, Users, Split, Trash2, Sparkles
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Unit, User, Workflow, WorkflowStep } from '../types';
@@ -115,6 +115,24 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
 
   const labelForProcessKey = (key: string): string =>
     (PROCESS_KEY_LABEL as Record<string, string>)[key] ?? customProcesses.find((c) => c.key === key)?.name ?? key;
+
+  const [applyingTemplate, setApplyingTemplate] = useState(false);
+  // Varsayılan Süreç Şablonu — tenant-1'de kurgulanıp doğrulanmış 13 süreci
+  // (+ gerekli birimleri) tek çağrıyla bu tenant'a uygular. Zaten kurgulanmış
+  // bir süreci ASLA üzerine yazmaz (backend `applyDefaultWorkflowTemplate`).
+  const handleApplyDefaultTemplate = async () => {
+    if (!confirm('Varsayılan süreç şablonu (13 süreç: Fırsat Onayı, Sözleşme İmza, İhale→Sözleşme, Satınalma, Proje, Fatura vb.) uygulanacak. Zaten kurguladığınız süreçlere dokunulmaz, yalnız eksikler doldurulur. Devam edilsin mi?')) return;
+    setApplyingTemplate(true);
+    try {
+      const result = await apiService.applyDefaultWorkflowTemplate();
+      alert(`Şablon uygulandı.\nEklenen birim: ${result.addedUnits.length}\nOluşturulan süreç: ${result.createdProcesses.length}\nZaten kurgulu olduğu için atlanan: ${result.skippedProcesses.length}`);
+      await fetchWorkflowForProcessKey(processKey);
+    } catch (error) {
+      alert((error instanceof Error ? error.message : '') || 'Şablon uygulanırken hata oluştu.');
+    } finally {
+      setApplyingTemplate(false);
+    }
+  };
 
   const handleCreateCustomProcess = () => {
     setNewProcessName('');
@@ -423,6 +441,15 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
           className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 border border-dashed border-primary/40 text-primary hover:bg-primary/5"
         >
           <Plus size={12} /> Yeni Süreç
+        </button>
+        <button
+          onClick={handleApplyDefaultTemplate}
+          disabled={applyingTemplate}
+          title="13 süreçlik doğrulanmış varsayılan şablonu (gerekli birimler dahil) bu tenant'a uygula — zaten kurgulanmış süreçlere dokunmaz"
+          className="px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all flex items-center gap-1.5 border border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50"
+        >
+          {applyingTemplate ? <div className="w-3 h-3 border-2 border-emerald-300 border-t-emerald-700 rounded-full animate-spin" /> : <Sparkles size={12} />}
+          Varsayılan Şablonu Yükle
         </button>
       </div>
       {!LIVE_PROCESS_KEYS.includes(processKey as typeof LIVE_PROCESS_KEYS[number]) && (

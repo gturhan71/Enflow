@@ -1,13 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../utils/logger';
 import path from 'path';
 import fs from 'fs';
-import { documentUpload } from '../utils/secureUpload';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
-import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 import { analyzeSpec } from '../services/specAnalysis';
 import { sweepTenderReminders } from '../services/tenderReminders';
 import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
@@ -400,6 +399,7 @@ router.post(
   '/:id/checklist/:itemId/upload',
   tenantMiddleware,
   tenderUpload.single('file'),
+  enforceStorageLimit(),
   asyncHandler(async (req: Request, res: Response) => {
     const id = String(req.params.id);
     const itemId = String(req.params.itemId);
@@ -417,22 +417,9 @@ router.post(
     fs.writeFileSync(localPath, req.file.buffer);
 
     const localUrl = `/uploads/tenders/${folder}/${safeName}`;
-    let fileUrl = localUrl;
-    let ncUrl: string | null = null;
-
-    const NC_URL = process.env.NEXTCLOUD_URL;
-    const NC_USER = process.env.NEXTCLOUD_USER;
-    const NC_PASS = process.env.NEXTCLOUD_PASS;
-    if (NC_URL && NC_USER && NC_PASS) {
-      try {
-        const remotePath = `/ENFLOW_DMS/Ihale/${folder}`;
-        ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
-        fileUrl = ncUrl;
-      } catch (e) {
-        logger.warn('[Nextcloud] Tender upload failed, using local:', (e as Error).message);
-        fileUrl = localUrl;
-      }
-    }
+    const remotePath = `/ENFLOW_DMS/Ihale/${folder}`;
+    const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
+    const fileUrl = ncUrl || localUrl;
 
     const item = await prisma.tenderChecklistItem.update({
       where: { id: itemId },

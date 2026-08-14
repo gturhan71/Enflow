@@ -12,13 +12,6 @@ import { prisma } from '../prismaClient';
 // tutarına göre onay aşaması rolleri matristen seçilir.
 export interface ApprovalTier { maxAmount: number; roles: string[] }
 
-// Yalnız öneri/varsayılan — tenant kendi matrisini girene kadar UYGULANMAZ.
-export const DEFAULT_APPROVAL_MATRIX: ApprovalTier[] = [
-  { maxAmount: 100_000, roles: ['SALES_MGR'] },
-  { maxAmount: 1_000_000, roles: ['FINANCE_MGR', 'GENERAL_MANAGER'] },
-  { maxAmount: Number.MAX_SAFE_INTEGER, roles: ['FINANCE_MGR', 'IGPD_MGR', 'GENERAL_MANAGER', 'KSU_MGR'] },
-];
-
 export async function getApprovalMatrix(tenantId: string): Promise<ApprovalTier[] | null> {
   const t = await prisma.tenant.findUnique({ where: { id: tenantId } });
   let ms: Record<string, unknown> = {};

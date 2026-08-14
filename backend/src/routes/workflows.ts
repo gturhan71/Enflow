@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { advanceProcess, ProcessNotConfiguredError, entityExists, ENTITY_TYPES } from '../services/processEngine';
+import { applyDefaultWorkflowTemplate } from '../services/workflowTemplate';
 
 const router: Router = Router();
 
@@ -57,6 +58,15 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     include: { steps: { orderBy: { order: 'asc' } } }
   });
   res.json(workflows);
+}));
+
+// Varsayılan Süreç Şablonu (Faz H) — tenant-1'de kurgulanıp doğrulanmış 13
+// süreci (+ gerekli varsayılan birimleri) boş/kısmen boş bir tenant'a tek
+// çağrıyla uygular. Tenant'ın ZATEN kurguladığı bir processKey asla üzerine
+// yazılmaz — yalnız eksikleri doldurur (immutable kural: harita tenant'ındır).
+router.post('/apply-default-template', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
+  const result = await applyDefaultWorkflowTemplate(req.tenantId, req.userId);
+  res.json(result);
 }));
 
 // Süreç Motoru (Faz A) — Tasarımcı UI'ın belirli bir processKey'e ait iş akışını

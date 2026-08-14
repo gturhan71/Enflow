@@ -1,6 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { logger } from '../utils/logger';
-import { documentUpload } from '../utils/secureUpload';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import path from 'path';
 import fs from 'fs';
 import { prisma } from '../prismaClient';
@@ -11,7 +10,7 @@ import { logActivity } from '../services/activityLog';
 import { computeProjectOverhead, applyProjectOverhead } from '../services/overheadService';
 import { computeProjectProgress } from '../services/projectProgress';
 import { summarizeProject } from '../services/projectSummary';
-import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
+import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -434,6 +433,7 @@ router.delete('/:id/handover-docs/:docId', asyncHandler(async (req: Request, res
 router.post(
   '/:id/handover-docs/:docId/upload',
   handoverUpload.single('file'),
+  enforceStorageLimit(),
   asyncHandler(async (req: Request, res: Response) => {
     const projectId = String(req.params.id);
     const docId = String(req.params.docId);
@@ -451,23 +451,9 @@ router.post(
     fs.writeFileSync(localPath, req.file.buffer);
 
     const localUrl = `/uploads/project-handovers/${folder}/${safeName}`;
-    let fileUrl = localUrl;
-    let ncUrl: string | null = null;
-
-    const NC_URL = process.env.NEXTCLOUD_URL;
-    const NC_USER = process.env.NEXTCLOUD_USER;
-    const NC_PASS = process.env.NEXTCLOUD_PASS;
-
-    if (NC_URL && NC_USER && NC_PASS) {
-      try {
-        const remotePath = `/ENFLOW_DMS/ProjeDevir/${folder}`;
-        ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
-        fileUrl = ncUrl;
-      } catch (e) {
-        logger.warn('[Nextcloud] Handover upload failed, using local:', (e as Error).message);
-        fileUrl = localUrl;
-      }
-    }
+    const remotePath = `/ENFLOW_DMS/ProjeDevir/${folder}`;
+    const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
+    const fileUrl = ncUrl || localUrl;
 
     const doc = await prisma.projectHandoverDoc.update({
       where: { id: docId },

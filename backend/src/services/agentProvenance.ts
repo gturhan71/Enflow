@@ -36,11 +36,6 @@ export function parseAgentActor(actorId?: string | null): { pluginKey: string | 
   return null;
 }
 
-/** İnsan/agent ayrımı için aktör tipi ('HUMAN' | 'AGENT'). */
-export function actorType(actorId?: string | null): 'HUMAN' | 'AGENT' {
-  return isAgentActor(actorId) ? 'AGENT' : 'HUMAN';
-}
-
 /** UI/log için okunur agent adı. pluginKey çözülemezse genel etiket. */
 export function agentDisplayLabel(actorId?: string | null): string {
   const parsed = parseAgentActor(actorId);

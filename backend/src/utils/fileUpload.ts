@@ -7,6 +7,8 @@ import path from 'path';
 import fs from 'fs';
 import https from 'https';
 import http from 'http';
+import { logger } from './logger';
+import { checkLimit, incrementUsage } from '../usageService';
 
 export function slugify(str: string): string {
   return str
@@ -67,4 +69,39 @@ export async function uploadToNextcloud(
     req.write(fileBuffer);
     req.end();
   });
+}
+
+/**
+ * `uploadToNextcloud`'u env değişkenleri + INTEGRATION_SYNC kotasıyla sarmalar
+ * — çağıran taraftaki tekrarlanan "NC_URL var mı / try-catch" bloğunun tek
+ * kaynağı. Nextcloud yapılandırılmamışsa, kota dolmuşsa veya çağrı başarısız
+ * olursa `null` döner (çağıran zaten yerel depolamaya düşüyor) — hiçbir zaman
+ * fırlatmaz, mevcut "best-effort mirror" davranışı korunur. Yalnız GERÇEK bir
+ * PUT başarılı olduğunda kota artırılır (başarısız denemeler ücretsiz).
+ */
+export async function tryUploadToNextcloud(
+  tenantId: string,
+  fileBuffer: Buffer,
+  fileName: string,
+  remotePath: string,
+): Promise<string | null> {
+  const ncUrl = process.env.NEXTCLOUD_URL;
+  const ncUser = process.env.NEXTCLOUD_USER;
+  const ncPass = process.env.NEXTCLOUD_PASS;
+  if (!ncUrl || !ncUser || !ncPass) return null;
+
+  const ok = await checkLimit(tenantId, 'INTEGRATION_SYNC');
+  if (!ok) {
+    logger.warn('[Nextcloud] Entegrasyon senkron kotası dolu, yerel depolamaya düşülüyor.', { tenantId });
+    return null;
+  }
+
+  try {
+    const url = await uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass);
+    await incrementUsage(tenantId, 'INTEGRATION_SYNC');
+    return url;
+  } catch (e) {
+    logger.warn('[Nextcloud] Upload failed, using local:', (e as Error).message);
+    return null;
+  }
 }

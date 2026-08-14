@@ -248,6 +248,7 @@ class ApiService {
   async getWorkflowByProcessKey(processKey: string) { return settingsService.getWorkflowByProcessKey(processKey); }
   async deleteWorkflow(id: string) { return settingsService.deleteWorkflow(id); }
   async getWorkflows() { return settingsService.getWorkflows(); }
+  async applyDefaultWorkflowTemplate() { return settingsService.applyDefaultWorkflowTemplate(); }
   async triggerProcess(processKey: string, entityId: string) { return settingsService.triggerProcess(processKey, entityId); }
 
   // --- MODULE SETTINGS ---
