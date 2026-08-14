@@ -10,6 +10,11 @@ coverage/
 # Yedekleme artefaktları (commit edilmez)
 backend/backups/
 
+# Kullanıcı yüklemeleri — sözleşme/teklif evrakları vb. çalışma zamanı içeriği,
+# gerçek veri barındırabileceğinden izlenmez (önceden commit edilmiş dosyalar
+# etkilenmez, yalnız yeni yüklemeler kapsam dışı kalır).
+backend/uploads/
+
 # Kurulum paketi çıktısı
 dist-installer/
 .env.local
