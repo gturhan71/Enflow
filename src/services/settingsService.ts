@@ -157,6 +157,14 @@ export const settingsService = {
     return apiClient.fetchWithAuth(`/workflows/by-process/${processKey}`);
   },
 
+  // Jenerik tetikleme — yalnız tenant-özel (sabit taksonomi dışı) süreçler için.
+  async triggerProcess(processKey: string, entityId: string) {
+    return apiClient.fetchWithAuth(`/workflows/${processKey}/trigger`, {
+      method: 'POST',
+      body: JSON.stringify({ entityId }),
+    });
+  },
+
   async deleteWorkflow(id: string) {
     return apiClient.fetchWithAuth(`/workflows/${id}`, { method: 'DELETE' });
   },

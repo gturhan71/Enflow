@@ -512,7 +512,7 @@ const Dashboard = ({
             </p>
           </div>
           <button
-            onClick={() => onNavigate?.('settings')}
+            onClick={() => onNavigate?.('settings-workflow')}
             className="px-5 py-2.5 bg-amber-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-amber-700 transition-all shrink-0"
           >
             Ayarlar'a Git

@@ -20,6 +20,7 @@ import { getApprovalSlaBusinessDays } from './approvalSlaEscalation';
 import { computeSlaDueDate } from '../utils/businessDays';
 import { resolveGroupAfterDecision, autoSkipOrphanStages, resolveEffectiveApprover } from './approvalChainService';
 import { createProjectWithMilestones } from './projectFactory';
+import { createInvoiceRecord } from './invoiceService';
 import type { ApprovalChain, ApprovalStage, User, WorkflowStep } from '@prisma/client';
 
 export class ProcessNotConfiguredError extends Error {
@@ -106,6 +107,127 @@ export interface StageActionCtx {
   // gibi ek alanlar) — action bunu kullanıp kullanmamakta serbest, entityId'den
   // türeyen alanlar (opportunityId vb.) action içinde her zaman üzerine yazılır.
   input?: Record<string, unknown>;
+}
+
+// ── Jenerik varlık alan kaydı (tenant-özel süreçler için) ───────────────────
+// COPY_FIELDS_TO_TASK ve generic tetikleme ucu bunu kullanır. Yalnız burada
+// KAYITLI alanlar okunabilir/kopyalanabilir — client'tan gelen keyfi bir alan
+// adı asla doğrudan DB kaydına erişemez (beyaz liste).
+export interface FieldSpec { key: string; label: string }
+export const ENTITY_FIELD_SPECS: Record<string, FieldSpec[]> = {
+  OPPORTUNITY: [
+    { key: 'title', label: 'Başlık' },
+    { key: 'value', label: 'Değer' },
+    { key: 'probability', label: 'Olasılık (%)' },
+    { key: 'status', label: 'Durum' },
+    { key: 'expectedCloseDate', label: 'Beklenen Kapanış' },
+  ],
+  CONTRACT_WORKFLOW_SIGNING: [
+    { key: 'title', label: 'Başlık' },
+    { key: 'contractValue', label: 'Sözleşme Bedeli' },
+    { key: 'tenderNo', label: 'İKN' },
+    { key: 'projectName', label: 'Proje Adı' },
+    { key: 'deadline', label: 'Son Tarih' },
+  ],
+  PROJECT: [
+    { key: 'name', label: 'Proje Adı' },
+    { key: 'code', label: 'Proje Kodu' },
+    { key: 'totalValue', label: 'Toplam Değer' },
+    { key: 'budgetTotal', label: 'Bütçe' },
+    { key: 'status', label: 'Durum' },
+  ],
+  PURCHASE_REQUEST: [
+    { key: 'title', label: 'Başlık' },
+    { key: 'budgetAmount', label: 'Bütçe Tutarı' },
+    { key: 'currency', label: 'Para Birimi' },
+    { key: 'status', label: 'Durum' },
+    { key: 'poNumber', label: 'PO Numarası' },
+  ],
+  TENDER: [
+    { key: 'name', label: 'İhale Adı' },
+    { key: 'ikn', label: 'İKN' },
+    { key: 'estimatedValue', label: 'Tahmini Bedel' },
+    { key: 'currency', label: 'Para Birimi' },
+    { key: 'submissionDeadline', label: 'Son Teklif Tarihi' },
+  ],
+};
+export const ENTITY_TYPES = Object.keys(ENTITY_FIELD_SPECS);
+
+async function fetchEntityRecord(tenantId: string, entityType: string, entityId: string): Promise<Record<string, unknown> | null> {
+  switch (entityType) {
+    case 'OPPORTUNITY':
+      return (await prisma.opportunity.findFirst({ where: { id: entityId, tenantId } })) as unknown as Record<string, unknown> | null;
+    case 'CONTRACT_WORKFLOW_SIGNING':
+      return (await prisma.contractWorkflow.findFirst({ where: { id: entityId, tenantId } })) as unknown as Record<string, unknown> | null;
+    case 'PROJECT':
+      return (await prisma.project.findFirst({ where: { id: entityId, tenantId } })) as unknown as Record<string, unknown> | null;
+    case 'PURCHASE_REQUEST':
+      return (await prisma.purchaseRequest.findFirst({ where: { id: entityId, tenantId } })) as unknown as Record<string, unknown> | null;
+    case 'TENDER':
+      return (await prisma.tender.findFirst({ where: { id: entityId, tenantId } })) as unknown as Record<string, unknown> | null;
+    default:
+      return null;
+  }
+}
+
+export async function entityExists(tenantId: string, entityType: string, entityId: string): Promise<boolean> {
+  return !!(await fetchEntityRecord(tenantId, entityType, entityId));
+}
+
+export async function readEntityFields(tenantId: string, entityType: string, entityId: string, fields: string[]): Promise<{ label: string; value: unknown }[]> {
+  const specs = ENTITY_FIELD_SPECS[entityType] || [];
+  const allowed = new Set(specs.map((s) => s.key));
+  const record = await fetchEntityRecord(tenantId, entityType, entityId);
+  if (!record) return [];
+  return fields
+    .filter((f) => allowed.has(f))
+    .map((f) => ({ label: specs.find((s) => s.key === f)?.label || f, value: record[f] }));
+}
+
+/**
+ * Jenerik "veri aktarımı" AUTO eylemi — tenant, süreci kurgularken hangi
+ * alanların kopyalanacağını seçer (adımın `actionConfig` JSON'unda
+ * `{fields:[...]}`), kod yazmaya gerek kalmaz. Yalnız basit alan-kopyalama
+ * içindir — hesaplı/dönüşümlü aktarımlar (ör. oranlı BoM dağıtımı) hâlâ özel
+ * bir STAGE_ACTIONS fonksiyonu gerektirir (bkz. createPurchaseRequestFromContract).
+ */
+async function copyFieldsToTask(ctx: StageActionCtx): Promise<void> {
+  let fields: string[] = [];
+  try {
+    const cfg = ctx.step.actionConfig ? (JSON.parse(ctx.step.actionConfig) as { fields?: string[] }) : null;
+    fields = Array.isArray(cfg?.fields) ? cfg.fields : [];
+  } catch {
+    fields = [];
+  }
+  if (fields.length === 0) return;
+
+  const picked = await readEntityFields(ctx.tenantId, ctx.entityType, ctx.entityId, fields);
+  if (picked.length === 0) return;
+
+  const recipients = await resolveStepRecipients(ctx.tenantId, { unitId: ctx.step.unitId, role: ctx.step.role, delegateUserId: ctx.step.delegateUserId });
+  if (recipients.length === 0) return;
+
+  const lines = picked.map((p) => `${p.label}: ${p.value ?? '—'}`).join('\n');
+
+  await prisma.todoTask.create({
+    data: {
+      tenantId: ctx.tenantId,
+      title: `Veri aktarımı: ${ctx.step.description || ctx.entityType}`,
+      description: lines,
+      unitId: ctx.step.unitId,
+      assignedToUserId: recipients[0].id,
+      assignedBy: ctx.actorUserId || 'system',
+      relatedModule: 'GENERAL',
+      relatedItemId: ctx.entityId,
+      priority: 'MEDIUM',
+      status: 'PENDING',
+      updatedAt: new Date(),
+    },
+  }).catch(() => {});
+
+  await Promise.all(recipients.map((u) => prisma.notification.create({
+    data: { tenantId: ctx.tenantId, userId: u.id, type: 'INFO', title: 'Veri aktarımı', message: lines.slice(0, 300) },
+  }).catch(() => {})));
 }
 
 async function createProjectFromEntity(ctx: StageActionCtx): Promise<void> {
@@ -345,11 +467,61 @@ async function createPurchaseRequestFromContract(ctx: StageActionCtx): Promise<v
   await logActivity({ tenantId: ctx.tenantId, userId: ctx.actorUserId, action: 'CONTRACT_TO_PROCUREMENT', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { purchaseRequestId: pr.id, items: pr.items.length } });
 }
 
+/**
+ * İhale teklifini gerçekten teslim eder (status→SUBMITTED). Eskiden
+ * `tenders.ts` `/:id/submit`'te hiçbir onay/rol kontrolü olmadan doğrudan
+ * çalışıyordu — şirketi bağlayan bu geri-dönüşsüz adım TENDER_SUBMIT_APPROVAL
+ * üzerinden geçer artık (Faz G).
+ */
+async function submitTender(ctx: StageActionCtx): Promise<void> {
+  if (ctx.entityType !== 'TENDER') {
+    throw new Error(`SUBMIT_TENDER bu entityType için henüz desteklenmiyor: ${ctx.entityType}`);
+  }
+  const tender = await prisma.tender.findFirst({ where: { id: ctx.entityId, tenantId: ctx.tenantId } });
+  if (!tender) throw new Error('İhale kaydı bulunamadı.');
+  if (['SUBMITTED', 'EVALUATING', 'WON', 'LOST'].includes(tender.status)) return; // idempotent
+  await prisma.tender.update({ where: { id: tender.id }, data: { status: 'SUBMITTED', submittedAt: new Date() } });
+  await logActivity({ tenantId: ctx.tenantId, userId: ctx.actorUserId, action: 'TENDER_SUBMITTED', entityType: 'TENDER', entityId: tender.id, details: {} });
+}
+
+/**
+ * Projeyi kapatan SATIŞ faturasını oluşturur (`invoiceService.createInvoiceRecord`
+ * — `finance.ts`'in gate'siz yoluyla AYNI mantık, kopyalanmadı). Eskiden
+ * `POST /finance/invoices` projeye bağlı SATIŞ faturaları dahil hiçbir rol/onay
+ * kontrolü olmadan çalışıyordu — PROJECT_TO_INVOICE üzerinden geçer artık (Faz G).
+ */
+async function createSalesInvoiceForProject(ctx: StageActionCtx): Promise<void> {
+  if (ctx.entityType !== 'PROJECT') {
+    throw new Error(`CREATE_SALES_INVOICE_FOR_PROJECT bu entityType için henüz desteklenmiyor: ${ctx.entityType}`);
+  }
+  const input = (ctx.input || {}) as Record<string, unknown>;
+  await createInvoiceRecord(ctx.tenantId, {
+    type: 'SALES',
+    invoiceNo: input.invoiceNo as string | undefined,
+    amount: input.amount as number | string,
+    currency: input.currency as string | undefined,
+    issueDate: input.issueDate as string | undefined,
+    dueDate: input.dueDate as string | undefined,
+    status: input.status as string | undefined,
+    projectId: ctx.entityId,
+    contractId: input.contractId as string | undefined,
+    milestoneId: input.milestoneId as string | undefined,
+    customerId: input.customerId as string | undefined,
+    customerName: input.customerName as string | undefined,
+    notes: input.notes as string | undefined,
+    categoryCode: input.categoryCode as string | undefined,
+    issueRateToTRY: input.issueRateToTRY as number | string | undefined,
+  }, ctx.actorUserId);
+}
+
 export const STAGE_ACTIONS: Record<string, (ctx: StageActionCtx) => Promise<void>> = {
   CREATE_PROJECT_FROM_ENTITY: createProjectFromEntity,
   CREATE_CONTRACT_FROM_TENDER: createContractFromTender,
   CREATE_PURCHASE_COST_ITEM: (ctx) => createPurchaseCostItemsForRequest(ctx.tenantId, ctx.entityId, ctx.actorUserId),
   CREATE_PURCHASE_REQUEST_FROM_CONTRACT: createPurchaseRequestFromContract,
+  COPY_FIELDS_TO_TASK: copyFieldsToTask,
+  SUBMIT_TENDER: submitTender,
+  CREATE_SALES_INVOICE_FOR_PROJECT: createSalesInvoiceForProject,
   // Yol haritası — kayıtlı ama henüz uygulanmadı, çağrılırsa açık hata verir:
   CREATE_INVOICE_FROM_PURCHASE: async () => { throw new Error('actionKey henüz uygulanmadı: CREATE_INVOICE_FROM_PURCHASE'); },
 };
@@ -435,8 +607,14 @@ export async function advanceProcess(
     throw new ProcessNotConfiguredError(processKey);
   }
 
+  // Faz F düzeltmesi — eskiden yalnız (entityType, entityId) ile aranıyordu.
+  // Bir varlık türü (ör. CONTRACT_WORKFLOW_SIGNING, OPPORTUNITY) birden fazla
+  // süreç tarafından paylaşılabilir (özellikle tenant'ın "+ Yeni Süreç" ile
+  // eklediği özel süreçler, sabit süreçlerle AYNI entityType'ı hedefleyebilir);
+  // processKey filtresi olmadan başka bir sürecin PENDING zinciri yanlışlıkla
+  // eşleşip walkForward'ı o zincirin (uyumsuz) aşamalarına karşı çalıştırıyordu.
   let chain: (ApprovalChain & { stages: ApprovalStage[] }) | null = await prisma.approvalChain.findFirst({
-    where: { tenantId, entityType, entityId, status: 'PENDING' },
+    where: { tenantId, entityType, entityId, processKey, status: 'PENDING' },
     include: { stages: { orderBy: { order: 'asc' } } },
   });
 
@@ -493,9 +671,15 @@ export async function continueProcess(
   tenantId: string,
   entityType: string,
   entityId: string,
+  // Faz F düzeltmesi — çağıran zaten hangi zinciri (ve dolayısıyla hangi
+  // processKey'i) devam ettirdiğini biliyor (`chain.id`'den geliyor); bunu
+  // AÇIKÇA geçmek, bir entityType birden fazla süreç tarafından paylaşılırken
+  // (ör. tenant'ın özel süreçleri sabit süreçlerle aynı entityType'ı hedeflediğinde)
+  // yanlış (başka bir sürece ait) PENDING zincirin sessizce eşleşmesini engeller.
+  processKey?: string | null,
 ): Promise<AdvanceProcessResult | null> {
   const chain = await prisma.approvalChain.findFirst({
-    where: { tenantId, entityType, entityId, status: 'PENDING' },
+    where: { tenantId, entityType, entityId, ...(processKey ? { processKey } : {}), status: 'PENDING' },
     include: { stages: { orderBy: { order: 'asc' } } },
   });
   if (!chain || !chain.processKey) return null;

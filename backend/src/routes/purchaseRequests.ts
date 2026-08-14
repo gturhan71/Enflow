@@ -202,8 +202,10 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     if (pr.status === 'DRAFT') {
       await advanceProcess(req.tenantId, 'PURCHASE_APPROVAL', 'PURCHASE_REQUEST', pr.id, { actorUserId: req.userId });
     } else {
+      // Faz F düzeltmesi — processKey filtresi eklendi (PURCHASE_REQUEST entityType'ı
+      // birden fazla süreç tarafından paylaşılabilir, bkz. processEngine.ts advanceProcess).
       const chain = await prisma.approvalChain.findFirst({
-        where: { tenantId: req.tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id, status: 'PENDING' },
+        where: { tenantId: req.tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id, processKey: 'PURCHASE_APPROVAL', status: 'PENDING' },
         include: { stages: { orderBy: { order: 'asc' } } },
       });
       if (!chain) return res.status(409).json({ error: 'Onay süreci başlatılmamış. Önce talebi onaya gönderin.' });

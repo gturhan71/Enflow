@@ -14,6 +14,8 @@ import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 import { recalcInvoice } from '../services/invoiceEngine';
 import { computeFinanceSummary } from '../services/financeSummary';
 import { computeAgingReport } from '../services/agingReport';
+import { createInvoiceRecord } from '../services/invoiceService';
+import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 
 const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
 
@@ -44,49 +46,41 @@ router.get('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res:
   res.json(items);
 }));
 
+// Süreç Motoru — proje kapanışını temsil eden SATIŞ faturası (projeye bağlı,
+// type=SALES) PROJECT_TO_INVOICE üzerinden geçer (Finans onayı gerektirebilir).
+// Diğer tüm faturalar (PURCHASE, projesiz SALES vb.) davranışı değişmedi —
+// blast radius'u yalnız "proje kapanış faturası" senaryosuna sınırlı tutuyoruz.
 router.post('/invoices', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const {
-    type, invoiceNo, amount, currency, issueDate, dueDate, status,
-    projectId, contractId, milestoneId, customerId, customerName, vendorName,
-    notes, createdById, categoryCode, issueRateToTRY,
-  } = req.body;
-  if (amount == null) return res.status(400).json({ error: 'Fatura tutarı zorunlu.' });
-  const docNumber = await maybeDocNumber(req.tenantId, categoryCode);
+  const { type, projectId } = req.body as { type?: string; projectId?: string };
+  const isProjectClosingInvoice = (type || 'SALES') === 'SALES' && !!projectId;
 
-  // customerId verildiyse müşteri adını oradan doğrula/doldur (elle girilen
-  // ismin üzerine yazmaz, yalnız boşsa doldurur) — bkz. computeCustomerHealth.
-  let resolvedCustomerName = customerName || null;
-  if (customerId) {
-    const customer = await prisma.customer.findFirst({ where: { id: customerId, tenantId: req.tenantId }, select: { name: true } });
-    if (!customer) return res.status(404).json({ error: 'Müşteri bulunamadı.' });
-    if (!resolvedCustomerName) resolvedCustomerName = customer.name;
+  if (isProjectClosingInvoice) {
+    const requestedAt = new Date();
+    try {
+      await advanceProcess(req.tenantId, 'PROJECT_TO_INVOICE', 'PROJECT', projectId as string, { actorUserId: req.userId, input: req.body });
+    } catch (e) {
+      if (e instanceof ProcessNotConfiguredError) {
+        return res.status(409).json({ error: 'Proje kapanış faturası süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Proje → Fatura" sürecini kurgulayın.' });
+      }
+      if (e instanceof Error) return res.status(409).json({ error: e.message });
+      throw e;
+    }
+    const created = await prisma.invoice.findFirst({
+      where: { tenantId: req.tenantId, projectId, type: 'SALES', createdAt: { gte: requestedAt } },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!created) {
+      return res.status(202).json({ pending: true, message: 'Proje kapanış faturası onay bekliyor — onay tamamlanınca oluşturulacak.' });
+    }
+    return res.json(created);
   }
 
-  const item = await prisma.invoice.create({
-    data: {
-      tenantId: req.tenantId,
-      type: type || 'SALES',
-      invoiceNo: invoiceNo || null,
-      amount: Number(amount) || 0,
-      currency: currency || 'TRY',
-      issueDate: issueDate ? new Date(issueDate) : null,
-      dueDate: dueDate ? new Date(dueDate) : null,
-      status: status || 'DRAFT',
-      projectId: projectId || null,
-      contractId: contractId || null,
-      milestoneId: milestoneId || null,
-      customerId: customerId || null,
-      customerName: resolvedCustomerName,
-      vendorName: vendorName || null,
-      notes: notes || null,
-      createdById: createdById || null,
-      docNumber,
-      // B-18 — yabancı para birimli faturada kesim kuru (döviz kur farkı hesabı için)
-      issueRateToTRY: (currency && currency !== 'TRY' && issueRateToTRY) ? Number(issueRateToTRY) : null,
-    },
-  });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'INVOICE', entityId: item.id, details: { type: item.type, amount: item.amount, invoiceNo: item.invoiceNo } });
-  res.json(item);
+  try {
+    const item = await createInvoiceRecord(req.tenantId, req.body, req.userId);
+    res.json(item);
+  } catch (e) {
+    res.status(e instanceof Error && e.message === 'Müşteri bulunamadı.' ? 404 : 400).json({ error: e instanceof Error ? e.message : 'Fatura oluşturulamadı.' });
+  }
 }));
 
 router.put('/invoices/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

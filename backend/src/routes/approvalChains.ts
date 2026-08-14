@@ -143,7 +143,7 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   // — dönüş değeri `updated`'a yansıtılır ki hem yanıt hem B-09 senkronu güncel
   // durumu görsün, `autoSkipOrphanStages`'in DÖNÜŞ ANINDAKİ eski görüntüsünü değil).
   if (updated) {
-    const continued = await continueProcess(req.tenantId, updated.entityType, updated.entityId).catch(() => null);
+    const continued = await continueProcess(req.tenantId, updated.entityType, updated.entityId, updated.processKey).catch(() => null);
     if (continued) updated = continued.chain;
   }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STAGE_APPROVE', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, role: stage.role, chainStatus: updated?.status } });

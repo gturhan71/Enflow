@@ -10,7 +10,7 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, uploadToNextcloud } from '../utils/fileUpload';
 import { analyzeSpec } from '../services/specAnalysis';
 import { sweepTenderReminders } from '../services/tenderReminders';
-import { advanceProcess } from '../services/processEngine';
+import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 
 const router: Router = Router();
 
@@ -313,6 +313,10 @@ router.post('/:id/auto-match', tenantMiddleware, asyncHandler(async (req: Reques
 }));
 
 // "Teklif İletildi" — dosyayı "Girilen İhaleler" arşivine taşı (status=SUBMITTED)
+// Süreç Motoru — eskiden bu route hiçbir onay/rol kontrolü olmadan çalışıyordu;
+// şirketi bağlayan geri-dönüşsüz teklif teslimi artık TENDER_SUBMIT_APPROVAL
+// üzerinden geçer (Faz G). Eksik-döküman kontrolü, onay isteğinden ÖNCE
+// yapılır (yarım-yazma riski yok — kontrol geçmeden hiçbir DB yazımı olmaz).
 router.post('/:id/submit', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const tenantId = req.tenantId;
@@ -330,8 +334,20 @@ router.post('/:id/submit', tenantMiddleware, asyncHandler(async (req: Request, r
     return res.status(422).json({ error: 'Eksik zorunlu döküman var.', missing: missing.map(m => m.name) });
   }
 
-  const updated = await prisma.tender.update({ where: { id }, data: { status: 'SUBMITTED', submittedAt: new Date() } });
-  await logActivity({ tenantId, userId: req.userId, action: 'TENDER_SUBMITTED', entityType: 'TENDER', entityId: id, details: { name: tender.name, forced: !!force, missing: missing.length } });
+  try {
+    await advanceProcess(tenantId, 'TENDER_SUBMIT_APPROVAL', 'TENDER', id, { actorUserId: req.userId });
+  } catch (e) {
+    if (e instanceof ProcessNotConfiguredError) {
+      return res.status(409).json({ error: 'Teklif onay süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Teklif Onayı" sürecini kurgulayın.' });
+    }
+    throw e;
+  }
+
+  const updated = await prisma.tender.findFirst({ where: { id, tenantId } });
+  if (updated?.status !== 'SUBMITTED') {
+    return res.status(202).json({ pending: true, message: 'Teklif onay bekliyor — onay tamamlanınca teslim edilecek.' });
+  }
+  // Not: TENDER_SUBMITTED aktivite kaydı submitTender (processEngine.ts) içinde zaten yazılıyor.
   res.json(updated);
 }));
 

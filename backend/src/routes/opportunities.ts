@@ -606,8 +606,10 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
   // Süreç Motoru (Faz A) — GM'nin bulunduğu belirli aşamayı (sırası GELMİŞSE)
   // çözer; artık tüm zinciri rol kontrolü yapmadan toptan tamamlayan eski
   // "tek-tık bypass" davranışı YOK. Önceki aşamalar hâlâ bekliyorsa 403 döner.
+  // Faz F düzeltmesi — processKey filtresi eklendi (OPPORTUNITY entityType'ı
+  // birden fazla süreç tarafından paylaşılabilir, bkz. processEngine.ts advanceProcess).
   const chain = await prisma.approvalChain.findFirst({
-    where: { tenantId, entityType: 'OPPORTUNITY', entityId: opportunityId, status: 'PENDING' },
+    where: { tenantId, entityType: 'OPPORTUNITY', entityId: opportunityId, processKey: 'OPPORTUNITY_APPROVAL', status: 'PENDING' },
     include: { stages: { orderBy: { order: 'asc' } } },
   });
   if (!chain) return res.status(409).json({ error: 'Onay süreci başlatılmamış. Önce "Onaya Gönder" ile süreci başlatın.' });

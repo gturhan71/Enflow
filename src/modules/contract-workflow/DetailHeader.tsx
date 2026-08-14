@@ -3,6 +3,7 @@ import { Calendar, XCircle, ChevronRight, AlertTriangle } from 'lucide-react';
 import { ContractWorkflow } from './types';
 import { TABS, TabId, WORKFLOW_STATUS_STEPS, CANCEL_TERMINATE_ROLES } from './constants';
 import { stepIndex, computeDeadlineAlarm } from './helpers';
+import ProcessTriggerButton from '../../components/ProcessTriggerButton';
 
 const ALARM_BANNER_STYLES: Record<'warning' | 'critical', string> = {
   warning: 'bg-amber-100 border-amber-200 text-amber-700',
@@ -43,15 +44,18 @@ export default function DetailHeader({
           </div>
         </div>
         {/* İptal / Fesih (B-01+B-14) */}
-        {currentUserRole && CANCEL_TERMINATE_ROLES.includes(currentUserRole) &&
-          !['TRANSFERRED', 'CANCELLED', 'TERMINATED'].includes(selected.status) && (
-          <button
-            onClick={onCancelClick}
-            className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-100 text-red-700 hover:bg-red-200 transition-colors flex items-center gap-1.5 flex-shrink-0"
-          >
-            <XCircle className="w-3.5 h-3.5" /> {selected.status === 'SIGNED' ? 'Feshet' : 'İptal Et'}
-          </button>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <ProcessTriggerButton entityType="CONTRACT_WORKFLOW_SIGNING" entityId={selected.id} />
+          {currentUserRole && CANCEL_TERMINATE_ROLES.includes(currentUserRole) &&
+            !['TRANSFERRED', 'CANCELLED', 'TERMINATED'].includes(selected.status) && (
+            <button
+              onClick={onCancelClick}
+              className="text-xs px-2.5 py-1.5 rounded-lg border border-red-200 bg-red-100 text-red-700 hover:bg-red-200 transition-colors flex items-center gap-1.5"
+            >
+              <XCircle className="w-3.5 h-3.5" /> {selected.status === 'SIGNED' ? 'Feshet' : 'İptal Et'}
+            </button>
+          )}
+        </div>
         {/* Status progress */}
         <div className="hidden lg:flex items-center gap-1">
           {WORKFLOW_STATUS_STEPS.map((step, i) => {

@@ -695,6 +695,7 @@ model Workflow {
   isActive    Boolean        @default(true)
   isDefault   Boolean        @default(false) // tenant başına tek varsayılan şablon (legacy, processKey=null kayıtlar için)
   processKey  String?        // süreç motoru anahtarı (OPPORTUNITY_APPROVAL, CONTRACT_SIGNING, ...) — bkz. processEngine.ts
+  entityType  String?        // tenant-özel (custom) süreçler için hedef varlık türü (OPPORTUNITY, PROJECT, ...) — generic tetikleme/COPY_FIELDS_TO_TASK bunu kullanır; sabit süreçlerde entityType zaten ilgili route'a hardcoded, burada boş kalabilir
   tenantId    String
   tenant      Tenant         @relation(fields: [tenantId], references: [id])
   steps       WorkflowStep[]
@@ -714,6 +715,7 @@ model WorkflowStep {
   delegateUserId     String?  // VEKİL — birimde aktif kullanıcı yoksa (boş koltuk) düşülecek kişi; resolveStepRecipients bunu unit üyeleri/yöneticisinden sonra dener
   approvalMode       String   @default("ANY") // ANY|ALL — aynı (workflowId, order) değerini paylaşan satırlar için
   actionKey          String?  // type=AUTO adımlarda çalıştırılacak kayıtlı eylem anahtarı (processEngine.ts STAGE_ACTIONS)
+  actionConfig       String?  // actionKey'e özel yapılandırma (JSON string) — örn. COPY_FIELDS_TO_TASK için {"fields":["title","value"]}
   order              Int
   // Değişmez kural: bir adım yalnız tenant AÇIKÇA "otomatik devir" (AUTO) olarak
   // işaretlerse insan onayı olmadan ilerler — varsayılan MANUAL'dır (bkz. memory

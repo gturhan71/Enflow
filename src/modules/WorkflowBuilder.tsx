@@ -11,18 +11,29 @@ import { Unit, User, Workflow, WorkflowStep } from '../types';
 import {
   PROCESS_KEYS, PROCESS_KEY_LABEL, LIVE_PROCESS_KEYS, ProcessKey,
   STAGE_ACTION_KEYS, STAGE_ACTION_LABEL, LIVE_STAGE_ACTION_KEYS,
+  ENTITY_TYPES, ENTITY_TYPE_LABEL, ENTITY_FIELD_SPECS, EntityType,
 } from '../types/workflow';
 import { ROLE_LABELS } from '../constants';
 import { apiService } from '../services/apiService';
 import { useUnsavedChanges } from '../contexts/UnsavedChangesContext';
 
-const emptyWorkflowFor = (processKey: string, name: string): Workflow => ({
+const emptyWorkflowFor = (processKey: string, name: string, entityType?: string | null): Workflow => ({
   id: `wf-${Date.now()}`,
   name,
   description: '',
   processKey,
+  entityType: entityType ?? null,
   steps: [],
 });
+
+const parseActionConfig = (raw?: string | null): { fields: string[] } => {
+  try {
+    const parsed = raw ? (JSON.parse(raw) as { fields?: string[] }) : null;
+    return { fields: Array.isArray(parsed?.fields) ? parsed.fields : [] };
+  } catch {
+    return { fields: [] };
+  }
+};
 
 // Türkçe bir süreç adından ("Proje Kapanış Onayı") tenant-özel bir processKey
 // üretir — sabit taksonomiden (PROCESS_KEYS) bağımsız. `CUSTOM_` öneki, sabit
@@ -40,7 +51,10 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
   // Tenant'ın kendi tanımladığı, sabit taksonomide (PROCESS_KEYS) olmayan
   // süreçler — "+ Yeni Süreç" ile eklenenler + sunucudan (GET /workflows)
   // keşfedilen daha önce oluşturulmuş özel süreçler.
-  const [customProcesses, setCustomProcesses] = useState<{ key: string; name: string }[]>([]);
+  const [customProcesses, setCustomProcesses] = useState<{ key: string; name: string; entityType: string | null }[]>([]);
+  const [newProcessModal, setNewProcessModal] = useState(false);
+  const [newProcessName, setNewProcessName] = useState('');
+  const [newProcessEntityType, setNewProcessEntityType] = useState<EntityType | ''>('');
   const [activeWorkflow, setActiveWorkflow] = useState<Workflow | null>(null);
   const [notConfigured, setNotConfigured] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -88,7 +102,7 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
       const known = new Set<string>(PROCESS_KEYS as readonly string[]);
       const discovered = (wfs || [])
         .filter((w) => w.processKey && !known.has(w.processKey))
-        .map((w) => ({ key: w.processKey as string, name: w.name }));
+        .map((w) => ({ key: w.processKey as string, name: w.name, entityType: w.entityType ?? null }));
       if (discovered.length) {
         setCustomProcesses((prev) => {
           const existingKeys = new Set(prev.map((c) => c.key));
@@ -103,16 +117,24 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
     (PROCESS_KEY_LABEL as Record<string, string>)[key] ?? customProcesses.find((c) => c.key === key)?.name ?? key;
 
   const handleCreateCustomProcess = () => {
-    const name = window.prompt('Yeni sürecin adı (örn: "Proje Kapanış Onayı"):');
-    if (!name || !name.trim()) return;
-    const key = toCustomProcessKey(name.trim());
+    setNewProcessName('');
+    setNewProcessEntityType('');
+    setNewProcessModal(true);
+  };
+
+  const handleConfirmCreateCustomProcess = () => {
+    const name = newProcessName.trim();
+    if (!name) return;
+    if (!newProcessEntityType) return;
+    const key = toCustomProcessKey(name);
     const allKeys = [...(PROCESS_KEYS as readonly string[]), ...customProcesses.map((c) => c.key)];
     if (allKeys.includes(key)) {
       alert('Bu isimde (veya çok benzer) bir süreç zaten var. Farklı bir ad deneyin.');
       return;
     }
-    setCustomProcesses((prev) => [...prev, { key, name: name.trim() }]);
+    setCustomProcesses((prev) => [...prev, { key, name, entityType: newProcessEntityType }]);
     setProcessKey(key);
+    setNewProcessModal(false);
   };
 
   useEffect(() => {
@@ -137,7 +159,7 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
       setActiveWorkflow(wf);
       setNotConfigured(false);
     } catch {
-      setActiveWorkflow(emptyWorkflowFor(key, labelForProcessKey(key)));
+      setActiveWorkflow(emptyWorkflowFor(key, labelForProcessKey(key), customProcesses.find((c) => c.key === key)?.entityType ?? null));
       setNotConfigured(true);
     } finally {
       setLoading(false);
@@ -167,7 +189,8 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
       completionNote: null
     };
 
-    const base: Workflow = activeWorkflow ?? emptyWorkflowFor(processKey, labelForProcessKey(processKey));
+    const fallbackEntityType = customProcesses.find((c) => c.key === processKey)?.entityType ?? null;
+    const base: Workflow = activeWorkflow ?? emptyWorkflowFor(processKey, labelForProcessKey(processKey), fallbackEntityType);
     setActiveWorkflow({ ...base, steps: [...steps, newStep] });
   };
 
@@ -270,14 +293,14 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
   const handleDeleteWorkflow = async () => {
     if (!activeWorkflow) return;
     if (!activeWorkflow.id || activeWorkflow.id.startsWith('wf-')) {
-      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey)));
+      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey), activeWorkflow.entityType ?? customProcesses.find((c) => c.key === processKey)?.entityType ?? null));
       return;
     }
     if (!confirm(`"${labelForProcessKey(processKey)}" sürecini tamamen silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
     setDeleting(true);
     try {
       await apiService.deleteWorkflow(activeWorkflow.id);
-      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey)));
+      setActiveWorkflow(emptyWorkflowFor(processKey, labelForProcessKey(processKey), activeWorkflow.entityType ?? customProcesses.find((c) => c.key === processKey)?.entityType ?? null));
       setNotConfigured(true);
     } catch (error) {
       alert((error instanceof Error ? error.message : '') || 'Silme sırasında hata oluştu.');
@@ -574,6 +597,40 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
                             </div>
                           )}
 
+                          {/* "Veri aktarımı" jenerik eylemi — kod yazmadan, kaynak varlığın
+                              hangi alanlarının hedef birime kopyalanacağını burada seçersiniz.
+                              Alan listesi, süreç oluşturulurken seçilen hedef kaydı türüne göre değişir. */}
+                          {step.type === 'AUTO' && step.actionKey === 'COPY_FIELDS_TO_TASK' && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Aktarılacak Alanlar</label>
+                              {activeWorkflow?.entityType && ENTITY_FIELD_SPECS[activeWorkflow.entityType as EntityType] ? (
+                                <div className="space-y-1.5 bg-slate-50 border border-slate-100 rounded-2xl p-3">
+                                  {ENTITY_FIELD_SPECS[activeWorkflow.entityType as EntityType].map((f) => {
+                                    const cfg = parseActionConfig(step.actionConfig);
+                                    const checked = cfg.fields.includes(f.key);
+                                    return (
+                                      <label key={f.key} className="flex items-center gap-2 text-[11px] font-bold text-slate-700 cursor-pointer">
+                                        <input
+                                          type="checkbox"
+                                          checked={checked}
+                                          onChange={(e) => {
+                                            const next = e.target.checked ? [...cfg.fields, f.key] : cfg.fields.filter((k) => k !== f.key);
+                                            handleUpdateStep(step.id, { actionConfig: JSON.stringify({ fields: next }) });
+                                          }}
+                                        />
+                                        {f.label}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="text-[10px] text-amber-600 font-bold px-1 leading-relaxed">
+                                  Bu sürecin hedef kaydı türü tanımlı değil — alan seçebilmek için "+ Yeni Süreç" ile oluştururken bir hedef tür seçmelisiniz.
+                                </p>
+                              )}
+                            </div>
+                          )}
+
                           {/* Devir gerekliliği: hazırlayan birim, devretmeden önce tamamlamalı mı? */}
                           <div className="space-y-2">
                             <button
@@ -799,6 +856,72 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
                   className={cn("flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all", handoffModal.blocked ? "bg-amber-500 text-white hover:bg-amber-600" : "bg-primary text-white hover:bg-primary/90")}
                 >
                   {handoffModal.blocked ? 'Yine de Aktar' : 'Aktar'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* "+ Yeni Süreç" modalı — sabit taksonomi dışında, tenant'ın kendi
+          tanımladığı özel süreç. Ad + hedef kaydı türü (jenerik tetikleme
+          ucunun hangi varlığa uygulanacağını bilmesi için zorunlu) sorulur. */}
+      <AnimatePresence>
+        {newProcessModal && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4"
+            onClick={() => setNewProcessModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 10 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.95, y: 10 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md glass-panel bg-white rounded-[32px] p-8 shadow-2xl border border-slate-100"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <h4 className="text-lg font-black text-slate-900 uppercase italic tracking-tighter leading-none">Yeni Süreç</h4>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Sabit listede olmayan, kendi tanımınız</p>
+                </div>
+                <button onClick={() => setNewProcessModal(false)} className="p-2 text-slate-300 hover:text-slate-600 rounded-xl transition-all"><X size={18} /></button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Süreç Adı</label>
+                  <input
+                    type="text"
+                    value={newProcessName}
+                    onChange={(e) => setNewProcessName(e.target.value)}
+                    placeholder='Örn: "Proje Kapanış Onayı"'
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary/20 transition-all"
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Hedef Kaydı Türü</label>
+                  <select
+                    value={newProcessEntityType}
+                    onChange={(e) => setNewProcessEntityType(e.target.value as EntityType | '')}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="">Seçin…</option>
+                    {ENTITY_TYPES.map((t) => <option key={t} value={t}>{ENTITY_TYPE_LABEL[t]}</option>)}
+                  </select>
+                  <p className="text-[10px] text-slate-400 font-medium px-1 leading-relaxed">
+                    Bu süreç hangi kayıt üzerinde çalışacak (örn. Proje). İlgili kaydın ekranında bu süreci elle başlatabileceğiniz bir buton çıkar.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 mt-6">
+                <button onClick={() => setNewProcessModal(false)} className="flex-1 px-4 py-3 bg-slate-100 text-slate-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-200 transition-all">Vazgeç</button>
+                <button
+                  onClick={handleConfirmCreateCustomProcess}
+                  disabled={!newProcessName.trim() || !newProcessEntityType}
+                  className="flex-1 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all bg-primary text-white hover:bg-primary/90 disabled:opacity-40"
+                >
+                  Oluştur
                 </button>
               </div>
             </motion.div>
