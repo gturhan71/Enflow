@@ -45,6 +45,13 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/users');
   },
 
+  // Oturum açık kullanıcının GÜNCEL kaydı (rol/izin/status dahil) — AuthContext
+  // uygulama her açıldığında bunu çağırır ki bir GM'nin Yetkiler'den yaptığı
+  // değişiklik zaten açık bir oturuma çıkış yapmadan yansısın.
+  async getCurrentUser(): Promise<User> {
+    return apiClient.fetchWithAuth('/users/me');
+  },
+
   async createUser(userData: Omit<User, 'id'>) {
     return apiClient.fetchWithAuth('/users', {
       method: 'POST',

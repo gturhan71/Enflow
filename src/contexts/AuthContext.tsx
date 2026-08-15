@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '../types';
+import { apiService } from '../services/apiService';
 
 // Kayıtlı kullanıcı yoksa (tutarsız durum) → İZİNSİZ misafir. ASLA GM'e düşme:
 // eski davranış MOCK_SYSTEM_USERS[0] (GM superuser) idi ve her girişte tüm
@@ -26,6 +27,22 @@ export const AuthProvider = ({ children, tenantId }: { children: ReactNode, tena
   useEffect(() => {
     localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(currentUser));
   }, [currentUser, tenantId]);
+
+  // currentUser eskiden yalnız girişte localStorage'a yazılıp bir daha hiç
+  // tazelenmiyordu — bir GM Yetkiler'den bu kullanıcının izinlerini/rolünü
+  // değiştirse bile, oturum çıkış yapılmadan bu asla yansımıyordu. Uygulama
+  // her açıldığında (sayfa yenileme dahil) sunucudan GÜNCEL kaydı çekip
+  // üzerine yazıyoruz — misafirde no-op, ağ hatasında sessizce eski (cache'li)
+  // veriyle devam edilir.
+  useEffect(() => {
+    if (!currentUser.id) return;
+    let cancelled = false;
+    apiService.getCurrentUser()
+      .then((fresh) => { if (!cancelled && fresh?.id) setCurrentUserState(fresh); })
+      .catch(() => { /* sessizce cache'li veriyle devam et */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenantId]);
 
   const hasPermission = (permission: string) => {
     if (!currentUser) return false;

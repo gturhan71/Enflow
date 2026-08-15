@@ -49,6 +49,18 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
   res.json(parsePermissions(user));
 }));
 
+// Oturum açık kullanıcının GÜNCEL kaydı — rol kapısı yok (herkes yalnız
+// kendi kaydını görür, req.userId'den gelir). AuthContext.tsx bunu uygulama
+// her açıldığında çağırır ki bir GM Yetkiler'den izinlerini değiştirdiğinde
+// zaten açık bir oturum, çıkış yapmadan güncel `permissions`'ı görsün — eskiden
+// currentUser yalnız girişte localStorage'a yazılıp bir daha hiç tazelenmiyordu.
+// MUTLAKA /:id'den ÖNCE tanımlanmalı (aksi halde Express 'me' değerini :id olarak yakalar).
+router.get('/me', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const user = await prisma.user.findFirst({ where: { id: req.userId, tenantId: req.tenantId } });
+  if (!user) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+  res.json(parsePermissions(user));
+}));
+
 // Kişiselleştirilmiş Dashboard düzeni — herkes kendi görünümünü düzenler (rol kapısı yok).
 // MUTLAKA /:id'den ÖNCE tanımlanmalı (aksi halde Express 'me' değerini :id olarak yakalar).
 router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
