@@ -368,25 +368,12 @@ src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, type
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useEnflowQueries.ts ← services/apiService
-src/modules/contract-workflow/AnalysisTab.tsx ← types
-src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
-src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
-src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
-src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
-src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
-src/modules/contract-workflow/SigningTab.tsx ← types
-src/modules/contract-workflow/TransferTab.tsx ← types
-src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
-src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
-src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
@@ -413,7 +400,18 @@ src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
+src/modules/contract-workflow/AnalysisTab.tsx ← types
+src/modules/contract-workflow/ContextTab.tsx ← ../types, types
+src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
+src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
+src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
+src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
+src/modules/contract-workflow/SigningTab.tsx ← types
+src/modules/contract-workflow/TransferTab.tsx ← types
+src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
+src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
@@ -431,6 +429,8 @@ src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
+src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
@@ -453,13 +453,14 @@ src/modules/reporting/helpers.ts ← ../constants, ../types
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
+src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
-backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
@@ -510,21 +511,14 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 8 minutes ago)
+## changes (last 10 commits — 13 minutes ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
 src/content/helpArticles.ts                   +zaman
-src/lib/guaranteeText.ts                      +sampleGuaranteeText
-src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
-src/modules/contract-workflow/DocumentsTab.tsx +GuaranteeRequestSection  ~DocumentsTab
-src/modules/contract-workflow/helpers.ts      ~bestProposalPrice
-src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowCard
-src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/CRMModule.tsx                     +birim
 src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
 src/modules/PresalesModule.tsx                +birim  ~Birim
-src/modules/SalesSupport.tsx                  ~sampleGuaranteeText  ~EkapTab  ~ChecklistTab  ~GuaranteesTab
 src/modules/todo/PendingChainApprovals.tsx    ~PendingChainApprovals
 src/modules/todo/UnifiedWorkQueue.tsx         +UnifiedWorkQueue
 src/modules/WorkflowBuilder.tsx               +birime  +kayd  +t  +Kayd
@@ -621,17 +615,6 @@ export interface BootstrapResult  :47-52
   user: { id: string  :50-50
   subscription: { plan: string  :51-51
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-132
-```
-
-### backend/src/services/contractWorkflowState.ts
-```
-export interface ContractAnalysisExtract  :69-69
-  projectName: string | null  :69-69
-export interface ContractWorkflowFallback  :70-70
-  tenderName: string | null  :70-70
-export type TransitionCheckResult  :33-33
-export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
-export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
 ### backend/src/services/governance.ts
@@ -764,6 +747,14 @@ export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğ
 export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
 ```
 
+### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
+```
+TABLE ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
+INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
+```
+
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
 ```
 TABLE new_BoMItem
@@ -838,27 +829,6 @@ export async function logActivity(p) → Promise<void>  :24-52
 export function startActivityLogArchiveScheduler() → void  :40-45
 ```
 
-### backend/src/services/activityLogArchiveService.ts
-```
-export interface ArchiveModuleSettings  :19-27
-  enabled?: boolean  :20-20
-  intervalDays?: number  :21-21
-  retentionDays?: number  :22-22
-  targetType?: TargetType  :23-23
-  location?: string  :24-24
-  nextcloud?: { url?: string  :25-25
-  s3?: { endpoint?: string  :26-26
-export interface RunArchiveOpts  :46-53
-  tenantId: string  :47-47
-  trigger?: 'MANUAL' | 'SCHEDULED'  :48-48
-  retentionDays?: number  :49-49
-  targetType?: TargetType  :50-50
-  location?: string | null  :51-51
-  settings?: ArchiveModuleSettings | null  :52-52
-export async function getArchiveSettings(tenantId) → Promise<ArchiveModuleSettings>  :38-44  # moduleSettings
-export async function runArchive(opts) → Promise<  :56-56  # Bir arşivleme işini baştan sona çalıştırır; ActivityLogArchi
-```
-
 ### backend/src/services/activityLogSummary.ts
 ```
 export interface SummaryInput  :157-162
@@ -911,6 +881,17 @@ export interface BidScoreLine  :230-236
   factors: { authorityWinRate: number  :234-234
   authorityWinPct: number | null  :235-235
 export interface BidScorecard  :237-241
+```
+
+### backend/src/services/contractWorkflowState.ts
+```
+export interface ContractAnalysisExtract  :69-69
+  projectName: string | null  :69-69
+export interface ContractWorkflowFallback  :70-70
+  tenderName: string | null  :70-70
+export type TransitionCheckResult  :33-33
+export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
+export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -1112,136 +1093,10 @@ export const useProposals = (tenantId, options) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
-### src/lib/guaranteeText.ts
-```
-export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
-```
-
-### src/modules/contract-workflow/AnalysisTab.tsx
-```
-component AnalysisTab
-handler onChange
-handler onClick
-```
-
-### src/modules/contract-workflow/CancelModal.tsx
-```
-component CancelModal
-handler onClick
-handler onChange
-```
-
-### src/modules/contract-workflow/constants.ts
-```
-export type TabId  :15-15
-```
-
-### src/modules/contract-workflow/ContextTab.tsx
-```
-component ContextTab
-handler onBlur
-handler onClick
-```
-
 ### src/modules/contract-workflow/DetailHeader.tsx
 ```
 component DetailHeader
 handler onClick
-```
-
-### src/modules/contract-workflow/DocumentsTab.tsx
-```
-component GuaranteeRequestSection
-component DocumentsTab
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-handler onChange
-handler onBlur
-```
-
-### src/modules/contract-workflow/helpers.ts
-```
-export interface DeadlineAlarm  :46-52
-  level: 'none' | 'warning' | 'critical'  :47-47
-  daysLeft: number | null  :48-48
-  missingRequired: number  :49-49
-  totalRequired: number  :50-50
-  label: string  :51-51
-export async function apiFetch(path, init?)  :8-10
-export function bestProposalPrice(opportunityId, proposals) → number | null  :14-36
-export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :54-68
-export const stepIndex = (status) =>  :38-52
-export const isDocsComplete = (wf, 'documents'>) =>  :70-70
-```
-
-### src/modules/contract-workflow/LegalCaseForm.tsx
-```
-component LegalCaseForm
-hook useState
-handler onClick
-handler onChange
-```
-
-### src/modules/contract-workflow/LegalView.tsx
-```
-component LegalView
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-```
-
-### src/modules/contract-workflow/SigningTab.tsx
-```
-component SigningTab
-handler onClick
-handler onChange
-```
-
-### src/modules/contract-workflow/TransferTab.tsx
-```
-component TransferTab
-handler onClick
-```
-
-### src/modules/contract-workflow/WorkflowListPanel.tsx
-```
-component WorkflowListPanel
-component WorkflowCard
-export WorkflowFormState
-handler onChange
-handler onClick
-```
-
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-hook useAuth
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onCreate
-handler onSelectWorkflow
-handler onTenderNameBlur
-handler onTenderNoBlur
-handler onContractValueBlur
-handler onDeadlineBlur
-handler onNotesBlur
-handler onSaveTexts
-handler onAnalyse
-handler onFileSelect
-handler onAddDoc
-handler onDeleteDoc
-handler onDocStatusChange
-handler onDocFieldUpdate
-handler onFetchFromArchive
-handler onMarkReadyToSign
-handler onSendForApproval
-handler onRejectSignature
 ```
 
 ### src/modules/CRMModule.tsx
@@ -1290,32 +1145,6 @@ handler onCount
 handler onSave
 ```
 
-### src/modules/FinanceModule.tsx
-```
-component OverheadPoolTab
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
-```
-
-### src/modules/IntegrationWizard.tsx
-```
-hook useState
-export IntegrationWizard
-handler onClick
-handler onChange
-```
-
 ### src/modules/LicenseTypesModule.tsx
 ```
 hook useAuth
@@ -1352,34 +1181,6 @@ handler onChange
 handler onClick
 handler onTransferToBoM
 handler onSelected
-```
-
-### src/modules/SalesSupport.tsx
-```
-component TenderList
-component TenderCalendar
-component ChecklistTab
-component GuaranteesTab
-component SubmittedTenders
-component TenderSelectorEmpty
-component Modal
-component TenderForm
-props SalesSupportProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-hook useAIGate
-export SalesSupport
-handler onSelect
-handler onChanged
-handler onWithdraw
-handler onSelectTender
-handler onChange
-handler onClick
-handler onKeyDown
-handler onClose
 ```
 
 ### src/modules/SettingsModule.tsx
@@ -1585,6 +1386,21 @@ handler onChange
 handler onKeyDown
 ```
 
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+```
+
+### src/lib/guaranteeText.ts
+```
+export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
+```
+
 ### src/modules/ActivityLogModule.tsx
 ```
 component ArchivesTab
@@ -1595,6 +1411,127 @@ hook useEffect
 export ActivityLogModule
 handler onClick
 handler onChange
+```
+
+### src/modules/contract-workflow/AnalysisTab.tsx
+```
+component AnalysisTab
+handler onChange
+handler onClick
+```
+
+### src/modules/contract-workflow/CancelModal.tsx
+```
+component CancelModal
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/constants.ts
+```
+export type TabId  :15-15
+```
+
+### src/modules/contract-workflow/ContextTab.tsx
+```
+component ContextTab
+handler onBlur
+handler onClick
+```
+
+### src/modules/contract-workflow/DocumentsTab.tsx
+```
+component GuaranteeRequestSection
+component DocumentsTab
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+handler onChange
+handler onBlur
+```
+
+### src/modules/contract-workflow/helpers.ts
+```
+export interface DeadlineAlarm  :46-52
+  level: 'none' | 'warning' | 'critical'  :47-47
+  daysLeft: number | null  :48-48
+  missingRequired: number  :49-49
+  totalRequired: number  :50-50
+  label: string  :51-51
+export async function apiFetch(path, init?)  :8-10
+export function bestProposalPrice(opportunityId, proposals) → number | null  :14-36
+export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :54-68
+export const stepIndex = (status) =>  :38-52
+export const isDocsComplete = (wf, 'documents'>) =>  :70-70
+```
+
+### src/modules/contract-workflow/LegalCaseForm.tsx
+```
+component LegalCaseForm
+hook useState
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/LegalView.tsx
+```
+component LegalView
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+```
+
+### src/modules/contract-workflow/SigningTab.tsx
+```
+component SigningTab
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/TransferTab.tsx
+```
+component TransferTab
+handler onClick
+```
+
+### src/modules/contract-workflow/WorkflowListPanel.tsx
+```
+component WorkflowListPanel
+component WorkflowCard
+export WorkflowFormState
+handler onChange
+handler onClick
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+hook useAuth
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onCreate
+handler onSelectWorkflow
+handler onTenderNameBlur
+handler onTenderNoBlur
+handler onContractValueBlur
+handler onDeadlineBlur
+handler onNotesBlur
+handler onSaveTexts
+handler onAnalyse
+handler onFileSelect
+handler onAddDoc
+handler onDeleteDoc
+handler onDocStatusChange
+handler onDocFieldUpdate
+handler onFetchFromArchive
+handler onMarkReadyToSign
+handler onSendForApproval
+handler onRejectSignature
 ```
 
 ### src/modules/CostAnalysisModule.tsx
@@ -1787,6 +1724,32 @@ handler onClose
 handler onChange
 ```
 
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
+```
+
+### src/modules/IntegrationWizard.tsx
+```
+hook useState
+export IntegrationWizard
+handler onClick
+handler onChange
+```
+
 ### src/modules/ManagementReportingModule.tsx
 ```
 component ManagementReportingModule
@@ -1953,6 +1916,34 @@ component TenderCard
 component UnitAbsorptionCard
 ```
 
+### src/modules/SalesSupport.tsx
+```
+component TenderList
+component TenderCalendar
+component ChecklistTab
+component GuaranteesTab
+component SubmittedTenders
+component TenderSelectorEmpty
+component Modal
+component TenderForm
+props SalesSupportProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+hook useAIGate
+export SalesSupport
+handler onSelect
+handler onChanged
+handler onWithdraw
+handler onSelectTender
+handler onChange
+handler onClick
+handler onKeyDown
+handler onClose
+```
+
 ### src/modules/ServiceTicketsModule.tsx
 ```
 component ServiceTicketsModule
@@ -1997,6 +1988,19 @@ export const getProposalDetail = (todo, { proposals, opportunities, projects, co
 ```
 component TaskList
 hook useState
+```
+
+### src/modules/VisitPlanModule.tsx
+```
+props VisitPlanModuleProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VisitPlanModule
+handler onChange
+handler onClick
+handler onBlur
 ```
 
 ### src/services/apiClient.ts

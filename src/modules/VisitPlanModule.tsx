@@ -125,10 +125,18 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
   const [shareInterval, setShareInterval] = useState(7);
   const [targetRate, setTargetRate] = useState(80);
   const [sharing, setSharing] = useState(false);
-  // Personel skor tablosu (yalnız yönetici) — bu haftanın konsolidasyonu
+  // Personel skor tablosu (yalnız yönetici) — görüntülenen haftanın konsolidasyonu
   const [scoreboard, setScoreboard] = useState<{ userId: string; name: string; isManager: boolean; plannedVisits: number; completedVisits: number; matchedVisits: number; matchRate: number }[]>([]);
 
-  const currentWeek = mondayOf(new Date());
+  const todayWeek = mondayOf(new Date());
+  // Geçmiş/gelecek haftalara göz atmak için — plans zaten tüm haftaları içeriyor,
+  // yalnız görüntülenen hafta değişiyor (bkz. WorkflowListPanel benzeri desen yok, lokal).
+  const [selectedWeek, setSelectedWeek] = useState(todayWeek);
+  const shiftWeek = (deltaWeeks: number) => {
+    const d = new Date(selectedWeek);
+    d.setDate(d.getDate() + deltaWeeks * 7);
+    setSelectedWeek(mondayOf(d));
+  };
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -142,13 +150,6 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
       setReports(reportList);
       setShareInterval(settings?.shareIntervalDays ?? 7);
       setTargetRate(settings?.visitTargetRate ?? 80);
-      // Yönetici: bu hafta için personel ziyaret-eşleşme skorları
-      if (canSetInterval) {
-        const wEnd = new Date(currentWeek); wEnd.setDate(wEnd.getDate() + 6);
-        apiService.getReportConsolidation('CRM', { start: currentWeek, end: wEnd.toISOString().slice(0, 10) })
-          .then((c: { people?: typeof scoreboard }) => setScoreboard(c?.people ?? []))
-          .catch(() => setScoreboard([]));
-      }
     } catch {
       // sessizce geç
     } finally {
@@ -158,12 +159,21 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const currentPlan = plans.find(p => p.weekOf.slice(0, 10) === currentWeek);
+  // Yönetici: görüntülenen hafta için personel ziyaret-eşleşme skorları (hafta değişince yeniden çek)
+  useEffect(() => {
+    if (!canSetInterval) { setScoreboard([]); return; }
+    const wEnd = new Date(selectedWeek); wEnd.setDate(wEnd.getDate() + 6);
+    apiService.getReportConsolidation('CRM', { start: selectedWeek, end: wEnd.toISOString().slice(0, 10) })
+      .then((c: { people?: typeof scoreboard }) => setScoreboard(c?.people ?? []))
+      .catch(() => setScoreboard([]));
+  }, [selectedWeek, canSetInterval]);
 
-  const ensureCurrentPlan = async (): Promise<VisitPlan> => {
+  const currentPlan = plans.find(p => p.weekOf.slice(0, 10) === selectedWeek);
+
+  const ensureSelectedPlan = async (): Promise<VisitPlan> => {
     if (currentPlan) return currentPlan;
     const created = await apiService.createVisitPlan({
-      weekOf: currentWeek,
+      weekOf: selectedWeek,
       preparedById: currentUser?.id,
       preparedByName: currentUser?.name,
     }) as VisitPlan;
@@ -175,7 +185,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
     if (!newVisit.plannedDate) return alert('Ziyaret tarihi zorunludur.');
     setLoading(true);
     try {
-      const plan = await ensureCurrentPlan();
+      const plan = await ensureSelectedPlan();
       const customer = customers.find(c => c.id === newVisit.customerId);
       const visit = await apiService.addVisit(plan.id, {
         customerId: newVisit.customerId || null,
@@ -185,7 +195,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
       }) as Visit;
       setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, visits: [...p.visits, visit] } : p));
       setShowNewVisitRow(null);
-      setNewVisit({ customerId: '', type: 'DEMO', plannedDate: currentWeek });
+      setNewVisit({ customerId: '', type: 'DEMO', plannedDate: selectedWeek });
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Ziyaret eklenemedi.');
     } finally {
@@ -343,7 +353,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
     XLSX.utils.book_append_sheet(wb, ws, 'Ziyaretler');
 
     // Bu haftaya ait günlük raporlar → ikinci sayfa
-    const weekStart = new Date(currentWeek);
+    const weekStart = new Date(selectedWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 7);
     const weekReports = reports.filter((r) => {
@@ -384,7 +394,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
       XLSX.utils.book_append_sheet(wb, mws, 'Özet Matris');
     }
 
-    XLSX.writeFile(wb, `ziyaret-plani-${currentWeek}.xlsx`);
+    XLSX.writeFile(wb, `ziyaret-plani-${selectedWeek}.xlsx`);
   };
 
   return (
@@ -394,12 +404,43 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
         <p className="text-slate-500 font-medium">Haftalık müşteri ziyaret planı ve günlük saha raporu — bağlı bulunan yöneticiyle haftalık paylaşılır.</p>
       </div>
 
-      {/* ── Bu haftanın ziyaret planı ──────────────────────────────────── */}
+      {/* ── Haftalık ziyaret planı — hafta gezinme ile geçmiş/gelecek haftalara erişim ── */}
       <div className="glass-panel rounded-[32px] p-8 bg-white border border-slate-100">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
+        <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => shiftWeek(-1)}
+              title="Önceki hafta"
+              className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all active:scale-95"
+            >
+              ‹
+            </button>
             <Calendar className="text-indigo-500" size={20} />
-            <h4 className="text-base font-black text-slate-800 uppercase tracking-widest">Bu Hafta — {currentWeek}</h4>
+            <h4 className="text-base font-black text-slate-800 uppercase tracking-widest">
+              {selectedWeek === todayWeek ? 'Bu Hafta' : 'Hafta'} — {selectedWeek}
+            </h4>
+            <button
+              onClick={() => shiftWeek(1)}
+              title="Sonraki hafta"
+              className="w-8 h-8 flex items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all active:scale-95"
+            >
+              ›
+            </button>
+            <input
+              type="date"
+              value={selectedWeek}
+              onChange={e => e.target.value && setSelectedWeek(mondayOf(new Date(e.target.value)))}
+              title="Belirli bir tarihe/haftaya git"
+              className="px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+            />
+            {selectedWeek !== todayWeek && (
+              <button
+                onClick={() => setSelectedWeek(todayWeek)}
+                className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+              >
+                Bu Haftaya Dön
+              </button>
+            )}
             <span className="bg-indigo-100 text-indigo-700 text-[10px] font-black px-2.5 py-0.5 rounded-full border border-indigo-200">
               {visits.length} ziyaret
             </span>
@@ -408,13 +449,13 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
             <button
               onClick={exportWeekToExcel}
               disabled={!visits.length}
-              title="Bu haftanın ziyaret planını ve günlük raporları Excel'e aktar"
+              title="Görüntülenen haftanın ziyaret planını ve günlük raporları Excel'e aktar"
               className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download size={14} /> Excel'e Aktar
             </button>
             <button
-              onClick={() => setShowNewVisitRow(currentPlan?.id || 'new')}
+              onClick={() => { setShowNewVisitRow(currentPlan?.id || 'new'); setNewVisit(v => ({ ...v, plannedDate: selectedWeek })); }}
               className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-indigo-700 transition-all active:scale-95"
             >
               <Plus size={14} /> Ziyaret Ekle
@@ -457,7 +498,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
         {visits.length === 0 ? (
           <div className="p-12 text-center border-2 border-dashed border-slate-100 rounded-2xl">
             <UsersIcon size={32} className="mx-auto text-slate-200 mb-2" />
-            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Bu hafta için planlanmış ziyaret yok.</p>
+            <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">Seçili hafta için planlanmış ziyaret yok.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -515,7 +556,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
             <div className="flex items-center gap-3">
               <CheckCircle2 className="text-emerald-500" size={20} />
               <h4 className="text-base font-black text-slate-800 uppercase tracking-widest">Personel Hedefleri & Skor</h4>
-              <span className="text-[10px] text-slate-400 font-bold normal-case tracking-normal">— planlanan ↔ yapılan+raporlanan ziyaret eşleşmesi</span>
+              <span className="text-[10px] text-slate-400 font-bold normal-case tracking-normal">— {selectedWeek} haftası, planlanan ↔ yapılan+raporlanan ziyaret eşleşmesi</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Birim hedefi:</span>
@@ -529,7 +570,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
             </div>
           </div>
           {scoreboard.filter(p => p.plannedVisits > 0).length === 0 ? (
-            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-6">Bu hafta planlanan ziyaret yok.</p>
+            <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-6">Seçili hafta için planlanan ziyaret yok.</p>
           ) : (
             <table className="w-full text-xs">
               <thead>
