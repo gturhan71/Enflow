@@ -26,6 +26,8 @@ import { startActivityLogArchiveScheduler } from './services/activityLogArchiveS
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import projectsRouter from './routes/projects';
 import serviceTicketsRouter from './routes/serviceTickets';
+import platformTicketsRouter from './routes/platformTickets';
+import platformTicketsAdminRouter from './routes/platformTicketsAdmin';
 import tasksRouter from './routes/tasks';
 import contractsRouter from './routes/contracts';
 import archiveRouter from './routes/archive';
@@ -142,6 +144,10 @@ app.use('/api/backup', backupRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/service-tickets', serviceTicketsRouter);
+app.use('/api/platform-tickets', platformTicketsRouter);
+// Tenant-çapraz (cross-tenant), dış triage aracı için — kendi paylaşımlı-secret
+// auth'unu kullanır (platformApiKeyMiddleware), tenantMiddleware YOK.
+app.use('/api/platform-tickets-admin', platformTicketsAdminRouter);
 app.use('/api/tasks', tasksRouter);
 app.use('/api/contracts', contractsRouter);
 app.use('/api/archive', archiveRouter);

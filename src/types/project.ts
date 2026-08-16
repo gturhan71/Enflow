@@ -123,6 +123,50 @@ export interface ServiceTicket {
   createdAt?: string;
   updatedAt?: string;
 }
+// Platform Ticket — tenant'ın Enflow'a (vendor'a) gönderdiği ürün geri bildirimi/
+// hata/iyileştirme/mimari değişiklik talebi. ServiceTicket'tan FARKLI bir domain:
+// bu, tenant'ın kendi müşterisine değil, Enflow'un kendisine açtığı bir talep.
+// category/priority/scope YALNIZ dış (repo dışı) bir triage aracı tarafından
+// doldurulur — kullanıcı title+description'a ek olarak yalnız kendi ilk izlenimini
+// (reportedType) bildirir; nihai sınıflandırma (category) bundan bağımsızdır.
+export type PlatformTicketScope = 'TENANT_SPECIFIC' | 'PLATFORM_WIDE';
+export type PlatformTicketReportedType = 'BUG' | 'IMPROVEMENT' | 'COMMENT';
+export type PlatformTicketCategory = 'BUG' | 'IMPROVEMENT' | 'ARCHITECTURE_CHANGE';
+export type PlatformTicketPriority = 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+export type PlatformTicketStatus = 'NEW' | 'TRIAGED' | 'PLANNED' | 'IN_PROGRESS' | 'DONE' | 'REJECTED';
+export const PLATFORM_TICKET_SCOPE_LABEL: Record<PlatformTicketScope, string> = {
+  TENANT_SPECIFIC: 'Bu şirkete özel', PLATFORM_WIDE: 'Platform geneli',
+};
+export const PLATFORM_TICKET_REPORTED_TYPE_LABEL: Record<PlatformTicketReportedType, string> = {
+  BUG: 'Hata', IMPROVEMENT: 'İyileştirme', COMMENT: 'Yorum',
+};
+export const PLATFORM_TICKET_CATEGORY_LABEL: Record<PlatformTicketCategory, string> = {
+  BUG: 'Hata', IMPROVEMENT: 'İyileştirme', ARCHITECTURE_CHANGE: 'Mimari Değişiklik',
+};
+export const PLATFORM_TICKET_PRIORITY_LABEL: Record<PlatformTicketPriority, string> = {
+  CRITICAL: 'Kritik', HIGH: 'Yüksek', MEDIUM: 'Orta', LOW: 'Düşük',
+};
+export const PLATFORM_TICKET_STATUS_LABEL: Record<PlatformTicketStatus, string> = {
+  NEW: 'Yeni', TRIAGED: 'Değerlendirildi', PLANNED: 'Planlandı', IN_PROGRESS: 'Uygulanıyor', DONE: 'Tamamlandı', REJECTED: 'Reddedildi',
+};
+export interface PlatformTicket {
+  id: string;
+  tenantId?: string;
+  userId: string;
+  userName: string;
+  title: string;
+  description: string;
+  reportedType: PlatformTicketReportedType;
+  scope?: PlatformTicketScope | null;
+  category?: PlatformTicketCategory | null;
+  priority?: PlatformTicketPriority | null;
+  status: PlatformTicketStatus;
+  targetTimeline?: string | null;
+  resolutionNote?: string | null;
+  metadata?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
 export interface Contract {
   id: string;
   title?: string;

@@ -1435,6 +1435,7 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Fiziksel Arşiv | Kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik | İdari |
 | Yedekleme | Sistem yedeği (LOCAL/Nextcloud/S3) → doğrulama → fark-analizli restore → zamanlama | Backup Admin |
 | Şirket Ayarları | Birim/kullanıcı, RBAC, YZ & entegrasyonlar, abonelik, lisans, sanal-agent | ADMIN / GM |
+| Talep & Geri Bildirim | Enflow'a ürün talebi/hata/iyileştirme gönder; sınıflandırma/öncelik/timeline dış triage aracından döner | Herkes |
 | Yardım | Uygulama-içi, bağlamsal kullanım kılavuzu — her modül için "nasıl kullanılır" | Herkes |
 
 ### 27.7 Kurulum ve İlk Yapılandırma (Yönetici İçin)

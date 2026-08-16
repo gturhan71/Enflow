@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
+import { timingSafeEqual } from 'crypto';
 import { prisma } from './prismaClient';
 import { verifyAuthToken } from './services/auth';
 import { logger } from './utils/logger';
@@ -82,6 +83,26 @@ export const requireRole = (allowed: string[]) =>
     }
     next();
   });
+
+// Platform ticket admin API'si — Enflow'un TENANT AUTH'undan tamamen bağımsız,
+// paylaşılan-secret tabanlı bir kapı. `tenantMiddleware`nin aksine req.tenantId/
+// req.userId KASITLI olarak set edilmez: bu uç yalnız dış (repo dışı) triage
+// aracının TÜM tenant'ların platform taleplerini okuyup güncelleyebilmesi için var.
+// Uzunluk kontrolü ÖNCE yapılır — timingSafeEqual, farklı uzunluktaki buffer'larda
+// RangeError fırlatır; kontrolsüz çağrılırsa her yanlış-uzunluklu istek 500'e yol açar.
+export const platformApiKeyMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
+  const header = req.headers['x-platform-api-key'];
+  const key = Array.isArray(header) ? header[0] : header;
+  const expected = process.env.PLATFORM_TICKET_API_KEY;
+  if (!expected) return res.status(500).json({ error: 'Platform API anahtarı yapılandırılmamış.' });
+  if (!key) return res.status(401).json({ error: 'Kimlik doğrulama gerekli.' });
+  const a = Buffer.from(key);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return res.status(401).json({ error: 'Geçersiz API anahtarı.' });
+  }
+  next();
+});
 
 // Eklenti/lisans koruması: modül ayrı lisanslıysa (PLUGIN_CATALOG) entitlement zorunlu.
 // Lisans yoksa 402 (Payment Required — upsell sinyali). Tek kaynak: isPluginEntitled.

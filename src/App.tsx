@@ -54,6 +54,7 @@ import FinanceModule from './modules/FinanceModule';
 import DmoModule from './modules/DmoModule';
 import VirtualAgentsTestModule from './modules/VirtualAgentsTestModule';
 import ActivityLogModule from './modules/ActivityLogModule';
+import PlatformTicketsModule from './modules/PlatformTicketsModule';
 import Login from './modules/Login';
 import SetupWizard from './modules/SetupWizard';
 import { UnsavedChangesProvider } from './contexts/UnsavedChangesContext';
@@ -360,6 +361,7 @@ const TenantAppInner = ({
       case 'security-test': return <SecurityTestModule onDone={() => setActiveTab('dashboard')} />;
       case 'virtual-agents-test': return <VirtualAgentsTestModule />;
       case 'activity-log': return <ActivityLogModule />;
+      case 'platform-tickets': return <PlatformTicketsModule />;
       case 'help': return <HelpModule contextModuleId={navItemId} />;
 
       default: return <Dashboard opportunities={opportunities} projects={projects} tasks={tasks} contracts={contracts} units={units} proposals={proposals} onApproveProposal={handleApproveProposal} onNavigate={setActiveTab} />;

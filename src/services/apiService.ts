@@ -3,6 +3,7 @@ import { crmService } from './crmService';
 import { projectService } from './projectService';
 import { taskService } from './taskService';
 import { serviceTicketService } from './serviceTicketService';
+import { platformTicketService } from './platformTicketService';
 import { documentService } from './documentService';
 import { settingsService } from './settingsService';
 import {
@@ -185,6 +186,10 @@ class ApiService {
   async updateServiceTicket(id: string, data: Partial<ServiceTicket>) { return serviceTicketService.updateServiceTicket(id, data); }
   async resolveServiceTicket(id: string, resolutionNotes?: string, costAmount?: number, costCurrency?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes, costAmount, costCurrency); }
   async deleteServiceTicket(id: string) { return serviceTicketService.deleteServiceTicket(id); }
+
+  // --- PLATFORM TICKET: Talep & Geri Bildirim ---
+  async getPlatformTickets(filters?: { status?: string }) { return platformTicketService.getPlatformTickets(filters); }
+  async createPlatformTicket(data: { title: string; description: string; reportedType?: string }) { return platformTicketService.createPlatformTicket(data); }
 
   // --- DOCUMENTS ---
   async getDocuments() { return documentService.getDocuments(); }

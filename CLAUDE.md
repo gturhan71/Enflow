@@ -384,8 +384,6 @@ src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, typ
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
-src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
-src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -435,6 +433,8 @@ src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/for
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
+src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
+src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/ArchiveCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers, ../components/InfoTooltip
@@ -510,7 +510,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 38 seconds ago)
+## changes (last 10 commits — 20 seconds ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
@@ -531,13 +531,14 @@ src/types/workflow.ts                         +varl
 backend/src/services/agentProvenance.ts       ~actorType  ~parseAgentActor  ~agentDisplayLabel
 backend/src/services/approvalChainService.ts  +resolveEffectiveApprover  +resolveGroupAfterDecision  ~completeApprovalChain  ~resolveEffectiveApprover
 backend/src/services/approvalSlaEscalation.ts ~sweepApprovalSlaEscalations
+backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/governance.ts            ~getApprovalMatrix
 backend/src/services/invoiceService.ts        +createInvoiceRecord
 backend/src/services/processEngine.ts         +ProcessNotConfiguredError  +resolveStepRecipients  +isAuthorizedForStep  +fetchEntityRecord
 backend/src/services/unitReportingService.ts  ~computeWorkflowBottlenecks
 backend/src/services/virtualAgentService.ts   ~runAgent
 backend/src/services/workflowTemplate.ts      +applyDefaultWorkflowTemplate
-backend/src/usageService.ts                   +checkLimit  +incrementUsage  ~checkLimit  ~incrementUsage
+backend/src/usageService.ts                   +checkLimit  +checkUserSeatLimit  +incrementUsage  ~checkLimit
 backend/src/utils/fileUpload.ts               +tryUploadToNextcloud  ~uploadToNextcloud  ~slugify
 backend/src/utils/secureUpload.ts             +enforceStorageLimit  ~documentUpload
 upgrade-tool/core.mjs                         ~runUpgrade
@@ -555,6 +556,11 @@ INDEX Workflow_tenantId_processKey_key ON Workflow
 ### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
 ```
 TABLE new_WorkflowStep
+```
+
+### backend/src/planCatalog.ts
+```
+export type PlanId  :5-5
 ```
 
 ### backend/src/services/agentProvenance.ts
@@ -809,11 +815,6 @@ key provider
 export const asyncHandler = (fn) =>  :8-10
 export const requireRole = (allowed) =>  :77-85
 export const requireEntitlement = (pluginKey) =>  :109-116
-```
-
-### backend/src/planCatalog.ts
-```
-export type PlanId  :5-5
 ```
 
 ### backend/src/services/activityLog.ts
@@ -1304,23 +1305,6 @@ handler onTransferToBoM
 handler onSelected
 ```
 
-### src/modules/procurement/VendorForm.tsx
-```
-props VendorFormProps
-hook useState
-hook useEffect
-export VendorForm
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### src/modules/procurement/VendorsTab.tsx
-```
-props VendorsTabProps
-export VendorsTab
-```
-
 ### src/modules/reporting/AnalyticsTab.tsx
 ```
 component AnalyticsTab
@@ -1804,6 +1788,23 @@ hook useState
 export PRDetailDrawer
 handler onClick
 handler onChange
+```
+
+### src/modules/procurement/VendorForm.tsx
+```
+props VendorFormProps
+hook useState
+hook useEffect
+export VendorForm
+handler onClick
+handler onChange
+handler onKeyDown
+```
+
+### src/modules/procurement/VendorsTab.tsx
+```
+props VendorsTabProps
+export VendorsTab
 ```
 
 ### src/modules/ProposalEditor.tsx

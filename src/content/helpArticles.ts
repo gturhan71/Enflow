@@ -176,6 +176,15 @@ export const HELP_ARTICLES: HelpArticle[] = [
       { heading: 'Lisans türleri', body: '**Lisans Planları**\'ndaki anahtar şirketinizin genel abonelik planını belirler (Tenant ID\'ye bağlıdır — şirket adı değil, ekrandaki Tenant ID\'yi lisans sağlayıcınıza iletin). Sanal agent\'lar ve bazı ek modüller (ör. DMO Kataloğu) **ayrı ayrı lisanslanır** — bunlar Test Ortamı → Sanal Agentlar ekranından etkinleştirilir, abonelik planından bağımsızdır.' },
     ],
   },
+  {
+    moduleId: 'platform-tickets',
+    summary: 'Enflow\'a doğrudan ürün talebi, hata bildirimi veya iyileştirme önerisi gönderin — değerlendirme sonucu ve zaman çizelgesi burada görünür.',
+    audience: 'Tüm kullanıcılar.',
+    sections: [
+      { heading: 'Ne işe yarar', body: 'Kullandığınız Enflow\'da eksik gördüğünüz, düzeltilmesini istediğiniz veya geliştirilmesini önerdiğiniz her şeyi buradan iletebilirsiniz. Enflow ekibi talebi değerlendirip kategorisini (hata/iyileştirme/mimari değişiklik), önceliğini ve tahmini zaman çizelgesini belirler; sonuç bu ekranda ve bildirimlerinizde görünür.' },
+      { heading: 'Nasıl kullanılır', body: '1) "Yeni Talep" ile önce tipini seçin (Hata / İyileştirme / Yorum), ardından başlık ve açıklama girin — bu yalnız sizin ilk izleniminiz, kesin kategori ve öncelik değerlendirme aşamasında ayrıca belirlenir. 2) Talebiniz "Yeni" durumunda listelenir; değerlendirildikçe "Değerlendirildi" → "Planlandı" → "Uygulanıyor" → "Tamamlandı" (veya "Reddedildi") olarak ilerler. 3) Durumu değiştiğinde bir bildirim alırsınız; talebin detayına tıklayarak değerlendirme notunu ve hedef zaman çizelgesini görebilirsiniz.' },
+    ],
+  },
 ];
 
 export const getHelpArticle = (moduleId: string): HelpArticle | undefined =>

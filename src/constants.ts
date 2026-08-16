@@ -30,10 +30,11 @@ import {
   ShieldCheck,
   DatabaseBackup,
   Wrench,
-  HelpCircle
+  HelpCircle,
+  MessageSquarePlus
 } from 'lucide-react';
 
-export const APP_VERSION = 'v2.3.0';
+export const APP_VERSION = 'v2.4.0';
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',
@@ -123,6 +124,7 @@ export const NAV_ITEMS = [
       { id: 'settings-product-taxonomy', label: 'Marka & Ürün Grubu',         requiredPermission: 'GENERAL_MANAGER' },
     ],
   },
+  { id: 'platform-tickets', label: 'Talep & Geri Bildirim', icon: MessageSquarePlus, requiredPermission: 'DASHBOARD_VIEW' },
   { id: 'help', label: 'Yardım', icon: HelpCircle, requiredPermission: 'DASHBOARD_VIEW' },
 ];
 
