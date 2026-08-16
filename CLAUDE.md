@@ -10,7 +10,7 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 ## Versiyonlama Kuralı
 
-**Güncel sürüm: Enflow v2.3.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
+**Güncel sürüm: Enflow v2.4.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
 
 Format `vMAJOR.MINOR.PATCH`:
 - **Feature eklemesi** → PATCH artar (`v2.1.0` → `v2.1.1` → `v2.1.2` → ...). Bir değişikliği PATCH'e yansıtmadan **önce**, eklenenin gerçekten bir feature olduğu (bugfix/refactor/dokümantasyon/chore/bakım değil) kullanıcıya sorularak doğrulanır — onay verilmeden versiyon numarası **değiştirilmez**.
@@ -19,7 +19,7 @@ Format `vMAJOR.MINOR.PATCH`:
 
 ## Sistem Durumu & Uçtan Uca Akış (Güncel — 2026-06-20)
 
-**Ölçek:** 74 Prisma modeli · 29 API alanı (`/api/*`) · 29 ekran modülü · 11 servis · 8 sanal agent · 7 katman.
+**Ölçek:** 75 Prisma modeli · 31 API alanı (`/api/*`) · 30 ekran modülü · 11 servis · 8 sanal agent · 7 katman.
 **Durum:** Faz 0–9 + bağımlılık/mobil/refactor tamamlandı. Tüm birimler-arası geçişler **otomatik** (zincir kapalı). RBAC süiti **69/69**.
 
 **Uçtan uca otomatik akış:**
@@ -134,6 +134,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 | `security-test` | `SecurityTestModule` | **TEST/GM** — OWASP/güvenlik testi |
 | `virtual-agents-test` | `VirtualAgentsTestModule` | **TEST/GM** — Sanal agent kataloğu + lisans + çalıştırma (8 agent) |
 | `activity-log` | `ActivityLogModule` | **TEST/GM** — Denetim İzi (ActivityLog) filtreli görüntüleyici |
+| `platform-tickets` | `PlatformTicketsModule` | Talep & Geri Bildirim — tenant kullanıcısı Enflow'a ürün talebi/hata/iyileştirme gönderir (DASHBOARD_VIEW, herkes); sınıflandırma/öncelik/timeline **dış** bir triage aracı tarafından `/api/platform-tickets-admin` üzerinden yazılır |
 
 ## ContractWorkflow Modülü — Aktif Geliştirme
 
@@ -321,6 +322,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 10 | Maliyet analizi versiyon geçmişi (`CostAnalysisVersion` — her `/cost-analysis` kaydında BoM/gider/costConfig snapshot'ı) + fırsat kartında kronolojik Teklif/Maliyet Analizi geçmiş paneli (`OpportunityHistoryPanel`) — geçmiş tekliften "Düzenle" ile yeni versiyon oluşturma, güncel maliyet analizine deep-link | add_cost_analysis_version |
 | 11 | Yönetim Dashboard'una **Ziyaret Performansı** widget'ı (`computeVisitPerformance`, `unitReportingService.ts`) — bu ayki planlanan/gerçekleşen ziyaret oranı + son 6 ay, penceresi (60 gün) dolmuş "olgun" ziyaretlerden heuristik ziyaret→fırsat dönüşüm oranı (aynı müşteri bir kez sayılır, en erken ziyarete atıf). GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi (`widgetCatalog.ts` `visitPerformance`), migration yok | — |
 | 12 | **Tenant verisi alan-bazlı şifreleme** — envelope encryption, tenant-başına DEK (`Tenant.dekWrapped`, `AUTH_JWT_SECRET` deseniyle aynı `DATA_ENCRYPTION_MASTER_KEY` env var). Kapsam: Tenant YZ `apiKey`, `Vendor.iban`/`bankName`, `Customer.taxNumber`/`taxOffice` (AES-256-GCM, `enc:v1:` önekli, arama/filtrede kullanılmadığı doğrulandı). Yeni `backend/src/services/tenantEncryption.ts` (`encryptForTenant`/`decryptForTenant`) + backfill script (`backfill-tenant-encryption.ts`, idempotent) + `install/wizard.mjs` otomatik key üretimi. Route-bazlı çağrı (genel Prisma `$extends` hot path'ine eklenmedi — bkz. gerekçe `docs/TENANT_DATA_ENCRYPTION_PLAN.md`). Yan-etki: `GET/POST/PUT /api/tenants` artık `dekWrapped`'i `omit` ediyor (önceden hiçbir alan şifrelenmediği için bu risk yoktu). Key rotation + `backend/uploads/` dosya şifrelemesi + gerçek KMS entegrasyonu bilinçli olarak kapsam dışı bırakıldı. | add_tenant_dek |
+| 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 
 Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -363,6 +365,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
@@ -375,7 +378,6 @@ src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
-src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
@@ -383,7 +385,6 @@ src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudServic
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
-src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -395,14 +396,14 @@ src/services/apiService.ts ← apiClient, crmService, projectService, taskServic
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/usageService.ts ← prismaClient
+backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
 backend/src/utils/secureUpload.ts ← usageService
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
@@ -410,10 +411,8 @@ src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
@@ -423,6 +422,7 @@ src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
+src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
@@ -431,8 +431,11 @@ src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
+src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
+src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/ArchiveCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/BomVarianceCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
@@ -453,13 +456,13 @@ src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/types/crm.ts ← auth, presales
+backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
-backend/src/services/backupService.ts ← prismaClient, backupTargets
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
@@ -507,7 +510,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 24 hours ago)
+## changes (last 10 commits — 32 hours ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
@@ -580,17 +583,17 @@ export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :
 
 ### backend/src/services/bootstrapTenant.ts
 ```
-export interface BootstrapInput  :41-48
-  companyName: string  :42-42
-  admin: { name: string  :43-43
-  license?: string  :45-45
-  tenantId?: string  :47-47
-export interface BootstrapResult  :49-54
-  tenantId: string  :50-50
-  token: string  :51-51
-  user: { id: string  :52-52
-  subscription: { plan: string  :53-53
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :56-132
+export interface BootstrapInput  :39-46
+  companyName: string  :40-40
+  admin: { name: string  :41-41
+  license?: string  :43-43
+  tenantId?: string  :45-45
+export interface BootstrapResult  :47-52
+  tenantId: string  :48-48
+  token: string  :49-49
+  user: { id: string  :50-50
+  subscription: { plan: string  :51-51
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-132
 ```
 
 ### backend/src/services/contractWorkflowState.ts
@@ -715,8 +718,9 @@ export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → P
 
 ### backend/src/usageService.ts
 ```
-export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :13-27
-export async function incrementUsage(tenantId, feature, amount = 1)  :29-36
+export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
+export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
+export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
 ```
 
 ### backend/src/utils/fileUpload.ts
@@ -783,9 +787,33 @@ TABLE CostAnalysisVersion
 INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
 ```
 
+### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
+```
+TABLE PlatformTicket
+INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
+```
+
+### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
+```
+TABLE new_PlatformTicket
+INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
+```
+
+### backend/src/middleware.ts
+```
+export const asyncHandler = (fn) =>  :8-10
+export const requireRole = (allowed) =>  :77-85
+export const requireEntitlement = (pluginKey) =>  :109-116
+```
+
+### backend/src/planCatalog.ts
+```
+export type PlanId  :5-5
 ```
 
 ### backend/src/services/activityLog.ts
@@ -880,35 +908,6 @@ export interface BidScoreLine  :230-236
   factors: { authorityWinRate: number  :234-234
   authorityWinPct: number | null  :235-235
 export interface BidScorecard  :237-241
-```
-
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :27-31
-  name: string  :28-28
-  delegateKey: string  :29-29
-  hasTenantId: boolean  :30-30
-export interface BackupModuleSettings  :98-107
-  enabled?: boolean  :99-99
-  intervalHours?: number  :100-100
-  scope?: BackupScope  :101-101
-  kind?: BackupKind  :102-102
-  targetType?: TargetType  :103-103
-  location?: string  :104-104
-  nextcloud?: { url?: string  :105-105
-  s3?: { endpoint?: string  :106-106
-export interface RunBackupOpts  :109-119
-  tenantId: string  :110-110
-  scope: BackupScope  :111-111
-  kind: BackupKind  :112-112
-  targetType: TargetType  :113-113
-  location?: string | null  :114-114
-  trigger?: 'MANUAL' | 'SCHEDULED'  :115-115
-  startedById?: string  :116-116
-  startedByName?: string  :117-117
-  … +1 more members  :109-109
-export type BackupScope  :17-17
-export type BackupKind  :18-18
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -1051,6 +1050,14 @@ export UnitManagement
 handler onClick
 handler onSubmit
 handler onChange
+```
+
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
 ```
 
 ### src/hooks/useEnflowQueries.ts
@@ -1199,11 +1206,6 @@ handler onSendForApproval
 handler onRejectSignature
 ```
 
-### src/modules/crm/ProposalsView.tsx
-```
-component ProposalsView
-```
-
 ### src/modules/CRMModule.tsx
 ```
 hook useAuth
@@ -1309,17 +1311,6 @@ props VendorsTabProps
 export VendorsTab
 ```
 
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
 ### src/modules/reporting/AnalyticsTab.tsx
 ```
 component AnalyticsTab
@@ -1414,16 +1405,16 @@ handler onChange
 
 ### src/services/apiService.ts
 ```
-class ApiService  :14-68
-  setAuth(tenantId, token)  :15-17
-  async login(email, password)  :19-21
-  async forgotPassword(email)  :23-25
-  async getSetupStatus() → Promise<  :28-28
-  async runSetup(payload) → Promise<  :33-33
-  async getCustomers()  :41-41
-  async createCustomer(data)  :42-42
-  async updateCustomer(id, data)  :43-43
-  … +23 more methods  :14-14
+class ApiService  :15-69
+  setAuth(tenantId, token)  :16-18
+  async login(email, password)  :20-22
+  async forgotPassword(email)  :24-26
+  async getSetupStatus() → Promise<  :29-29
+  async runSetup(payload) → Promise<  :34-34
+  async getCustomers()  :42-42
+  async createCustomer(data)  :43-43
+  async updateCustomer(id, data)  :44-44
+  … +23 more methods  :15-15
 ```
 
 ### src/types/workflow.ts
@@ -1530,15 +1521,7 @@ export interface HelpArticle  :13-18
   summary: string  :15-15
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
-export const getHelpArticle = (moduleId) =>  :181-181
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
+export const getHelpArticle = (moduleId) =>  :190-190
 ```
 
 ### src/hooks/useBoM.ts
@@ -1573,16 +1556,6 @@ handler onAccess
 handler onClick
 handler onChange
 handler onKeyDown
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
 ```
 
 ### src/modules/ActivityLogModule.tsx
@@ -1662,6 +1635,11 @@ hook useState
 hook useEffect
 handler onChange
 handler onClick
+```
+
+### src/modules/crm/ProposalsView.tsx
+```
+component ProposalsView
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -1782,6 +1760,16 @@ handler onClose
 handler onChange
 ```
 
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/ManagementReportingModule.tsx
 ```
 component ManagementReportingModule
@@ -1797,11 +1785,34 @@ handler onDelete
 handler onReviewed
 ```
 
+### src/modules/PlatformTicketsModule.tsx
+```
+component PlatformTicketsModule
+hook useState
+hook useCallback
+hook useEffect
+export PlatformTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
 ### src/modules/procurement/PRDetailDrawer.tsx
 ```
 props PRDetailDrawerProps
 hook useState
 export PRDetailDrawer
+handler onClick
+handler onChange
+```
+
+### src/modules/ProposalEditor.tsx
+```
+props ProposalEditorProps
+hook useState
+hook useMemo
+hook useEffect
+export ProposalEditor
 handler onClick
 handler onChange
 ```

@@ -17,6 +17,7 @@ import {
   AlertCircle,
   CheckCircle2,
   Copy,
+  Database,
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { useAuth } from '../contexts/AuthContext';
@@ -41,6 +42,7 @@ interface PlanDef {
   priceNote: string;
   userLimit: number;
   storageGB: number;
+  database: string;
   features: { text: string; included: boolean }[];
   recommended?: boolean;
 }
@@ -57,6 +59,7 @@ const PLANS: PlanDef[] = [
     priceNote: '/ay',
     userLimit: 5,
     storageGB: 20,
+    database: 'SQLite',
     features: [
       { text: 'CRM & Fırsat Yönetimi', included: true },
       { text: 'BoM & Teklif Akışı', included: true },
@@ -73,10 +76,11 @@ const PLANS: PlanDef[] = [
     icon: Star,
     color: 'primary',
     badgeColor: 'bg-primary/15 text-primary border-primary/30',
-    price: '₺14.990',
+    price: '₺49.990',
     priceNote: '/ay',
-    userLimit: 25,
-    storageGB: 100,
+    userLimit: 10,
+    storageGB: 40,
+    database: 'SQLite',
     recommended: true,
     features: [
       { text: 'CRM & Fırsat Yönetimi', included: true },
@@ -98,6 +102,7 @@ const PLANS: PlanDef[] = [
     priceNote: '',
     userLimit: 999,
     storageGB: 999,
+    database: 'PostgreSQL',
     features: [
       { text: 'CRM & Fırsat Yönetimi', included: true },
       { text: 'BoM & Teklif Akışı', included: true },
@@ -226,10 +231,10 @@ const LicenseTypesModule: React.FC = () => {
                     <span>{sub.licensedUserLimit} kullanıcı</span>
                   </div>
                 )}
-                {sub.licensedStorageLimit && (
+                {(sub.licensedStorageLimit || sub.licenseModel === 'TRIAL') && (
                   <div className="flex items-center gap-1.5 text-xs text-slate-500">
                     <HardDrive size={12} />
-                    <span>{sub.licensedStorageLimit} GB</span>
+                    <span>{sub.licenseModel === 'TRIAL' ? '500 MB' : `${sub.licensedStorageLimit} GB`}</span>
                   </div>
                 )}
               </div>
@@ -353,6 +358,10 @@ const LicenseTypesModule: React.FC = () => {
                     <HardDrive size={12} />
                     {plan.storageGB === 999 ? 'Sınırsız' : `${plan.storageGB} GB`}
                   </span>
+                  <span className="flex items-center gap-1">
+                    <Database size={12} />
+                    {plan.database}
+                  </span>
                 </div>
 
                 <ul className="space-y-1.5 flex-1">
@@ -408,9 +417,10 @@ const LicenseTypesModule: React.FC = () => {
           <div className="glass-card rounded-[20px] p-5 grid grid-cols-2 md:grid-cols-4 gap-4 border border-white/20">
             {[
               { icon: Users,      label: 'Kullanıcı Limiti', value: sub.licensedUserLimit ?? (active.userLimit === 999 ? 'Sınırsız' : active.userLimit) },
-              { icon: HardDrive,  label: 'Depolama',          value: sub.licensedStorageLimit ? `${sub.licensedStorageLimit} GB` : (active.storageGB === 999 ? 'Sınırsız' : `${active.storageGB} GB`) },
+              { icon: HardDrive,  label: 'Depolama',          value: sub.licenseModel === 'TRIAL' ? '500 MB' : sub.licensedStorageLimit ? `${sub.licensedStorageLimit} GB` : (active.storageGB === 999 ? 'Sınırsız' : `${active.storageGB} GB`) },
               { icon: Package,    label: 'Lisans Modeli',     value: sub.licenseModel ?? active.model },
               { icon: Cpu,        label: 'Aktif Plan',        value: sub.plan },
+              { icon: Database,   label: 'Veritabanı',        value: active.database },
             ].map(({ icon: Icon, label, value }) => (
               <div key={label} className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
