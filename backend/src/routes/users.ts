@@ -4,6 +4,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { hashPassword } from '../services/auth';
 import { getOwnedItems, transferOwnership, deactivateUser, hardDeleteUser } from '../services/personnelTransferService';
+import { checkUserSeatLimit } from '../usageService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
@@ -35,6 +36,10 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
   const { name, email, role, unitId, permissions, password } = req.body;
   if (typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'Kullanıcı için en az 6 karakterli bir şifre zorunludur.' });
+  }
+  const seat = await checkUserSeatLimit(req.tenantId);
+  if (!seat.ok) {
+    return res.status(402).json({ error: `Kullanıcı limitinize ulaştınız (${seat.current}/${seat.limit}). Planınızı yükseltin ya da pasif kullanıcıları temizleyin.` });
   }
   const user = await prisma.user.create({
     data: {

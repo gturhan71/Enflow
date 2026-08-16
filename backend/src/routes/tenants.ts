@@ -5,6 +5,7 @@ import { logActivity } from '../services/activityLog';
 import { isAIConfigured, assertSafeAiUrl } from '../services/aiClient';
 import { verifyLicenseToken } from '../services/licenseVerify';
 import { encryptForTenant } from '../services/tenantEncryption';
+import { PLAN_MAP } from '../planCatalog';
 
 const router: Router = Router();
 
@@ -59,7 +60,9 @@ router.put('/:id/subscription', tenantMiddleware, requireRole(['GENERAL_MANAGER'
 // ── Lisans aktivasyonu (Ed25519 imzalı, tenant-bağlı — yalnız DOĞRULA) ───────
 // Lisans vendor aracıyla üretilir; burada yalnız PUBLIC key ile doğrulanır.
 // Eski imzasız base64-JSON lisansları KABUL EDİLMEZ (sert kesim).
-router.post('/activate-license', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+// GM-only: plan/limit değiştiren bir işlem — önceden rol kapısı yoktu, herhangi
+// bir kimliği doğrulanmış kullanıcı tenant'ın planını değiştirebiliyordu.
+router.post('/activate-license', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
   const { licenseKey } = req.body as { licenseKey: string };
   if (!licenseKey) return res.status(400).json({ error: 'Lisans anahtarı zorunludur.' });
 
@@ -76,10 +79,7 @@ router.post('/activate-license', tenantMiddleware, asyncHandler(async (req: Requ
   }
 
   const p = result.payload;
-  const planMap: Record<string, 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
-    STARTER: 'STARTER', PRO: 'PROFESSIONAL', PROFESSIONAL: 'PROFESSIONAL', ENTERPRISE: 'ENTERPRISE', CUSTOM: 'PROFESSIONAL',
-  };
-  const plan = planMap[(p.sku || '').toUpperCase()] || 'PROFESSIONAL';
+  const plan = PLAN_MAP[(p.sku || '').toUpperCase()] || 'PROFESSIONAL';
 
   const data = {
     plan,

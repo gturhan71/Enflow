@@ -4,6 +4,7 @@
 import { prisma } from '../prismaClient';
 import { verifyLicenseToken } from './licenseVerify';
 import { hashPassword, signAuthToken } from './auth';
+import { PLAN_MAP, TRIAL_USER_LIMIT, TRIAL_STORAGE_LIMIT_MB } from '../planCatalog';
 
 // Varsayılan birim seti (kurumsal süreç swimlane'leri — seed.ts ile aynı).
 // Kurulumda otomatik oluşturulur; sonradan "şablon yükle" ile de eklenir (units.ts).
@@ -34,9 +35,6 @@ const GM_PERMISSIONS = [
 ];
 
 const TRIAL_DAYS = 30;
-const PLAN_MAP: Record<string, 'STARTER' | 'PROFESSIONAL' | 'ENTERPRISE'> = {
-  STARTER: 'STARTER', PRO: 'PROFESSIONAL', PROFESSIONAL: 'PROFESSIONAL', ENTERPRISE: 'ENTERPRISE', CUSTOM: 'PROFESSIONAL',
-};
 
 export interface BootstrapInput {
   companyName: string;
@@ -109,7 +107,9 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
       };
     } else {
       const exp = new Date(); exp.setDate(exp.getDate() + TRIAL_DAYS);
-      subData = { plan: 'STARTER', licenseKey: null, licenseModel: 'TRIAL', licenseExpiryDate: exp, licensedUserLimit: 5, licensedStorageLimit: 5 };
+      // licensedStorageLimit null bırakılır: sütun GB granülaritesinde, 500 MB'a sığmaz.
+      // Gerçek deneme kotası TRIAL_STORAGE_LIMIT_MB üzerinden licenseModel==='TRIAL' dalıyla uygulanır.
+      subData = { plan: 'STARTER', licenseKey: null, licenseModel: 'TRIAL', licenseExpiryDate: exp, licensedUserLimit: TRIAL_USER_LIMIT, licensedStorageLimit: null };
     }
     await tx.subscription.create({ data: { tenantId: tenant.id, ...subData } });
 

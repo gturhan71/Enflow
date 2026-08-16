@@ -382,6 +382,7 @@ src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, componen
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
@@ -431,7 +432,6 @@ src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
-src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
@@ -510,7 +510,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 32 hours ago)
+## changes (last 10 commits — 38 seconds ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
@@ -1278,6 +1278,16 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/PresalesModule.tsx
 ```
 props PresalesModuleProps
@@ -1758,16 +1768,6 @@ handler onDelete
 handler onSaved
 handler onClose
 handler onChange
-```
-
-### src/modules/LicenseTypesModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export LicenseTypesModule
-handler onChange
-handler onClick
 ```
 
 ### src/modules/ManagementReportingModule.tsx
