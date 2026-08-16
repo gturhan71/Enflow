@@ -319,6 +319,26 @@ export default function OpportunitiesView({
                     </div>
                   )}
 
+                  {opp.techEvalStatus && !['WON', 'LOST', 'WITHDRAWN'].includes(opp.status) && (
+                    <div className="flex flex-col gap-1">
+                      {opp.techEvalStatus === 'PENDING' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 self-start">
+                          ⏳ Teknik Değerlendirme: Presales Müdürü onayı bekleniyor
+                        </span>
+                      )}
+                      {opp.techEvalStatus === 'COMPLETED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 self-start">
+                          ✓ Teknik Değerlendirme: Onaylandı
+                        </span>
+                      )}
+                      {opp.techEvalStatus === 'REJECTED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-red-700 bg-red-50 border border-red-100 rounded-full px-2 py-0.5 self-start" title={opp.techEvalReason || undefined}>
+                          ✕ Teknik Değerlendirme Reddedildi{opp.techEvalReason ? `: ${opp.techEvalReason}` : ''}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
                     {opp.status !== 'WON' && opp.status !== 'LOST' && (
                       <button

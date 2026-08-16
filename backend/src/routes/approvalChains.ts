@@ -101,7 +101,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
 router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const stageId = String(req.params.stageId);
-  const { note } = req.body as { note?: string };
+  const { note, assigneeUserId } = req.body as { note?: string; assigneeUserId?: string };
 
   const chain = await prisma.approvalChain.findFirst({
     where: { id, tenantId: req.tenantId },
@@ -111,6 +111,22 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
 
   const stage = chain.stages.find(s => s.id === stageId);
   if (!stage) return res.status(404).json({ error: 'Onay aşaması bulunamadı.' });
+
+  // Presales Müdürü teknik değerlendirmeyi onaylarken BoM'u kimin hazırlayacağını
+  // (hangi mühendis) AÇIKÇA seçmeli — "birime bildir, kim bakarsa çalışsın" birim-
+  // geneli yayını, birimde birden fazla/az sayıda mühendis olduğunda kimseye
+  // ulaşmayabiliyordu (bkz. geri bildirim). Seçim burada zorunlu kılınır; sonuç
+  // Opportunity.presalesId'e yazılır — ileride birim utilizasyonu bu alandan okunabilir.
+  const isPresalesTechEval = chain.entityType === 'OPPORTUNITY' && chain.processKey === 'CRM_HANDOFF' && stage.role === 'PRESALES_MGR';
+  let assignedEngineer: { id: string; name: string; unitId: string | null } | null = null;
+  if (isPresalesTechEval) {
+    if (!assigneeUserId) return res.status(400).json({ error: 'BoM hazırlayacak Presales Mühendisi seçilmelidir.' });
+    assignedEngineer = await prisma.user.findFirst({
+      where: { id: assigneeUserId, tenantId: req.tenantId, role: 'PRESALES_ENG', status: 'ACTIVE' },
+      select: { id: true, name: true, unitId: true },
+    });
+    if (!assignedEngineer) return res.status(400).json({ error: 'Seçilen kullanıcı geçerli/aktif bir Presales Mühendisi değil.' });
+  }
 
   // B-08 — yalnız aşamanın rolüne sahip kullanıcı ya da o role vekalet verilmiş kullanıcı onaylayabilir.
   // (approverId artık client body'den değil, kimliği doğrulanmış req.userId'den alınır.)
@@ -152,11 +168,44 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   // swimlane iki bağımsız kayıt tutuyordu (legacy→chain zaten bağlıydı, chain→legacy
   // eksikti). Swimlane burada COMPLETED olduğunda legacy alanı da senkronize edilir —
   // hangi ekrandan onaylanırsa onaylansın iki mekanizma birbirinden sapmaz.
-  if (updated?.status === 'COMPLETED' && chain.entityType === 'OPPORTUNITY') {
+  // processKey filtresi zorunlu: OPPORTUNITY entityType'ı CRM_HANDOFF/PRESALES_HANDOFF
+  // gibi başka süreçlerle de paylaşılıyor — filtresiz haliyle bu blok, henüz hiçbir
+  // maliyet analizi/BoM yapılmamışken salt teknik değerlendirme onaylandığında bile
+  // fırsatı yanlışlıkla 'PROPOSAL'a taşıyıp technicalStatus'ü 'APPROVED' işaretliyordu.
+  if (updated?.status === 'COMPLETED' && chain.entityType === 'OPPORTUNITY' && chain.processKey === 'OPPORTUNITY_APPROVAL') {
     await prisma.opportunity.updateMany({
       where: { id: chain.entityId, technicalStatus: { not: 'APPROVED' } },
       data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' },
     });
+  }
+
+  // Presales Müdürü teknik değerlendirmeyi onayladığında: Satış Müdürü onayı
+  // görebilsin diye bilgilendirilir; Presales Mühendisi'ne BoM hazırlama görevi
+  // açılır (bkz. opportunities.ts POST /:id/bom — bu görev tamamlanmadan BoM
+  // girişi zaten backend'de engelleniyor, burada iş sırasının başlatılması).
+  if (updated?.status === 'COMPLETED' && chain.entityType === 'OPPORTUNITY' && chain.processKey === 'CRM_HANDOFF' && assignedEngineer) {
+    const opp = await prisma.opportunity.findFirst({ where: { id: chain.entityId, tenantId: req.tenantId } });
+    if (opp) {
+      const salesMgrs = await prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'SALES_MGR', status: 'ACTIVE' } });
+      await Promise.all(salesMgrs.map((u) => prisma.notification.create({
+        data: { tenantId: req.tenantId, userId: u.id, type: 'SUCCESS', title: 'Teknik değerlendirme onaylandı', message: `"${opp.title}" fırsatı Presales Müdürü tarafından teknik olarak onaylandı. BoM hazırlığı ${assignedEngineer.name}'e devredildi.`, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id },
+      }).catch(() => undefined)));
+      // Birim-geneli yayın yerine seçilen mühendise doğrudan atama — hem bildirim
+      // hem görev garanti ulaşır, hem de presalesId ileride birim utilizasyonu
+      // ("kim kaç BoM üstlendi") raporlanabilir hale gelir.
+      await prisma.notification.create({
+        data: { tenantId: req.tenantId, userId: assignedEngineer.id, type: 'APPROVAL', title: 'BoM hazırlığı size devredildi', message: `"${opp.title}" fırsatı teknik değerlendirmeden geçti. BoM hazırlayabilirsiniz.`, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id },
+      }).catch(() => undefined);
+      await prisma.todoTask.create({ data: {
+        title: `BoM Hazırla: ${opp.title}`,
+        description: 'Presales Müdürü teknik değerlendirmeyi onayladı ve bu fırsatı size devretti. BoM hazırlayın.',
+        unitId: assignedEngineer.unitId || stage.unitId || '', assignedToUserId: assignedEngineer.id,
+        assignedBy: req.userId || 'system', tenantId: req.tenantId,
+        relatedModule: 'OPPORTUNITY', relatedItemId: opp.id, priority: 'HIGH', status: 'PENDING',
+      } }).catch(() => undefined);
+      await prisma.opportunity.update({ where: { id: opp.id }, data: { presalesId: assignedEngineer.id } }).catch(() => undefined);
+      await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TECH_EVAL_APPROVED', entityType: 'OPPORTUNITY', entityId: opp.id, details: { assignedEngineerId: assignedEngineer.id, assignedEngineerName: assignedEngineer.name } });
+    }
   }
 
   res.json(updated);
@@ -166,6 +215,14 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
   const id = String(req.params.id);
   const stageId = String(req.params.stageId);
   const { note } = req.body as { note?: string };
+
+  // Bir red her zaman bir gerekçe taşımalı — onaylayanın/reddedenin niyetini
+  // kaydeden tek yer bu alan; gerekçesiz red, ilgili tarafların "neden?" sorusunu
+  // yanıtsız bırakır (bkz. CRM_HANDOFF özel akışı aşağıda — gerekçe hem Satış
+  // Müdürü/GM bildirimine hem Alınan Dersler kaydına taşınır).
+  if (!note || !note.trim()) {
+    return res.status(400).json({ error: 'Red gerekçesi zorunludur.' });
+  }
 
   const chain = await prisma.approvalChain.findFirst({
     where: { id, tenantId: req.tenantId },
@@ -195,6 +252,40 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
     include: { stages: { orderBy: { order: 'asc' } } }
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STAGE_REJECT', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, note: note || null } });
+
+  // Presales Müdürü teknik değerlendirmeyi reddettiğinde: Satış Müdürü + Üst
+  // Yönetim (GM) gerekçeyle bilgilendirilir ve gerekçe Kurumsal Yönetişim →
+  // Alınan Dersler'e otomatik işlenir ki Kalite birimi görüp aksiyon alsın.
+  if (chain.entityType === 'OPPORTUNITY' && chain.processKey === 'CRM_HANDOFF') {
+    const opp = await prisma.opportunity.findFirst({ where: { id: chain.entityId, tenantId: req.tenantId } });
+    if (opp) {
+      const [salesMgrs, gms, rejector] = await Promise.all([
+        prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'SALES_MGR', status: 'ACTIVE' } }),
+        prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'GENERAL_MANAGER', status: 'ACTIVE' } }),
+        prisma.user.findFirst({ where: { id: req.userId, tenantId: req.tenantId }, select: { name: true } }),
+      ]);
+      const msg = `"${opp.title}" fırsatı teknik değerlendirmede reddedildi. Gerekçe: ${note}`;
+      await Promise.all([
+        ...salesMgrs.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id } }).catch(() => undefined)),
+        ...gms.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id } }).catch(() => undefined)),
+      ]);
+      await prisma.lessonsLearned.create({
+        data: {
+          tenantId: req.tenantId,
+          title: `Teknik değerlendirme reddi: ${opp.title}`,
+          category: 'TECHNICAL',
+          situation: msg,
+          rootCause: note,
+          status: 'OPEN',
+          impact: 'MEDIUM',
+          createdById: req.userId,
+          createdByName: rejector?.name || null,
+        },
+      }).catch(() => undefined);
+      await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TECH_EVAL_REJECTED', entityType: 'OPPORTUNITY', entityId: opp.id, details: { note } });
+    }
+  }
+
   res.json(updated);
 }));
 

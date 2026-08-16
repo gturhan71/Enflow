@@ -35,6 +35,18 @@ interface NavItemShape {
 const ROLE_KEYS = new Set(Object.keys(ROLE_LABELS));
 const isPerm = (code?: string): code is string => !!code && !ROLE_KEYS.has(code);
 
+// NAV_ITEMS yalnız sidebar GÖRÜNÜRLÜĞÜnü (*_VIEW) kapsar — modül içi aksiyon
+// butonları (Ekle/Düzenle/Sil, PermissionGate ile korunan) ayrı bir *_EDIT
+// izni kullanır ve NAV_ITEMS'ta hiç yer almaz. Bu izinler türetilemediği için
+// (ör. CRM_EDIT — bkz. OpportunitiesView.tsx "+ Yeni Fırsat") editörde hiç
+// toggle'ı olmuyordu; yönetici View'ı açsa bile Edit'i vermenin bir yolu yoktu.
+// Burada ilgili üst modülün alt-izinlerine elle eklenir.
+const EXTRA_CHILD_PERMISSIONS: Record<string, PermChild[]> = {
+  crm: [{ permission: 'CRM_EDIT', label: 'Fırsat / Müşteri / Teklif Ekleme-Düzenleme' }],
+  presales: [{ permission: 'PRESALES_EDIT', label: 'BoM / Maliyet Ekleme-Düzenleme' }],
+  documents: [{ permission: 'ARCHIVE_EDIT', label: 'Fiziksel Arşiv Kaydı Ekleme-Düzenleme' }],
+};
+
 export function buildPermissionGroups(): PermGroup[] {
   return (NAV_ITEMS as NavItemShape[])
     .filter((item) => isPerm(item.requiredPermission))
@@ -49,6 +61,7 @@ export function buildPermissionGroups(): PermGroup[] {
         permission,
         label: [...labels].join(' · '),
       }));
+      children.push(...(EXTRA_CHILD_PERMISSIONS[item.id] || []));
       return { id: item.id, label: item.label, icon: item.icon, permission: item.requiredPermission, children };
     });
 }

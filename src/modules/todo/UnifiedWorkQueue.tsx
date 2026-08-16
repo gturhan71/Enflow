@@ -1,7 +1,7 @@
 import { Landmark, FileCheck2, Truck, ClipboardList, ArrowRight } from 'lucide-react';
-import { TodoTask, ApprovalChain } from '../../types';
+import { TodoTask, ApprovalChain, Opportunity } from '../../types';
 import { dleftBadge, severityRank } from '../dashboard/helpers';
-import { CHAIN_ROLE_LABEL } from './helpers';
+import { CHAIN_ROLE_LABEL, CHAIN_ENTITY_LABEL } from './helpers';
 
 // Süreç Motoru'nun "Todo'ya eklenecek + deadline taşıyacak" kuralının (değişmez
 // kural #5) görünür karşılığı: aşağıdaki 4 ayrı kaynaktan (Onay Zinciri, Teklif
@@ -39,6 +39,7 @@ export default function UnifiedWorkQueue({
   proposalTasks,
   deliveryTasks,
   regularTasks,
+  opportunities,
 }: {
   chains: ApprovalChain[];
   currentUserRole?: string;
@@ -46,6 +47,7 @@ export default function UnifiedWorkQueue({
   proposalTasks: TodoTask[];
   deliveryTasks: TodoTask[];
   regularTasks: TodoTask[];
+  opportunities?: Opportunity[];
 }) {
   const chainItems: UnifiedItem[] = chains
     .map((chain): UnifiedItem | null => {
@@ -54,7 +56,11 @@ export default function UnifiedWorkQueue({
       ));
       if (!myStage) return null;
       const role = myStage.role ? (CHAIN_ROLE_LABEL[myStage.role] || myStage.role) : 'Birim onayı';
-      return { id: `chain-${chain.id}`, kind: 'CHAIN', title: `${role} — ${chain.entityType}`, dueDate: myStage.dueDate ?? null, targetId: 'todo-section-chains' };
+      // Fırsat zincirlerinde ham "OPPORTUNITY" yerine fırsatın adı gösterilir —
+      // hangi kaydın onayını beklediğini bir bakışta anlamak için.
+      const oppTitle = chain.entityType === 'OPPORTUNITY' ? opportunities?.find(o => o.id === chain.entityId)?.title : null;
+      const entityLabel = oppTitle || CHAIN_ENTITY_LABEL[chain.entityType || ''] || chain.entityType;
+      return { id: `chain-${chain.id}`, kind: 'CHAIN', title: `${role} — ${entityLabel}`, dueDate: myStage.dueDate ?? null, targetId: 'todo-section-chains' };
     })
     .filter((x): x is UnifiedItem => x !== null);
 

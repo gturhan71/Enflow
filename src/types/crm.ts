@@ -16,6 +16,8 @@ export interface Opportunity {
   } | null;
   technicalStatus?: string;
   bomStatus?: string;
+  techEvalStatus?: 'PENDING' | 'COMPLETED' | 'REJECTED' | null; // CRM_HANDOFF zincir durumu — Presales Müdürü teknik değerlendirmesi
+  techEvalReason?: string | null; // REJECTED ise red gerekçesi
   procurementMethod?: string; // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — Satış Destek tetikleyici
   targetBidDate?: string;     // son teklif/dönüşüm tarihi
   bomEvaluation?: string;     // JSON — BoM tedarikçi teklif değerlendirme snapshot'ı

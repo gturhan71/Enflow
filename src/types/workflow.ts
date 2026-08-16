@@ -174,6 +174,7 @@ export interface ApprovalChain {
   id: string;
   entityType?: string; // OPPORTUNITY | CONTRACT_WORKFLOW_SIGNING | ...
   entityId: string;
+  processKey?: string | null; // süreç motoru tarafından üretildiyse — ör. CRM_HANDOFF, OPPORTUNITY_APPROVAL
   stages: ApprovalStage[];
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
 }

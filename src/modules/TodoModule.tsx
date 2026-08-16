@@ -69,14 +69,14 @@ const TodoModule = ({
 
   useEffect(() => { refreshPendingChainApprovals(); }, [refreshPendingChainApprovals]);
 
-  const handleChainStageAction = async (chain: ApprovalChain, stageId: string, action: 'approve' | 'reject') => {
+  const handleChainStageAction = async (chain: ApprovalChain, stageId: string, action: 'approve' | 'reject', note?: string, assigneeUserId?: string) => {
     if (!currentUser?.id) return;
     setChainActionLoading(stageId);
     try {
       if (action === 'approve') {
-        await apiService.approveApprovalStage(chain.id, stageId, { approverId: currentUser.id });
+        await apiService.approveApprovalStage(chain.id, stageId, { approverId: currentUser.id, note, assigneeUserId });
       } else {
-        await apiService.rejectApprovalStage(chain.id, stageId, { approverId: currentUser.id });
+        await apiService.rejectApprovalStage(chain.id, stageId, { approverId: currentUser.id, note });
       }
       await refreshPendingChainApprovals();
     } catch (err) {
@@ -189,6 +189,7 @@ const TodoModule = ({
         proposalTasks={pendingApprovals}
         deliveryTasks={pendingDeliveries}
         regularTasks={regularTasks}
+        opportunities={opportunities}
       />
 
       <div id="todo-section-chains">
@@ -198,6 +199,7 @@ const TodoModule = ({
           currentUserUnitId={currentUser?.unitId}
           actionLoading={chainActionLoading}
           onAction={handleChainStageAction}
+          opportunities={opportunities}
         />
       </div>
 

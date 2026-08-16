@@ -20,12 +20,32 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     where: { tenantId: req.tenantId },
     include: { customer: true, assignedTo: true, createdBy: true, bomItems: { include: { brand: true, category: true } }, costItems: true }
   });
+
+  // Zorunlu teknik değerlendirme (CRM_HANDOFF) durumu — Satış Müdürü'nün fırsat
+  // kartında görebilmesi için her fırsatın EN GÜNCEL zincirinden okunur (tekrar
+  // gönderim reddedilmiş bir fırsatta yeni bir zincir oluşturur, en yeni geçerli olan).
+  const techChains = opps.length
+    ? await prisma.approvalChain.findMany({
+        where: { tenantId: req.tenantId, entityType: 'OPPORTUNITY', processKey: 'CRM_HANDOFF', entityId: { in: opps.map((o) => o.id) } },
+        include: { stages: true },
+        orderBy: { createdAt: 'desc' },
+      })
+    : [];
+  const techChainByOppId = new Map<string, (typeof techChains)[number]>();
+  for (const c of techChains) if (!techChainByOppId.has(c.entityId)) techChainByOppId.set(c.entityId, c);
+
   // costConfig JSON string'ini parse ederek nesne olarak gönder
-  const parsed = opps.map((o) => ({
-    ...o,
-    costConfig: o.costConfig ? (() => { try { return JSON.parse(o.costConfig); } catch { return undefined; } })() : undefined,
-    agentTriage: o.agentTriage ? (() => { try { return JSON.parse(o.agentTriage); } catch { return null; } })() : null,
-  }));
+  const parsed = opps.map((o) => {
+    const chain = techChainByOppId.get(o.id);
+    const rejectedStage = chain?.stages.find((s) => s.status === 'REJECTED');
+    return {
+      ...o,
+      costConfig: o.costConfig ? (() => { try { return JSON.parse(o.costConfig as string); } catch { return undefined; } })() : undefined,
+      agentTriage: o.agentTriage ? (() => { try { return JSON.parse(o.agentTriage as string); } catch { return null; } })() : null,
+      techEvalStatus: chain?.status ?? null,
+      techEvalReason: rejectedStage?.note ?? null,
+    };
+  });
   res.json(parsed);
 }));
 
@@ -99,6 +119,17 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
       } }).catch(() => {});
     }
     await logActivity({ tenantId, userId: finalCreatedById, action: 'TENDER_TRIGGERED', entityType: 'OPPORTUNITY', entityId: opp.id, details: { method: procurementMethod, tenderId: tender?.id ?? null } });
+  }
+
+  // Zorunlu teknik değerlendirme kapısı: her yeni fırsat, Presales BoM'a başlamadan
+  // önce Presales Müdürü onayına otomatik gider (CRM_HANDOFF süreci — bkz.
+  // workflowTemplate.ts). Tenant bu süreci henüz kurgulamadıysa (ProcessNotConfiguredError)
+  // fırsat oluşturmayı engellemeyiz — süreç yapılandırılana kadar sessizce atlanır.
+  try {
+    await advanceProcess(tenantId, 'CRM_HANDOFF', 'OPPORTUNITY', opp.id, { actorUserId: finalCreatedById });
+    await notify(tenantId, finalAssignedId, 'Teknik değerlendirmeye gönderildi', `"${title}" fırsatı Presales Müdürü'nün teknik değerlendirme onayına otomatik gönderildi.`, 'INFO');
+  } catch (e) {
+    if (!(e instanceof ProcessNotConfiguredError)) throw e;
   }
 
   res.json(opp);
@@ -213,6 +244,21 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
 
   if (!items || !Array.isArray(items)) {
     return res.status(400).json({ error: 'Geçersiz BoM listesi.' });
+  }
+
+  // Zorunlu teknik değerlendirme kapısı: BoM'a hiç başlanmamışsa (ilk kayıt),
+  // Presales Müdürü'nün CRM_HANDOFF onayı tamamlanmadan girilemez. Bu özellikten
+  // önce zaten BoM girişi başlamış fırsatlar (en az bir kalem varsa) muaf tutulur
+  // — devam eden iş kesintiye uğramaz.
+  const existingBomCount = await prisma.boMItem.count({ where: { opportunityId } });
+  if (existingBomCount === 0) {
+    const techChain = await prisma.approvalChain.findFirst({
+      where: { tenantId, entityType: 'OPPORTUNITY', entityId: opportunityId, processKey: 'CRM_HANDOFF' },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (!techChain || techChain.status !== 'COMPLETED') {
+      return res.status(403).json({ error: 'Bu fırsat için Presales Müdürü teknik değerlendirme onayı bekleniyor. BoM oluşturulamaz.' });
+    }
   }
 
   const result = await prisma.$transaction(async (tx) => {
@@ -709,6 +755,12 @@ router.post('/:id/handoff', tenantMiddleware, asyncHandler(async (req: Request, 
 
   try {
     const result = await advanceProcess(tenantId, processKey, 'OPPORTUNITY', opportunityId, { actorUserId: req.userId, note });
+    // BoM/teknik analiz Satış'a devredildiğinde Satış Müdürü zaten süreç motorundan
+    // (MANUAL adım → TodoTask+Notification) haberdar olur; fırsat sahibi satışçı bu
+    // akışın parçası değildir — burada ayrıca bilgilendirilir ki teklif hazırlığına geçebilsin.
+    if (processKey === 'PRESALES_HANDOFF') {
+      await notify(tenantId, record.assignedToId, 'BoM hazır', `"${record.title}" için BoM/teknik analiz tamamlandı. Satış destek ve teklif aşamasına geçebilirsiniz.`, 'SUCCESS');
+    }
     res.json({ ok: true, chain: result.chain });
   } catch (e) {
     if (e instanceof ProcessNotConfiguredError) {

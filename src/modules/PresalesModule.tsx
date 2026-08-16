@@ -51,6 +51,15 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   const isPresalesMgr = currentUser?.role === 'PRESALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
+  // Zorunlu teknik değerlendirme kapısı (backend'de de uygulanır — bkz.
+  // opportunities.ts POST /:id/bom): Presales Müdürü CRM_HANDOFF'u onaylamadan
+  // fırsat burada seçilemez. Bu özellikten önce BoM girişi başlamış fırsatlar
+  // (en az bir kalem varsa) muaf — devam eden iş listeden kaybolmaz.
+  const isBomEligible = (o: Opportunity) =>
+    o.status !== 'WON' && o.status !== 'LOST' && (o.techEvalStatus === 'COMPLETED' || (o.bomItems?.length ?? 0) > 0);
+  const bomEligibleOpportunities = opportunities.filter(isBomEligible);
+  const pendingTechEvalOpportunities = opportunities.filter(o => o.status !== 'WON' && o.status !== 'LOST' && !isBomEligible(o));
+
   // Deep-link: dışarıdan gelen fırsatı otomatik seç (varsa ve listede ise).
   useEffect(() => {
     if (initialOppId && opportunities.some(o => o.id === initialOppId)) {
@@ -193,17 +202,22 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           <h3 className="text-2xl font-bold text-slate-900 font-sans">Presales & Dizayn</h3>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-slate-500 whitespace-nowrap">BoM listesini fırsata bağlayın:</p>
-            <select 
+            <select
               value={selectedOppId}
               onChange={(e) => setSelectedOppId(e.target.value)}
               className="bg-white/50 border border-slate-200 rounded-lg px-3 py-1 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="">Fırsat Seçin</option>
-              {opportunities.filter(o => o.status !== 'WON' && o.status !== 'LOST').map(opp => (
+              {bomEligibleOpportunities.map(opp => (
                 <option key={opp.id} value={opp.id}>{opp.title}</option>
               ))}
             </select>
           </div>
+          {pendingTechEvalOpportunities.length > 0 && (
+            <p className="text-[11px] text-amber-600 font-bold mt-1">
+              ⏳ {pendingTechEvalOpportunities.length} fırsat Presales Müdürü teknik değerlendirme onayı bekliyor — onaylanmadan BoM listesinde görünmez: {pendingTechEvalOpportunities.map(o => o.title).join(', ')}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-4">
           <PermissionGate permission="PRESALES_EDIT">

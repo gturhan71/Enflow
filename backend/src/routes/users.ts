@@ -66,6 +66,21 @@ router.get('/me', tenantMiddleware, asyncHandler(async (req: Request, res: Respo
   res.json(parsePermissions(user));
 }));
 
+// Hafif, herkese açık kullanıcı seçici — ör. Presales Müdürü'nün BoM devri için
+// bir mühendis seçmesi (bkz. approvalChains.ts CRM_HANDOFF onayı). Tam liste
+// (`GET /`, yukarıda) GM-only'dir (email/izin gibi hassas alanlar taşır); bu uç
+// yalnız ad+id+birim döner, RBAC riski taşımaz. MUTLAKA /:id'den ÖNCE tanımlanmalı.
+router.get('/lookup', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { role } = req.query as { role?: string };
+  if (!role) return res.status(400).json({ error: 'role parametresi zorunludur.' });
+  const users = await prisma.user.findMany({
+    where: { tenantId: req.tenantId, role, status: 'ACTIVE' },
+    select: { id: true, name: true, unitId: true },
+    orderBy: { name: 'asc' },
+  });
+  res.json(users);
+}));
+
 // Kişiselleştirilmiş Dashboard düzeni — herkes kendi görünümünü düzenler (rol kapısı yok).
 // MUTLAKA /:id'den ÖNCE tanımlanmalı (aksi halde Express 'me' değerini :id olarak yakalar).
 router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

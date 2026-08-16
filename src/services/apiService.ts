@@ -413,7 +413,10 @@ class ApiService {
   async createApprovalChain(data: { entityType: string; entityId: string; stages: { role: string; order?: number }[] }) {
     return apiClient.fetchWithAuth('/approval-chains', { method: 'POST', body: JSON.stringify(data) });
   }
-  async approveApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string }) {
+  async getUsersByRole(role: string) {
+    return apiClient.fetchWithAuth(`/users/lookup?role=${encodeURIComponent(role)}`);
+  }
+  async approveApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string; assigneeUserId?: string }) {
     return apiClient.fetchWithAuth(`/approval-chains/${chainId}/stages/${stageId}/approve`, { method: 'POST', body: JSON.stringify(data) });
   }
   async rejectApprovalStage(chainId: string, stageId: string, data: { approverId: string; note?: string }) {
