@@ -1431,8 +1431,7 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Görevler & Takip | Birimler-arası görev havuzu + "Bekleyen Onaylarım"; iş-günü SLA | Tüm birimler |
 | Yönetim Raporları | Birim metrik + darboğaz + dönem raporu (escalation) + yazdırma | GM + Müdürler |
 | Genel Hususlar | Dersler/risk/KPI/dış doküman + doküman kodlama | Kalite / Yönetim |
-| Şirket Evrakları | Kurumsal doküman envanteri (geçerlilik tarihli) | İdari |
-| Fiziksel Arşiv | Kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik | İdari |
+| Şirket Evrakları | Kurumsal doküman envanteri (geçerlilik tarihli) + alt-menüde Fiziksel Arşiv (kutu/raf arşiv; kaybedilen fırsat + BoM değerlendirme otomatik) | İdari |
 | Yedekleme | Sistem yedeği (LOCAL/Nextcloud/S3) → doğrulama → fark-analizli restore → zamanlama | Backup Admin |
 | Şirket Ayarları | Birim/kullanıcı, RBAC, YZ & entegrasyonlar, abonelik, lisans, sanal-agent | ADMIN / GM |
 | Talep & Geri Bildirim | Enflow'a ürün talebi/hata/iyileştirme gönder; sınıflandırma/öncelik/timeline dış triage aracından döner | Herkes |

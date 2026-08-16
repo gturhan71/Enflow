@@ -140,20 +140,13 @@ export const HELP_ARTICLES: HelpArticle[] = [
   },
   {
     moduleId: 'documents',
-    summary: 'Şirketin resmî/kurumsal dokümanlarının (politika, prosedür, sertifika vb.) geçerlilik tarihli envanteri.',
+    summary: 'Şirketin resmî/kurumsal dokümanlarının (politika, prosedür, sertifika vb.) geçerlilik tarihli envanteri + fiziksel kutu/raf arşivinin dijital lokasyon kaydı.',
     audience: 'İdari ekip.',
     sections: [
-      { heading: 'Ne işe yarar', body: 'Kurumsal dokümanları kategori ve geçerlilik tarihiyle kayıt altına alır, süresi dolan/dolmak üzere olan dokümanları takip edersiniz.' },
-      { heading: 'Nasıl kullanılır', body: '"Yeni Doküman" ile dosyayı yükleyip kategori + geçerlilik tarihi girin. Listeyi kategoriye göre filtreleyebilirsiniz.' },
-    ],
-  },
-  {
-    moduleId: 'archive',
-    summary: 'Fiziksel kutu/raf arşivinin dijital lokasyon kaydı.',
-    audience: 'İdari ekip.',
-    sections: [
-      { heading: 'Ne işe yarar', body: 'Fiziksel olarak saklanan sözleşme/fatura/evrak kutularının hangi rafta, hangi kutuda olduğunu dijital olarak kaydeder, arama ile hızlıca bulmanızı sağlar. Kaybedilen fırsatlar ve tamamlanan BoM değerlendirmeleri de otomatik olarak arşive düşer.' },
-      { heading: 'Nasıl kullanılır', body: 'Üstteki arama kutusundan kutu no, raf no veya etikete göre arayın. "Yeni Kayıt" ile fiziksel bir kutunun içeriğini ve konumunu tanımlayın.' },
+      { heading: 'Kurumsal Evraklar — ne işe yarar', body: 'Kurumsal dokümanları kategori ve geçerlilik tarihiyle kayıt altına alır, süresi dolan/dolmak üzere olan dokümanları takip edersiniz.' },
+      { heading: 'Kurumsal Evraklar — nasıl kullanılır', body: '"Yeni Doküman" ile dosyayı yükleyip kategori + geçerlilik tarihi girin. Listeyi kategoriye göre filtreleyebilirsiniz.' },
+      { heading: 'Fiziksel Arşiv — ne işe yarar', body: 'Fiziksel olarak saklanan sözleşme/fatura/evrak kutularının hangi rafta, hangi kutuda olduğunu dijital olarak kaydeder, arama ile hızlıca bulmanızı sağlar. Kaybedilen fırsatlar ve tamamlanan BoM değerlendirmeleri de otomatik olarak arşive düşer.' },
+      { heading: 'Fiziksel Arşiv — nasıl kullanılır', body: 'Sekmeyi "Fiziksel Arşiv" alt-menüsünden açın. Üstteki arama kutusundan kutu no, raf no veya etikete göre arayın. "Yeni Kayıt" ile fiziksel bir kutunun içeriğini ve konumunu tanımlayın.' },
     ],
   },
   {

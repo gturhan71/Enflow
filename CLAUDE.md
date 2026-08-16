@@ -126,8 +126,8 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 | `management-reports` | `ManagementReportingModule` | Yönetim Raporları — birim metrik + darboğaz + UnitReport + yazdırma (MANAGEMENT_REPORTS_VIEW) |
 | `corporate-governance` | `CorporateGovernanceModule` | Genel Hususlar — dersler/risk/KPI/dış doküman + doküman kodlama (CORPORATE_GOV_VIEW) |
 | `todo` | `TodoModule` | Görev yönetimi + "Bekleyen Onaylarım" onay swimlane |
-| `documents` | `DocumentsModule` | Kurumsal dokümanlar |
-| `archive` | `ArchiveModule` | Fiziksel arşiv |
+| `documents` | `DocumentsModule` | Kurumsal dokümanlar — sidebar'da alt-menü: Kurumsal Evraklar + Fiziksel Arşiv |
+| `archive` | `ArchiveModule` | Fiziksel arşiv — `documents` sidebar grubunun alt-öğesi (`src/constants.ts` NAV_ITEMS.subItems), kendi route/component'i aynı kalır |
 | `settings` | `SettingsModule` | Ayarlar (kullanıcı, birim, yetki, abonelik, doküman kodlama, entegrasyon) |
 | `contract-workflow` | `ContractWorkflowModule` | **Sözleşme Yönetimi** (tam modül) — evrak/imza/AI analiz/transfer→Proje + Hukuk görünümü (mode: contracts\|legal). Backend rol kapısı: GM+KSU+SALES_MGR+PROJECT_MGR+LEGAL+FINANCE+İGPD |
 | `contract-workflow-test` | (legacy alias → `ContractWorkflowModule`) | Geriye dönük uyumluluk; ayrı UI yok |
@@ -363,6 +363,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/contexts/AuthContext.tsx ← types, services/apiService
@@ -383,8 +384,8 @@ src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/f
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
+src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
-src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers
@@ -392,6 +393,7 @@ src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
@@ -405,7 +407,6 @@ backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstra
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
 backend/src/utils/secureUpload.ts ← usageService
-src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
@@ -431,11 +432,11 @@ src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../cons
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
-src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
+src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/ArchiveCard.tsx ← ../types, ../components/InfoTooltip
 src/modules/reporting/BidScorecardCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/BomVarianceCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
@@ -456,7 +457,6 @@ src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/types/crm.ts ← auth, presales
-backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogArchiveService.ts ← prismaClient, backupTargets, backupService, activityLog
@@ -510,10 +510,11 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 20 seconds ago)
+## changes (last 10 commits — 8 minutes ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
+src/content/helpArticles.ts                   +zaman
 src/lib/guaranteeText.ts                      +sampleGuaranteeText
 src/modules/contract-workflow/DetailHeader.tsx ~DetailHeader
 src/modules/contract-workflow/DocumentsTab.tsx +GuaranteeRequestSection  ~DocumentsTab
@@ -521,6 +522,7 @@ src/modules/contract-workflow/helpers.ts      ~bestProposalPrice
 src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowCard
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/CRMModule.tsx                     +birim
+src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
 src/modules/PresalesModule.tsx                +birim  ~Birim
 src/modules/SalesSupport.tsx                  ~sampleGuaranteeText  ~EkapTab  ~ChecklistTab  ~GuaranteesTab
 src/modules/todo/PendingChainApprovals.tsx    ~PendingChainApprovals
@@ -556,6 +558,25 @@ INDEX Workflow_tenantId_processKey_key ON Workflow
 ### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
 ```
 TABLE new_WorkflowStep
+```
+
+### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
+```
+TABLE PlatformTicket
+INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
+```
+
+### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
+```
+TABLE new_PlatformTicket
+INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
+```
+
+### backend/src/middleware.ts
+```
+export const asyncHandler = (fn) =>  :8-10
+export const requireRole = (allowed) =>  :77-85
+export const requireEntitlement = (pluginKey) =>  :109-116
 ```
 
 ### backend/src/planCatalog.ts
@@ -793,28 +814,9 @@ TABLE CostAnalysisVersion
 INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
 ```
 
-### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
-```
-TABLE PlatformTicket
-INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
-```
-
-### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
-```
-TABLE new_PlatformTicket
-INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
-```
-
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
-```
-
-### backend/src/middleware.ts
-```
-export const asyncHandler = (fn) =>  :8-10
-export const requireRole = (allowed) =>  :77-85
-export const requireEntitlement = (pluginKey) =>  :109-116
 ```
 
 ### backend/src/services/activityLog.ts
@@ -1027,6 +1029,28 @@ export function similarityRatio(a, b) → number  :39-43  # 0 (tamamen farklı) 
 
 ## src
 
+### src/App.tsx
+```
+hook useState
+hook useRef
+hook useEffect
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useContracts
+hook useTasks
+hook useUnits
+hook useUsers
+hook useDocuments
+hook useProposals
+export App
+handler onApproveProposal
+handler onNavigate
+handler onLogout
+handler onComplete
+handler onLogin
+```
+
 ### src/components/HandOffModal.tsx
 ```
 props HandOffModalProps
@@ -1051,6 +1075,19 @@ export UnitManagement
 handler onClick
 handler onSubmit
 handler onChange
+```
+
+### src/content/helpArticles.ts
+```
+export interface HelpArticleSection  :8-11
+  heading: string  :9-9
+  body: string  :10-10
+export interface HelpArticle  :13-18
+  moduleId: string  :14-14
+  summary: string  :15-15
+  audience: string  :16-16
+  sections: HelpArticleSection[]  :17-17
+export const getHelpArticle = (moduleId) =>  :183-183
 ```
 
 ### src/contexts/AuthContext.tsx
@@ -1289,6 +1326,18 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/PlatformTicketsModule.tsx
+```
+component PlatformTicketsModule
+hook useState
+hook useCallback
+hook useEffect
+export PlatformTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
 ### src/modules/PresalesModule.tsx
 ```
 props PresalesModuleProps
@@ -1303,16 +1352,6 @@ handler onChange
 handler onClick
 handler onTransferToBoM
 handler onSelected
-```
-
-### src/modules/reporting/AnalyticsTab.tsx
-```
-component AnalyticsTab
-hook useState
-hook useCallback
-hook useEffect
-hook useDashboardStream
-handler onSaved
 ```
 
 ### src/modules/SalesSupport.tsx
@@ -1411,6 +1450,35 @@ class ApiService  :15-69
   … +23 more methods  :15-15
 ```
 
+### src/types/project.ts
+```
+export interface ProjectMilestone  :9-34
+  id: string  :10-10
+  projectId: string  :11-11
+  title: string  :12-12
+  description?: string | null  :13-13
+  milestoneType: MilestoneType  :14-14
+  status: MilestoneStatus  :15-15
+  progress: number  :16-16
+  assignedToId?: string | null  :17-17
+  … +16 more members  :9-9
+export interface ProjectCostItem  :35-52
+  id: string  :36-36
+  projectId: string  :37-37
+  category: CostCategory  :38-38
+  description: string  :39-39
+  plannedAmount: number  :40-40
+  actualAmount: number  :41-41
+  currency: string  :42-42
+  amountTRY: number  :43-43
+  … +8 more members  :35-35
+export interface Project  :53-83
+  id: string  :54-54
+  code?: string | null  :55-55
+  name: string  :56-56
+  type: ProjectType  :57-57
+```
+
 ### src/types/workflow.ts
 ```
 export interface EntityFieldSpec  :84-84
@@ -1438,28 +1506,6 @@ export interface ApprovalStage  :142-156
 export interface Workflow  :157-167
   id: string  :158-158
   name: string  :159-159
-```
-
-### src/App.tsx
-```
-hook useState
-hook useRef
-hook useEffect
-hook useOpportunities
-hook useCustomers
-hook useProjects
-hook useContracts
-hook useTasks
-hook useUnits
-hook useUsers
-hook useDocuments
-hook useProposals
-export App
-handler onApproveProposal
-handler onNavigate
-handler onLogout
-handler onComplete
-handler onLogin
 ```
 
 ### src/components/HealthCards.tsx
@@ -1503,19 +1549,6 @@ hook useState
 export UserManagement
 handler onSubmit
 handler onConfirm
-```
-
-### src/content/helpArticles.ts
-```
-export interface HelpArticleSection  :8-11
-  heading: string  :9-9
-  body: string  :10-10
-export interface HelpArticle  :13-18
-  moduleId: string  :14-14
-  summary: string  :15-15
-  audience: string  :16-16
-  sections: HelpArticleSection[]  :17-17
-export const getHelpArticle = (moduleId) =>  :190-190
 ```
 
 ### src/hooks/useBoM.ts
@@ -1769,18 +1802,6 @@ handler onDelete
 handler onReviewed
 ```
 
-### src/modules/PlatformTicketsModule.tsx
-```
-component PlatformTicketsModule
-hook useState
-hook useCallback
-hook useEffect
-export PlatformTicketsModule
-handler onClick
-handler onChange
-handler onSubmit
-```
-
 ### src/modules/procurement/PRDetailDrawer.tsx
 ```
 props PRDetailDrawerProps
@@ -1816,6 +1837,16 @@ hook useEffect
 export ProposalEditor
 handler onClick
 handler onChange
+```
+
+### src/modules/reporting/AnalyticsTab.tsx
+```
+component AnalyticsTab
+hook useState
+hook useCallback
+hook useEffect
+hook useDashboardStream
+handler onSaved
 ```
 
 ### src/modules/reporting/ArchiveCard.tsx
@@ -2219,35 +2250,6 @@ export interface BrandSource  :23-32
   isActive: boolean  :29-29
   createdAt: string  :30-30
   updatedAt: string  :31-31
-```
-
-### src/types/project.ts
-```
-export interface ProjectMilestone  :9-34
-  id: string  :10-10
-  projectId: string  :11-11
-  title: string  :12-12
-  description?: string | null  :13-13
-  milestoneType: MilestoneType  :14-14
-  status: MilestoneStatus  :15-15
-  progress: number  :16-16
-  assignedToId?: string | null  :17-17
-  … +16 more members  :9-9
-export interface ProjectCostItem  :35-52
-  id: string  :36-36
-  projectId: string  :37-37
-  category: CostCategory  :38-38
-  description: string  :39-39
-  plannedAmount: number  :40-40
-  actualAmount: number  :41-41
-  currency: string  :42-42
-  amountTRY: number  :43-43
-  … +8 more members  :35-35
-export interface Project  :53-83
-  id: string  :54-54
-  code?: string | null  :55-55
-  name: string  :56-56
-  type: ProjectType  :57-57
 ```
 
 ## upgrade-tool

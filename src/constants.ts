@@ -5,7 +5,6 @@ import {
   FileSearch,
   FileText,
   ShoppingCart,
-  Archive,
   Settings,
   Bell,
   Search,
@@ -101,8 +100,16 @@ export const NAV_ITEMS = [
   // Yönetim Raporları artık ayrı sekme değil — MANAGEMENT_REPORTS_VIEW izni olan
   // kullanıcılar için doğrudan Dashboard'a gömülü (bkz. src/modules/Dashboard.tsx).
   { id: 'corporate-governance', label: 'Genel Hususlar',   icon: ShieldCheck,   requiredPermission: 'CORPORATE_GOV_VIEW' },
-  { id: 'documents',         label: 'Şirket Evrakları',    icon: FileText,      requiredPermission: 'DOCUMENTS_VIEW' },
-  { id: 'archive',           label: 'Fiziksel Arşiv',      icon: Archive,       requiredPermission: 'ARCHIVE_VIEW' },
+  {
+    id: 'documents',
+    label: 'Şirket Evrakları',
+    icon: FileText,
+    requiredPermission: 'DOCUMENTS_VIEW',
+    subItems: [
+      { id: 'documents', label: 'Kurumsal Evraklar', requiredPermission: 'DOCUMENTS_VIEW' },
+      { id: 'archive',   label: 'Fiziksel Arşiv',    requiredPermission: 'ARCHIVE_VIEW' },
+    ],
+  },
   // ── Sistem ────────────────────────────────────────────────────────────
   { id: 'backup',            label: 'Yedekleme',           icon: DatabaseBackup, requiredPermission: 'BACKUP_VIEW' },
   {
