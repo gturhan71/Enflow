@@ -61,6 +61,7 @@ export const CHAIN_ENTITY_LABEL: Record<string, string> = {
   PROPOSAL: 'Teklif Onayı',
   CONTRACT_WORKFLOW_SIGNING: 'Sözleşme İmza Onayı',
   DMO_ORDER: 'DMO Sipariş Onayı (kârsız)',
+  PURCHASE_REQUEST: 'Satınalma Talebi Onayı',
 };
 
 // Görevin tamamlandığı an — her zaman görünür olması gereken zaman damgası

@@ -6,7 +6,7 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 **Hedef kullanıcı rolleri:** GENERAL_MANAGER, SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL, PROJECT_MANAGER, ADMIN
 
-**Kurumsal onay swimlane rolleri (2026-06-16 eklendi):** FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi), LEGAL_MGR (Hukuk) — `src/constants.ts` ROLE_LABELS'ta tanımlı; karşılık gelen `Unit` kayıtları tenant-1'e eklendi.
+**Kurumsal onay swimlane rolleri (2026-06-16 eklendi):** FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Güvence), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi), LEGAL_MGR (Hukuk) — `src/constants.ts` ROLE_LABELS'ta tanımlı; karşılık gelen `Unit` kayıtları tenant-1'e eklendi. **IGPD_MGR/KGD_MGR fiili onay kapısı (2026-08-19):** önceden yalnız görünürlük/danışma (İGB → `AGENT_IGPD` triyaj notu) idi, hiçbir `ApprovalStage`'de yoktu — `workflowTemplate.ts` `DEFAULT_WORKFLOW_TEMPLATE`'e eklendi: İGB → `OPPORTUNITY_APPROVAL` 2. aşama (SALES_MGR sonrası, GENERAL_MANAGER'dan önce), KY → `CONTRACT_TO_PROJECT` 1. aşama (PROJECT_MGR'dan önce). Şablon değişikliği yalnız HENÜZ kurgulanmamış (yeni) tenant'lara otomatik uygulanır (`applyDefaultWorkflowTemplate` var olan süreçlerin üzerine yazmaz) — zaten kurgulanmış tenant-1'e `backend/src/scripts/backfill-workflow-igpd-kgd-steps.ts` ile geriye dönük işlendi (idempotent, rol zaten varsa atlar).
 
 ## Versiyonlama Kuralı
 
@@ -282,7 +282,7 @@ Tümü `tenantMiddleware` izolasyonlu; path'ler `/api` ön-ekli. Frontend `apiCl
 - **/workflows** — `/default` (ensureDefaultWorkflow, `/:id`'den ÖNCE), `/:id/steps/:sid/resolve-next` (skip-logic), CRUD. `Workflow.isDefault`, `WorkflowStep.enabled/requiresCompletion`.
 - **/tasks** — TodoTask CRUD; `relatedModule` ∈ {OPPORTUNITY,PROPOSAL,CONTRACT,PROJECT,PROCUREMENT,DELIVERY,LEGAL,GENERAL}; `slaBusinessDays` → otomatik dueDate (`businessDays.ts`).
 - **/projects** — `/summary/all` (`/:id`'den ÖNCE), CRUD, `/:id/milestones`, `/:id/costs`, `/:id/handover-docs` (11 evrak auto-seed + upload). Proje oluşturma ortak servis: `projectFactory.createProjectWithMilestones`.
-- **/purchase-requests**, **/vendors** — 9 statü (DRAFT→PENDING_UNIT→PENDING_PROCUREMENT→PENDING_GM→PO_ISSUED→IN_DELIVERY→INVOICED→CLOSED / REJECTED). `/approve` `/reject` `/quotes[/:qid/select]` `/delivery` `/invoice` `/close`. PO_ISSUED→ProjectCostItem (T5); invoice→Finans Invoice (T6).
+- **/purchase-requests**, **/vendors** — 9 statü (DRAFT→PENDING_UNIT→PENDING_PROCUREMENT→PENDING_GM→PO_ISSUED→IN_DELIVERY→INVOICED→CLOSED / REJECTED). `/approve` `/reject` `/quotes[/:qid/select]` `/delivery` `/invoice` `/close`. PO_ISSUED→ProjectCostItem (T5); invoice→Finans Invoice (T6). **`/invoice` (PURCHASE_TO_INVOICE, 2026-08-19)** artık diğer 9 süreç kapısıyla aynı desende — tam `advanceProcess`/ApprovalChain (çok-adımlı MANUAL onay + AUTO `CREATE_INVOICE_FROM_PURCHASE` son adımı, `processEngine.ts` `finalizePurchaseInvoice`). İlk fatura gönderiminde alanlar (invoiceNo/Amount/Date/PaidAt) PR'a **taslak** yazılır (status değişmez), zincir tamamlanınca (tenant'ın kaç MANUAL aşama koyduğundan bağımsız — ara onaylar generic `/approval-chains/:id/stages/:sid/approve` üzerinden `PendingChainApprovals.tsx`'te geçer) AUTO adım statüyü INVOICED/CLOSED'a ilerletir + Finans Invoice'unu oluşturur; zincir PENDING'se `202 {pending:true}` döner. `status==='INVOICED'` iken aynı endpoint'e yapılan takip çağrısı (ödeme tarihi/kapama) zincire tekrar girmez, doğrudan `finalizePurchaseInvoice` çalışır.
 - **/finance** — `/invoices` (SALES/PURCHASE) + `/invoices/:id/payments` (recalcInvoice), `/guarantees[/:id/upload]`, `/cost-approvals`, `/costs/:id/approve`, `/summary`.
 - **/legal** — `/cases` CRUD + `/cases/:id/upload`, `/requests` (LEGAL TodoTask'lar). docNumber ENF-HUK-*.
 - **/tenders** — CRUD (PUT WON → ContractWorkflow oluştur+bağla, **T3**) + `/:id/checklist` (10 kalem auto-seed) + upload. Teminat: `GuaranteeLetter type=BID_BOND + tenderId` (Finans ile paylaşımlı).
@@ -365,32 +365,29 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
-src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useEnflowQueries.ts ← services/apiService
+src/lib/permissionTree.ts ← constants
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
-src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
+src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
-backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
-backend/src/services/unitReportingService.ts ← prismaClient
-backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
@@ -398,11 +395,10 @@ backend/src/utils/secureUpload.ts ← usageService
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
-src/lib/permissionTree.ts ← constants
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
@@ -419,16 +415,17 @@ src/modules/crm/constants.ts ← ../types
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
-src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
+src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
+src/modules/dashboard/useDashboardStream.ts ← ../services/apiClient
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
@@ -457,14 +454,15 @@ src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../co
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
-src/types/crm.ts ← auth, presales
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
+backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
@@ -474,6 +472,8 @@ backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupSe
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
+backend/src/services/unitReportingService.ts ← prismaClient
+backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 ```
 
 ## versions (installed direct deps)
@@ -509,31 +509,24 @@ xlsx@0.18.5
 
 ## todos
 ```
-backend/src/services/processEngine.ts:764  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
+backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 2 hours ago)
+## changes (last 10 commits — 2 days ago)
 ```
-src/components/HandOffModal.tsx               +birim  ~Birim  ~Personel
 src/components/ProcessTriggerButton.tsx       +ProcessTriggerButton
 src/content/helpArticles.ts                   +zaman
-src/modules/CRMModule.tsx                     +birim
+src/lib/permissionTree.ts                     ~buildPermissionGroups
 src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
-src/modules/PresalesModule.tsx                +birim  ~Birim
-src/modules/todo/PendingChainApprovals.tsx    ~PendingChainApprovals
-src/modules/todo/UnifiedWorkQueue.tsx         +UnifiedWorkQueue
 src/modules/WorkflowBuilder.tsx               +birime  +kayd  +t  +Kayd
 src/services/apiService.ts                    ~ApiService
 src/types/workflow.ts                         +varl
 backend/src/services/agentProvenance.ts       ~actorType  ~parseAgentActor  ~agentDisplayLabel
-backend/src/services/approvalChainService.ts  +resolveEffectiveApprover  +resolveGroupAfterDecision  ~completeApprovalChain  ~resolveEffectiveApprover
-backend/src/services/approvalSlaEscalation.ts ~sweepApprovalSlaEscalations
+backend/src/services/approvalChainService.ts  ~completeApprovalChain  ~ensureApprovalChain
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/governance.ts            ~getApprovalMatrix
 backend/src/services/invoiceService.ts        +createInvoiceRecord
-backend/src/services/processEngine.ts         +ProcessNotConfiguredError  +resolveStepRecipients  +isAuthorizedForStep  +fetchEntityRecord
-backend/src/services/unitReportingService.ts  ~computeWorkflowBottlenecks
-backend/src/services/virtualAgentService.ts   ~runAgent
+backend/src/services/processEngine.ts         +fetchEntityRecord  +entityExists  +readEntityFields  +copyFieldsToTask
 backend/src/services/workflowTemplate.ts      +applyDefaultWorkflowTemplate
 backend/src/usageService.ts                   +checkLimit  +checkUserSeatLimit  +incrementUsage  ~checkLimit
 backend/src/utils/fileUpload.ts               +tryUploadToNextcloud  ~uploadToNextcloud  ~slugify
@@ -541,18 +534,6 @@ backend/src/utils/secureUpload.ts             +enforceStorageLimit  ~documentUpl
 ```
 
 ## backend
-
-### backend/prisma/migrations/20260813184227_add_process_engine_fields/migration.sql
-```
-TABLE new_ApprovalStage
-TABLE new_WorkflowStep
-INDEX Workflow_tenantId_processKey_key ON Workflow
-```
-
-### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
-```
-TABLE new_WorkflowStep
-```
 
 ### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
 ```
@@ -589,17 +570,11 @@ export function agentDisplayLabel(actorId?) → string  :40-47  # UI/log için o
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
-export async function autoSkipOrphanStages(tenantId, chainId)  :74-193  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
+export async function autoSkipOrphanStages(tenantId, chainId)  :74-169  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
 export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :201-213  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
 export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :226-244  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
 export async function resolveGroupAfterDecision(tenantId, chainId)  :254-311  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
 export async function resetApprovalChain(tenantId, entityType, entityId)  :314-327  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
-```
-
-### backend/src/services/approvalSlaEscalation.ts
-```
-export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
-export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
 ```
 
 ### backend/src/services/bootstrapTenant.ts
@@ -614,7 +589,7 @@ export interface BootstrapResult  :47-52
   token: string  :49-49
   user: { id: string  :50-50
   subscription: { plan: string  :51-51
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-132
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-122
 ```
 
 ### backend/src/services/governance.ts
@@ -658,72 +633,27 @@ export interface StageActionCtx  :100-110
   input?: Record<string, unknown>  :109-109
 export interface FieldSpec  :116-116
   key: string  :116-116
-export interface AdvanceProcessOpts  :531-539
-  actorUserId?: string  :532-532
-  stageId?: string  :533-533
-  decision?: 'APPROVE' | 'REJECT'  :534-534
-  note?: string  :535-535
-  input?: Record<string, unknown>  :538-538
-export interface AdvanceProcessResult  :541-545
-  chain: ApprovalChain & { stages: ApprovalS  :542-542
-  advancedToOrder: number | null  :543-543
-  actionsInvoked: string[]  :544-544
+export interface AdvanceProcessOpts  :585-593
+  actorUserId?: string  :586-586
+  stageId?: string  :587-587
+  decision?: 'APPROVE' | 'REJECT'  :588-588
+  note?: string  :589-589
+  input?: Record<string, unknown>  :592-592
+export interface AdvanceProcessResult  :595-599
+  chain: ApprovalChain & { stages: ApprovalS  :596-596
+  advancedToOrder: number | null  :597-597
+  actionsInvoked: string[]  :598-598
 export class ProcessNotConfiguredError  :26-31
   constructor(public processKey)  :27-30
 ```
 
-### backend/src/services/unitReportingService.ts
-```
-export interface UnitDefinition  :6-10
-  key: string  :7-7
-  label: string  :8-8
-  role: string  :9-9
-export interface Period  :52-55
-  start: Date  :53-53
-  end: Date  :54-54
-export interface Metric  :76-82
-  label: string  :77-77
-  value: number | string  :78-78
-  unit?: string  :79-79
-  hint?: string  :80-80
-  tone?: 'default' | 'positive' | 'warning'   :81-81
-export interface ChartSeries  :84-88
-  title: string  :85-85
-  type: 'bar' | 'pie' | 'line'  :86-86
-  data: { name: string  :87-87
-export interface UnitMetricsResult  :90-97
-  unitKey: string  :91-91
-  label: string  :92-92
-  role: string  :93-93
-  period: { start: string  :94-94
-  metrics: Metric[]  :95-95
-  charts: ChartSeries[]  :96-96
-export interface WorkflowBottleneck  :457-461
-```
-
-### backend/src/services/virtualAgentService.ts
-```
-export interface AgentOutput  :13-25
-  rationale: string  :14-14
-  output: Record<string, unknown>  :15-15
-  taskTitle: string  :17-17
-  autonomousAction?: { kind: string  :19-20
-  summary: string  :21-21
-  reversible: boolean  :22-22
-  execute: () => Promise<void>  :23-23
-export function scoreQuotes(quotes,)  :189-191
-export function hasHandler(pluginKey) → boolean  :505-507
-export async function runAgent(params) → Promise<  :513-518  # Bir agent eklentisini çalıştır
-export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
-```
-
 ### backend/src/services/workflowTemplate.ts
 ```
-export interface ApplyTemplateResult  :133-137
-  addedUnits: string[]  :134-134
-  createdProcesses: string[]  :135-135
-  skippedProcesses: string[]  :136-136
-export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :145-202  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
+export interface ApplyTemplateResult  :135-139
+  addedUnits: string[]  :136-136
+  createdProcesses: string[]  :137-137
+  skippedProcesses: string[]  :138-138
+export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :147-204  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
 ### backend/src/usageService.ts
@@ -745,6 +675,14 @@ export async function tryUploadToNextcloud(tenantId, fileBuffer, fileName, remot
 ```
 export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
 export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
+```
+
+### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
+```
+TABLE ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
+INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
+INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
 ```
 
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
@@ -795,6 +733,18 @@ INDEX OpportunityProgressLog_tenantId_opportunityId_createdAt_idx ON Opportunity
 ```
 TABLE CostAnalysisVersion
 INDEX CostAnalysisVersion_tenantId_opportunityId_version_idx ON CostAnalysisVersion
+```
+
+### backend/prisma/migrations/20260813184227_add_process_engine_fields/migration.sql
+```
+TABLE new_ApprovalStage
+TABLE new_WorkflowStep
+INDEX Workflow_tenantId_processKey_key ON Workflow
+```
+
+### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
+```
+TABLE new_WorkflowStep
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -875,6 +825,12 @@ export interface BidScoreLine  :230-236
 export interface BidScorecard  :237-241
 ```
 
+### backend/src/services/approvalSlaEscalation.ts
+```
+export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
+export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
+```
+
 ### backend/src/services/contractWorkflowState.ts
 ```
 export interface ContractAnalysisExtract  :69-69
@@ -894,6 +850,7 @@ export async function computeDashboard(tenantId, userId?)  :15-70
 ### backend/src/services/dashboardStream.ts
 ```
 export function pingDashboard(tenantId) → void  :10-12
+export function subscribeDashboard(tenantId, listener) → () => void  :14-17
 ```
 
 ### backend/src/services/guaranteeReminders.ts
@@ -993,6 +950,51 @@ export function isEncrypted(value) → boolean  :98-100
 export async function sweepTenderReminders(tenantId) → Promise<void>  :21-63
 ```
 
+### backend/src/services/unitReportingService.ts
+```
+export interface UnitDefinition  :6-10
+  key: string  :7-7
+  label: string  :8-8
+  role: string  :9-9
+export interface Period  :52-55
+  start: Date  :53-53
+  end: Date  :54-54
+export interface Metric  :76-82
+  label: string  :77-77
+  value: number | string  :78-78
+  unit?: string  :79-79
+  hint?: string  :80-80
+  tone?: 'default' | 'positive' | 'warning'   :81-81
+export interface ChartSeries  :84-88
+  title: string  :85-85
+  type: 'bar' | 'pie' | 'line'  :86-86
+  data: { name: string  :87-87
+export interface UnitMetricsResult  :90-97
+  unitKey: string  :91-91
+  label: string  :92-92
+  role: string  :93-93
+  period: { start: string  :94-94
+  metrics: Metric[]  :95-95
+  charts: ChartSeries[]  :96-96
+export interface WorkflowBottleneck  :457-461
+```
+
+### backend/src/services/virtualAgentService.ts
+```
+export interface AgentOutput  :13-25
+  rationale: string  :14-14
+  output: Record<string, unknown>  :15-15
+  taskTitle: string  :17-17
+  autonomousAction?: { kind: string  :19-20
+  summary: string  :21-21
+  reversible: boolean  :22-22
+  execute: () => Promise<void>  :23-23
+export function scoreQuotes(quotes,)  :189-191
+export function hasHandler(pluginKey) → boolean  :505-507
+export async function runAgent(params) → Promise<  :513-518  # Bir agent eklentisini çalıştır
+export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
+```
+
 ### backend/src/utils/textSimilarity.ts
 ```
 export function normalizeCompanyName(name) → string  :7-14  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
@@ -1024,30 +1026,11 @@ handler onComplete
 handler onLogin
 ```
 
-### src/components/HandOffModal.tsx
-```
-props HandOffModalProps
-hook useState
-export HandOffModal
-handler onClick
-handler onChange
-```
-
 ### src/components/ProcessTriggerButton.tsx
 ```
 component ProcessTriggerButton
 hook useState
 hook useEffect
-```
-
-### src/components/settings/UnitManagement.tsx
-```
-props UnitManagementProps
-hook useState
-export UnitManagement
-handler onClick
-handler onSubmit
-handler onChange
 ```
 
 ### src/content/helpArticles.ts
@@ -1073,16 +1056,30 @@ export AuthProvider
 
 ### src/hooks/useEnflowQueries.ts
 ```
-export const useOpportunities = (tenantId, options) =>  :6-14
-export const useCustomers = (tenantId, options) =>  :16-24
-export const useProjects = (tenantId, options) =>  :26-34
-export const useContracts = (tenantId, options) =>  :36-44
-export const useTasks = (tenantId, options) =>  :46-54
-export const useUnits = (tenantId, options) =>  :56-64
-export const useUsers = (tenantId, options) =>  :66-74
-export const useDocuments = (tenantId, options) =>  :76-84
-export const useProposals = (tenantId, options) =>  :86-94
+export const useOpportunities = (tenantId, options = {}) =>  :6-14
+export const useCustomers = (tenantId, options = {}) =>  :16-24
+export const useProjects = (tenantId, options = {}) =>  :26-34
+export const useContracts = (tenantId, options = {}) =>  :36-44
+export const useTasks = (tenantId, options = {}) =>  :46-54
+export const useUnits = (tenantId, options = {}) =>  :56-64
+export const useUsers = (tenantId, options = {}) =>  :66-74
+export const useDocuments = (tenantId, options = {}) =>  :76-84
+export const useProposals = (tenantId, options = {}) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
+```
+
+### src/lib/permissionTree.ts
+```
+export interface PermChild  :15-18
+  permission: string  :16-16
+  label: string  :17-17
+export interface PermGroup  :19-25
+  id: string  :20-20
+  label: string  :21-21
+  icon: React.ComponentType<{ size?: number  :22-22
+  permission: string  :23-23
+  children: PermChild[]  :24-24
+export function buildPermissionGroups() → PermGroup[]  :50-67
 ```
 
 ### src/modules/contract-workflow/DetailHeader.tsx
@@ -1091,33 +1088,15 @@ component DetailHeader
 handler onClick
 ```
 
-### src/modules/CRMModule.tsx
+### src/modules/crm/OpportunitiesView.tsx
 ```
-hook useAuth
+component OpportunitiesView
 hook useState
-hook useEffect
-hook useSearch
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onSave
-handler onSaveAll
-handler onProgressStatus
-handler onMarkLost
-handler onHandOff
-handler onEdit
-handler onCheckIn
+hook useMemo
+handler onClick
+handler onChange
 handler onEditProposal
 handler onGoToCostAnalysis
-handler onOpenReport
-handler onOpenContacts
-handler onCreateProposal
-handler onWonOpportunity
-handler onLostOpportunity
-handler onSendForApproval
-handler onGeneratePdf
-handler onMarkDelivered
-handler onWonProposal
 ```
 
 ### src/modules/Dashboard.tsx
@@ -1173,20 +1152,6 @@ handler onChange
 handler onClick
 handler onTransferToBoM
 handler onSelected
-```
-
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
 ```
 
 ### src/modules/todo/PendingChainApprovals.tsx
@@ -1256,7 +1221,36 @@ class ApiService  :15-69
   async getCustomers()  :42-42
   async createCustomer(data)  :43-43
   async updateCustomer(id, data)  :44-44
-  … +23 more methods  :15-15
+  … +22 more methods  :15-15
+```
+
+### src/types/crm.ts
+```
+export interface Opportunity  :4-39
+  id: string  :5-5
+  title: string  :6-6
+  value: number  :7-7
+  probability: number  :8-8
+  expectedCloseDate?: string  :9-9
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
+  description?: string  :11-11
+  lostReason?: string  :12-12
+  … +24 more members  :4-4
+export interface OpportunityProgressLog  :42-54
+  id: string  :43-43
+  tenantId: string  :44-44
+  opportunityId: string  :45-45
+  recordedById: string  :46-46
+  previousStatus: string  :47-47
+  newStatus: string  :48-48
+  previousProbability: number  :49-49
+  newProbability: number  :50-50
+  … +3 more members  :42-42
+export interface Customer  :55-84
+  id: string  :56-56
+  name: string  :57-57
+  shortName?: string  :58-58
+  industry?: string  :59-59
 ```
 
 ### src/types/project.ts
@@ -1290,31 +1284,40 @@ export interface Project  :53-83
 
 ### src/types/workflow.ts
 ```
-export interface EntityFieldSpec  :84-84
-  key: string  :84-84
-export interface WorkflowStep  :123-141
-  id: string  :124-124
-  workflowId?: string  :125-125
-  unitId: string  :126-126
-  role?: string | null  :127-127
-  delegateUserId?: string | null  :129-129
-  approvalMode?: ApprovalMode  :130-130
-  actionKey?: string | null  :131-131
-  actionConfig?: string | null  :133-133
-  … +7 more members  :123-123
-export interface ApprovalStage  :142-156
-  id: string  :143-143
-  role: string | null  :144-144
-  unitId?: string | null  :145-145
-  delegateUserId?: string | null  :146-146
-  mode?: ApprovalMode  :147-147
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :148-148
-  approverId?: string  :149-149
-  note?: string  :150-150
-  … +5 more members  :142-142
-export interface Workflow  :157-167
-  id: string  :158-158
-  name: string  :159-159
+export interface EntityFieldSpec  :85-85
+  key: string  :85-85
+export interface WorkflowStep  :124-142
+  id: string  :125-125
+  workflowId?: string  :126-126
+  unitId: string  :127-127
+  role?: string | null  :128-128
+  delegateUserId?: string | null  :130-130
+  approvalMode?: ApprovalMode  :131-131
+  actionKey?: string | null  :132-132
+  actionConfig?: string | null  :134-134
+  … +7 more members  :124-124
+export interface ApprovalStage  :143-157
+  id: string  :144-144
+  role: string | null  :145-145
+  unitId?: string | null  :146-146
+  delegateUserId?: string | null  :147-147
+  mode?: ApprovalMode  :148-148
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :149-149
+  approverId?: string  :150-150
+  note?: string  :151-151
+  … +5 more members  :143-143
+export interface Workflow  :158-168
+  id: string  :159-159
+  name: string  :160-160
+```
+
+### src/components/HandOffModal.tsx
+```
+props HandOffModalProps
+hook useState
+export HandOffModal
+handler onClick
+handler onChange
 ```
 
 ### src/components/HealthCards.tsx
@@ -1349,6 +1352,16 @@ export ProductTaxonomyManagement
 handler onChange
 handler onKeyDown
 handler onClick
+```
+
+### src/components/settings/UnitManagement.tsx
+```
+props UnitManagementProps
+hook useState
+export UnitManagement
+handler onClick
+handler onSubmit
+handler onChange
 ```
 
 ### src/components/settings/UserManagement.tsx
@@ -1394,33 +1407,9 @@ handler onChange
 handler onKeyDown
 ```
 
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
-```
-
 ### src/lib/guaranteeText.ts
 ```
 export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
-```
-
-### src/lib/permissionTree.ts
-```
-export interface PermChild  :15-18
-  permission: string  :16-16
-  label: string  :17-17
-export interface PermGroup  :19-25
-  id: string  :20-20
-  label: string  :21-21
-  icon: React.ComponentType<{ size?: number  :22-22
-  permission: string  :23-23
-  children: PermChild[]  :24-24
-export function buildPermissionGroups() → PermGroup[]  :50-67
 ```
 
 ### src/modules/ActivityLogModule.tsx
@@ -1483,9 +1472,9 @@ export interface DeadlineAlarm  :46-52
   label: string  :51-51
 export async function apiFetch(path, init?)  :8-10
 export function bestProposalPrice(opportunityId, proposals) → number | null  :14-36
-export function computeDeadlineAlarm(wf, 'status' | 'deadline' | 'documents'>) → DeadlineAlarm  :54-68
+export function computeDeadlineAlarm(wf) → DeadlineAlarm  :54-68
 export const stepIndex = (status) =>  :38-52
-export const isDocsComplete = (wf, 'documents'>) =>  :70-70
+export const isDocsComplete = (wf) =>  :70-70
 ```
 
 ### src/modules/contract-workflow/LegalCaseForm.tsx
@@ -1596,17 +1585,6 @@ handler onSubmit
 handler onChange
 ```
 
-### src/modules/crm/OpportunitiesView.tsx
-```
-component OpportunitiesView
-hook useState
-hook useMemo
-handler onClick
-handler onChange
-handler onEditProposal
-handler onGoToCostAnalysis
-```
-
 ### src/modules/crm/OpportunityHistoryPanel.tsx
 ```
 component OpportunityHistoryPanel
@@ -1626,6 +1604,35 @@ handler onClick
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
+```
+
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onSave
+handler onSaveAll
+handler onProgressStatus
+handler onMarkLost
+handler onHandOff
+handler onEdit
+handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
+handler onOpenReport
+handler onOpenContacts
+handler onCreateProposal
+handler onWonOpportunity
+handler onLostOpportunity
+handler onSendForApproval
+handler onGeneratePdf
+handler onMarkDelivered
+handler onWonProposal
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -1653,7 +1660,7 @@ handler onClick
 
 ### src/modules/dashboard/helpers.ts
 ```
-export const byCurStr = (m, number>) =>  :3-4
+export const byCurStr = (m) =>  :3-4
 export const dleftBadge = (d) =>  :6-12
 export const severityRank = (d) =>  :15-15
 ```
@@ -1689,6 +1696,16 @@ handler onDragOver
 handler onDragEnd
 handler onDrop
 handler onClick
+```
+
+### src/modules/dashboard/useDashboardStream.ts
+```
+export function useDashboardStream(onRefresh) → void  :8-31
+```
+
+### src/modules/dashboard/useDragReorder.ts
+```
+export function useDragReorder(items, setItems) → { dragIndex, onDragStart, onDragOver, onDragEnd }  :5-20
 ```
 
 ### src/modules/dashboard/widgetCatalog.ts
@@ -1919,7 +1936,7 @@ export function prevRange(start, end)  :45-45
 export function printReportWindow(title, body)  :55-67
 export function printUnitReport(r)  :121-141
 export function printOverview(overview, start, end)  :143-153
-export const pct = (n) =>  :4-4
+export const pct = (n) =>  :4-6
 export const esc = (s) =>  :69-69
 ```
 
@@ -1979,31 +1996,45 @@ handler onChange
 handler onSubmit
 ```
 
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
 ### src/modules/todo/helpers.ts
 ```
-export interface ProposalDetailItem  :140-148
-  partNumber: string  :141-141
-  description: string  :142-142
-  quantity: number  :143-143
-  purchaseCost?: number  :144-144
-  unitSalePrice?: number  :145-145
-  totalSalePrice?: number  :146-146
-  marginPercentage?: number  :147-147
-export interface ProposalDetail  :150-159
-  price: string  :151-151
-  totalPrice: number  :152-152
-  totalCost: number  :153-153
-  items: ProposalDetailItem[]  :154-154
-  description: string  :155-155
-  terms: string  :156-156
-  version: number  :157-157
-  opportunityTitle: string  :158-158
+export interface ProposalDetailItem  :141-149
+  partNumber: string  :142-142
+  description: string  :143-143
+  quantity: number  :144-144
+  purchaseCost?: number  :145-145
+  unitSalePrice?: number  :146-146
+  totalSalePrice?: number  :147-147
+  marginPercentage?: number  :148-148
+export interface ProposalDetail  :151-160
+  price: string  :152-152
+  totalPrice: number  :153-153
+  totalCost: number  :154-154
+  items: ProposalDetailItem[]  :155-155
+  description: string  :156-156
+  terms: string  :157-157
+  version: number  :158-158
+  opportunityTitle: string  :159-159
 export const taskTargetTab = (t) =>  :49-58
-export const fmtCompletedAt = (d?) =>  :68-69
-export const getPriorityColor = (priority) =>  :71-78
-export const composedTitle = (newTask, taskAction, ctx) =>  :91-102
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :104-138
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :161-207
+export const fmtCompletedAt = (d?) =>  :69-70
+export const getPriorityColor = (priority) =>  :72-79
+export const composedTitle = (newTask, taskAction, ctx) =>  :92-103
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :105-139
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :162-208
 ```
 
 ### src/modules/todo/TaskList.tsx
@@ -2016,7 +2047,8 @@ hook useState
 ```
 class ApiClient  :3-100
   setAuth(tenantId, token)  :7-10
-  async fetchWithAuth(endpoint, options)  :12-44
+  async fetchWithAuth(endpoint, options = {})  :12-44
+  async streamDashboard(onMessage, signal) → Promise<void>  :49-70
   async login(email, password)  :72-85
   async forgotPassword(email)  :87-99
 ```
@@ -2077,35 +2109,6 @@ export interface OwnedCategory  :29-34
   key: string  :30-30
   label: string  :31-31
   count: number  :32-32
-```
-
-### src/types/crm.ts
-```
-export interface Opportunity  :4-39
-  id: string  :5-5
-  title: string  :6-6
-  value: number  :7-7
-  probability: number  :8-8
-  expectedCloseDate?: string  :9-9
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :10-10
-  description?: string  :11-11
-  lostReason?: string  :12-12
-  … +24 more members  :4-4
-export interface OpportunityProgressLog  :42-54
-  id: string  :43-43
-  tenantId: string  :44-44
-  opportunityId: string  :45-45
-  recordedById: string  :46-46
-  previousStatus: string  :47-47
-  newStatus: string  :48-48
-  previousProbability: number  :49-49
-  newProbability: number  :50-50
-  … +3 more members  :42-42
-export interface Customer  :55-84
-  id: string  :56-56
-  name: string  :57-57
-  shortName?: string  :58-58
-  industry?: string  :59-59
 ```
 
 ### src/types/dashboard.ts

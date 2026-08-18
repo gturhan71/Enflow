@@ -63,11 +63,12 @@ export const STAGE_ACTION_LABEL: Record<StageActionKey, string> = {
   COPY_FIELDS_TO_TASK: 'Seçili alanları göreve kopyala (veri aktarımı)',
   SUBMIT_TENDER: 'Teklifi teslim et',
   CREATE_SALES_INVOICE_FOR_PROJECT: 'Satış faturası oluştur (proje kapanışı)',
-  CREATE_INVOICE_FROM_PURCHASE: 'Fatura kaydı oluştur (yakında)',
+  CREATE_INVOICE_FROM_PURCHASE: 'Fatura kaydı oluştur (satınalma)',
 };
 export const LIVE_STAGE_ACTION_KEYS: StageActionKey[] = [
   'CREATE_PROJECT_FROM_ENTITY', 'CREATE_CONTRACT_FROM_TENDER', 'CREATE_PURCHASE_COST_ITEM',
   'CREATE_PURCHASE_REQUEST_FROM_CONTRACT', 'COPY_FIELDS_TO_TASK', 'SUBMIT_TENDER', 'CREATE_SALES_INVOICE_FOR_PROJECT',
+  'CREATE_INVOICE_FROM_PURCHASE',
 ];
 
 // Jenerik tetikleme + COPY_FIELDS_TO_TASK'ın kullandığı varlık türleri —

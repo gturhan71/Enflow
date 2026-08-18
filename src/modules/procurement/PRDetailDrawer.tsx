@@ -35,6 +35,7 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
   const computedQuoteTotal = quoteLines.reduce((s, l) => s + (Number(l.quantity) || 0) * (Number(l.unitPrice) || 0), 0);
   const [deliveryForm, setDeliveryForm] = useState({ deliveredAt: new Date().toISOString().split('T')[0], receivedBy: '', quantityOrdered: '', quantityReceived: '', quantityDamaged: '', status: 'RECEIVED', notes: '' });
   const [invoiceForm, setInvoiceForm] = useState({ invoiceNo: pr.invoiceNo ?? '', invoiceAmount: pr.invoiceAmount?.toString() ?? '', invoiceDate: pr.invoiceDate?.split('T')[0] ?? '', invoicePaidAt: pr.invoicePaidAt?.split('T')[0] ?? '' });
+  const [invoicePending, setInvoicePending] = useState(false);
 
   const canApprove = () => {
     if (pr.status === 'PENDING_UNIT' && (currentUserRole === 'SALES_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
@@ -121,10 +122,11 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
   const handleSaveInvoice = async () => {
     setLoading(true);
     try {
-      await apiService.updatePurchaseInvoice(pr.id, {
+      const result = await apiService.updatePurchaseInvoice(pr.id, {
         ...invoiceForm,
         invoiceAmount: invoiceForm.invoiceAmount ? Number(invoiceForm.invoiceAmount) : undefined,
-      });
+      }) as { pending?: boolean };
+      setInvoicePending(!!result?.pending);
       onRefresh();
     } finally { setLoading(false); }
   };
@@ -525,8 +527,38 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
               </div>
             )}
 
-            {pr.status !== 'INVOICED' && pr.status !== 'CLOSED' && (
-              <p className="text-sm text-slate-400 text-center py-6">Fatura, teslimat tamamlandıktan sonra kaydedilebilir.</p>
+            {(pr.status === 'PO_ISSUED' || pr.status === 'IN_DELIVERY') && (
+              <div className="border border-white/10 rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold text-slate-300">Fatura Bilgilerini Kaydet</p>
+                {(invoicePending || pr.invoiceNo || pr.invoiceAmount) && (
+                  <p className="text-xs font-semibold text-amber-500 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    Fatura onay zincirine gönderildi — onay tamamlanınca statü otomatik ilerleyecek.
+                  </p>
+                )}
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    ['invoiceNo', 'Fatura No', 'text'],
+                    ['invoiceAmount', 'Tutar (TRY)', 'number'],
+                    ['invoiceDate', 'Fatura Tarihi', 'date'],
+                    ['invoicePaidAt', 'Ödeme Tarihi (opsiyonel)', 'date'],
+                  ].map(([k, lbl, type]) => (
+                    <div key={k}>
+                      <label className="text-xs text-slate-400">{lbl}</label>
+                      <input type={type} value={(invoiceForm as Record<string,string>)[k]}
+                        onChange={e => setInvoiceForm(f => ({ ...f, [k]: e.target.value }))}
+                        className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1" />
+                    </div>
+                  ))}
+                </div>
+                <button onClick={handleSaveInvoice} disabled={loading}
+                  className="btn-primary px-4 py-2 text-sm rounded-xl disabled:opacity-50">
+                  Onaya Gönder
+                </button>
+              </div>
+            )}
+
+            {pr.status !== 'INVOICED' && pr.status !== 'CLOSED' && pr.status !== 'PO_ISSUED' && pr.status !== 'IN_DELIVERY' && (
+              <p className="text-sm text-slate-400 text-center py-6">Fatura, PO kesildikten sonra kaydedilebilir.</p>
             )}
           </div>
         )}

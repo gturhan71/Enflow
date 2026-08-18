@@ -136,7 +136,14 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   // İhale WON → Süreç Motoru: TENDER_TO_CONTRACT'ı ilerletir (yapılandırılmış
   // AUTO+CREATE_CONTRACT_FROM_TENDER adımı ContractWorkflow'u oluşturur ve bağlar).
   if (becomingWon) {
-    await advanceProcess(req.tenantId, 'TENDER_TO_CONTRACT', 'TENDER', item.id, { actorUserId: req.userId });
+    try {
+      await advanceProcess(req.tenantId, 'TENDER_TO_CONTRACT', 'TENDER', item.id, { actorUserId: req.userId });
+    } catch (e) {
+      if (e instanceof ProcessNotConfiguredError) {
+        return res.status(409).json({ error: 'İhale→Sözleşme süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "İhale → Sözleşme" sürecini kurgulayın.' });
+      }
+      throw e;
+    }
     item = (await prisma.tender.findFirst({ where: { id, tenantId: req.tenantId } })) ?? item;
   }
 

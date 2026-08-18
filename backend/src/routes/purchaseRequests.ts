@@ -3,7 +3,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { scoreQuotes } from '../services/virtualAgentService';
-import { advanceProcess, isAuthorizedForStep, ProcessNotConfiguredError } from '../services/processEngine';
+import { advanceProcess, finalizePurchaseInvoice, ProcessNotConfiguredError } from '../services/processEngine';
 import { resolveEffectiveApprover } from '../services/approvalChainService';
 
 const router: Router = Router();
@@ -525,69 +525,66 @@ router.post('/:id/delivery', asyncHandler(async (req: Request, res: Response) =>
 }));
 
 // ── INVOICE ───────────────────────────────────────────────────────────────
-// Süreç Motoru (Faz B) — tek-aktörlü yetkilendirme (isAuthorizedForStep):
-// tam bir onay zinciri gerekmiyor, yalnız tenant'ın PURCHASE_TO_INVOICE için
-// kurguladığı role/birime sahip kullanıcılar fatura işleyebilir.
+// Süreç Motoru — PURCHASE_TO_INVOICE artık tam bir çok-adımlı ApprovalChain
+// (advanceProcess), eski tek-aktörlü isAuthorizedForStep kaldırıldı. Fatura
+// verisi ÖNCE entity'ye "taslak" yazılır (status değişmez), zincir SONRA
+// başlatılır — AUTO adım (CREATE_INVOICE_FROM_PURCHASE, processEngine.ts)
+// kaç MANUAL onay aşaması olursa olsun bu taslak alanları entity'den okuyup
+// statüyü ilerletir + Finans Invoice'unu oluşturur. Ara onaylar generic
+// /approval-chains/:id/stages/:sid/approve (PendingChainApprovals.tsx) ile geçer.
 router.post('/:id/invoice', asyncHandler(async (req: Request, res: Response) => {
   const { invoiceNo, invoiceAmount, invoiceDate, invoicePaidAt } = req.body;
   const pr = await prisma.purchaseRequest.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId } });
   if (!pr) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
-  if (pr.status !== 'PO_ISSUED' && pr.status !== 'IN_DELIVERY') {
+
+  // Zaten onaylanıp INVOICED'a geçmiş bir talebin takip güncellemesi (ör. ödeme
+  // tarihi girip kapama) — bu ikinci adım yeniden onaya gitmez, ilk gönderim
+  // zaten zincirden geçmişti.
+  const isFollowUpUpdate = pr.status === 'INVOICED';
+  if (!isFollowUpUpdate && pr.status !== 'PO_ISSUED' && pr.status !== 'IN_DELIVERY') {
     return res.status(409).json({ error: 'Yalnız PO kesilmiş veya teslimat aşamasındaki bir talebe fatura işlenebilir.' });
   }
+
+  await prisma.purchaseRequest.update({
+    where: { id: pr.id },
+    data: {
+      invoiceNo: invoiceNo !== undefined ? (invoiceNo || null) : undefined,
+      invoiceAmount: invoiceAmount !== undefined ? (invoiceAmount ? Number(invoiceAmount) : null) : undefined,
+      invoiceDate: invoiceDate !== undefined ? (invoiceDate ? new Date(invoiceDate) : null) : undefined,
+      invoicePaidAt: invoicePaidAt !== undefined ? (invoicePaidAt ? new Date(invoicePaidAt) : null) : undefined,
+    },
+  });
+
+  if (isFollowUpUpdate) {
+    await finalizePurchaseInvoice(req.tenantId, pr.id, req.userId);
+    const after = await prisma.purchaseRequest.findFirst({
+      where: { id: pr.id, tenantId: req.tenantId },
+      include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
+    });
+    return res.json(after);
+  }
+
   try {
-    const authorized = await isAuthorizedForStep(req.tenantId, 'PURCHASE_TO_INVOICE', req.userId);
-    if (!authorized) return res.status(403).json({ error: 'Fatura işleme yetkiniz yok.' });
+    await advanceProcess(req.tenantId, 'PURCHASE_TO_INVOICE', 'PURCHASE_REQUEST', pr.id, { actorUserId: req.userId });
   } catch (e) {
     if (e instanceof ProcessNotConfiguredError) {
-      return res.status(409).json({ error: 'Satınalma fatura yetkilendirmesi henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Satınalma → Fatura" sürecini kurgulayın.' });
+      return res.status(409).json({ error: 'Satınalma fatura süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Satınalma → Fatura" sürecini kurgulayın.' });
     }
     throw e;
   }
 
-  const updated = await prisma.purchaseRequest.update({
-    where: { id: String(req.params.id), tenantId: req.tenantId },
-    data: {
-      invoiceNo: invoiceNo || null,
-      invoiceAmount: invoiceAmount ? Number(invoiceAmount) : null,
-      invoiceDate: invoiceDate ? new Date(invoiceDate) : null,
-      invoicePaidAt: invoicePaidAt ? new Date(invoicePaidAt) : null,
-      status: invoicePaidAt ? 'CLOSED' : 'INVOICED',
-    },
+  const after = await prisma.purchaseRequest.findFirst({
+    where: { id: pr.id, tenantId: req.tenantId },
     include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
+  if (!after) return res.status(404).json({ error: 'Satınalma talebi bulunamadı.' });
 
-  // Satınalma faturası → Finans Invoice (type=PURCHASE). Idempotent: purchaseRequestId ile upsert.
-  if (invoiceAmount || invoiceNo) {
-    const selectedQuote = updated.quotes.find(q => q.isSelected);
-    const amount = invoiceAmount ? Number(invoiceAmount) : 0;
-    const paid = !!invoicePaidAt;
-    const invData = {
-      type: 'PURCHASE',
-      invoiceNo: invoiceNo || null,
-      amount,
-      issueDate: invoiceDate ? new Date(invoiceDate) : null,
-      projectId: updated.projectId || null,
-      vendorName: selectedQuote?.vendorName || null,
-      status: paid ? 'PAID' : 'ISSUED',
-      paidAmount: paid ? amount : 0,
-      paidAt: paid ? new Date(invoicePaidAt) : null,
-      notes: `Satınalma talebinden: ${updated.title}`,
-    };
-    const existingInv = await prisma.invoice.findFirst({
-      where: { purchaseRequestId: updated.id, tenantId: req.tenantId },
-    });
-    if (existingInv) {
-      await prisma.invoice.update({ where: { id: existingInv.id }, data: invData });
-    } else {
-      await prisma.invoice.create({
-        data: { tenantId: req.tenantId, purchaseRequestId: updated.id, ...invData },
-      });
-    }
+  if (after.status === pr.status) {
+    // Zincir hâlâ PENDING (en az bir MANUAL onay aşaması bekliyor) — statü henüz ilerlemedi.
+    return res.status(202).json({ pending: true, message: 'Fatura onay zincirine gönderildi — onay tamamlanınca işlenecek.', purchaseRequest: after });
   }
 
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: `STATUS_${updated.status}`, entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { invoiceNo: invoiceNo || null, invoiceAmount: invoiceAmount ?? null } });
-  res.json(updated);
+  res.json(after);
 }));
 
 // ── CLOSE ─────────────────────────────────────────────────────────────────

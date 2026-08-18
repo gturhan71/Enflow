@@ -514,6 +514,61 @@ async function createSalesInvoiceForProject(ctx: StageActionCtx): Promise<void> 
   }, ctx.actorUserId);
 }
 
+/**
+ * Satınalma faturasını sonlandırır: PR.status'u INVOICED/CLOSED'a ilerletir +
+ * Finans Invoice (type=PURCHASE) kaydını idempotent upsert eder. Fatura
+ * alanları (invoiceNo/Amount/Date/PaidAt) `purchaseRequests.ts` `/:id/invoice`
+ * tarafından bu fonksiyon çağrılmadan ÖNCE entity'ye yazılmış olmalı — AUTO
+ * adım, tenant'ın PURCHASE_TO_INVOICE'a kaç MANUAL onay aşaması koyduğundan
+ * bağımsız çalışabilsin diye (aradaki onaylar `continueProcess` üzerinden,
+ * orijinal istek gövdesi olmadan geçer — bkz. walkForward) veriyi `opts.input`
+ * yerine doğrudan PurchaseRequest kaydından okur.
+ */
+export async function finalizePurchaseInvoice(tenantId: string, purchaseRequestId: string, actorUserId?: string): Promise<void> {
+  const pr = await prisma.purchaseRequest.findFirst({
+    where: { id: purchaseRequestId, tenantId },
+    include: { quotes: true },
+  });
+  if (!pr) throw new Error('Satınalma talebi bulunamadı.');
+  if (pr.status === 'INVOICED' || pr.status === 'CLOSED') return; // idempotent — zaten sonlandırılmış
+
+  const paid = !!pr.invoicePaidAt;
+  const nextStatus = paid ? 'CLOSED' : 'INVOICED';
+  await prisma.purchaseRequest.update({ where: { id: pr.id }, data: { status: nextStatus } });
+
+  if (pr.invoiceAmount || pr.invoiceNo) {
+    const selectedQuote = pr.quotes.find(q => q.isSelected);
+    const amount = pr.invoiceAmount ? Number(pr.invoiceAmount) : 0;
+    const invData = {
+      type: 'PURCHASE',
+      invoiceNo: pr.invoiceNo || null,
+      amount,
+      issueDate: pr.invoiceDate,
+      projectId: pr.projectId || null,
+      vendorName: selectedQuote?.vendorName || null,
+      status: paid ? 'PAID' : 'ISSUED',
+      paidAmount: paid ? amount : 0,
+      paidAt: pr.invoicePaidAt,
+      notes: `Satınalma talebinden: ${pr.title}`,
+    };
+    const existingInv = await prisma.invoice.findFirst({ where: { purchaseRequestId: pr.id, tenantId } });
+    if (existingInv) {
+      await prisma.invoice.update({ where: { id: existingInv.id }, data: invData });
+    } else {
+      await prisma.invoice.create({ data: { tenantId, purchaseRequestId: pr.id, ...invData } });
+    }
+  }
+
+  await logActivity({ tenantId, userId: actorUserId, action: `STATUS_${nextStatus}`, entityType: 'PURCHASE_REQUEST', entityId: pr.id, details: { invoiceNo: pr.invoiceNo, invoiceAmount: pr.invoiceAmount } });
+}
+
+async function createInvoiceFromPurchase(ctx: StageActionCtx): Promise<void> {
+  if (ctx.entityType !== 'PURCHASE_REQUEST') {
+    throw new Error(`CREATE_INVOICE_FROM_PURCHASE bu entityType için henüz desteklenmiyor: ${ctx.entityType}`);
+  }
+  await finalizePurchaseInvoice(ctx.tenantId, ctx.entityId, ctx.actorUserId);
+}
+
 export const STAGE_ACTIONS: Record<string, (ctx: StageActionCtx) => Promise<void>> = {
   CREATE_PROJECT_FROM_ENTITY: createProjectFromEntity,
   CREATE_CONTRACT_FROM_TENDER: createContractFromTender,
@@ -522,8 +577,7 @@ export const STAGE_ACTIONS: Record<string, (ctx: StageActionCtx) => Promise<void
   COPY_FIELDS_TO_TASK: copyFieldsToTask,
   SUBMIT_TENDER: submitTender,
   CREATE_SALES_INVOICE_FOR_PROJECT: createSalesInvoiceForProject,
-  // Yol haritası — kayıtlı ama henüz uygulanmadı, çağrılırsa açık hata verir:
-  CREATE_INVOICE_FROM_PURCHASE: async () => { throw new Error('actionKey henüz uygulanmadı: CREATE_INVOICE_FROM_PURCHASE'); },
+  CREATE_INVOICE_FROM_PURCHASE: createInvoiceFromPurchase,
 };
 
 // ── advanceProcess ──────────────────────────────────────────────────────────

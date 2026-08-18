@@ -31,7 +31,8 @@ export const DEFAULT_WORKFLOW_TEMPLATE: Record<string, TemplateProcess> = {
     entityType: 'OPPORTUNITY',
     steps: [
       { unitKey: 'sales', role: 'SALES_MGR', type: 'MANUAL', description: 'Satış Müdürü ön onayı', order: 0 },
-      { unitKey: 'top', role: 'GENERAL_MANAGER', type: 'MANUAL', description: 'Genel Müdür nihai onayı', order: 1 },
+      { unitKey: 'igpd', role: 'IGPD_MGR', type: 'MANUAL', description: 'İGB iş geliştirme uygunluk onayı', order: 1 },
+      { unitKey: 'top', role: 'GENERAL_MANAGER', type: 'MANUAL', description: 'Genel Müdür nihai onayı', order: 2 },
     ],
   },
   CONTRACT_SIGNING: {
@@ -63,8 +64,9 @@ export const DEFAULT_WORKFLOW_TEMPLATE: Record<string, TemplateProcess> = {
     name: 'Sözleşme → Proje',
     entityType: 'CONTRACT_WORKFLOW_SIGNING',
     steps: [
-      { unitKey: 'project', role: 'PROJECT_MGR', type: 'MANUAL', description: 'Proje devralma onayı', order: 0 },
-      { unitKey: 'project', role: null, type: 'AUTO', description: 'Proje kaydı oluştur', order: 1, actionKey: 'CREATE_PROJECT_FROM_ENTITY' },
+      { unitKey: 'kgd', role: 'KGD_MGR', type: 'MANUAL', description: 'KY kalite güvence ön kontrolü', order: 0 },
+      { unitKey: 'project', role: 'PROJECT_MGR', type: 'MANUAL', description: 'Proje devralma onayı', order: 1 },
+      { unitKey: 'project', role: null, type: 'AUTO', description: 'Proje kaydı oluştur', order: 2, actionKey: 'CREATE_PROJECT_FROM_ENTITY' },
     ],
   },
   CONTRACT_TO_PROCUREMENT: {
