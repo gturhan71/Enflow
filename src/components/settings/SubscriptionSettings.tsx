@@ -1,19 +1,16 @@
 import React from 'react';
-import { apiService } from '../../services/apiService';
 import { Subscription, UsageMetric, User } from '../../types';
 
 interface SubscriptionSettingsProps {
   subscription: Subscription | null;
   usage: UsageMetric[];
   currentUser: User;
-  fetchSubscriptionData: () => void;
 }
 
 export const SubscriptionSettings = ({
   subscription,
   usage,
   currentUser,
-  fetchSubscriptionData
 }: SubscriptionSettingsProps) => {
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -42,25 +39,9 @@ export const SubscriptionSettings = ({
           })()}
 
           {currentUser?.role === 'GENERAL_MANAGER' && (
-            <div className="space-y-2">
-              <select
-                onChange={async (e) => {
-                  try {
-                    await apiService.updateTenantSubscription(currentUser.tenantId ?? '', e.target.value);
-                    fetchSubscriptionData();
-                    alert('Plan güncellendi.');
-                  } catch (err) {
-                    alert('Plan güncellenemedi.');
-                  }
-                }}
-                className="w-full px-4 py-2 border border-slate-200 rounded-xl bg-white text-sm outline-none focus:border-primary"
-                value={subscription?.plan || 'STARTER'}
-              >
-                <option value="STARTER">STARTER</option>
-                <option value="PROFESSIONAL">PROFESSIONAL</option>
-                <option value="ENTERPRISE">ENTERPRISE</option>
-              </select>
-            </div>
+            <p className="text-xs text-slate-500 font-medium bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+              Plan doğrudan değiştirilemez — lisansınıza bağlıdır. Yükseltmek için Ayarlar → Lisans Planları'ndan yeni bir lisans anahtarı aktive edin.
+            </p>
           )}
         </div>
         <div className="glass-panel p-6 rounded-3xl bg-white border border-slate-100 shadow-sm">

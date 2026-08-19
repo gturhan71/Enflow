@@ -8,6 +8,13 @@ export const PLAN_MAP: Record<string, PlanId> = {
   STARTER: 'STARTER', PRO: 'PROFESSIONAL', PROFESSIONAL: 'PROFESSIONAL', ENTERPRISE: 'ENTERPRISE', CUSTOM: 'PROFESSIONAL',
 };
 
+// Plan sıralaması — /tenants/activate-license'ın "yalnız yükselt" kuralı için
+// (bkz. docs/LICENSING_ARCHITECTURE.md): aktive edilen yeni lisansın planı mevcut
+// plandan düşükse (rank azalıyorsa) reddedilir. Düşürme yalnız vendor'un yeni bir
+// lisans üretmesiyle (dolayısıyla harici, uygulama-dışı bir süreçle) mümkündür —
+// bu app ödeme/faturalama takip etmez, o her zaman lisans üretim sürecinin dışındaydı.
+export const PLAN_RANK: Record<PlanId, number> = { STARTER: 0, PROFESSIONAL: 1, ENTERPRISE: 2 };
+
 // Lisansta (Subscription.licensedUserLimit / licensedStorageLimit) özel bir
 // değer yoksa uygulanan varsayılan plan limitleri. ENTERPRISE için 999/1000
 // pratikte "sınırsız" temsilidir (frontend'de de aynı sentinel kullanılır).

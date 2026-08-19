@@ -232,7 +232,6 @@ class ApiService {
 
   // --- SUBSCRIPTION & USAGE ---
   async getSubscription() { return settingsService.getSubscription(); }
-  async updateTenantSubscription(tenantId: string, plan: string) { return settingsService.updateTenantSubscription(tenantId, plan); }
   async activateLicense(licenseKey: string) { return settingsService.activateLicense(licenseKey); }
   async getUsage() { return settingsService.getUsage(); }
 

@@ -89,13 +89,6 @@ export const settingsService = {
     return apiClient.fetchWithAuth('/subscription');
   },
 
-  async updateTenantSubscription(tenantId: string, plan: string) {
-    return apiClient.fetchWithAuth(`/tenants/${tenantId}/subscription`, {
-      method: 'PUT',
-      body: JSON.stringify({ plan })
-    });
-  },
-
   async activateLicense(licenseKey: string) {
     return apiClient.fetchWithAuth('/tenants/activate-license', {
       method: 'POST',

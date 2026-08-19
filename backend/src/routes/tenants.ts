@@ -5,7 +5,7 @@ import { logActivity } from '../services/activityLog';
 import { isAIConfigured, assertSafeAiUrl } from '../services/aiClient';
 import { verifyLicenseToken } from '../services/licenseVerify';
 import { encryptForTenant } from '../services/tenantEncryption';
-import { PLAN_MAP } from '../planCatalog';
+import { PLAN_MAP, PLAN_RANK } from '../planCatalog';
 
 const router: Router = Router();
 
@@ -35,26 +35,17 @@ router.post('/', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandle
 // NOT: Bare `/:id` rotaları, `/module-settings` ve `/ai-settings` gibi sabit
 // segmentleri gölgelememesi için DOSYA SONUNA taşındı (specific-before-param).
 
-router.put('/:id/subscription', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
-  // IDOR koruması: yalnız çağıranın KENDİ tenant'ı üzerinde işlem yapılır.
-  // URL parametresi yetkili kaynak DEĞİL — req.tenantId (imzalı token) kullanılır.
-  if (req.params.id && req.params.id !== req.tenantId) {
-    return res.status(403).json({ error: 'Yalnız kendi şirketinizin aboneliğini değiştirebilirsiniz.' });
-  }
-  const tenantId = req.tenantId;
-  const { plan } = req.body;
-
-  if (!['STARTER', 'PROFESSIONAL', 'ENTERPRISE'].includes(plan)) {
-    return res.status(400).json({ error: 'Geçersiz plan tipi.' });
-  }
-
-  const subscription = await prisma.subscription.upsert({
-    where: { tenantId },
-    update: { plan },
-    create: { tenantId, plan }
-  });
-
-  res.json(subscription);
+// Eskiden herhangi bir GM burada plan'ı ('STARTER'|'PROFESSIONAL'|'ENTERPRISE')
+// HİÇBİR lisans doğrulaması olmadan doğrudan yazabiliyordu — docs/LICENSING_ARCHITECTURE.md'nin
+// "tenant yalnız doğrula+aktive eder, uygulama içi üretim kalkar" hedefini bypass eden bir
+// kalıntıydı (tenant kendine bedava ENTERPRISE limiti basabiliyordu). Bunun "kilit" olarak
+// göründüğü frontend kontrolü (LicenseTypesModule.tsx eski UNLOCKED_PLANS) de KOBI/
+// PAY_AS_YOU_GO/ON_PREMISE anahtarları kullanıyordu — license-tool'un gerçekte ürettiği
+// sku vokabüleriyle (STARTER/PRO/ENTERPRISE/CUSTOM, bkz. planCatalog.ts PLAN_MAP)
+// hiç eşleşmediği için pratikte hiçbir zaman kilitlemiyordu. Kaldırıldı — /plugins/generate-key
+// 410 emsaliyle aynı sert kesim. Plan artık YALNIZ /activate-license (imzalı lisans) ile değişir.
+router.put('/:id/subscription', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (_req: Request, res: Response) => {
+  res.status(410).json({ error: 'Plan doğrudan değiştirilemez. Yükseltmek için Ayarlar → Lisans Planları\'ndan yeni bir lisans anahtarı aktive edin.' });
 }));
 
 // ── Lisans aktivasyonu (Ed25519 imzalı, tenant-bağlı — yalnız DOĞRULA) ───────
@@ -80,6 +71,14 @@ router.post('/activate-license', tenantMiddleware, requireRole(['GENERAL_MANAGER
 
   const p = result.payload;
   const plan = PLAN_MAP[(p.sku || '').toUpperCase()] || 'PROFESSIONAL';
+
+  // Yalnız yükseltme — yeni lisansın planı mevcut plandan düşükse reddedilir
+  // (bkz. docs/LICENSING_ARCHITECTURE.md, PLAN_RANK). Düşürme ancak vendor'un
+  // ayrıca yeni bir lisans üretmesiyle (uygulama-dışı bir süreçle) mümkündür.
+  const current = await prisma.subscription.findUnique({ where: { tenantId: req.tenantId }, select: { plan: true } });
+  if (current && PLAN_RANK[plan] < PLAN_RANK[current.plan as keyof typeof PLAN_RANK]) {
+    return res.status(409).json({ error: `Bu lisans mevcut planınızdan (${current.plan}) daha düşük bir plana (${plan}) sahip. Plan düşürme yalnız vendor'dan yeni bir lisans talep ederek yapılabilir.` });
+  }
 
   const data = {
     plan,

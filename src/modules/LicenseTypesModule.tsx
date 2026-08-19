@@ -5,14 +5,12 @@ import {
   Zap,
   Building2,
   Globe,
-  ChevronRight,
   Star,
   Users,
   HardDrive,
   Cpu,
   RefreshCw,
   Key,
-  Lock,
   Calendar,
   AlertCircle,
   CheckCircle2,
@@ -114,13 +112,6 @@ const PLANS: PlanDef[] = [
   },
 ];
 
-// Lisans modeline göre hangi planlar erişilebilir
-const UNLOCKED_PLANS: Record<string, string[]> = {
-  KOBI: ['STARTER'],
-  PAY_AS_YOU_GO: ['STARTER', 'PROFESSIONAL'],
-  ON_PREMISE: ['STARTER', 'PROFESSIONAL', 'ENTERPRISE'],
-};
-
 const COLOR_MAP: Record<string, { ring: string; bg: string; text: string; btn: string }> = {
   emerald: { ring: 'ring-emerald-500/30', bg: 'bg-emerald-500/10', text: 'text-emerald-600', btn: 'bg-emerald-500 hover:bg-emerald-400 text-white' },
   primary:  { ring: 'ring-primary/40',    bg: 'bg-primary/10',     text: 'text-primary',     btn: 'bg-primary hover:bg-primary/90 text-white' },
@@ -132,7 +123,6 @@ const LicenseTypesModule: React.FC = () => {
   const isGM = currentUser?.role === 'GENERAL_MANAGER';
 
   const [sub, setSub] = useState<SubscriptionData>({ plan: 'STARTER' });
-  const [saving, setSaving] = useState(false);
   const [licenseInput, setLicenseInput] = useState('');
   const [activating, setActivating] = useState(false);
   const [activateError, setActivateError] = useState<string | null>(null);
@@ -146,20 +136,6 @@ const LicenseTypesModule: React.FC = () => {
   };
 
   useEffect(() => { fetchSub(); }, []);
-
-  const unlocked = sub.licenseModel ? (UNLOCKED_PLANS[sub.licenseModel] ?? null) : null;
-
-  const isPlanUnlocked = (planId: string) => !unlocked || unlocked.includes(planId);
-
-  const handleChangePlan = async (planId: string) => {
-    if (!isGM || planId === sub.plan || !isPlanUnlocked(planId)) return;
-    setSaving(true);
-    try {
-      await apiService.updateTenantSubscription(currentUser!.tenantId ?? '', planId);
-      setSub((prev) => ({ ...prev, plan: planId }));
-    } catch { /* sessiz */ }
-    finally { setSaving(false); }
-  };
 
   const handleActivate = async () => {
     if (!licenseInput.trim()) return;
@@ -304,15 +280,12 @@ const LicenseTypesModule: React.FC = () => {
         </button>
       </div>
 
-      {/* Plan kartları */}
+      {/* Plan kartları — salt bilgi amaçlı; plan yalnız yukarıdaki lisans aktivasyonuyla değişir */}
       <div>
-        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">
-          {unlocked ? `Lisansınız (${sub.licenseModel}) ile erişilebilen planlar` : 'Mevcut Planlar'}
-        </p>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Mevcut Planlar</p>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {PLANS.map((plan) => {
             const isActive = sub.plan === plan.id;
-            const isLocked = !isPlanUnlocked(plan.id);
             const cm = COLOR_MAP[plan.color];
 
             return (
@@ -320,21 +293,18 @@ const LicenseTypesModule: React.FC = () => {
                 key={plan.id}
                 className={cn(
                   'glass-card rounded-[24px] p-6 flex flex-col gap-4 border transition-all duration-300',
-                  isActive ? `ring-2 ${cm.ring} border-transparent` : 'border-white/20',
-                  isLocked ? 'opacity-50' : 'hover:border-white/40'
+                  isActive ? `ring-2 ${cm.ring} border-transparent` : 'border-white/20 hover:border-white/40'
                 )}
               >
-                {plan.recommended && !isActive && !isLocked && (
+                {plan.recommended && !isActive && (
                   <span className="self-start text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-full bg-primary/10 text-primary border border-primary/20">
                     Önerilen
                   </span>
                 )}
 
                 <div className="flex items-center gap-3">
-                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', isLocked ? 'bg-slate-100' : cm.bg)}>
-                    {isLocked
-                      ? <Lock size={16} className="text-slate-300" />
-                      : <plan.icon size={18} className={cm.text} strokeWidth={2} />}
+                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', cm.bg)}>
+                    <plan.icon size={18} className={cm.text} strokeWidth={2} />
                   </div>
                   <div>
                     <p className="font-bold text-slate-900 text-sm leading-tight">{plan.label}</p>
@@ -375,34 +345,16 @@ const LicenseTypesModule: React.FC = () => {
                   ))}
                 </ul>
 
-                {isLocked ? (
-                  <div className="text-center text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center gap-1.5">
-                    <Lock size={11} /> Lisans Gerekli
-                  </div>
-                ) : isGM ? (
-                  <button
-                    onClick={() => handleChangePlan(plan.id)}
-                    disabled={isActive || saving}
-                    className={cn(
-                      'w-full py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5',
-                      isActive ? `${cm.btn} cursor-default` : 'bg-slate-100 text-slate-600 hover:bg-slate-200 active:scale-95',
-                      saving ? 'opacity-50 cursor-wait' : ''
-                    )}
-                  >
-                    {saving ? (
-                      <RefreshCw size={12} className="animate-spin" />
-                    ) : isActive ? (
-                      <><Check size={12} strokeWidth={3} /> Aktif Plan</>
-                    ) : (
-                      <><ChevronRight size={12} /> Bu Plana Geç</>
-                    )}
-                  </button>
-                ) : isActive ? (
+                {isActive ? (
                   <div className={cn('text-center text-[10px] font-black uppercase tracking-widest py-2 rounded-xl', cm.bg, cm.text)}>
                     <Check size={11} className="inline mr-1" strokeWidth={3} />
                     Aktif Planınız
                   </div>
-                ) : null}
+                ) : (
+                  <div className="text-center text-[10px] font-black uppercase tracking-widest py-2.5 rounded-xl bg-slate-100 text-slate-400 flex items-center justify-center gap-1.5">
+                    <Key size={11} /> Yükseltmek için lisans aktive edin
+                  </div>
+                )}
               </div>
             );
           })}
