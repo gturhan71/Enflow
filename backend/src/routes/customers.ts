@@ -9,15 +9,32 @@ const DUPLICATE_SIMILARITY_THRESHOLD = 0.82;
 
 // B-06 — mükerrer kurum kaydı uyarısı: kayıt reddedilmez (Faz 1/2'deki "uyar,
 // engelleme" felsefesiyle aynı), yalnız görünür + denetlenebilir hale gelir.
-async function findPossibleDuplicates(tenantId: string, name: string) {
+// excludeId: parentId verilmişse üst müşteri karşılaştırmadan hariç tutulur —
+// şube adının üst müşteri adına benzemesi (ör. "ABC — İstanbul Şubesi" vs "ABC") beklenendir.
+async function findPossibleDuplicates(tenantId: string, name: string, excludeId?: string) {
   if (!name) return [] as { id: string; name: string; similarity: number }[];
   const normalizedNew = normalizeCompanyName(name);
-  const existing = await prisma.customer.findMany({ where: { tenantId }, select: { id: true, name: true } });
+  const existing = await prisma.customer.findMany({
+    where: { tenantId, ...(excludeId ? { id: { not: excludeId } } : {}) },
+    select: { id: true, name: true },
+  });
   return existing
     .map((c) => ({ id: c.id, name: c.name, similarity: Math.round(similarityRatio(normalizedNew, normalizeCompanyName(c.name)) * 100) / 100 }))
     .filter((m) => m.similarity >= DUPLICATE_SIMILARITY_THRESHOLD)
     .sort((a, b) => b.similarity - a.similarity)
     .slice(0, 3);
+}
+
+// Alt birim (şube) ilişkisi — tek seviye hiyerarşi (bkz. Unit.parentId deseni).
+// Tenant-scope doğrulaması burada yapılır: parentId'nin var olduğunu VE aynı
+// tenant'a ait olduğunu kontrol etmeden kabul etmek, FK'nın satırın varlığını
+// kontrol edip tenant'ını kontrol etmemesi nedeniyle cross-tenant bağlantıya yol açar.
+async function validateParent(tenantId: string, parentId: string, selfId?: string): Promise<string | null> {
+  if (selfId && parentId === selfId) return 'Bir müşteri kendi üst müşterisi olamaz.';
+  const parent = await prisma.customer.findFirst({ where: { id: parentId, tenantId }, select: { id: true, parentId: true } });
+  if (!parent) return 'Üst müşteri bulunamadı.';
+  if (parent.parentId) return 'Üst müşteri olarak yalnızca en üst seviye müşteri seçilebilir.';
+  return null;
 }
 
 const GM = requireRole(['GENERAL_MANAGER']);
@@ -44,7 +61,11 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
   const body = { ...req.body };
-  const duplicateWarning = await findPossibleDuplicates(req.tenantId, body.name);
+  if (body.parentId) {
+    const parentError = await validateParent(req.tenantId, body.parentId);
+    if (parentError) return res.status(400).json({ error: parentError });
+  }
+  const duplicateWarning = await findPossibleDuplicates(req.tenantId, body.name, body.parentId || undefined);
   if (body.taxNumber) body.taxNumber = await encryptForTenant(req.tenantId, body.taxNumber);
   if (body.taxOffice) body.taxOffice = await encryptForTenant(req.tenantId, body.taxOffice);
   const customer = await prisma.customer.create({
@@ -62,6 +83,12 @@ router.put('/:id', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Reque
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
   const body = { ...req.body };
+  if (body.parentId) {
+    const parentError = await validateParent(tenantId, body.parentId, id);
+    if (parentError) return res.status(400).json({ error: parentError });
+    const childCount = await prisma.customer.count({ where: { parentId: id, tenantId } });
+    if (childCount > 0) return res.status(400).json({ error: 'Alt birimi olan bir müşteri başka bir müşterinin altına taşınamaz.' });
+  }
   if (body.taxNumber) body.taxNumber = await encryptForTenant(tenantId, body.taxNumber);
   if (body.taxOffice) body.taxOffice = await encryptForTenant(tenantId, body.taxOffice);
   const customer = await prisma.customer.update({ where: { id }, data: body });
@@ -75,6 +102,9 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
 
   const record = await prisma.customer.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
+
+  const childCount = await prisma.customer.count({ where: { parentId: id, tenantId } });
+  if (childCount > 0) return res.status(400).json({ error: `Bu müşterinin ${childCount} alt birimi var, önce onları silin veya taşıyın.` });
 
   await prisma.customer.delete({ where: { id } });
   await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'CUSTOMER', entityId: id });

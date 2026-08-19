@@ -77,6 +77,7 @@ export interface Customer {
   socialMedia?: string;
   notes?: string;
   status: 'ACTIVE' | 'PASSIVE';
+  parentId?: string | null;
   tenantId: string;
   createdAt?: string;
   updatedAt?: string;

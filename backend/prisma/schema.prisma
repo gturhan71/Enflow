@@ -169,13 +169,18 @@ model Customer {
   socialMedia       String?
   notes             String?
   status            String        @default("ACTIVE")
+  parentId          String?       // üst müşteri (şube/alt-birim — tek seviye, bkz. Unit.parentId deseni)
   tenantId          String
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
   tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  parent            Customer?     @relation("CustomerHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children          Customer[]    @relation("CustomerHierarchy")
   opportunities     Opportunity[]
   contacts          Contact[]
   invoices          Invoice[]
+
+  @@index([tenantId, parentId])
 }
 
 // Kurumsal müşteride birden çok kişi (satınalma sorumlusu/teknik şartname yazarı/

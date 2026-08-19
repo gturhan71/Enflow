@@ -29,7 +29,26 @@ export default function NewOpportunityModal({
           <input type="text" name="title" required value={values.title} onChange={handleChange} placeholder="Fırsat Başlığı" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
           <select name="customerId" required value={values.customerId} onChange={handleChange} className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none">
             <option value="">Müşteri Seçin...</option>
-            {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            {(() => {
+              const topLevel = customers.filter(c => !c.parentId);
+              const childrenByParent = new Map<string, Customer[]>();
+              for (const c of customers) {
+                if (!c.parentId) continue;
+                const arr = childrenByParent.get(c.parentId) ?? [];
+                arr.push(c);
+                childrenByParent.set(c.parentId, arr);
+              }
+              return topLevel.map(parent => {
+                const kids = childrenByParent.get(parent.id) ?? [];
+                if (kids.length === 0) return <option key={parent.id} value={parent.id}>{parent.name}</option>;
+                return (
+                  <optgroup key={parent.id} label={parent.name}>
+                    <option value={parent.id}>{parent.name} (Genel Merkez)</option>
+                    {kids.map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
+                  </optgroup>
+                );
+              });
+            })()}
           </select>
           <input type="number" name="value" min={0} value={values.value ?? 0} onChange={handleChange} placeholder="Tahmini Bedel" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
           <div>

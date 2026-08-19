@@ -365,7 +365,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/SubscriptionSettings.tsx ← ../types
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
@@ -387,12 +386,14 @@ backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, p
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
+src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
+src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
@@ -408,11 +409,12 @@ src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
-src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
+src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
-src/modules/crm/NewCustomerModal.tsx ← ../types
+src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
+src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
@@ -456,7 +458,6 @@ src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
@@ -516,7 +517,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 16 minutes ago)
+## changes (last 10 commits — 78 minutes ago)
 ```
 src/content/helpArticles.ts                   +zaman
 src/lib/permissionTree.ts                     ~buildPermissionGroups
@@ -613,14 +614,6 @@ export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
 export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
 ```
 
-### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
-```
-TABLE ActivityLogArchive
-INDEX ActivityLogArchive_tenantId_status_idx ON ActivityLogArchive
-INDEX ActivityLogArchive_tenantId_startedAt_idx ON ActivityLogArchive
-INDEX ActivityLog_tenantId_timestamp_idx ON ActivityLog
-```
-
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
 ```
 TABLE new_BoMItem
@@ -683,6 +676,12 @@ INDEX Workflow_tenantId_processKey_key ON Workflow
 TABLE new_WorkflowStep
 ```
 
+### backend/prisma/migrations/20260819134722_add_customer_parent_hierarchy/migration.sql
+```
+TABLE new_Customer
+INDEX Customer_tenantId_parentId_idx ON Customer
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
@@ -700,11 +699,6 @@ export interface LogActivityParams  :13-22
   actorType?: 'HUMAN' | 'AGENT'  :20-20
   agentRunId?: string | null  :21-21
 export async function logActivity(p) → Promise<void>  :24-52
-```
-
-### backend/src/services/activityLogArchiveScheduler.ts
-```
-export function startActivityLogArchiveScheduler() → void  :40-45
 ```
 
 ### backend/src/services/activityLogSummary.ts
@@ -1039,14 +1033,6 @@ export interface HelpArticle  :13-18
 export const getHelpArticle = (moduleId) =>  :183-183
 ```
 
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
-```
-
 ### src/layout/Sidebar.tsx
 ```
 hook useUnsavedChanges
@@ -1264,7 +1250,7 @@ export interface OpportunityProgressLog  :42-54
   previousProbability: number  :49-49
   newProbability: number  :50-50
   … +3 more members  :42-42
-export interface Customer  :55-84
+export interface Customer  :55-85
   id: string  :56-56
   name: string  :57-57
   shortName?: string  :58-58
@@ -1327,6 +1313,14 @@ export interface ApprovalStage  :143-157
 export interface Workflow  :158-168
   id: string  :159-159
   name: string  :160-160
+```
+
+### src/components/CustomerCombobox.tsx
+```
+component CustomerCombobox
+hook useState
+hook useMemo
+handler onChange
 ```
 
 ### src/components/HandOffModal.tsx
@@ -1396,6 +1390,14 @@ hook useState
 export UserManagement
 handler onSubmit
 handler onConfirm
+```
+
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -1590,19 +1592,6 @@ handler onSendForApproval
 handler onRejectSignature
 ```
 
-### src/modules/CorporateGovernanceModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export CorporateGovernanceModule
-handler onDelete
-handler onTrack
-handler onClick
-handler onChange
-```
-
 ### src/modules/CostAnalysisModule.tsx
 ```
 hook useAuth
@@ -1620,6 +1609,13 @@ export const proposalStatusTone = (status) =>  :16-32
 export const getStatusStyle = (status) =>  :21-32
 ```
 
+### src/modules/crm/CustomersView.tsx
+```
+component CustomersView
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/DashboardView.tsx
 ```
 component DashboardView
@@ -1627,12 +1623,21 @@ handler onOpps
 handler onValue
 ```
 
+### src/modules/crm/LostReasonModal.tsx
+```
+component LostReasonModal
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/NewCustomerModal.tsx
 ```
 component NewCustomerModal
+hook useState
 handler onClick
 handler onSubmit
 handler onChange
+handler onPick
 ```
 
 ### src/modules/crm/NewOpportunityModal.tsx
@@ -1670,6 +1675,7 @@ hook useAuth
 hook useState
 hook useEffect
 hook useSearch
+hook useMemo
 export CRMModule
 handler onProposal
 handler onOpportunity
@@ -1690,7 +1696,6 @@ handler onLostOpportunity
 handler onSendForApproval
 handler onGeneratePdf
 handler onMarkDelivered
-handler onWonProposal
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -2274,6 +2279,13 @@ export interface BrandSource  :23-32
   isActive: boolean  :29-29
   createdAt: string  :30-30
   updatedAt: string  :31-31
+```
+
+### src/utils/textSimilarity.ts
+```
+export function normalizeCompanyName(name) → string  :10-17  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
+export function levenshteinDistance(a, b) → number  :20-39  # Standart düzenleme mesafesi (dinamik programlama)
+export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) — 1 (aynı) arası benzerlik oranı
 ```
 
 ## upgrade-tool

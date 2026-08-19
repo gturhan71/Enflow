@@ -1,13 +1,14 @@
-import { Search, FileSpreadsheet, Plus, Building, Mail, Phone, MapPin, Trophy, AlertTriangle, BarChart2, ChevronRight, Users } from 'lucide-react';
+import { Search, FileSpreadsheet, Plus, Building, Mail, Phone, MapPin, Trophy, AlertTriangle, BarChart2, ChevronRight, Users, GitBranch } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Customer, CustomerHealthReport } from '../../types';
 import { CustomerHealthCard } from '../../components/HealthCards';
 import { PermissionGate } from '../../components/PermissionGate';
+import InfoTooltip from '../../components/InfoTooltip';
 import { CustomerStats } from './helpers';
 
 export default function CustomersView({
-  filteredCustomers, totalCount, searchQuery, setSearchQuery, customerHealth,
+  filteredCustomers, totalCount, searchQuery, setSearchQuery, customerHealth, customersById,
   onImport, onNewCustomer, getStats, onOpenReport, onOpenContacts,
 }: {
   filteredCustomers: Customer[];
@@ -15,6 +16,7 @@ export default function CustomersView({
   searchQuery: string;
   setSearchQuery: (v: string) => void;
   customerHealth: CustomerHealthReport | null;
+  customersById: Map<string, Customer>;
   onImport: () => void;
   onNewCustomer: () => void;
   getStats: (customerId: string) => CustomerStats;
@@ -86,7 +88,24 @@ export default function CustomersView({
                   {customer.status === 'ACTIVE' ? 'Aktif' : 'Pasif'}
                 </span>
               </div>
-              <h4 className="font-black text-slate-900 text-base leading-snug">{customer.name}</h4>
+              <div className="flex items-center gap-1.5">
+                <h4 className="font-black text-slate-900 text-base leading-snug">{customer.name}</h4>
+                {(() => {
+                  const children = [...customersById.values()].filter(c => c.parentId === customer.id);
+                  if (children.length === 0) return null;
+                  return (
+                    <span className="flex items-center gap-1 shrink-0">
+                      <InfoTooltip text={children.map(c => c.name).join('\n')} />
+                      <span className="text-[9px] font-black text-primary uppercase tracking-widest">{children.length} şube</span>
+                    </span>
+                  );
+                })()}
+              </div>
+              {customer.parentId && customersById.get(customer.parentId) && (
+                <p className="flex items-center gap-1 text-[10px] text-slate-400 font-bold mt-0.5">
+                  <GitBranch size={10} /> {customersById.get(customer.parentId)!.name}
+                </p>
+              )}
               {customer.shortName && <p className="text-xs text-primary font-bold mt-0.5">{customer.shortName}</p>}
               {customer.industry && <p className="text-xs text-slate-500 font-medium mt-1">{customer.industry}</p>}
               <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4">

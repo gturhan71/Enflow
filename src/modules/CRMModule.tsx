@@ -1,4 +1,4 @@
-import { useState, useEffect, type Dispatch, type SetStateAction, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type Dispatch, type SetStateAction, type FormEvent } from 'react';
 import { AnimatePresence } from 'motion/react';
 import {
   TodoTask,
@@ -113,6 +113,7 @@ const CRMModule = ({
   };
 
   const customerSearch = useSearch(customers, ['name', 'shortName', 'industry']);
+  const customersById = useMemo(() => new Map(customers.map(c => [c.id, c])), [customers]);
   const opportunitySearch = useSearch(opportunities, ['title', 'description']);
 
   const handleSaveProposal = async (proposalData: Omit<Proposal, 'id'>) => {
@@ -168,8 +169,24 @@ const CRMModule = ({
     name: '', shortName: '', industry: '', website: '', email: '', phone: '',
     address: '', city: '', country: 'Türkiye', taxOffice: '', taxNumber: '',
     riskScore: 0, creditLimit: 0, currency: 'USD', techStack: '', notes: '',
-    status: 'ACTIVE'
+    status: 'ACTIVE', parentId: null
   });
+
+  // Üst müşteri seçildiğinde legal-entity düzeyindeki ortak alanlar otomatik
+  // dolar (elle değiştirilebilir kalır) — vergi/adres/iletişim gibi şubeye özgü
+  // alanlara dokunulmaz.
+  const handleAdoptParent = (parent: Customer) => {
+    customerForm.setValues(prev => ({
+      ...prev,
+      parentId: parent.id,
+      industry: parent.industry ?? prev.industry,
+      website: parent.website ?? prev.website,
+      country: parent.country ?? prev.country,
+      currency: parent.currency ?? prev.currency,
+      techStack: parent.techStack ?? prev.techStack,
+    }));
+  };
+  const handleClearParent = () => customerForm.setValues(prev => ({ ...prev, parentId: null }));
 
   const opportunityForm = useForm<Partial<Opportunity>>({
     title: '', value: 0, probability: 50, customerId: '', description: '', status: 'NEW',
@@ -589,6 +606,7 @@ const CRMModule = ({
           searchQuery={customerSearch.searchQuery}
           setSearchQuery={customerSearch.setSearchQuery}
           customerHealth={customerHealth}
+          customersById={customersById}
           onImport={() => setShowImportWizard(true)}
           onNewCustomer={() => { customerForm.resetForm(); setShowNewCustomerModal(true); }}
           getStats={(customerId) => getCustomerStats(customerId, opportunities, proposals)}
@@ -682,6 +700,9 @@ const CRMModule = ({
             onSubmit={handleSaveCustomer}
             onClose={() => setShowNewCustomerModal(false)}
             loading={loading}
+            customers={customers}
+            onAdoptParent={handleAdoptParent}
+            onClearParent={handleClearParent}
           />
         )}
 

@@ -1,17 +1,23 @@
-import type { ChangeEvent, FormEvent } from 'react';
-import { X, Loader2 } from 'lucide-react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
+import { X, Loader2, Building2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Customer } from '../../types';
+import CustomerCombobox from '../../components/CustomerCombobox';
 
 export default function NewCustomerModal({
-  values, handleChange, onSubmit, onClose, loading,
+  values, handleChange, onSubmit, onClose, loading, customers, onAdoptParent, onClearParent,
 }: {
   values: Partial<Customer>;
   handleChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
   onSubmit: (e: FormEvent) => void;
   onClose: () => void;
   loading: boolean;
+  customers: Customer[];
+  onAdoptParent: (parent: Customer) => void;
+  onClearParent: () => void;
 }) {
+  const [showParentPicker, setShowParentPicker] = useState(false);
+  const selectedParent = values.parentId ? customers.find((c) => c.id === values.parentId) : undefined;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
       <motion.div
@@ -34,13 +40,52 @@ export default function NewCustomerModal({
             <div>
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Temel Bilgiler</p>
               <div className="grid grid-cols-2 gap-4">
-                <input
-                  type="text" name="name" required
-                  value={values.name ?? ''}
-                  onChange={handleChange}
-                  placeholder="Müşteri Adı *"
-                  className="col-span-2 px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                />
+                <div className="col-span-2 relative">
+                  <input
+                    type="text" name="name" required
+                    value={values.name ?? ''}
+                    onChange={handleChange}
+                    placeholder="Müşteri Adı *"
+                    autoComplete="off"
+                    className="w-full px-5 py-3.5 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                  />
+                  <CustomerCombobox
+                    customers={customers}
+                    query={values.name ?? ''}
+                    onPick={(parent) => { onAdoptParent(parent); setShowParentPicker(false); }}
+                  />
+                </div>
+                {selectedParent ? (
+                  <div className="col-span-2 flex items-center justify-between gap-3 px-5 py-3 bg-primary/5 border border-primary/20 rounded-2xl">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Building2 size={14} className="text-primary shrink-0" />
+                      <p className="text-xs font-bold text-slate-700 truncate">
+                        Üst Müşteri: <span className="text-primary">{selectedParent.name}</span>
+                      </p>
+                    </div>
+                    <button type="button" onClick={onClearParent} className="shrink-0 p-1.5 hover:bg-primary/10 rounded-xl transition-colors">
+                      <X size={14} className="text-slate-400" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="col-span-2 relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowParentPicker((v) => !v)}
+                      className="text-xs font-bold text-slate-400 hover:text-primary transition-colors"
+                    >
+                      + Üst müşteri seç (bu bir şube/alt birim ise)
+                    </button>
+                    {showParentPicker && (
+                      <CustomerCombobox
+                        customers={customers}
+                        query=""
+                        parentOnly
+                        onPick={(parent) => { onAdoptParent(parent); setShowParentPicker(false); }}
+                      />
+                    )}
+                  </div>
+                )}
                 <input
                   type="text" name="shortName"
                   value={values.shortName ?? ''}
