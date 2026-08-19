@@ -124,11 +124,16 @@ export const NAV_ITEMS = [
       { id: 'settings-workflow',     label: 'İş Akışı',               requiredPermission: 'SETTINGS_PERMISSIONS' },
       { id: 'settings-permissions',  label: 'Yetkiler',               requiredPermission: 'SETTINGS_PERMISSIONS' },
       { id: 'settings-integrations', label: 'Entegrasyonlar',         requiredPermission: 'SETTINGS_INTEGRATIONS' },
+      { id: 'virtual-agents-test',   label: 'Sanal Agentlar',         requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-subscription',      label: 'Abonelik & Kullanım',       requiredPermission: 'SETTINGS_VIEW' },
       { id: 'settings-license-types',    label: 'Lisans Planları',            requiredPermission: 'SETTINGS_VIEW' },
       { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-dashboard-templates', label: 'Kokpit Şablonları',       requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-product-taxonomy', label: 'Marka & Ürün Grubu',         requiredPermission: 'GENERAL_MANAGER' },
+      // Eskiden Sidebar'daki ayrı "Test Ortamı" GM-only bloğundaydı (2026-08-19'da kaldırıldı) —
+      // artık normal Ayarlar alt-öğeleri, aynı GM-only kısıtı (GENERAL_MANAGER permission-superuser) korunuyor.
+      { id: 'security-test',  label: 'Güvenlik Testi', requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'activity-log',   label: 'Denetim İzi',    requiredPermission: 'GENERAL_MANAGER' },
     ],
   },
   { id: 'platform-tickets', label: 'Talep & Geri Bildirim', icon: MessageSquarePlus, requiredPermission: 'DASHBOARD_VIEW' },

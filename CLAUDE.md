@@ -364,8 +364,8 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
+src/components/settings/SubscriptionSettings.tsx ← ../types
 src/contexts/AuthContext.tsx ← types, services/apiService
-src/hooks/useEnflowQueries.ts ← services/apiService
 src/lib/permissionTree.ts ← constants
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
@@ -377,27 +377,21 @@ src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag,
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
-src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
-backend/src/services/agentProvenance.ts ← pluginCatalog
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
-backend/src/services/governance.ts ← prismaClient
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
-backend/src/utils/fileUpload.ts ← logger, usageService
-backend/src/utils/secureUpload.ts ← usageService
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
+src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
@@ -460,13 +454,17 @@ src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
 backend/src/services/activityLogSummary.ts ← prismaClient, agentProvenance
+backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
+backend/src/services/governance.ts ← prismaClient
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
@@ -478,6 +476,8 @@ backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
+backend/src/utils/fileUpload.ts ← logger, usageService
+backend/src/utils/secureUpload.ts ← usageService
 ```
 
 ## versions (installed direct deps)
@@ -516,21 +516,15 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 15 hours ago)
+## changes (last 10 commits — 16 seconds ago)
 ```
 src/content/helpArticles.ts                   +zaman
 src/lib/permissionTree.ts                     ~buildPermissionGroups
 src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
 src/services/apiService.ts                    ~ApiService
-backend/src/services/agentProvenance.ts       ~actorType  ~parseAgentActor  ~agentDisplayLabel
-backend/src/services/approvalChainService.ts  ~completeApprovalChain  ~ensureApprovalChain
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/governance.ts            ~getApprovalMatrix
 backend/src/services/processEngine.ts         +finalizePurchaseInvoice  +createInvoiceFromPurchase  ~createSalesInvoiceForProject
-backend/src/services/workflowTemplate.ts      +applyDefaultWorkflowTemplate
-backend/src/usageService.ts                   +checkLimit  +checkUserSeatLimit  +incrementUsage  ~checkLimit
-backend/src/utils/fileUpload.ts               +tryUploadToNextcloud  ~uploadToNextcloud  ~slugify
-backend/src/utils/secureUpload.ts             +enforceStorageLimit  ~documentUpload
+backend/src/usageService.ts                   +checkUserSeatLimit  ~checkLimit  ~incrementUsage
 ```
 
 ## backend
@@ -559,24 +553,6 @@ export const requireEntitlement = (pluginKey) =>  :109-116
 export type PlanId  :5-5
 ```
 
-### backend/src/services/agentProvenance.ts
-```
-export function agentActorId(pluginKey) → string  :17-19  # Bir agent eklentisi için kanonik aktör kimliği üretir
-export function isAgentActor(actorId?) → boolean  :22-25  # Verilen aktör kimliği bir sanal agent'a mı ait
-export function parseAgentActor(actorId?)  :28-28  # Aktör kimliğinden pluginKey çözer; legacy etiket için null p
-export function agentDisplayLabel(actorId?) → string  :40-47  # UI/log için okunur agent adı
-```
-
-### backend/src/services/approvalChainService.ts
-```
-export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
-export async function autoSkipOrphanStages(tenantId, chainId)  :74-169  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
-export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :201-213  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
-export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :226-244  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
-export async function resolveGroupAfterDecision(tenantId, chainId)  :254-311  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
-export async function resetApprovalChain(tenantId, entityType, entityId)  :314-327  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
-```
-
 ### backend/src/services/bootstrapTenant.ts
 ```
 export interface BootstrapInput  :39-46
@@ -590,17 +566,6 @@ export interface BootstrapResult  :47-52
   user: { id: string  :50-50
   subscription: { plan: string  :51-51
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-122
-```
-
-### backend/src/services/governance.ts
-```
-export interface ApprovalTier  :13-13
-  maxAmount: number  :13-13
-export async function getApprovalMatrix(tenantId) → Promise<ApprovalTier[] | null>  :15-25
-export async function resolveApproverRoles(tenantId, amount?,) → Promise<string[] | null>  :30-39  # Tutara göre onay rolleri; matris yoksa veya tutar yoksa null
-export async function isSoDEnabled(tenantId) → Promise<boolean>  :41-47
-export async function resolveEntityCreator(entityType, entityId) → Promise<string | null>  :50-66  # Onay zinciri / domain entity'sinin oluşturanını çözer (yoksa
-export async function sodViolation(tenantId, actorUserId, entityType, entityId,) → Promise<string | null>  :72-85  # SoD ihlali varsa açıklama döner; ihlal yoksa/kapalıysa/çözül
 ```
 
 ### backend/src/services/processEngine.ts
@@ -646,20 +611,6 @@ export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → P
 export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
 export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
 export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
-```
-
-### backend/src/utils/fileUpload.ts
-```
-export function slugify(str) → string  :13-18
-export function getUploadDir(root, folderName) → string  :20-24
-export async function uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass,) → Promise<string>  :26-72
-export async function tryUploadToNextcloud(tenantId, fileBuffer, fileName, remotePath,) → Promise<string | null>  :82-107  # `uploadToNextcloud`'u env değişkenleri + INTEGRATION_SYNC ko
-```
-
-### backend/src/utils/secureUpload.ts
-```
-export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
-export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
 ```
 
 ### backend/prisma/migrations/20260804195427_activity_log_summary_and_archive/migration.sql
@@ -768,6 +719,14 @@ export async function resolveEntityLabel(tenantId, entityType, entityId) → Pro
 export function buildSummary({ actorName, action, entityType, entityLabel }) → string  :165-170  # Tek satırlık Türkçe denetim-izi özeti: "Ad: Varlık eylem (\"
 ```
 
+### backend/src/services/agentProvenance.ts
+```
+export function agentActorId(pluginKey) → string  :17-19  # Bir agent eklentisi için kanonik aktör kimliği üretir
+export function isAgentActor(actorId?) → boolean  :22-25  # Verilen aktör kimliği bir sanal agent'a mı ait
+export function parseAgentActor(actorId?)  :28-28  # Aktör kimliğinden pluginKey çözer; legacy etiket için null p
+export function agentDisplayLabel(actorId?) → string  :40-47  # UI/log için okunur agent adı
+```
+
 ### backend/src/services/aiClient.ts
 ```
 export interface TenantAIConfig  :14-19
@@ -810,6 +769,16 @@ export interface BidScoreLine  :230-236
 export interface BidScorecard  :237-241
 ```
 
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
+export async function autoSkipOrphanStages(tenantId, chainId)  :74-169  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
+export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :201-213  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
+export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :226-244  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
+export async function resolveGroupAfterDecision(tenantId, chainId)  :254-311  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
+export async function resetApprovalChain(tenantId, entityType, entityId)  :314-327  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+```
+
 ### backend/src/services/approvalSlaEscalation.ts
 ```
 export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
@@ -836,6 +805,17 @@ export async function computeDashboard(tenantId, userId?)  :15-70
 ```
 export function pingDashboard(tenantId) → void  :10-12
 export function subscribeDashboard(tenantId, listener) → () => void  :14-17
+```
+
+### backend/src/services/governance.ts
+```
+export interface ApprovalTier  :13-13
+  maxAmount: number  :13-13
+export async function getApprovalMatrix(tenantId) → Promise<ApprovalTier[] | null>  :15-25
+export async function resolveApproverRoles(tenantId, amount?,) → Promise<string[] | null>  :30-39  # Tutara göre onay rolleri; matris yoksa veya tutar yoksa null
+export async function isSoDEnabled(tenantId) → Promise<boolean>  :41-47
+export async function resolveEntityCreator(entityType, entityId) → Promise<string | null>  :50-66  # Onay zinciri / domain entity'sinin oluşturanını çözer (yoksa
+export async function sodViolation(tenantId, actorUserId, entityType, entityId,) → Promise<string | null>  :72-85  # SoD ihlali varsa açıklama döner; ihlal yoksa/kapalıysa/çözül
 ```
 
 ### backend/src/services/guaranteeReminders.ts
@@ -995,6 +975,20 @@ export async function runAgent(params) → Promise<  :513-518  # Bir agent eklen
 export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
 ```
 
+### backend/src/utils/fileUpload.ts
+```
+export function slugify(str) → string  :13-18
+export function getUploadDir(root, folderName) → string  :20-24
+export async function uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass,) → Promise<string>  :26-72
+export async function tryUploadToNextcloud(tenantId, fileBuffer, fileName, remotePath,) → Promise<string | null>  :82-107  # `uploadToNextcloud`'u env değişkenleri + INTEGRATION_SYNC ko
+```
+
+### backend/src/utils/secureUpload.ts
+```
+export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
+export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
+```
+
 ### backend/src/utils/textSimilarity.ts
 ```
 export function normalizeCompanyName(name) → string  :7-14  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
@@ -1026,6 +1020,12 @@ handler onComplete
 handler onLogin
 ```
 
+### src/components/settings/SubscriptionSettings.tsx
+```
+props SubscriptionSettingsProps
+export SubscriptionSettings
+```
+
 ### src/content/helpArticles.ts
 ```
 export interface HelpArticleSection  :8-11
@@ -1045,20 +1045,6 @@ hook useState
 hook useEffect
 hook useContext
 export AuthProvider
-```
-
-### src/hooks/useEnflowQueries.ts
-```
-export const useOpportunities = (tenantId, options = {}) =>  :6-14
-export const useCustomers = (tenantId, options = {}) =>  :16-24
-export const useProjects = (tenantId, options = {}) =>  :26-34
-export const useContracts = (tenantId, options = {}) =>  :36-44
-export const useTasks = (tenantId, options = {}) =>  :46-54
-export const useUnits = (tenantId, options = {}) =>  :56-64
-export const useUsers = (tenantId, options = {}) =>  :66-74
-export const useDocuments = (tenantId, options = {}) =>  :76-84
-export const useProposals = (tenantId, options = {}) =>  :86-94
-export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
 ### src/lib/permissionTree.ts
@@ -1202,18 +1188,6 @@ export VisitPlanModule
 handler onChange
 handler onClick
 handler onBlur
-```
-
-### src/modules/WorkflowBuilder.tsx
-```
-hook useUnsavedChanges
-hook useState
-hook useMemo
-hook useEffect
-export WorkflowBuilder
-handler onConfig
-handler onClick
-handler onChange
 ```
 
 ### src/services/apiService.ts
@@ -1367,12 +1341,6 @@ handler onKeyDown
 handler onClick
 ```
 
-### src/components/settings/SubscriptionSettings.tsx
-```
-props SubscriptionSettingsProps
-export SubscriptionSettings
-```
-
 ### src/components/settings/UnitManagement.tsx
 ```
 props UnitManagementProps
@@ -1405,6 +1373,20 @@ export interface AbbreviatedBoMItem  :7-20
   vendor?: string  :15-15
   … +4 more members  :7-7
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
+```
+
+### src/hooks/useEnflowQueries.ts
+```
+export const useOpportunities = (tenantId, options = {}) =>  :6-14
+export const useCustomers = (tenantId, options = {}) =>  :16-24
+export const useProjects = (tenantId, options = {}) =>  :26-34
+export const useContracts = (tenantId, options = {}) =>  :36-44
+export const useTasks = (tenantId, options = {}) =>  :46-54
+export const useUnits = (tenantId, options = {}) =>  :56-64
+export const useUsers = (tenantId, options = {}) =>  :66-74
+export const useDocuments = (tenantId, options = {}) =>  :76-84
+export const useProposals = (tenantId, options = {}) =>  :86-94
+export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
 ### src/layout/Header.tsx
@@ -2084,6 +2066,18 @@ handler onClick
 handler onSetMode
 handler onDisable
 handler onRatify
+```
+
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useMemo
+hook useEffect
+export WorkflowBuilder
+handler onConfig
+handler onClick
+handler onChange
 ```
 
 ### src/services/apiClient.ts

@@ -12,7 +12,7 @@ import { isAgentActor } from '../lib/agentProvenance';
 // ── Sanal Agent Test Modülü (Faz 8) ──────────────────────────────────────────
 // Çekirdek ticari sürümün DIŞINDA, ayrı lisanslanan upsell eklentileri.
 // Boş koltuğu dolduran vekil: bir birimin işini yapar, gerçek kişiye devreder.
-// Yalnızca GENERAL_MANAGER görür (Test Ortamı). Açık tema.
+// Yalnızca GENERAL_MANAGER görür (Ayarlar → Sanal Agentlar). Açık tema.
 
 type TabKey = 'catalog' | 'runs';
 

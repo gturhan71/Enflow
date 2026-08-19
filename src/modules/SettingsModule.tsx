@@ -15,7 +15,7 @@ import { apiService } from '../services/apiService';
 import { useModuleSettings } from '../hooks/useEnflowQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { PROMOTABLE_TEST_MODULES, NAV_ITEMS } from '../constants';
-import { FlaskConical, CheckCircle2, Users as UsersIcon, Lock, ShieldCheck, Cpu, KeyRound, Loader2 } from 'lucide-react';
+import { FlaskConical, CheckCircle2, Users as UsersIcon, Lock, Cpu, KeyRound, Loader2 } from 'lucide-react';
 
 interface SettingsModuleProps {
   companyLogo: string | null;
@@ -86,26 +86,14 @@ const ModuleManagement: React.FC<{ tenantId: string }> = ({ tenantId }) => {
         ))}
       </div>
 
-      {/* Test modülleri — toggle'lı */}
+      {/* Test modülleri — toggle'lı. Güvenlik Testi/Denetim İzi/Sanal Agentlar artık
+          Ayarlar'ın kalıcı alt-öğeleri (bkz. constants.ts NAV_ITEMS settings.subItems,
+          2026-08-19) — bu listede değiller, kalıcı olarak "ana menüde". */}
       <div className="space-y-3">
         <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Test Modülleri</p>
-        {/* Sabit GM-only: Güvenlik Testi */}
-        <div className="glass-card rounded-[18px] p-4 flex items-center gap-4 border border-white/20 opacity-60">
-          <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center shrink-0">
-            <ShieldCheck size={18} className="text-slate-400" strokeWidth={2} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-bold text-slate-700 text-sm">Güvenlik Testi</p>
-            <p className="text-[10px] text-slate-400 mt-0.5">Sadece Genel Müdür — ana menüye alınamaz</p>
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2.5 py-1 rounded-lg">
-            <Lock size={11} />
-            GM Only
-          </div>
-          <Lock size={14} className="text-slate-300 shrink-0" />
-        </div>
-
-        {/* Tanıtılabilir test modülleri */}
+        {PROMOTABLE_TEST_MODULES.length === 0 && (
+          <p className="text-xs text-slate-400 italic px-1">Şu an tanıtılabilir bir test modülü yok.</p>
+        )}
         {PROMOTABLE_TEST_MODULES.map(mod => {
           const isPromoted = promoted.has(mod.id);
           const isSaving = saving === mod.id;
@@ -155,7 +143,7 @@ const ModuleManagement: React.FC<{ tenantId: string }> = ({ tenantId }) => {
       <div className="glass-card rounded-[16px] p-4 flex items-start gap-3 border border-slate-200/60">
         <FlaskConical size={13} className="text-slate-400 shrink-0 mt-0.5" />
         <p className="text-xs text-slate-500">
-          Toggle kapatılınca modül <span className="font-bold">Test Ortamı</span> bölümünde Genel Müdür'e görünmeye devam eder; ana menüden kaldırılır.
+          Toggle kapatılınca modül ana menüden kaldırılır, yalnız Genel Müdür'e görünmeye devam eder.
         </p>
       </div>
     </div>
@@ -386,7 +374,7 @@ const SettingsModule = ({
       case 'users':
         return <UserManagement users={users} setUsers={setUsers} units={units} tenants={tenants} activeTenantId={activeTenantId} currentUser={currentUser} />;
       case 'subscription': // settings-subscription → 'subscription'
-        return <SubscriptionSettings subscription={subscription} usage={usage} currentUser={currentUser} fetchSubscriptionData={fetchSubscriptionData} />;
+        return <SubscriptionSettings subscription={subscription} usage={usage} currentUser={currentUser} />;
       case 'license-types': // settings-license-types
         return <LicenseTypesModule />;
       case 'license-generate': // settings-license-generate (kaldırıldı)
