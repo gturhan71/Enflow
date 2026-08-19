@@ -19,6 +19,7 @@ router.get('/', platformApiKeyMiddleware, asyncHandler(async (req: Request, res:
   const tickets = await prisma.platformTicket.findMany({
     where: { ...(status ? { status } : {}) },
     orderBy: { createdAt: 'desc' },
+    include: { tenant: { select: { name: true } } },
   });
 
   if (sort === 'priority') {
@@ -29,7 +30,9 @@ router.get('/', platformApiKeyMiddleware, asyncHandler(async (req: Request, res:
     });
   }
 
-  res.json(tickets);
+  // tenantName düz alan olarak eklenir (dış triage aracı tenant bazında gruplarken
+  // ham cuid yerine okunur isim görsün); ilişki objesi (tenant: {...}) response'ta bırakılmaz.
+  res.json(tickets.map(({ tenant, ...t }) => ({ ...t, tenantName: tenant.name })));
 }));
 
 router.put('/:id', platformApiKeyMiddleware, asyncHandler(async (req: Request, res: Response) => {

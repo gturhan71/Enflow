@@ -366,16 +366,19 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/contexts/AuthContext.tsx ← types, services/apiService
+src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
+src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
@@ -393,7 +396,6 @@ src/components/settings/UserManagement.tsx ← ../types, ../constants, ../servic
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
@@ -451,9 +453,7 @@ src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../co
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
-src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
-src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService
@@ -516,7 +516,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 16 seconds ago)
+## changes (last 10 commits — 16 minutes ago)
 ```
 src/content/helpArticles.ts                   +zaman
 src/lib/permissionTree.ts                     ~buildPermissionGroups
@@ -1047,6 +1047,16 @@ hook useContext
 export AuthProvider
 ```
 
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+```
+
 ### src/lib/permissionTree.ts
 ```
 export interface PermChild  :15-18
@@ -1119,6 +1129,20 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
 ### src/modules/todo/helpers.ts
 ```
 export interface ProposalDetailItem  :141-149
@@ -1175,6 +1199,20 @@ handler onMarkRead
 handler onNavigate
 handler onToggleStatus
 handler onSubmit
+```
+
+### src/modules/VirtualAgentsTestModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VirtualAgentsTestModule
+handler onChange
+handler onClick
+handler onSetMode
+handler onDisable
+handler onRatify
 ```
 
 ### src/modules/VisitPlanModule.tsx
@@ -1406,16 +1444,6 @@ handler onAccess
 handler onClick
 handler onChange
 handler onKeyDown
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
 ```
 
 ### src/lib/guaranteeText.ts
@@ -2034,38 +2062,10 @@ handler onChange
 handler onSubmit
 ```
 
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
-```
-
 ### src/modules/todo/TaskList.tsx
 ```
 component TaskList
 hook useState
-```
-
-### src/modules/VirtualAgentsTestModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VirtualAgentsTestModule
-handler onChange
-handler onClick
-handler onSetMode
-handler onDisable
-handler onRatify
 ```
 
 ### src/modules/WorkflowBuilder.tsx
