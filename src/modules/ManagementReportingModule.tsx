@@ -18,7 +18,7 @@ type ReportTab = 'overview' | 'analytics' | 'unit' | 'my-reports' | 'incoming';
 // Her sekmenin ne gösterdiği + neye göre düzenlendiği — sekme çubuğunun altında
 // aktif sekme için her zaman görünür açıklama olarak gösterilir.
 const TAB_META: Record<ReportTab, string> = {
-  overview: 'Her birimin dönemsel öne çıkan metrikleri + onay zincirinde en uzun bekleyen aşamalar (darboğazlar); birimler sabit/kanonik sırayla, darboğazlar bekleme süresine göre azalan sıralı listelenir.',
+  overview: 'Her birimin dönemsel öne çıkan metrikleri + KPI grafikleri (bar/çizgi/pasta) + onay zincirinde en uzun bekleyen aşamalar (darboğazlar); birimler sabit/kanonik sırayla, darboğazlar bekleme süresine göre azalan sıralı listelenir.',
   analytics: 'Şirket geneli büyüme/sağlık göstergeleri (iş sağlığı skoru, kârlılık, kazanma oranı, doküman portföyü vb.) — her kart kendi ⓘ açıklamasını taşır, veriler dönemden bağımsız güncel durumu yansıtır.',
   unit: 'Seçtiğiniz tek bir birimin dönem metrikleri + grafiği, önceki dönemle karşılaştırmalı (▲/▼); üstteki birim seçiciyle değiştirilir.',
   'my-reports': 'Kendi biriminiz için hazırladığınız dönemsel raporlar, en yeni en üstte; durum etiketiyle (taslak/sunuldu/incelendi) sıralı.',

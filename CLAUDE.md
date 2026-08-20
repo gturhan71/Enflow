@@ -372,6 +372,7 @@ src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobo
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
+src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
@@ -381,10 +382,11 @@ src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag,
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
-src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
+backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
+backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
@@ -423,7 +425,6 @@ src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/useDashboardStream.ts ← ../services/apiClient
-src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
@@ -453,6 +454,7 @@ src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/forma
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
@@ -463,7 +465,6 @@ backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
-backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
@@ -474,7 +475,6 @@ backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupSe
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
-backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
@@ -524,9 +524,12 @@ src/components/HandOffModal.tsx               +birim  ~birim
 src/lib/permissionTree.ts                     ~buildPermissionGroups
 src/modules/crm/CustomersView.tsx             ~CustomersView
 src/modules/crm/NewCustomerModal.tsx          ~NewCustomerModal
+src/modules/crm/NewOpportunityModal.tsx       ~NewOpportunityModal
 src/services/apiService.ts                    ~ApiService
 src/utils/textSimilarity.ts                   +normalizeCompanyName  +levenshteinDistance  +similarityRatio
+backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/processEngine.ts         +finalizePurchaseInvoice  +createInvoiceFromPurchase  ~createSalesInvoiceForProject
+backend/src/services/unitReportingService.ts  ~computeVisitPerformance
 ```
 
 ## backend
@@ -540,6 +543,11 @@ INDEX Customer_tenantId_parentId_idx ON Customer
 ### backend/src/planCatalog.ts
 ```
 export type PlanId  :5-5
+```
+
+### backend/src/services/dashboardService.ts
+```
+export async function computeDashboard(tenantId, userId?)  :15-70
 ```
 
 ### backend/src/services/processEngine.ts
@@ -569,6 +577,35 @@ export interface AdvanceProcessResult  :595-599
   actionsInvoked: string[]  :598-598
 export class ProcessNotConfiguredError  :26-31
   constructor(public processKey)  :27-30
+```
+
+### backend/src/services/unitReportingService.ts
+```
+export interface UnitDefinition  :6-10
+  key: string  :7-7
+  label: string  :8-8
+  role: string  :9-9
+export interface Period  :52-55
+  start: Date  :53-53
+  end: Date  :54-54
+export interface Metric  :76-82
+  label: string  :77-77
+  value: number | string  :78-78
+  unit?: string  :79-79
+  hint?: string  :80-80
+  tone?: 'default' | 'positive' | 'warning'   :81-81
+export interface ChartSeries  :84-88
+  title: string  :85-85
+  type: 'bar' | 'pie' | 'line'  :86-86
+  data: { name: string  :87-87
+export interface UnitMetricsResult  :90-97
+  unitKey: string  :91-91
+  label: string  :92-92
+  role: string  :93-93
+  period: { start: string  :94-94
+  metrics: Metric[]  :95-95
+  charts: ChartSeries[]  :96-96
+export interface WorkflowBottleneck  :457-461
 ```
 
 ### backend/src/services/workflowTemplate.ts
@@ -784,11 +821,6 @@ export function checkStatusTransition(currentStatus, nextStatus, role, cancelRea
 export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
-### backend/src/services/dashboardService.ts
-```
-export async function computeDashboard(tenantId, userId?)  :15-70
-```
-
 ### backend/src/services/dashboardStream.ts
 ```
 export function pingDashboard(tenantId) → void  :10-12
@@ -916,35 +948,6 @@ export function isEncrypted(value) → boolean  :98-100
 ### backend/src/services/tenderReminders.ts
 ```
 export async function sweepTenderReminders(tenantId) → Promise<void>  :21-63
-```
-
-### backend/src/services/unitReportingService.ts
-```
-export interface UnitDefinition  :6-10
-  key: string  :7-7
-  label: string  :8-8
-  role: string  :9-9
-export interface Period  :52-55
-  start: Date  :53-53
-  end: Date  :54-54
-export interface Metric  :76-82
-  label: string  :77-77
-  value: number | string  :78-78
-  unit?: string  :79-79
-  hint?: string  :80-80
-  tone?: 'default' | 'positive' | 'warning'   :81-81
-export interface ChartSeries  :84-88
-  title: string  :85-85
-  type: 'bar' | 'pie' | 'line'  :86-86
-  data: { name: string  :87-87
-export interface UnitMetricsResult  :90-97
-  unitKey: string  :91-91
-  label: string  :92-92
-  role: string  :93-93
-  period: { start: string  :94-94
-  metrics: Metric[]  :95-95
-  charts: ChartSeries[]  :96-96
-export interface WorkflowBottleneck  :457-461
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1120,6 +1123,16 @@ handler onLostOpportunity
 handler onSendForApproval
 ```
 
+### src/modules/dashboard/WidgetDetailDrawer.tsx
+```
+component Rows
+component Row
+props Props
+export WidgetDetailDrawer
+handler onClose
+handler onNavigate
+```
+
 ### src/modules/LicenseTypesModule.tsx
 ```
 hook useAuth
@@ -1241,19 +1254,6 @@ handler onDisable
 handler onRatify
 ```
 
-### src/modules/VisitPlanModule.tsx
-```
-props VisitPlanModuleProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VisitPlanModule
-handler onChange
-handler onClick
-handler onBlur
-```
-
 ### src/services/apiService.ts
 ```
 class ApiService  :15-69
@@ -1295,6 +1295,20 @@ export interface Customer  :55-85
   name: string  :57-57
   shortName?: string  :58-58
   industry?: string  :59-59
+```
+
+### src/types/dashboard.ts
+```
+export interface DashboardPayload  :1-35
+  kpis: { winRate: number  :2-2
+  timeSensitive: { tenderDeadlines: { id: string  :3-4
+  guaranteeExpiries: { id: string  :5-5
+  guaranteeRequests: { id: string  :6-6
+  costApprovalsPending: { id: string  :7-7
+  invoicesDue: { id: string  :8-8
+  milestonesDue: { id: string  :9-9
+  contractDeadlines: { id: string  :10-10
+  … +19 more members  :1-1
 ```
 
 ### src/types/workflow.ts
@@ -1755,16 +1769,6 @@ export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → 
 export function buildEditableLayout(role, saved, roleTemplateOverride?)  :223-223
 ```
 
-### src/modules/dashboard/WidgetDetailDrawer.tsx
-```
-component Rows
-component Row
-props Props
-export WidgetDetailDrawer
-handler onClose
-handler onNavigate
-```
-
 ### src/modules/Dashboard.tsx
 ```
 hook useState
@@ -2053,6 +2057,19 @@ component TaskList
 hook useState
 ```
 
+### src/modules/VisitPlanModule.tsx
+```
+props VisitPlanModuleProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VisitPlanModule
+handler onChange
+handler onClick
+handler onBlur
+```
+
 ### src/modules/WorkflowBuilder.tsx
 ```
 hook useUnsavedChanges
@@ -2131,20 +2148,6 @@ export interface OwnedCategory  :29-34
   key: string  :30-30
   label: string  :31-31
   count: number  :32-32
-```
-
-### src/types/dashboard.ts
-```
-export interface DashboardPayload  :1-35
-  kpis: { winRate: number  :2-2
-  timeSensitive: { tenderDeadlines: { id: string  :3-4
-  guaranteeExpiries: { id: string  :5-5
-  guaranteeRequests: { id: string  :6-6
-  costApprovalsPending: { id: string  :7-7
-  invoicesDue: { id: string  :8-8
-  milestonesDue: { id: string  :9-9
-  contractDeadlines: { id: string  :10-10
-  … +19 more members  :1-1
 ```
 
 ### src/types/dmo.ts

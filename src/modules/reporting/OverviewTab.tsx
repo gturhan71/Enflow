@@ -4,6 +4,7 @@ import { ROLE_LABELS } from '../../constants';
 import { printOverview } from './helpers';
 import BottleneckPanel from './BottleneckPanel';
 import MetricCard from './MetricCard';
+import ChartBlock from './ChartBlock';
 import InfoTooltip from '../../components/InfoTooltip';
 
 export default function OverviewTab({ overview, start, end }: { overview: ReportOverview; start: string; end: string }) {
@@ -26,6 +27,11 @@ export default function OverviewTab({ overview, start, end }: { overview: Report
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {u.headline.map((m, i) => <MetricCard key={i} m={m} />)}
           </div>
+          {u.charts.length > 0 && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {u.charts.map((c, i) => <ChartBlock key={i} c={c} />)}
+            </div>
+          )}
         </div>
       ))}
     </div>
