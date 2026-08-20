@@ -387,10 +387,8 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/usageService.ts ← prismaClient, planCatalog
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
@@ -464,6 +462,7 @@ backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
@@ -477,6 +476,7 @@ backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
+backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
 backend/src/utils/secureUpload.ts ← usageService
 ```
@@ -517,7 +517,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 29 hours ago)
+## changes (last 10 commits — 8 minutes ago)
 ```
 src/components/CustomerCombobox.tsx           +CustomerCombobox
 src/content/helpArticles.ts                   +zaman
@@ -527,9 +527,7 @@ src/modules/crm/NewCustomerModal.tsx          ~NewCustomerModal
 src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
 src/services/apiService.ts                    ~ApiService
 src/utils/textSimilarity.ts                   +normalizeCompanyName  +levenshteinDistance  +similarityRatio
-backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/processEngine.ts         +finalizePurchaseInvoice  +createInvoiceFromPurchase  ~createSalesInvoiceForProject
-backend/src/usageService.ts                   +checkUserSeatLimit  ~checkLimit  ~incrementUsage
 ```
 
 ## backend
@@ -562,21 +560,6 @@ export const requireEntitlement = (pluginKey) =>  :109-116
 ### backend/src/planCatalog.ts
 ```
 export type PlanId  :5-5
-```
-
-### backend/src/services/bootstrapTenant.ts
-```
-export interface BootstrapInput  :39-46
-  companyName: string  :40-40
-  admin: { name: string  :41-41
-  license?: string  :43-43
-  tenantId?: string  :45-45
-export interface BootstrapResult  :47-52
-  tenantId: string  :48-48
-  token: string  :49-49
-  user: { id: string  :50-50
-  subscription: { plan: string  :51-51
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-122
 ```
 
 ### backend/src/services/processEngine.ts
@@ -615,13 +598,6 @@ export interface ApplyTemplateResult  :135-139
   createdProcesses: string[]  :137-137
   skippedProcesses: string[]  :138-138
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :147-204  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
-```
-
-### backend/src/usageService.ts
-```
-export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
-export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
-export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
 ```
 
 ### backend/prisma/migrations/20260806110030_add_bom_item_vat_rate/migration.sql
@@ -781,6 +757,21 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :314-3
 ```
 export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
 export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
+```
+
+### backend/src/services/bootstrapTenant.ts
+```
+export interface BootstrapInput  :39-46
+  companyName: string  :40-40
+  admin: { name: string  :41-41
+  license?: string  :43-43
+  tenantId?: string  :45-45
+export interface BootstrapResult  :47-52
+  tenantId: string  :48-48
+  token: string  :49-49
+  user: { id: string  :50-50
+  subscription: { plan: string  :51-51
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-122
 ```
 
 ### backend/src/services/contractWorkflowState.ts
@@ -971,6 +962,13 @@ export function scoreQuotes(quotes,)  :189-191
 export function hasHandler(pluginKey) → boolean  :505-507
 export async function runAgent(params) → Promise<  :513-518  # Bir agent eklentisini çalıştır
 export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
+```
+
+### backend/src/usageService.ts
+```
+export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
+export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
+export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
 ```
 
 ### backend/src/utils/fileUpload.ts

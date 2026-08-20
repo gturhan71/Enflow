@@ -37,6 +37,26 @@ async function validateParent(tenantId: string, parentId: string, selfId?: strin
   return null;
 }
 
+// Yalnız Customer'ın gerçekten düzenlenebilir alanlarını istemciden kabul eder —
+// req.body'yi olduğu gibi Prisma'ya vermek, GET /customers'ın döndürdüğü nested
+// ilişkileri (contacts vb.) veya id/tenantId/createdAt gibi salt-okunur alanları
+// formdan geri gönderen bir istemcide Prisma hatasına yol açar (bkz. projects.ts
+// PUT'taki aynı desen).
+const EDITABLE_CUSTOMER_FIELDS = [
+  'name', 'shortName', 'industry', 'website', 'logo', 'email', 'phone',
+  'address', 'city', 'country', 'postalCode', 'taxOffice', 'taxNumber',
+  'chamberOfCommerce', 'tradeRegistryNo', 'source', 'riskScore', 'creditLimit',
+  'currency', 'techStack', 'socialMedia', 'notes', 'status', 'parentId',
+] as const;
+
+function pickCustomerFields(body: Record<string, unknown>): Record<string, unknown> {
+  const picked: Record<string, unknown> = {};
+  for (const key of EDITABLE_CUSTOMER_FIELDS) {
+    if (body[key] !== undefined) picked[key] = body[key];
+  }
+  return picked;
+}
+
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
 const router: Router = Router();
@@ -60,7 +80,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 }));
 
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
-  const body = { ...req.body };
+  const body = pickCustomerFields(req.body) as Record<string, unknown> & { name: string; parentId?: string; taxNumber?: string | null; taxOffice?: string | null };
   if (body.parentId) {
     const parentError = await validateParent(req.tenantId, body.parentId);
     if (parentError) return res.status(400).json({ error: parentError });
@@ -82,7 +102,7 @@ router.put('/:id', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Reque
   const record = await prisma.customer.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
-  const body = { ...req.body };
+  const body = pickCustomerFields(req.body) as Record<string, unknown> & { parentId?: string; taxNumber?: string | null; taxOffice?: string | null };
   if (body.parentId) {
     const parentError = await validateParent(tenantId, body.parentId, id);
     if (parentError) return res.status(400).json({ error: parentError });
@@ -105,6 +125,9 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
 
   const childCount = await prisma.customer.count({ where: { parentId: id, tenantId } });
   if (childCount > 0) return res.status(400).json({ error: `Bu müşterinin ${childCount} alt birimi var, önce onları silin veya taşıyın.` });
+
+  const opportunityCount = await prisma.opportunity.count({ where: { customerId: id, tenantId } });
+  if (opportunityCount > 0) return res.status(400).json({ error: `Bu müşteriye bağlı ${opportunityCount} satış fırsatı var, önce onları silin veya başka bir müşteriye taşıyın.` });
 
   await prisma.customer.delete({ where: { id } });
   await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'CUSTOMER', entityId: id });
