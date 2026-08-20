@@ -159,6 +159,26 @@ router.delete('/visits/:visitId', asyncHandler(async (req: Request, res: Respons
   res.json({ message: 'Ziyaret silindi.' });
 }));
 
+// Yeni fırsat oluştururken müşterinin yakın dönem ziyaret geçmişini özetler —
+// salt bilgi amaçlı (kalıcı bir alana yazılmaz, her seferinde canlı hesaplanır).
+// Visit.customerId gerçek bir FK değil (bkz. şema notu), düz string eşleşmesi yeterli.
+router.get('/customer-summary/:customerId', asyncHandler(async (req: Request, res: Response) => {
+  const customerId = String(req.params.customerId);
+  const months = Math.min(Math.max(Number(req.query.months) || 3, 1), 24);
+  const cutoff = new Date(Date.now() - months * 30 * 86400000);
+
+  const visits = await prisma.visit.findMany({
+    where: { tenantId: req.tenantId, customerId, status: 'COMPLETED' },
+    select: { actualDate: true, plannedDate: true },
+  });
+  const inWindow = visits
+    .map((v) => v.actualDate ?? v.plannedDate)
+    .filter((d) => d >= cutoff)
+    .sort((a, b) => b.getTime() - a.getTime());
+
+  res.json({ count: inWindow.length, lastVisitDate: inWindow[0] ?? null, windowMonths: months });
+}));
+
 // ── GÜNLÜK RAPOR ──────────────────────────────────────────────────────────────
 
 router.get('/daily-reports', asyncHandler(async (req: Request, res: Response) => {

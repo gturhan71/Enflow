@@ -716,13 +716,16 @@ export interface VisitPerformanceSummary {
     convertedVisits: number;
     conversionRatePct: number;
   };
-  topPerformers: { userId: string; name: string; completed: number; converted: number }[];
+  topPerformers: { userId: string; name: string; completed: number; converted: number; highEngagementCustomers: number; kpiBonusPoints: number }[];
+  totalKpiBonusPoints: number;
 }
 
 const VISIT_CONVERSION_WINDOW_DAYS = 60;   // ziyaretten sonra fırsat bu süre içinde açılırsa "dönüşüm" sayılır
 const VISIT_CONVERSION_LOOKBACK_DAYS = 180; // dönüşüm oranı bu kadar geriye giden VE penceresi dolmuş (olgun)
                                              // ziyaretler üzerinden hesaplanır — bu ayki taze tamamlanan ziyaretler
                                              // henüz 60 günü doldurmadığından oranı yapay düşürmesin diye ayrı tutulur
+const ENGAGEMENT_WINDOW_DAYS = 90;   // "son 3 ay" — bağımsız kayan pencere, dönüşüm penceresinden ayrı
+const ENGAGEMENT_VISIT_THRESHOLD = 3; // aynı müşteriye bu pencerede bu kadar ziyaret → yüksek etkileşim
 const DAY_MS = 86400000;
 
 export async function computeVisitPerformance(tenantId: string, startStr?: string, endStr?: string): Promise<VisitPerformanceSummary> {
@@ -792,10 +795,41 @@ export async function computeVisitPerformance(tenantId: string, startStr?: strin
     p.completed++;
     if (convertedVisitIds.has(v.id)) p.converted++;
   }
+
+  // Satışçı KPI bonusu — konudan/fırsattan bağımsız: son ENGAGEMENT_WINDOW_DAYS
+  // içinde AYNI müşteriye ENGAGEMENT_VISIT_THRESHOLD veya daha fazla tamamlanmış
+  // ziyaret yapan satışçı, o müşteri için 1 bonus puan kazanır (kayan pencere,
+  // "olgunlaşma" beklenmez — dönüşüm metriğinden bağımsız, cohortPlans zaten
+  // 180 günlük lookback'i kapsadığından ek sorgu gerekmez).
+  const engagementCutoff = new Date(now - ENGAGEMENT_WINDOW_DAYS * DAY_MS);
+  const engagementVisits = cohortPlans
+    .flatMap((p) => p.visits.map((v) => ({ ...v, preparedById: p.preparedById })))
+    .filter((v) => v.status === 'COMPLETED' && v.customerId)
+    .map((v) => ({ ...v, effectiveDate: v.actualDate ?? v.plannedDate }))
+    .filter((v) => v.effectiveDate >= engagementCutoff);
+
+  const visitCountByUserCustomer = new Map<string, number>();
+  for (const v of engagementVisits) {
+    const key = `${v.preparedById}::${v.customerId}`;
+    visitCountByUserCustomer.set(key, (visitCountByUserCustomer.get(key) ?? 0) + 1);
+  }
+  const highEngagementByUser = new Map<string, number>();
+  for (const [key, count] of visitCountByUserCustomer) {
+    if (count < ENGAGEMENT_VISIT_THRESHOLD) continue;
+    const userId = key.split('::')[0];
+    highEngagementByUser.set(userId, (highEngagementByUser.get(userId) ?? 0) + 1);
+  }
+  const totalKpiBonusPoints = [...highEngagementByUser.values()].reduce((sum, n) => sum + n, 0);
+
   const topPerformers = users
-    .map((u) => ({ userId: u.id, name: u.name ?? u.email, ...(perUser.get(u.id) ?? { completed: 0, converted: 0 }) }))
-    .filter((p) => p.completed > 0)
-    .sort((a, b) => b.completed - a.completed)
+    .map((u) => ({
+      userId: u.id, name: u.name ?? u.email,
+      ...(perUser.get(u.id) ?? { completed: 0, converted: 0 }),
+      highEngagementCustomers: highEngagementByUser.get(u.id) ?? 0,
+      kpiBonusPoints: highEngagementByUser.get(u.id) ?? 0,
+    }))
+    .filter((p) => p.completed > 0 || p.highEngagementCustomers > 0)
+    .sort((a, b) => (b.completed - a.completed) || (b.kpiBonusPoints - a.kpiBonusPoints))
     .slice(0, 8);
 
   return {
@@ -809,6 +843,7 @@ export async function computeVisitPerformance(tenantId: string, startStr?: strin
       conversionRatePct: maturedVisits.length ? Math.round((convertedVisitIds.size / maturedVisits.length) * 100) : 0,
     },
     topPerformers,
+    totalKpiBonusPoints,
   };
 }
 

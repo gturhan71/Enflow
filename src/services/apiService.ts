@@ -446,6 +446,9 @@ class ApiService {
   async deleteVisit(visitId: string) {
     return apiClient.fetchWithAuth(`/visits/visits/${visitId}`, { method: 'DELETE' });
   }
+  async getCustomerVisitSummary(customerId: string, months = 3) {
+    return apiClient.fetchWithAuth(`/visits/customer-summary/${customerId}?months=${months}`) as Promise<{ count: number; lastVisitDate: string | null; windowMonths: number }>;
+  }
   async getDailyReports(params?: { userId?: string; weekStart?: string; weekEnd?: string }) {
     const qs = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
     return apiClient.fetchWithAuth(`/visits/daily-reports${qs}`);

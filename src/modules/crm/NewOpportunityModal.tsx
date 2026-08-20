@@ -1,8 +1,12 @@
-import type { ChangeEvent, FormEvent } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { X, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
+import { cn } from '../../lib/utils';
 import { Customer, Opportunity } from '../../types';
 import { PROCUREMENT_METHODS } from '../../lib/procurementCosts';
+import { apiService } from '../../services/apiService';
+
+const VISIT_ENGAGEMENT_THRESHOLD = 3;
 
 export default function NewOpportunityModal({
   values, handleChange, customers, onSubmit, onClose,
@@ -13,6 +17,16 @@ export default function NewOpportunityModal({
   onSubmit: (e: FormEvent) => void;
   onClose: () => void;
 }) {
+  const [visitSummary, setVisitSummary] = useState<{ count: number; windowMonths: number } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!values.customerId) { setVisitSummary(null); return; }
+    apiService.getCustomerVisitSummary(values.customerId, 3)
+      .then((data) => { if (!cancelled) setVisitSummary(data); })
+      .catch(() => { if (!cancelled) setVisitSummary(null); });
+    return () => { cancelled = true; };
+  }, [values.customerId]);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
       <motion.div
@@ -50,6 +64,18 @@ export default function NewOpportunityModal({
               });
             })()}
           </select>
+          {visitSummary && visitSummary.count > 0 && (
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs font-bold -mt-2",
+              visitSummary.count >= VISIT_ENGAGEMENT_THRESHOLD
+                ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
+                : "bg-slate-50 text-slate-500 border border-slate-200"
+            )}>
+              <MapPin size={13} className="shrink-0" />
+              Bu müşteriye son {visitSummary.windowMonths} ayda {visitSummary.count} ziyaret yapılmış
+              {visitSummary.count >= VISIT_ENGAGEMENT_THRESHOLD ? ' — yüksek etkileşim' : ''}
+            </div>
+          )}
           <input type="number" name="value" min={0} value={values.value ?? 0} onChange={handleChange} placeholder="Tahmini Bedel" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Muhtemel Kapanış Tarihi (bilgi amaçlı)</label>

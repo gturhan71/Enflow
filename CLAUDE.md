@@ -369,7 +369,7 @@ src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants,
 src/lib/permissionTree.ts ← constants
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
-src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
+src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
@@ -411,8 +411,8 @@ src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constan
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
+src/modules/crm/CustomerReportModal.tsx ← ../lib/utils, ../types, helpers, constants
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
-src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
@@ -520,6 +520,7 @@ backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine
 ## changes (last 10 commits — 13 minutes ago)
 ```
 src/components/CustomerCombobox.tsx           +CustomerCombobox
+src/components/HandOffModal.tsx               +birim  ~birim
 src/lib/permissionTree.ts                     ~buildPermissionGroups
 src/modules/crm/CustomersView.tsx             ~CustomersView
 src/modules/crm/NewCustomerModal.tsx          ~NewCustomerModal
@@ -1000,6 +1001,15 @@ hook useMemo
 handler onChange
 ```
 
+### src/components/HandOffModal.tsx
+```
+props HandOffModalProps
+hook useState
+export HandOffModal
+handler onClick
+handler onChange
+```
+
 ### src/components/settings/SubscriptionSettings.tsx
 ```
 props SubscriptionSettingsProps
@@ -1063,6 +1073,8 @@ handler onPick
 ### src/modules/crm/NewOpportunityModal.tsx
 ```
 component NewOpportunityModal
+hook useState
+hook useEffect
 handler onClick
 handler onSubmit
 handler onChange
@@ -1343,15 +1355,6 @@ handler onComplete
 handler onLogin
 ```
 
-### src/components/HandOffModal.tsx
-```
-props HandOffModalProps
-hook useState
-export HandOffModal
-handler onClick
-handler onChange
-```
-
 ### src/components/HealthCards.tsx
 ```
 component ProjectHealthCard
@@ -1629,18 +1632,17 @@ export const proposalStatusTone = (status) =>  :16-32
 export const getStatusStyle = (status) =>  :21-32
 ```
 
+### src/modules/crm/CustomerReportModal.tsx
+```
+component CustomerReportModal
+handler onClick
+```
+
 ### src/modules/crm/DashboardView.tsx
 ```
 component DashboardView
 handler onOpps
 handler onValue
-```
-
-### src/modules/crm/LostReasonModal.tsx
-```
-component LostReasonModal
-handler onChange
-handler onClick
 ```
 
 ### src/modules/crm/OpportunityHistoryPanel.tsx
@@ -2133,7 +2135,7 @@ export interface OwnedCategory  :29-34
 
 ### src/types/dashboard.ts
 ```
-export interface DashboardPayload  :1-34
+export interface DashboardPayload  :1-35
   kpis: { winRate: number  :2-2
   timeSensitive: { tenderDeadlines: { id: string  :3-4
   guaranteeExpiries: { id: string  :5-5
@@ -2142,7 +2144,7 @@ export interface DashboardPayload  :1-34
   invoicesDue: { id: string  :8-8
   milestonesDue: { id: string  :9-9
   contractDeadlines: { id: string  :10-10
-  … +18 more members  :1-1
+  … +19 more members  :1-1
 ```
 
 ### src/types/dmo.ts

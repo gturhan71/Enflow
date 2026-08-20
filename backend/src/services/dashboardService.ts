@@ -37,6 +37,7 @@ export async function computeDashboard(tenantId: string, userId?: string) {
       planned: 0, completed: 0, cancelled: 0, coveragePct: 0, targetRate: 80,
       conversion: { windowDays: 60, lookbackDays: 180, maturedVisits: 0, convertedVisits: 0, conversionRatePct: 0 },
       topPerformers: [],
+      totalKpiBonusPoints: 0,
     })),
   ]);
 

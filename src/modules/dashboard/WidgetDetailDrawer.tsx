@@ -97,9 +97,20 @@ const DETAIL_BODY: Partial<Record<WK, (d: DashboardPayload) => React.ReactNode>>
           </div>
         </div>
         <div>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Temsilci Bazında (son {Math.round(vp.conversion.lookbackDays / 30)} ay)</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Temsilci Bazında (son {Math.round(vp.conversion.lookbackDays / 30)} ay)</p>
+            {vp.totalKpiBonusPoints > 0 && (
+              <p className="text-[10px] font-black text-amber-600">🏆 Toplam {vp.totalKpiBonusPoints} KPİ bonus puanı</p>
+            )}
+          </div>
+          <p className="text-[10px] text-slate-400 mb-2">KPİ bonusu: aynı müşteriye son 3 ayda 3+ ziyaret yapan temsilci, o müşteri için 1 bonus puan kazanır.</p>
           <Rows empty="Bu dönemde tamamlanmış ziyaret yok." items={vp.topPerformers} row={(p) => (
-            <Row key={p.userId} left={p.name} sub={`${p.converted} dönüşüm`} right={`${p.completed} ziyaret`} />
+            <Row
+              key={p.userId}
+              left={p.name}
+              sub={p.kpiBonusPoints > 0 ? `${p.converted} dönüşüm · 🏆 ${p.kpiBonusPoints} KPİ puanı` : `${p.converted} dönüşüm`}
+              right={`${p.completed} ziyaret`}
+            />
           )} />
         </div>
       </div>
