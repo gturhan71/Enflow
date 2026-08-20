@@ -364,10 +364,15 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
+src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
+src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
+src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
+src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
+src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
@@ -386,7 +391,6 @@ backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, p
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
-src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/PersonnelTransferModal.tsx ← ../services/apiService, ../types, ../constants
@@ -411,15 +415,11 @@ src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, types, constan
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, contract-workflow/types, contract-workflow/constants
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
-src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/LostReasonModal.tsx ← ../lib/utils, ../types, constants
-src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
-src/modules/crm/NewOpportunityModal.tsx ← ../types, ../lib/procurementCosts
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/criticalAlerts.ts ← ../types, helpers
 src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/helpers.ts ← ../lib/format
@@ -517,12 +517,16 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 78 minutes ago)
+## changes (last 10 commits — 29 hours ago)
 ```
+src/components/CustomerCombobox.tsx           +CustomerCombobox
 src/content/helpArticles.ts                   +zaman
 src/lib/permissionTree.ts                     ~buildPermissionGroups
+src/modules/crm/CustomersView.tsx             ~CustomersView
+src/modules/crm/NewCustomerModal.tsx          ~NewCustomerModal
 src/modules/PlatformTicketsModule.tsx         +PlatformTicketsModule  +Zaman  +zaman
 src/services/apiService.ts                    ~ApiService
+src/utils/textSimilarity.ts                   +normalizeCompanyName  +levenshteinDistance  +similarityRatio
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/processEngine.ts         +finalizePurchaseInvoice  +createInvoiceFromPurchase  ~createSalesInvoiceForProject
 backend/src/usageService.ts                   +checkUserSeatLimit  ~checkLimit  ~incrementUsage
@@ -540,6 +544,12 @@ INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
 ```
 TABLE new_PlatformTicket
 INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
+```
+
+### backend/prisma/migrations/20260819134722_add_customer_parent_hierarchy/migration.sql
+```
+TABLE new_Customer
+INDEX Customer_tenantId_parentId_idx ON Customer
 ```
 
 ### backend/src/middleware.ts
@@ -674,12 +684,6 @@ INDEX Workflow_tenantId_processKey_key ON Workflow
 ### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
 ```
 TABLE new_WorkflowStep
-```
-
-### backend/prisma/migrations/20260819134722_add_customer_parent_hierarchy/migration.sql
-```
-TABLE new_Customer
-INDEX Customer_tenantId_parentId_idx ON Customer
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -1014,6 +1018,14 @@ handler onComplete
 handler onLogin
 ```
 
+### src/components/CustomerCombobox.tsx
+```
+component CustomerCombobox
+hook useState
+hook useMemo
+handler onChange
+```
+
 ### src/components/settings/SubscriptionSettings.tsx
 ```
 props SubscriptionSettingsProps
@@ -1057,6 +1069,31 @@ export interface PermGroup  :19-25
 export function buildPermissionGroups() → PermGroup[]  :50-67
 ```
 
+### src/modules/crm/CustomersView.tsx
+```
+component CustomersView
+handler onChange
+handler onClick
+```
+
+### src/modules/crm/NewCustomerModal.tsx
+```
+component NewCustomerModal
+hook useState
+handler onClick
+handler onSubmit
+handler onChange
+handler onPick
+```
+
+### src/modules/crm/NewOpportunityModal.tsx
+```
+component NewOpportunityModal
+handler onClick
+handler onSubmit
+handler onChange
+```
+
 ### src/modules/crm/OpportunitiesView.tsx
 ```
 component OpportunitiesView
@@ -1066,6 +1103,35 @@ handler onClick
 handler onChange
 handler onEditProposal
 handler onGoToCostAnalysis
+```
+
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+hook useMemo
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onSave
+handler onSaveAll
+handler onProgressStatus
+handler onMarkLost
+handler onHandOff
+handler onEdit
+handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
+handler onOpenReport
+handler onOpenContacts
+handler onEditCustomer
+handler onDeleteCustomer
+handler onCreateProposal
+handler onWonOpportunity
+handler onLostOpportunity
+handler onSendForApproval
 ```
 
 ### src/modules/LicenseTypesModule.tsx
@@ -1315,12 +1381,11 @@ export interface Workflow  :158-168
   name: string  :160-160
 ```
 
-### src/components/CustomerCombobox.tsx
+### src/utils/textSimilarity.ts
 ```
-component CustomerCombobox
-hook useState
-hook useMemo
-handler onChange
+export function normalizeCompanyName(name) → string  :10-17  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
+export function levenshteinDistance(a, b) → number  :20-39  # Standart düzenleme mesafesi (dinamik programlama)
+export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) — 1 (aynı) arası benzerlik oranı
 ```
 
 ### src/components/HandOffModal.tsx
@@ -1609,13 +1674,6 @@ export const proposalStatusTone = (status) =>  :16-32
 export const getStatusStyle = (status) =>  :21-32
 ```
 
-### src/modules/crm/CustomersView.tsx
-```
-component CustomersView
-handler onChange
-handler onClick
-```
-
 ### src/modules/crm/DashboardView.tsx
 ```
 component DashboardView
@@ -1628,24 +1686,6 @@ handler onValue
 component LostReasonModal
 handler onChange
 handler onClick
-```
-
-### src/modules/crm/NewCustomerModal.tsx
-```
-component NewCustomerModal
-hook useState
-handler onClick
-handler onSubmit
-handler onChange
-handler onPick
-```
-
-### src/modules/crm/NewOpportunityModal.tsx
-```
-component NewOpportunityModal
-handler onClick
-handler onSubmit
-handler onChange
 ```
 
 ### src/modules/crm/OpportunityHistoryPanel.tsx
@@ -1667,35 +1707,6 @@ handler onClick
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-hook useMemo
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onSave
-handler onSaveAll
-handler onProgressStatus
-handler onMarkLost
-handler onHandOff
-handler onEdit
-handler onCheckIn
-handler onEditProposal
-handler onGoToCostAnalysis
-handler onOpenReport
-handler onOpenContacts
-handler onCreateProposal
-handler onWonOpportunity
-handler onLostOpportunity
-handler onSendForApproval
-handler onGeneratePdf
-handler onMarkDelivered
 ```
 
 ### src/modules/dashboard/criticalAlerts.ts
@@ -2279,13 +2290,6 @@ export interface BrandSource  :23-32
   isActive: boolean  :29-29
   createdAt: string  :30-30
   updatedAt: string  :31-31
-```
-
-### src/utils/textSimilarity.ts
-```
-export function normalizeCompanyName(name) → string  :10-17  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
-export function levenshteinDistance(a, b) → number  :20-39  # Standart düzenleme mesafesi (dinamik programlama)
-export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) — 1 (aynı) arası benzerlik oranı
 ```
 
 ## upgrade-tool

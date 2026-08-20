@@ -209,18 +209,44 @@ const CRMModule = ({
   const handleSaveCustomer = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    const editingId = customerForm.values.id;
     try {
-      const saved = await apiService.createCustomer(customerForm.values);
-      const { duplicateWarning, ...savedCustomer } = saved as Customer & { duplicateWarning?: { id: string; name: string; similarity: number }[] | null };
-      setCustomers(prev => [...prev, savedCustomer]);
-      setShowNewCustomerModal(false);
-      customerForm.resetForm();
-      if (duplicateWarning?.length) {
-        const list = duplicateWarning.map(d => `• ${d.name} (%${Math.round(d.similarity * 100)} benzer)`).join('\n');
-        alert(`⚠ Olası mükerrer kayıt: girilen isme benzer müşteri(ler) zaten var:\n${list}`);
+      if (editingId) {
+        const updated = await apiService.updateCustomer(editingId, customerForm.values);
+        setCustomers(prev => prev.map(c => c.id === editingId ? (updated as Customer) : c));
+        setShowNewCustomerModal(false);
+        customerForm.resetForm();
+      } else {
+        const saved = await apiService.createCustomer(customerForm.values);
+        const { duplicateWarning, ...savedCustomer } = saved as Customer & { duplicateWarning?: { id: string; name: string; similarity: number }[] | null };
+        setCustomers(prev => [...prev, savedCustomer]);
+        setShowNewCustomerModal(false);
+        customerForm.resetForm();
+        if (duplicateWarning?.length) {
+          const list = duplicateWarning.map(d => `• ${d.name} (%${Math.round(d.similarity * 100)} benzer)`).join('\n');
+          alert(`⚠ Olası mükerrer kayıt: girilen isme benzer müşteri(ler) zaten var:\n${list}`);
+        }
       }
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Müşteri kaydedilemedi.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditCustomer = (customer: Customer) => {
+    customerForm.setValues({ ...customer });
+    setShowNewCustomerModal(true);
+  };
+
+  const handleDeleteCustomer = async (customer: Customer) => {
+    if (!window.confirm(`"${customer.name}" müşterisini silmek istediğinize emin misiniz?`)) return;
+    setLoading(true);
+    try {
+      await apiService.deleteCustomer(customer.id);
+      setCustomers(prev => prev.filter(c => c.id !== customer.id));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Müşteri silinemedi.');
     } finally {
       setLoading(false);
     }
@@ -612,6 +638,9 @@ const CRMModule = ({
           getStats={(customerId) => getCustomerStats(customerId, opportunities, proposals)}
           onOpenReport={setCustomerReportTarget}
           onOpenContacts={(customer) => { setContactsModal(customer); resetContactForm(); }}
+          onEditCustomer={handleEditCustomer}
+          onDeleteCustomer={handleDeleteCustomer}
+          canDeleteCustomer={currentUser?.role === 'GENERAL_MANAGER'}
         />
       ) : activeTab === 'crm-proposals' ? (
         <ProposalsView

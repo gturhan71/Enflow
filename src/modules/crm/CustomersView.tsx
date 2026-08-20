@@ -1,4 +1,4 @@
-import { Search, FileSpreadsheet, Plus, Building, Mail, Phone, MapPin, Trophy, AlertTriangle, BarChart2, ChevronRight, Users, GitBranch } from 'lucide-react';
+import { Search, FileSpreadsheet, Plus, Building, Mail, Phone, MapPin, Trophy, AlertTriangle, BarChart2, ChevronRight, Users, GitBranch, Pencil, Trash2 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Customer, CustomerHealthReport } from '../../types';
@@ -9,7 +9,7 @@ import { CustomerStats } from './helpers';
 
 export default function CustomersView({
   filteredCustomers, totalCount, searchQuery, setSearchQuery, customerHealth, customersById,
-  onImport, onNewCustomer, getStats, onOpenReport, onOpenContacts,
+  onImport, onNewCustomer, getStats, onOpenReport, onOpenContacts, onEditCustomer, onDeleteCustomer, canDeleteCustomer,
 }: {
   filteredCustomers: Customer[];
   totalCount: number;
@@ -22,6 +22,9 @@ export default function CustomersView({
   getStats: (customerId: string) => CustomerStats;
   onOpenReport: (customer: Customer) => void;
   onOpenContacts: (customer: Customer) => void;
+  onEditCustomer: (customer: Customer) => void;
+  onDeleteCustomer: (customer: Customer) => void;
+  canDeleteCustomer: boolean;
 }) {
   return (
     <div className="p-8 space-y-8 h-full overflow-y-auto pb-24 custom-scrollbar min-h-0">
@@ -67,7 +70,9 @@ export default function CustomersView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredCustomers.map(customer => (
+          {filteredCustomers.map(customer => {
+          const children = [...customersById.values()].filter(c => c.parentId === customer.id);
+          return (
             <motion.div
               layout
               key={customer.id}
@@ -91,7 +96,6 @@ export default function CustomersView({
               <div className="flex items-center gap-1.5">
                 <h4 className="font-black text-slate-900 text-base leading-snug">{customer.name}</h4>
                 {(() => {
-                  const children = [...customersById.values()].filter(c => c.parentId === customer.id);
                   if (children.length === 0) return null;
                   return (
                     <span className="flex items-center gap-1 shrink-0">
@@ -198,8 +202,30 @@ export default function CustomersView({
                 </span>
                 <span className="font-black">{customer.contacts?.length || 0}</span>
               </button>
+
+              <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2">
+                <PermissionGate permission="CRM_EDIT">
+                  <button
+                    onClick={() => onEditCustomer(customer)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-primary hover:bg-primary/5 rounded-xl transition-colors"
+                  >
+                    <Pencil size={12} /> Düzenle
+                  </button>
+                </PermissionGate>
+                {canDeleteCustomer && (
+                  <button
+                    onClick={() => onDeleteCustomer(customer)}
+                    disabled={children.length > 0}
+                    title={children.length > 0 ? 'Önce alt birimlerini silin veya taşıyın.' : undefined}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-600 hover:bg-red-50 rounded-xl transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  >
+                    <Trash2 size={12} /> Sil
+                  </button>
+                )}
+              </div>
             </motion.div>
-          ))}
+          );
+          })}
         </div>
       )}
     </div>

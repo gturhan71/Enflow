@@ -18,6 +18,7 @@ export default function NewCustomerModal({
 }) {
   const [showParentPicker, setShowParentPicker] = useState(false);
   const selectedParent = values.parentId ? customers.find((c) => c.id === values.parentId) : undefined;
+  const isEditMode = Boolean(values.id);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
       <motion.div
@@ -28,7 +29,9 @@ export default function NewCustomerModal({
       >
         <div className="p-8 border-b border-slate-100 flex items-center justify-between shrink-0">
           <div>
-            <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Yeni Müşteri</h4>
+            <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">
+              {isEditMode ? 'Müşteriyi Düzenle' : 'Yeni Müşteri'}
+            </h4>
             <p className="text-xs text-slate-400 font-medium mt-0.5">Müşteri bilgilerini doldurun</p>
           </div>
           <button onClick={onClose} className="p-3 hover:bg-slate-100 rounded-2xl transition-all">
@@ -52,6 +55,7 @@ export default function NewCustomerModal({
                   <CustomerCombobox
                     customers={customers}
                     query={values.name ?? ''}
+                    excludeId={values.id}
                     onPick={(parent) => { onAdoptParent(parent); setShowParentPicker(false); }}
                   />
                 </div>
@@ -81,6 +85,7 @@ export default function NewCustomerModal({
                         customers={customers}
                         query=""
                         parentOnly
+                        excludeId={values.id}
                         onPick={(parent) => { onAdoptParent(parent); setShowParentPicker(false); }}
                       />
                     )}
@@ -262,7 +267,7 @@ export default function NewCustomerModal({
             className="bg-primary text-white px-10 py-4 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
           >
             {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-            KAYDET
+            {isEditMode ? 'GÜNCELLE' : 'KAYDET'}
           </button>
         </div>
       </motion.div>
