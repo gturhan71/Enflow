@@ -12,7 +12,7 @@ import {
   resolveEscalationTarget,
 } from '../services/unitReportingService';
 import { computeDashboard } from '../services/dashboardService';
-import { subscribeDashboard } from '../services/dashboardStream';
+import { getDashboardPingAt } from '../services/dashboardStream';
 import { computeFunnel, computeTenderAnalytics, computeBomVariance, computeConcentration, computeForecast, computeBidScorecard, computeDocumentPortfolio, computeBusinessHealth, computeProjectHealth, computeCustomerHealth, computeDmoAnalytics, computeArchiveAnalytics, computeBrandCategoryAnalytics } from '../services/analyticsService';
 
 const router: Router = Router();
@@ -151,7 +151,10 @@ router.get('/dashboard', tenantMiddleware, asyncHandler(async (req: Request, res
 // Gerçek-zamanlılık: "bir şey değişti" sinyali (SSE). Tam veri taşımaz —
 // frontend bunu alınca GET /dashboard ile yeniden çeker. Uzun ömürlü bağlantı
 // olduğu için asyncHandler kullanılmaz; hata/kopma req 'close' ile temizlenir.
-router.get('/dashboard/stream', tenantMiddleware, (req: Request, res: Response) => {
+// DB-native poll (2sn) — çoklu replikada her replika kendi bağlantısı için
+// doğrudan Tenant.dashboardPingAt'i okur, aralarında koordinasyona gerek yok
+// (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-02).
+router.get('/dashboard/stream', tenantMiddleware, async (req: Request, res: Response) => {
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -159,14 +162,24 @@ router.get('/dashboard/stream', tenantMiddleware, (req: Request, res: Response) 
   });
   res.write(': connected\n\n');
 
-  const unsubscribe = subscribeDashboard(req.tenantId, (payload) => {
-    res.write(`data: ${JSON.stringify(payload)}\n\n`);
-  });
+  const tenantId = req.tenantId;
+  let stopped = false;
+  let lastSeen = await getDashboardPingAt(tenantId);
+
+  const poll = setInterval(async () => {
+    if (stopped) return;
+    const current = await getDashboardPingAt(tenantId);
+    if (current !== null && current !== lastSeen) {
+      lastSeen = current;
+      res.write(`data: ${JSON.stringify({ type: 'refresh', at: current })}\n\n`);
+    }
+  }, 2000);
   const heartbeat = setInterval(() => res.write(': ping\n\n'), 25000);
 
   req.on('close', () => {
+    stopped = true;
+    clearInterval(poll);
     clearInterval(heartbeat);
-    unsubscribe();
   });
 });
 

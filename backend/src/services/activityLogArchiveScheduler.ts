@@ -5,9 +5,15 @@
 // bir, 180 günden eski kayıtlar). backupScheduler.ts ile aynı desen — süreç
 // dışı kalıcı değil (ileride cron/queue); 1 saatte bir tarar (backup'tan daha
 // seyrek — arşivleme günlük değil aylık taneli bir iştir).
+// Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
+// (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
 
 import { prisma } from '../prismaClient';
 import { runArchive, getArchiveSettings } from './activityLogArchiveService';
+import { acquireLock, releaseLock } from './schedulerLock';
+
+const LOCK_NAME = 'activity-log-archive-scheduler';
+const LOCK_TTL_MS = 2 * 3_600_000; // 2sa — tick aralığından (1sa) büyük
 
 let running = false;
 
@@ -15,6 +21,7 @@ async function tick(): Promise<void> {
   if (running) return;
   running = true;
   try {
+    if (!(await acquireLock(LOCK_NAME, LOCK_TTL_MS))) return;
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
       const s = await getArchiveSettings(t.id);
@@ -33,6 +40,7 @@ async function tick(): Promise<void> {
       } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
     }
   } catch { /* sweep ana akışı bozmaz */ } finally {
+    await releaseLock(LOCK_NAME);
     running = false;
   }
 }

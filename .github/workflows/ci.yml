@@ -1,0 +1,45 @@
+name: CI
+
+# Faz C / S-08 (docs/OLCEKLENDIRME_DUZELTME_PLANI.md) — tsc/no-mock/tenant-scope/
+# no-console guard'ları + backend vitest unit + frontend build tek komutta:
+# kök `pnpm verify` script'i (package.json). Bilinçli kapsam dışı: RBAC Playwright
+# süiti (tests/rbac) ve Postgres matrix testi — RBAC'ın çapraz-tenant izolasyon
+# testi, backend/prisma/seed.ts'in ürettiği deterministik veride OLMAYAN, elle
+# oluşturulmuş ikinci bir tenant'a (sabit cuid, tests/rbac/.env.example'daki
+# CROSS_TENANT_ID) bağımlı — taze bir CI ortamında bu fixture yok, süit güvenilir
+# çalışmaz. Bu, önce seed.ts'e reprodüklenebilir bir ikinci tenant eklenmeden
+# ayrı bir iş olarak bırakıldı.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (kök)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install (backend)
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Prisma client üret
+        working-directory: backend
+        run: npx prisma generate
+
+      - name: Doğrula (tsc kök+backend, guard'lar, vitest unit, build)
+        run: pnpm verify

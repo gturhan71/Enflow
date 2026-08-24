@@ -3,11 +3,17 @@
 // Her tenant'ın moduleSettings.backup.enabled + intervalHours değerine göre
 // zamanı gelen yedeği tetikler, ardından doğrulama kuyruğunu boşaltır.
 // Not: süreç dışı kalıcı değil (ileride cron/queue). 60sn'de bir tarar.
+// Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
+// (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
 
 import { prisma } from '../prismaClient';
 import { runBackup, getBackupSettings, BackupScope, BackupKind, TargetType } from './backupService';
 import { drainVerifyQueue } from './backupVerifyService';
 import { logActivity } from './activityLog';
+import { acquireLock, releaseLock } from './schedulerLock';
+
+const LOCK_NAME = 'backup-scheduler';
+const LOCK_TTL_MS = 10 * 60_000; // 10dk — runBackup uzun sürebilir (VACUUM INTO)
 
 let running = false;
 
@@ -15,6 +21,7 @@ async function tick(): Promise<void> {
   if (running) return;
   running = true;
   try {
+    if (!(await acquireLock(LOCK_NAME, LOCK_TTL_MS))) return;
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
       const s = await getBackupSettings(t.id);
@@ -46,6 +53,7 @@ async function tick(): Promise<void> {
     // Doğrulama kuyruğu (manuel + zamanlı tüm bekleyenler)
     await drainVerifyQueue(5);
   } catch { /* sweep ana akışı bozmaz */ } finally {
+    await releaseLock(LOCK_NAME);
     running = false;
   }
 }

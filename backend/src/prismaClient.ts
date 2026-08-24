@@ -13,8 +13,12 @@ const connectionString = process.env.DATABASE_URL || 'file:./dev.db';
 const isPostgres = /^postgres(ql)?:\/\//i.test(connectionString);
 // timeout=busy_timeout (ms, libsql Config) — SQLite varsayılanı 0 (anında SQLITE_BUSY);
 // eşzamanlı yazımda kısa bekleme ile hata oranını düşürür. Postgres'te karşılığı yok.
+// Havuz boyutu (yalnız Postgres): önceden kod seviyesinde belirlenmiyordu, node-postgres
+// varsayılanına (10) sessizce kalıyordu. Çoklu replikada replika_sayısı × bu değer,
+// Postgres'in max_connections'ını aşabilir — artık env'den görünür/ayarlanabilir
+// (bkz. docs/SYSTEM_REQUIREMENTS.md Senaryo 4, docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz B / S-05).
 const adapter = isPostgres
-  ? new PrismaPg({ connectionString })
+  ? new PrismaPg({ connectionString, max: Number(process.env.DATABASE_POOL_MAX) || 10 })
   : new PrismaLibSql({ url: connectionString, timeout: 5000 });
 
 // Para temiz-yuvarlama: tüm yazımlarda para alanları 2 ondalığa (kuruş) yuvarlanır.

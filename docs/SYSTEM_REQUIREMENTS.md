@@ -105,6 +105,25 @@ Mevcut bir Senaryo 1/2 kurulumundan geçiş: [`POSTGRES_MIGRATION_PLAN.md`](../i
 
 ---
 
+## Senaryo 4 — Çoklu-Replika Kurumsal (birden fazla backend kopyası)
+
+Senaryo 3'ün "yatay ölçekleme mümkün" ifadesi veritabanı için doğru, ama **uygulama
+katmanı** için ek ön koşullar gerektirir — Senaryo 3'ten Senaryo 4'e (tek backend →
+N backend replikası + load balancer) geçmeden önce aşağıdakiler sağlanmalı. Detaylı
+gerekçe ve kod kanıtı: [Enflow Ölçeklendirme Mimarisi](../docs/OLCEKLENDIRME_DUZELTME_PLANI.md).
+
+| Ön koşul | Durum | Not |
+|---|---|---|
+| Zamanlayıcı kilidi | ✅ Faz A'da eklendi | `backend/src/services/schedulerLock.ts` — DB-native, dialect-bağımsız |
+| Paylaşımlı dosya deposu | ⚠️ **Zorunlu, elle yapılandırılır** | Nextcloud (`NEXTCLOUD_URL/USER/PASS`) yapılandırılmadan ikinci bir replika eklemeyin — aksi halde bir replikaya yüklenen sözleşme evrakı diğerinden erişilemez. `ENFLOW_MULTI_REPLICA=true` set edildiğinde boot'ta bu kontrol edilip eksikse loglanır (`deploymentGuard.ts`), süreç durdurulmaz. |
+| Bağlantı havuzu boyutlandırma | ✅ Faz B'de eklendi | `backend/.env` → `DATABASE_POOL_MAX` (varsayılan 10). Kural: `DATABASE_POOL_MAX × replika_sayısı ≤ Postgres max_connections`; yüksek eşzamanlılıkta **PgBouncer artık önerilir değil, zorunludur**. |
+| Genel API hız-sınırlama | ℹ️ Bilinçli sınırlama | `express-rate-limit` in-memory — fiili limit replika sayısıyla orantılı büyür. Şimdilik kabul edilen bir kısıt (bkz. Eksiklik Raporu S-04). |
+
+Kurulum: `ENFLOW_MULTI_REPLICA=true` ortam değişkenini set edin, load balancer'ı
+kurun, yukarıdaki tablo tamamlanmadan replika sayısını artırmayın.
+
+---
+
 ## Lisans kapsamı notu
 
 Sistem gereksinimleri lisans planından **bağımsızdır** — TRIAL/STARTER/PROFESSIONAL/ENTERPRISE

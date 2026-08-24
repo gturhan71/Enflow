@@ -7,6 +7,12 @@
 import { readFileSync } from 'fs';
 import path from 'path';
 import { prisma } from '../prismaClient';
+import { acquireLock, releaseLock } from './schedulerLock';
+
+// Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
+// (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
+const LOCK_NAME = 'update-notifier';
+const LOCK_TTL_MS = 15 * 60_000; // 15dk — tick aralığından (10dk) büyük
 
 export interface UpdateStatus {
   checkedAt?: string;
@@ -77,6 +83,7 @@ async function tick(): Promise<void> {
     const status = readUpdateStatus();
     const u = status?.update;
     if (!u) return; // araç henüz çalışmadı / dosya yok
+    if (!(await acquireLock(LOCK_NAME, LOCK_TTL_MS))) return;
 
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
@@ -103,6 +110,7 @@ async function tick(): Promise<void> {
       } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
     }
   } catch { /* sweep ana akışı bozmaz */ } finally {
+    await releaseLock(LOCK_NAME);
     running = false;
   }
 }

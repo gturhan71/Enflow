@@ -24,6 +24,7 @@ import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './mi
 import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
+import { checkDeploymentTopology } from './services/deploymentGuard';
 import projectsRouter from './routes/projects';
 import serviceTicketsRouter from './routes/serviceTickets';
 import platformTicketsRouter from './routes/platformTickets';
@@ -70,6 +71,20 @@ app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false 
 // veya yalnız HTTP başlığına bakan tarayıcılar için ikinci güvenlik katmanı.
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet');
+  next();
+});
+
+// İstek-süresi log'u — çoklu replikada "hangi istek hangi replikada/adımda
+// yavaşladı" sorusuna cevap için minimum gözlemlenebilirlik (tam APM/tracing
+// kapsam dışı — bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-07).
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const startedAt = Date.now();
+  res.on('finish', () => {
+    logger.info(`${req.method} ${req.originalUrl}`, {
+      status: res.statusCode,
+      durationMs: Date.now() - startedAt,
+    });
+  });
   next();
 });
 
@@ -197,6 +212,7 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
 
 app.listen(port, () => {
   logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
+  checkDeploymentTopology();
   startBackupScheduler();
   startActivityLogArchiveScheduler();
   startUpdateNotifier();

@@ -10,7 +10,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:unit": "vitest run",
     "sync:roles": "ts-node --transpile-only src/scripts/syncRolePermissions.ts",
-    "migrate:to-postgres": "ts-node --transpile-only src/scripts/migrateToPostgres.ts"
+    "migrate:to-postgres": "ts-node --transpile-only src/scripts/migrateToPostgres.ts",
+    "test:load": "node scripts/loadtest/mixed-read.mjs",
+    "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts"
   },
   "keywords": [],
   "author": "",
@@ -42,6 +44,7 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/multer": "^2.1.0",
     "@types/node": "^26.0.0",
+    "autocannon": "^8.0.0",
     "nodemon": "^3.1.14",
     "prisma": "^7.8.0",
     "ts-node": "^10.9.2",

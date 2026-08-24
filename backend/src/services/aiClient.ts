@@ -11,6 +11,28 @@
 import { prisma } from '../prismaClient';
 import { decryptForTenant } from './tenantEncryption';
 
+// Ardışık ağ/timeout hatası birikince kısa süreli "cooldown" — sağlayıcı sürekli
+// yanıt vermezken her isteğin 60sn zaman aşımını beklemesini önler (tam
+// circuit-breaker kütüphanesi yerine, mevcut hafif-bağımlılık tarzına uygun
+// minimal bir koruma). bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-10.
+const COOLDOWN_THRESHOLD = 3;
+const COOLDOWN_MS = 60_000;
+const failureState = new Map<string, { failCount: number; cooldownUntil: number }>();
+
+function isInCooldown(tenantId: string): boolean {
+  const s = failureState.get(tenantId);
+  return !!s && s.cooldownUntil > Date.now();
+}
+function recordFailure(tenantId: string): void {
+  const s = failureState.get(tenantId) || { failCount: 0, cooldownUntil: 0 };
+  s.failCount += 1;
+  if (s.failCount >= COOLDOWN_THRESHOLD) s.cooldownUntil = Date.now() + COOLDOWN_MS;
+  failureState.set(tenantId, s);
+}
+function recordSuccess(tenantId: string): void {
+  failureState.delete(tenantId);
+}
+
 export interface TenantAIConfig {
   baseUrl: string;
   apiKey: string;
@@ -85,6 +107,7 @@ export async function chatJSON<T = Record<string, unknown>>(opts: {
 }): Promise<T | null> {
   const cfg = await getTenantAIConfig(opts.tenantId);
   if (!cfg) return null;
+  if (isInCooldown(opts.tenantId)) return null;
 
   try {
     assertSafeAiUrl(cfg.baseUrl);
@@ -92,38 +115,50 @@ export async function chatJSON<T = Record<string, unknown>>(opts: {
     if (opts.system) messages.push({ role: 'system', content: opts.system });
     messages.push({ role: 'user', content: opts.user });
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 60_000);
+    const body = JSON.stringify({
+      model: cfg.model,
+      max_tokens: opts.maxTokens ?? 4096,
+      temperature: 0.2,
+      response_format: { type: 'json_object' },
+      messages,
+    });
+    const doFetch = async (): Promise<Response> => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 60_000);
+      try {
+        return await fetch(joinUrl(cfg.baseUrl, '/chat/completions'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
+          body,
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    // Ağ/timeout hatasında (fetch'in kendisi throw ederse — sağlayıcının döndürdüğü
+    // 4xx/5xx DEĞİL) tek retry. Bir HTTP yanıtı geldiyse (başarılı ya da hatalı) bu
+    // zaten "sağlayıcıya ulaşıldı" demektir, retry edilmez.
     let res: Response;
     try {
-      res = await fetch(joinUrl(cfg.baseUrl, '/chat/completions'), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: cfg.model,
-          max_tokens: opts.maxTokens ?? 4096,
-          temperature: 0.2,
-          response_format: { type: 'json_object' },
-          messages,
-        }),
-        signal: controller.signal,
-      });
-    } finally {
-      clearTimeout(timer);
+      res = await doFetch();
+    } catch {
+      await new Promise(r => setTimeout(r, 500));
+      res = await doFetch();
     }
 
-    if (!res.ok) return null;
+    if (!res.ok) { recordFailure(opts.tenantId); return null; }
     const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     const raw = data.choices?.[0]?.message?.content;
-    if (!raw) return null;
+    if (!raw) { recordFailure(opts.tenantId); return null; }
     const start = raw.indexOf('{');
     const end = raw.lastIndexOf('}');
-    if (start === -1 || end === -1) return null;
+    if (start === -1 || end === -1) { recordFailure(opts.tenantId); return null; }
+    recordSuccess(opts.tenantId);
     return JSON.parse(raw.slice(start, end + 1)) as T;
   } catch {
+    recordFailure(opts.tenantId);
     return null;
   }
 }

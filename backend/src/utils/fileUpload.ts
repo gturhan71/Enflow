@@ -97,7 +97,15 @@ export async function tryUploadToNextcloud(
   }
 
   try {
-    const url = await uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass);
+    let url: string;
+    try {
+      url = await uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass);
+    } catch {
+      // Tek retry — WebDAV geçici ağ blip'lerine karşı (bkz.
+      // docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-10).
+      await new Promise(r => setTimeout(r, 500));
+      url = await uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass);
+    }
     await incrementUsage(tenantId, 'INTEGRATION_SYNC');
     return url;
   } catch (e) {

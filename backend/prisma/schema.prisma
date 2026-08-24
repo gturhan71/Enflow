@@ -14,6 +14,10 @@ model Tenant {
   // sarmalanmış (envelope encryption) — bkz. backend/src/services/tenantEncryption.ts +
   // docs/TENANT_DATA_ENCRYPTION_PLAN.md
   dekWrapped     String?
+  // Dashboard SSE "bir şey değişti" sinyali — DB-native, çoklu-replika güvenli
+  // (bkz. backend/src/services/dashboardStream.ts, docs/OLCEKLENDIRME_DUZELTME_PLANI.md
+  // Faz C / S-02). Önceden bellek-içi EventEmitter idi, replikalar arası paylaşılmıyordu.
+  dashboardPingAt DateTime?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
   subscription  Subscription?
@@ -240,6 +244,9 @@ model Opportunity {
   proposals         Proposal[]
   progressLogs      OpportunityProgressLog[]
   costAnalysisVersions CostAnalysisVersion[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToId])
 }
 
 // Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
@@ -470,6 +477,8 @@ model Project {
   handoverDocs      ProjectHandoverDoc[]
   unitParticipations ProjectUnitParticipation[]
   serviceTickets    ServiceTicket[]
+
+  @@index([tenantId, status])
 }
 
 // B-22 — Garanti/Servis: ACCEPTANCE sonrası (WARRANTY döneminde) arıza bildirimi,
@@ -636,6 +645,9 @@ model TodoTask {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToUserId])
 }
 
 model ArchiveItem {
@@ -709,6 +721,8 @@ model Notification {
   tenantId  String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([tenantId, userId])
 }
 
 model CorporateDocument {
@@ -797,6 +811,8 @@ model ContractWorkflow {
   documents       ContractWorkflowDoc[]
   createdAt       DateTime              @default(now())
   updatedAt       DateTime              @updatedAt
+
+  @@index([tenantId, status])
 }
 
 model ContractWorkflowDoc {
@@ -886,6 +902,8 @@ model PurchaseRequest {
   items           PurchaseItem[]
   quotes          PurchaseQuote[]
   deliveries      DeliveryRecord[]
+
+  @@index([tenantId, status])
 }
 
 model PurchaseItem {
@@ -1724,4 +1742,16 @@ model ProjectUnitParticipation {
   updatedAt   DateTime @updatedAt
   @@unique([projectId, unitId])
   @@index([projectId])
+}
+
+// Çoklu-replika koordinasyonu — in-process zamanlayıcıların (backupScheduler,
+// activityLogArchiveScheduler, updateNotifier) yalnız bir replikada çalışmasını
+// garanti eden DB-native kilit. Platform-geneli (tenant'tan bağımsız) — süreç
+// bazında çalışır. bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01,
+// backend/src/services/schedulerLock.ts
+model SchedulerLock {
+  name      String   @id
+  holder    String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
 }
