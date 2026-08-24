@@ -32,8 +32,10 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   // Parola hash'ini ASLA yanıta koyma. `tenant.moduleSettings` da YZ/entegrasyon
   // API anahtarları/şifreleri içerir (bkz. tenants.ts ai-settings maskeleme kuralı) —
   // frontend bu alanı hiç kullanmıyor, login yanıtında sızdırılmasına gerek yok.
+  // `dekWrapped` tenant'ın sarılı veri şifreleme anahtarı — Tenant döndüren her
+  // route'ta omit edilmeli (bkz. tenantEncryption.ts / CLAUDE.md Faz 12).
   const { password: _pw, tenant, ...safeUser } = user;
-  const { moduleSettings: _ms, ...safeTenant } = tenant;
+  const { moduleSettings: _ms, dekWrapped: _dek, ...safeTenant } = tenant;
   res.json({ user: { ...safeUser, tenant: safeTenant, permissions }, token });
 }));
 
