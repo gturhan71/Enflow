@@ -10,15 +10,18 @@ import {
   Info,
   Percent
 } from 'lucide-react';
-import { 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   ResponsiveContainer,
-  Cell
+  Cell,
+  PieChart,
+  Pie,
+  Legend
 } from 'recharts';
 import { motion } from 'motion/react';
 import { Opportunity, Project, TodoTask, Contract, Unit, Proposal, DashboardPayload } from '../types';
@@ -63,29 +66,24 @@ const KPICard = React.memo(({ kpi, index, onExpand }: { kpi: KPI, index: number,
       delay: index * 0.06
     }}
     onClick={() => onExpand(kpi.key)}
-    className="glass-panel p-8 rounded-[32px] group relative overflow-hidden shadow-sm hover:shadow-2xl transition-all border border-white/50 bg-gradient-to-br from-white/80 to-white/40 cursor-pointer"
+    className="glass-panel p-4 rounded-2xl group relative overflow-hidden shadow-sm hover:shadow-xl transition-all border border-white/50 bg-gradient-to-br from-white/80 to-white/40 cursor-pointer"
   >
     {/* Dynamic Background Mesh Glow */}
     <div className={cn(
-      "absolute -right-16 -top-16 w-36 h-36 rounded-full blur-[50px] opacity-10 group-hover:opacity-30 group-hover:scale-125 transition-all duration-700 ease-out pointer-events-none",
+      "absolute -right-10 -top-10 w-24 h-24 rounded-full blur-[36px] opacity-10 group-hover:opacity-30 group-hover:scale-125 transition-all duration-700 ease-out pointer-events-none",
       kpi.glowBg
     )} />
 
-    <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity duration-500 pointer-events-none">
-      <kpi.icon size={80} />
+    <div className="flex items-center justify-between mb-3">
+      <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 group-hover:scale-110 shadow-md shadow-black/5", kpi.bg, kpi.color)}>
+        <kpi.icon size={17} />
+      </div>
+      <ArrowUpRight size={13} className={cn("transition-transform group-hover:translate-x-1 group-hover:-translate-y-1 duration-300 opacity-0 group-hover:opacity-100", kpi.color)} />
     </div>
 
-    <div className={cn("w-14 h-14 rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 group-hover:scale-110 shadow-lg shadow-black/5", kpi.bg, kpi.color)}>
-      <kpi.icon size={28} />
-    </div>
-
-    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{kpi.label}</p>
-    <div className="flex items-baseline gap-2">
-      <h4 className="text-3xl font-black text-slate-900 tracking-tighter">{kpi.value}</h4>
-      <ArrowUpRight size={16} className={cn("transition-transform group-hover:translate-x-1 group-hover:-translate-y-1 duration-300", kpi.color)} />
-      <span className="ml-auto text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest bg-slate-900/5 text-slate-500 group-hover:bg-slate-900/10 transition-colors">Detay →</span>
-    </div>
-    <p className="text-[10px] text-slate-500 font-bold uppercase mt-1 italic">{kpi.sub}</p>
+    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5 truncate">{kpi.label}</p>
+    <h4 className="text-xl font-black text-slate-900 tracking-tighter leading-none">{kpi.value}</h4>
+    <p className="text-[9px] text-slate-500 font-bold uppercase mt-1 italic truncate">{kpi.sub}</p>
   </motion.div>
 ));
 
@@ -392,6 +390,24 @@ const Dashboard = ({
     return Object.values(map);
   }, [allUnitReports]);
 
+  // En son gelen rapor en üstte — panel 3 satır gösterip fazlasını kaydırmaya bırakıyor.
+  const sortedIncomingReports = useMemo(() => {
+    return [...incomingReports].sort((a, b) => {
+      const ta = new Date(a.submittedAt || a.createdAt || 0).getTime();
+      const tb = new Date(b.submittedAt || b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+  }, [incomingReports]);
+
+  // En son eklenen proje en üstte — aynı 3-satır + kaydırma deseni.
+  const sortedRecentProjects = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const ta = new Date(a.createdAt || 0).getTime();
+      const tb = new Date(b.createdAt || 0).getTime();
+      return tb - ta;
+    });
+  }, [projects]);
+
   // Optimization: useMemo for expensive calculations
   const kpis = useMemo(() => {
     // Build best proposal value per opportunity (prefer highest-ranked status, then highest version)
@@ -445,7 +461,7 @@ const Dashboard = ({
       { key: 'pipeline' as const, label: 'Toplam Pipeline', value: fmtVal(totalPipelineValue), sub: `${activeOpps.length} Aktif Fırsat`, icon: DollarSign, color: 'text-emerald-600', bg: 'bg-emerald-500/10', glowBg: 'bg-emerald-500', items: oppItems(activeOpps) },
       { key: 'won' as const, label: 'Kazanılan Değer', value: fmtVal(wonValue), sub: `${wonOpps.length} Kazanılan Fırsat`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-500/10', glowBg: 'bg-blue-500', items: oppItems(wonOpps) },
       { key: 'winProbability' as const, label: 'Ort. Kazanma Olasılığı', value: `%${avgProbability}`, sub: `${probItems.length} aktif fırsat üzerinden`, icon: Percent, color: 'text-amber-600', bg: 'bg-amber-500/10', glowBg: 'bg-amber-500', items: probItems },
-      { key: 'projects' as const, label: 'Aktif Projeler', value: activeProjectsList.length, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-500/10', glowBg: 'bg-purple-500', items: activeProjectsList.map(p => ({ id: p.id, name: p.name, status: p.status, progress: p.progress || 0 })) },
+      { key: 'projects' as const, label: 'Aktif Projeler', value: activeProjectsList.length, sub: 'Uygulama Aşamasında', icon: Briefcase, color: 'text-purple-600', bg: 'bg-purple-500/10', glowBg: 'bg-purple-500', items: activeProjectsList.map(p => ({ id: p.id, name: p.name, status: p.status, progress: p.progress || 0, value: p.totalValue || 0 })) },
       { key: 'lost' as const, label: 'Kaybedilen Değer', value: fmtVal(lostValue), sub: `${lostOpps.length} Kaybedilen Fırsat`, icon: XCircle, color: 'text-red-500', bg: 'bg-red-500/10', glowBg: 'bg-red-500', items: oppItems(lostOpps) },
     ];
   }, [opportunities, projects, proposals]);
@@ -465,18 +481,18 @@ const Dashboard = ({
 
   const pipelineChartData = useMemo(() => {
     const rows = [
-      { name: 'Yeni',         value: opportunities.filter(o => o.status === 'NEW').length,         grad: 'url(#barPrimary)' },
-      { name: 'İletişimde',   value: opportunities.filter(o => o.status === 'CONTACTED').length,   grad: 'url(#barBlue)' },
-      { name: 'Nitelikli',    value: opportunities.filter(o => o.status === 'QUALIFIED').length,    grad: 'url(#barPurple)' },
-      { name: 'Teklif',       value: opportunities.filter(o => o.status === 'PROPOSAL').length,     grad: 'url(#barOrange)' },
-      { name: 'Pazarlık',     value: opportunities.filter(o => o.status === 'NEGOTIATION').length,  grad: 'url(#barEmerald)' },
+      { name: 'Yeni',         value: opportunities.filter(o => o.status === 'NEW').length,         color: '#0ea5e9' },
+      { name: 'İletişimde',   value: opportunities.filter(o => o.status === 'CONTACTED').length,   color: '#3b82f6' },
+      { name: 'Nitelikli',    value: opportunities.filter(o => o.status === 'QUALIFIED').length,    color: '#8b5cf6' },
+      { name: 'Teklif',       value: opportunities.filter(o => o.status === 'PROPOSAL').length,     color: '#f97316' },
+      { name: 'Pazarlık',     value: opportunities.filter(o => o.status === 'NEGOTIATION').length,  color: '#eab308' },
       ...(liveNegotiationCount > 0
-        ? [{ name: 'Canlı Pazarlık', value: liveNegotiationCount, grad: 'url(#barLive)' }]
+        ? [{ name: 'Canlı Pazarlık', value: liveNegotiationCount, color: '#ec4899' }]
         : []),
-      { name: 'Kazanıldı',   value: opportunities.filter(o => o.status === 'WON').length,          grad: 'url(#barWon)' },
-      { name: 'Kaybedildi',  value: opportunities.filter(o => o.status === 'LOST').length,         grad: 'url(#barLost)' },
+      { name: 'Kazanıldı',   value: opportunities.filter(o => o.status === 'WON').length,          color: '#22c55e' },
+      { name: 'Kaybedildi',  value: opportunities.filter(o => o.status === 'LOST').length,         color: '#ef4444' },
     ];
-    return rows;
+    return rows.filter(r => r.value > 0);
   }, [opportunities, liveNegotiationCount]);
 
   return (
@@ -536,8 +552,12 @@ const Dashboard = ({
 
       {/* Yönetici için klasik KPI kartları + grafikler (alt bölüm) */}
       {isManager && <>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {kpis.map((kpi, i) => <KPICard key={kpi.label} kpi={kpi} index={i} onExpand={setExpandedKpi} />)}
+      {/* 'Aktif Projeler' kartı burada gösterilmiyor — aynı veri, aşağıdaki "Aktif Projeler"
+          panelinde zaten detaylı olarak veriliyor (tekrar önlemek için). Veri/drawer bağlantısı
+          korunuyor (kpis dizisinden kaldırılmadı) — aşağıdaki panel satıra tıklayınca hâlâ
+          setExpandedKpi('projects') ile aynı drawer'ı açıyor. */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {kpis.filter(k => k.key !== 'projects').map((kpi, i) => <KPICard key={kpi.label} kpi={kpi} index={i} onExpand={setExpandedKpi} />)}
       </div>
       {expandedKpi && (() => {
         const kpi = kpis.find(k => k.key === expandedKpi)!;
@@ -545,7 +565,7 @@ const Dashboard = ({
           <KpiDetailDrawer
             kpiKey={expandedKpi}
             oppItems={expandedKpi === 'projects' ? undefined : (kpi.items as { id: string; title: string; value: number; status: string; probability?: number }[])}
-            projectItems={expandedKpi === 'projects' ? (kpi.items as { id: string; name: string; status: string; progress: number }[]) : undefined}
+            projectItems={expandedKpi === 'projects' ? (kpi.items as { id: string; name: string; status: string; progress: number; value: number }[]) : undefined}
             onClose={() => setExpandedKpi(null)}
             onNavigate={(t) => onNavigate?.(t)}
           />
@@ -554,45 +574,50 @@ const Dashboard = ({
 
       {/* Yönetici: Gelen Birim Raporları + birim rapor KPI grafiği */}
       {isManager && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="glass-panel rounded-3xl p-6 bg-white border border-slate-100">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest">Gelen Raporlar</h4>
-              <span className={`text-[11px] font-black px-3 py-1 rounded-full ${incomingReports.length ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="glass-panel rounded-2xl p-5 bg-white border border-slate-100">
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest">Gelen Raporlar</h4>
+              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${incomingReports.length ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-500'}`}>
                 {incomingReports.length} bekliyor
               </span>
             </div>
             {incomingReports.length === 0 ? (
-              <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-8">İnceleme bekleyen rapor yok.</p>
+              <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest text-center py-6">İnceleme bekleyen rapor yok.</p>
             ) : (
-              <div className="space-y-2">
-                {incomingReports.slice(0, 6).map((r) => (
-                  <div key={r.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100">
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold text-slate-800 truncate">{r.unitLabel || r.unitKey}</p>
-                      <p className="text-[10px] text-slate-400">{(r.periodStart || '').slice(0, 10)} — {(r.periodEnd || '').slice(0, 10)} · {r.authorName || '—'}</p>
+              <>
+                <div className="space-y-1.5 max-h-[168px] overflow-y-auto custom-scrollbar pr-1">
+                  {sortedIncomingReports.map((r) => (
+                    <div key={r.id} className="flex items-center justify-between p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-slate-800 truncate">{r.unitLabel || r.unitKey}</p>
+                        <p className="text-[9px] text-slate-400">{(r.periodStart || '').slice(0, 10)} — {(r.periodEnd || '').slice(0, 10)} · {r.authorName || '—'}</p>
+                      </div>
+                      <span className="text-[8px] font-black px-1.5 py-0.5 rounded-full bg-sky-100 text-sky-700 shrink-0">SUNULDU</span>
                     </div>
-                    <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 shrink-0">SUNULDU</span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+                {sortedIncomingReports.length > 3 && (
+                  <p className="text-[9px] text-slate-400 font-bold italic text-center mt-2">Son 3 satır gösteriliyor — devamı için kaydırın</p>
+                )}
+              </>
             )}
           </div>
           {isGM && (
-            <div className="glass-panel rounded-3xl p-6 bg-white border border-slate-100 lg:col-span-2">
-              <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Birim Rapor KPI</h4>
+            <div className="glass-panel rounded-2xl p-5 bg-white border border-slate-100 lg:col-span-2">
+              <h4 className="text-xs font-black text-slate-800 uppercase tracking-widest mb-3">Birim Rapor KPI</h4>
               {reportKpiByUnit.length === 0 ? (
-                <p className="text-xs text-slate-400 font-bold uppercase tracking-widest text-center py-8">Henüz birim raporu yok.</p>
+                <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest text-center py-6">Henüz birim raporu yok.</p>
               ) : (
-                <div className="h-56">
+                <div className="h-36">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={reportKpiByUnit}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="unit" tick={{ fontSize: 10 }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 10 }} />
+                      <XAxis dataKey="unit" tick={{ fontSize: 9 }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 9 }} width={22} />
                       <Tooltip />
-                      <Bar dataKey="sunulan" name="Sunulan" fill="#38bdf8" radius={[4, 4, 0, 0]} />
-                      <Bar dataKey="onaylanan" name="Onaylanan" fill="#34d399" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="sunulan" name="Sunulan" fill="#38bdf8" radius={[3, 3, 0, 0]} />
+                      <Bar dataKey="onaylanan" name="Onaylanan" fill="#34d399" radius={[3, 3, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -602,148 +627,120 @@ const Dashboard = ({
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* Sales Pipeline Chart */}
-        <div className="lg:col-span-3 glass-panel p-8 rounded-[32px] flex flex-col min-h-[450px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
-          <div className="flex items-center justify-between mb-8">
+        <div className="lg:col-span-3 glass-panel p-6 rounded-[24px] flex flex-col h-[300px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Satış Boru Hattı</h4>
-              <p className="text-xs text-slate-500 font-bold">Fırsatların aşamalara göre dağılımı</p>
+              <h4 className="text-base font-black text-slate-900 uppercase tracking-tight italic">Satış Boru Hattı</h4>
+              <p className="text-[10px] text-slate-500 font-bold">Fırsatların aşamalara göre dağılımı</p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               {liveNegotiationCount > 0 && (
-                <div className="flex items-center gap-2 text-[10px] font-black text-rose-600 uppercase tracking-widest bg-rose-500/10 px-4 py-1.5 rounded-full border border-rose-500/20 animate-pulse">
-                  <Zap size={12} fill="currentColor" /> {liveNegotiationCount} Canlı Pazarlık
+                <div className="flex items-center gap-1.5 text-[9px] font-black text-rose-600 uppercase tracking-widest bg-rose-500/10 px-3 py-1 rounded-full border border-rose-500/20 animate-pulse">
+                  <Zap size={10} fill="currentColor" /> {liveNegotiationCount} Canlı
                 </div>
               )}
-              <div className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-4 py-1.5 rounded-full border border-emerald-500/20">
-                <ShieldCheck size={12} /> Doğrulanmış Veri
+              <div className="flex items-center gap-1.5 text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20">
+                <ShieldCheck size={10} /> Doğrulanmış
               </div>
             </div>
           </div>
-          <div className="flex-1 w-full min-h-[280px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={pipelineChartData} margin={{ top: 20, right: 20, left: -20, bottom: 0 }}>
-                {/* Premium Glow & Solid Neon Gradients */}
-                <defs>
-                  <linearGradient id="barPrimary" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(151, 86%, 39%, 1)" />
-                    <stop offset="100%" stopColor="hsla(151, 86%, 39%, 0.15)" />
-                  </linearGradient>
-                  <linearGradient id="barBlue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(217, 91%, 60%, 1)" />
-                    <stop offset="100%" stopColor="hsla(217, 91%, 60%, 0.15)" />
-                  </linearGradient>
-                  <linearGradient id="barPurple" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(271, 91%, 65%, 1)" />
-                    <stop offset="100%" stopColor="hsla(271, 91%, 65%, 0.15)" />
-                  </linearGradient>
-                  <linearGradient id="barOrange" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(14, 91%, 60%, 1)" />
-                    <stop offset="100%" stopColor="hsla(14, 91%, 60%, 0.15)" />
-                  </linearGradient>
-                  <linearGradient id="barEmerald" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(151, 86%, 39%, 1)" />
-                    <stop offset="100%" stopColor="hsla(151, 86%, 39%, 0.3)" />
-                  </linearGradient>
-                  <linearGradient id="barLive" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(340, 90%, 55%, 1)" />
-                    <stop offset="100%" stopColor="hsla(340, 90%, 55%, 0.2)" />
-                  </linearGradient>
-                  <linearGradient id="barWon" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(142, 76%, 36%, 1)" />
-                    <stop offset="100%" stopColor="hsla(142, 76%, 36%, 0.25)" />
-                  </linearGradient>
-                  <linearGradient id="barLost" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="hsla(0, 84%, 60%, 1)" />
-                    <stop offset="100%" stopColor="hsla(0, 84%, 60%, 0.2)" />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="8 8" vertical={false} stroke="rgba(0,0,0,0.015)" />
-                <XAxis 
-                  dataKey="name" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{ fill: '#64748b', fontSize: 10, fontWeight: 900 }} 
-                  dy={15}
-                />
-                <YAxis hide />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(0,0,0,0.01)' }}
-                  contentStyle={{ 
-                    borderRadius: '24px', 
-                    border: '1px solid rgba(255,255,255,0.6)', 
-                    boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)', 
-                    padding: '16px 20px', 
-                    backgroundColor: 'rgba(255,255,255,0.85)', 
-                    backdropFilter: 'blur(16px)' 
-                  }}
-                />
-                <Bar dataKey="value" radius={[12, 12, 12, 12]} barSize={38}>
-                  {pipelineChartData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.grad} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="flex-1 w-full min-h-0">
+            {pipelineChartData.length === 0 ? (
+              <div className="h-full flex items-center justify-center text-slate-300">
+                <p className="text-[10px] font-black uppercase tracking-widest italic">Henüz fırsat yok</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Tooltip
+                    contentStyle={{
+                      borderRadius: '24px',
+                      border: '1px solid rgba(255,255,255,0.6)',
+                      boxShadow: '0 25px 50px -12px rgb(0 0 0 / 0.15)',
+                      padding: '16px 20px',
+                      backgroundColor: 'rgba(255,255,255,0.85)',
+                      backdropFilter: 'blur(16px)'
+                    }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    formatter={(value) => <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{value}</span>}
+                  />
+                  <Pie
+                    data={pipelineChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius="45%"
+                    outerRadius="80%"
+                    paddingAngle={2}
+                    cornerRadius={8}
+                    label={({ name, percent }) => `${name} %${Math.round((percent ?? 0) * 100)}`}
+                    labelLine={false}
+                  >
+                    {pipelineChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} stroke="rgba(255,255,255,0.8)" strokeWidth={2} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        {/* Recent Projects List */}
-        <div className="lg:col-span-2 glass-panel p-8 rounded-[32px] flex flex-col max-h-[450px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
-          <div className="flex items-center justify-between mb-8">
+        {/* Recent Projects List — küçültülmüş; satıra tıklayınca sağdan detay paneli açılır (KpiDetailDrawer, 'projects') */}
+        <div className="lg:col-span-2 glass-panel p-5 rounded-[24px] flex flex-col max-h-[300px] shadow-sm bg-gradient-to-br from-white/80 to-white/40 border border-white/50">
+          <div className="flex items-center justify-between mb-4">
             <div>
-              <h4 className="text-xl font-black text-slate-900 uppercase tracking-tight italic">Aktif Projeler</h4>
-              <p className="text-xs text-slate-500 font-bold">Kritik uygulama süreçleri</p>
+              <h4 className="text-base font-black text-slate-900 uppercase tracking-tight italic">Aktif Projeler</h4>
+              <p className="text-[10px] text-slate-500 font-bold">Kritik uygulama süreçleri</p>
             </div>
-            <button onClick={() => onNavigate?.('project-mgmt')} className="text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-500/5 px-4 py-2 rounded-xl transition-all border border-emerald-500/10 cursor-pointer">Tümünü Gör</button>
+            <button onClick={() => onNavigate?.('project-mgmt')} className="text-[9px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-500/5 px-3 py-1.5 rounded-lg transition-all border border-emerald-500/10 cursor-pointer shrink-0">Tümünü Gör</button>
           </div>
-          <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-1">
+          <div className="space-y-1.5 overflow-y-auto pr-2 custom-scrollbar max-h-[168px]">
             {projects.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-4">
-                <Briefcase size={48} className="opacity-10" />
-                <p className="text-[10px] font-black uppercase tracking-widest italic">Henüz proje kaydı bulunmuyor</p>
+              <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-3">
+                <Briefcase size={32} className="opacity-10" />
+                <p className="text-[9px] font-black uppercase tracking-widest italic">Henüz proje kaydı bulunmuyor</p>
               </div>
             ) : (
-              projects.slice(0, 8).map(p => (
+              sortedRecentProjects.map(p => (
                 <motion.div
                   layout
                   key={p.id}
-                  onClick={() => onNavigate?.('project-mgmt')}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-white/20 hover:bg-white transition-all border border-transparent hover:border-slate-100/50 group cursor-pointer shadow-none hover:shadow-lg"
+                  onClick={() => setExpandedKpi('projects')}
+                  className="flex items-center gap-3 p-2.5 rounded-xl bg-white/20 hover:bg-white transition-all border border-transparent hover:border-slate-100/50 group cursor-pointer shadow-none hover:shadow-md"
                 >
-                  <div className="w-12 h-12 rounded-xl bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-all shrink-0">
-                    <Briefcase size={18} />
+                  <div className="w-8 h-8 rounded-lg bg-slate-50 text-slate-400 group-hover:bg-emerald-600 group-hover:text-white flex items-center justify-center transition-all shrink-0">
+                    <Briefcase size={14} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h5 className="text-sm font-black text-slate-900 truncate group-hover:text-emerald-600 transition-colors">{p.name}</h5>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className={cn(
-                        "text-[9px] px-2 py-0.5 rounded-full font-black uppercase tracking-tighter",
-                        p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" :
-                        p.status === 'COMPLETED' ? "bg-blue-500/10 text-blue-600" :
-                        p.status === 'PLANNING' ? "bg-amber-500/10 text-amber-600" :
-                        "bg-slate-100 text-slate-500"
-                      )}>
-                        {({ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' } as Record<string, string>)[p.status] ?? p.status}
-                      </span>
-                    </div>
+                    <h5 className="text-xs font-black text-slate-900 truncate group-hover:text-emerald-600 transition-colors">{p.name}</h5>
+                    <span className={cn(
+                      "text-[8px] px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter inline-block mt-0.5",
+                      p.status === 'IN_PROGRESS' ? "bg-emerald-500/10 text-emerald-600" :
+                      p.status === 'COMPLETED' ? "bg-blue-500/10 text-blue-600" :
+                      p.status === 'PLANNING' ? "bg-amber-500/10 text-amber-600" :
+                      "bg-slate-100 text-slate-500"
+                    )}>
+                      {({ IN_PROGRESS: 'Devam Ediyor', NOT_STARTED: 'Başlamadı', COMPLETED: 'Tamamlandı', DRAFT: 'Taslak', APPROVED: 'Onaylandı', ANALYSIS: 'Analiz', AWAITING_APPROVAL: 'Onay Bekliyor', WON: 'Kazanıldı', LOST: 'Kaybedildi' } as Record<string, string>)[p.status] ?? p.status}
+                    </span>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="text-sm font-black text-slate-900">{((p.totalValue || 0) / 1000).toFixed(0)}k $</p>
-                    <div className="w-20 h-1.5 bg-slate-100/80 rounded-full mt-2 overflow-hidden border border-slate-200/30">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${p.progress || 0}%` }}
-                        transition={{ duration: 1, ease: "easeOut" }}
-                        className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.4)]"
-                      />
+                    <p className="text-xs font-black text-slate-900">{((p.totalValue || 0) / 1000).toFixed(0)}k $</p>
+                    <div className="w-14 h-1 bg-slate-100/80 rounded-full mt-1.5 overflow-hidden border border-slate-200/30">
+                      <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${p.progress || 0}%` }} />
                     </div>
                   </div>
                 </motion.div>
               ))
             )}
           </div>
+          {sortedRecentProjects.length > 3 && (
+            <p className="text-[9px] text-slate-400 font-bold italic text-center mt-2">Son 3 satır gösteriliyor — devamı için kaydırın</p>
+          )}
         </div>
       </div>
 

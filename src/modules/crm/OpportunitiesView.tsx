@@ -1,6 +1,7 @@
 import { Fragment, useMemo, useState } from 'react';
-import { Plus, ArrowRight, Building, FileSignature, XCircle, GitBranch, Edit2, Target, Calendar, Printer, X, ClipboardCheck } from 'lucide-react';
+import { Plus, ArrowRight, Building, FileSignature, XCircle, GitBranch, Edit2, Target, Calendar, Printer, X, ClipboardCheck, LayoutGrid, Table2, Download } from 'lucide-react';
 import { motion } from 'motion/react';
+import * as XLSX from 'xlsx';
 import { cn } from '../../lib/utils';
 import { Opportunity, Customer, Proposal } from '../../types';
 import { SaveButton } from '../../components/SaveButton';
@@ -47,6 +48,7 @@ export default function OpportunitiesView({
   const [closeFrom, setCloseFrom] = useState('');
   const [closeTo, setCloseTo] = useState('');
   const dateFilterActive = !!(openFrom || openTo || closeFrom || closeTo);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   const dateFilteredOpportunities = useMemo(() => {
     if (!dateFilterActive) return filteredOpportunities;
@@ -86,6 +88,24 @@ export default function OpportunitiesView({
     printReportWindow('Fırsat Açılış-Kapanış Raporu', body);
   };
 
+  const handleExportXlsx = () => {
+    const rows = dateFilteredOpportunities.map(o => {
+      const c = customers.find(cc => cc.id === o.customerId);
+      return {
+        Fırsat: o.title,
+        Müşteri: c?.name || '—',
+        Aşama: STATUS_LABEL[o.status] || o.status,
+        Değer: o.value || 0,
+        'Olasılık (%)': o.probability || 0,
+        Açılış: fmtShortDate(o.createdAt) || '—',
+        'Beklenen Kapanış': fmtShortDate(o.expectedCloseDate) || '—',
+      };
+    });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), 'Fırsatlar');
+    XLSX.writeFile(wb, `Firsatlar_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   // Group by status for pipeline view
   const grouped: Partial<Record<Opportunity['status'], Opportunity[]>> = {};
   for (const stage of PIPELINE_STAGES) grouped[stage] = [];
@@ -111,7 +131,30 @@ export default function OpportunitiesView({
             {dateFilteredOpportunities.length} fırsat{dateFilterActive ? ` (${filteredOpportunities.length} toplam içinden)` : ''} · {dateFilteredOpportunities.filter(o => o.status !== 'LOST' && o.status !== 'WON' && o.status !== 'WITHDRAWN').length} aktif
           </p>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-slate-100 rounded-xl p-1">
+            <button
+              onClick={() => setViewMode('card')}
+              title="Kart görünümü"
+              className={cn("p-2 rounded-lg transition-all", viewMode === 'card' ? "bg-white shadow-sm text-primary" : "text-slate-400 hover:text-slate-600")}
+            >
+              <LayoutGrid size={16} />
+            </button>
+            <button
+              onClick={() => setViewMode('table')}
+              title="Tablo görünümü"
+              className={cn("p-2 rounded-lg transition-all", viewMode === 'table' ? "bg-white shadow-sm text-primary" : "text-slate-400 hover:text-slate-600")}
+            >
+              <Table2 size={16} />
+            </button>
+          </div>
+          <button
+            onClick={handleExportXlsx}
+            title="Excel'e Aktar (.xlsx)"
+            className="flex items-center gap-2 bg-slate-100 text-slate-600 hover:bg-emerald-500/10 hover:text-emerald-600 px-4 py-3 rounded-xl text-xs font-black transition-all"
+          >
+            <Download size={15} /> Excel'e Aktar
+          </button>
           <SaveButton onClick={onSaveAll} loading={loading} />
           <PermissionGate permission="CRM_EDIT">
             <button
@@ -189,6 +232,7 @@ export default function OpportunitiesView({
         )}
       </div>
 
+      {viewMode === 'card' && <>
       {/* Pipeline Progress Bar */}
       <div className="flex items-center gap-0 overflow-x-auto pb-1">
         {PIPELINE_STAGES.filter(s => s !== 'WON').map((stage, idx) => {
@@ -393,6 +437,58 @@ export default function OpportunitiesView({
           </div>
         </div>
       ))}
+      </>}
+
+      {viewMode === 'table' && dateFilteredOpportunities.length > 0 && (
+        <div className="glass-panel rounded-[24px] overflow-x-auto custom-scrollbar">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-slate-100">
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Fırsat</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Müşteri</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Aşama</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Değer</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Olasılık</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Açılış</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Beklenen Kapanış</th>
+                <th className="px-5 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">İşlem</th>
+              </tr>
+            </thead>
+            <tbody>
+              {dateFilteredOpportunities.map(opp => {
+                const customer = customers.find(c => c.id === opp.customerId);
+                return (
+                  <tr key={opp.id} className="border-b border-slate-50 hover:bg-slate-50/60 transition-colors">
+                    <td className="px-5 py-3 text-xs font-black text-slate-900 max-w-[240px] truncate">{opp.title}</td>
+                    <td className="px-5 py-3 text-xs font-bold text-slate-600">{customer?.name || '—'}</td>
+                    <td className="px-5 py-3">
+                      <span className={cn("text-[9px] font-black uppercase tracking-wider px-2 py-1 rounded-full border", getStatusStyle(opp.status))}>
+                        {STATUS_LABEL[opp.status]}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-xs font-black text-slate-800 text-right whitespace-nowrap">
+                      {opp.value > 0 ? `${opp.value.toLocaleString('tr-TR')} ${customer?.currency || ''}` : '—'}
+                    </td>
+                    <td className="px-5 py-3 text-xs font-bold text-slate-600 text-right">{opp.probability > 0 ? `%${opp.probability}` : '—'}</td>
+                    <td className="px-5 py-3 text-xs text-slate-500 font-medium whitespace-nowrap">{fmtShortDate(opp.createdAt) || '—'}</td>
+                    <td className="px-5 py-3 text-xs text-slate-500 font-medium whitespace-nowrap">{fmtShortDate(opp.expectedCloseDate) || '—'}</td>
+                    <td className="px-5 py-3 text-right">
+                      <PermissionGate permission="CRM_EDIT">
+                        <button
+                          onClick={() => onEdit(opp)}
+                          className="inline-flex items-center gap-1 text-slate-400 hover:text-primary px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all hover:bg-primary/5"
+                        >
+                          <Edit2 size={11} /> Düzenle
+                        </button>
+                      </PermissionGate>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {dateFilteredOpportunities.length === 0 && (
         <div className="flex flex-col items-center justify-center py-24 text-slate-400">

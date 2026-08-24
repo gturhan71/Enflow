@@ -364,14 +364,12 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
-src/components/settings/SubscriptionSettings.tsx ← ../types
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
-src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -392,6 +390,7 @@ src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dash
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
+src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
@@ -427,6 +426,7 @@ src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/f
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
+src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
@@ -518,7 +518,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 16 seconds ago)
+## changes (last 10 commits — 12 hours ago)
 ```
 src/components/CustomerCombobox.tsx           +CustomerCombobox
 src/components/HandOffModal.tsx               +birim  ~birim
@@ -575,11 +575,6 @@ INDEX TodoTask_tenantId_assignedToUserId_idx ON TodoTask
 ```
 async function login()  :18-27
 async function main()  :29-57
-```
-
-### backend/src/planCatalog.ts
-```
-export type PlanId  :5-5
 ```
 
 ### backend/src/services/activityLogArchiveScheduler.ts
@@ -765,6 +760,11 @@ key provider
 export const asyncHandler = (fn) =>  :8-10
 export const requireRole = (allowed) =>  :77-85
 export const requireEntitlement = (pluginKey) =>  :109-116
+```
+
+### backend/src/planCatalog.ts
+```
+export type PlanId  :5-5
 ```
 
 ### backend/src/services/activityLog.ts
@@ -1062,12 +1062,6 @@ handler onClick
 handler onChange
 ```
 
-### src/components/settings/SubscriptionSettings.tsx
-```
-props SubscriptionSettingsProps
-export SubscriptionSettings
-```
-
 ### src/content/helpArticles.ts
 ```
 export interface HelpArticleSection  :8-11
@@ -1155,16 +1149,6 @@ props Props
 export WidgetDetailDrawer
 handler onClose
 handler onNavigate
-```
-
-### src/modules/LicenseTypesModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-export LicenseTypesModule
-handler onChange
-handler onClick
 ```
 
 ### src/modules/ManagementReportingModule.tsx
@@ -1329,6 +1313,12 @@ export ProductTaxonomyManagement
 handler onChange
 handler onKeyDown
 handler onClick
+```
+
+### src/components/settings/SubscriptionSettings.tsx
+```
+props SubscriptionSettingsProps
+export SubscriptionSettings
 ```
 
 ### src/components/settings/UnitManagement.tsx
@@ -1635,6 +1625,7 @@ props Props
 export KpiKey
 export KpiDetailDrawer
 handler onClose
+handler onClick
 ```
 
 ### src/modules/dashboard/LayoutEditor.tsx
@@ -1758,6 +1749,16 @@ hook useState
 export IntegrationWizard
 handler onClick
 handler onChange
+```
+
+### src/modules/LicenseTypesModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+export LicenseTypesModule
+handler onChange
+handler onClick
 ```
 
 ### src/modules/PlatformTicketsModule.tsx

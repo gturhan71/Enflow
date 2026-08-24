@@ -1,11 +1,13 @@
 import React from 'react';
+import { Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { fmtCurrency as cfmt } from '../../lib/format';
 import DrawerShell from './DrawerShell';
 
 export type KpiKey = 'pipeline' | 'won' | 'lost' | 'projects' | 'winProbability';
 
 interface OppItem { id: string; title: string; value: number; status: string; probability?: number }
-interface ProjectItem { id: string; name: string; status: string; progress: number }
+interface ProjectItem { id: string; name: string; status: string; progress: number; value?: number }
 
 const KPI_META: Record<KpiKey, { title: string; philosophy: string; targetTab: string }> = {
   pipeline: {
@@ -45,6 +47,21 @@ interface Props {
 
 const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onClose, onNavigate }) => {
   const meta = KPI_META[kpiKey];
+  const hasRows = kpiKey === 'projects' ? (projectItems || []).length > 0 : (oppItems || []).length > 0;
+
+  const handleExport = () => {
+    const rows = kpiKey === 'projects'
+      ? (projectItems || []).map(p => ({ Proje: p.name, Durum: p.status, 'İlerleme (%)': p.progress, Değer: p.value ?? 0 }))
+      : (oppItems || []).map(o => ({
+          Fırsat: o.title,
+          Durum: o.status,
+          Değer: o.value,
+          ...(kpiKey === 'winProbability' ? { 'Olasılık (%)': o.probability ?? 0 } : {}),
+        }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(rows), meta.title.slice(0, 31));
+    XLSX.writeFile(wb, `${meta.title.replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
 
   return (
     <DrawerShell
@@ -53,6 +70,14 @@ const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onCl
       onClose={onClose}
       onNavigate={() => { onNavigate(meta.targetTab); onClose(); }}
     >
+      {hasRows && (
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-emerald-600 hover:bg-emerald-500/5 px-3 py-2 rounded-xl border border-slate-200 hover:border-emerald-500/20 transition-all mb-4 ml-auto"
+        >
+          <Download size={12} /> Excel'e Aktar (.xlsx)
+        </button>
+      )}
       {kpiKey === 'projects' ? (
         (projectItems || []).length === 0 ? (
           <p className="text-xs text-slate-400 italic text-center py-8">Aktif proje yok.</p>
@@ -64,6 +89,9 @@ const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onCl
                   <p className="text-xs font-bold text-slate-800 truncate">{p.name}</p>
                   <p className="text-[10px] text-slate-400">{p.status} · %{p.progress} ilerleme</p>
                 </div>
+                {p.value != null && p.value > 0 && (
+                  <span className="text-xs font-black text-slate-700 shrink-0">{cfmt(p.value)}</span>
+                )}
               </div>
             ))}
           </div>
