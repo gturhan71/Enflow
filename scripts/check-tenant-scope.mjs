@@ -10,9 +10,16 @@ import { join } from 'node:path';
 const ROOT = new URL('..', import.meta.url).pathname;
 const ROUTES = join(ROOT, 'backend', 'src', 'routes');
 
+// Dosya-bazlı, dokümante edilmiş istisnalar — bu guard yalnız tenant-JWT
+// auth'lu route'lar için anlamlıdır. platformTicketsAdmin.ts KASITLI olarak
+// tenant-çapraz (dış triage aracı, platformApiKeyMiddleware ile korunur, normal
+// tenant auth'undan tamamen bağımsız — bkz. dosyanın kendi başlık yorumu).
+const EXCLUDE_FILES = new Set(['platformTicketsAdmin.ts']);
+
 const offenders = [];
 for (const name of readdirSync(ROUTES)) {
   if (!name.endsWith('.ts')) continue;
+  if (EXCLUDE_FILES.has(name)) continue;
   const file = join(ROUTES, name);
   const L = readFileSync(file, 'utf-8').split('\n');
   for (let i = 0; i < L.length; i++) {

@@ -16,7 +16,11 @@ router.use(tenantMiddleware);
 // B-08 — tedarikçi teslim taahhüdü → proje takvimi senkronu. Milestone.status/progress'e
 // dokunulmaz (insan kararı olarak kalır) — yalnız tarih alanları + görünür bir uyarı.
 async function syncProcurementMilestoneDate(tenantId: string, projectId: string, expectedDate: Date, reason: string) {
-  const milestone = await prisma.projectMilestone.findFirst({ where: { projectId, milestoneType: 'PROCUREMENT' } });
+  // project: { tenantId } — her iki çağıran zaten tenant-doğrulanmış bir projectId
+  // geçiriyor (bkz. routes'taki findFirst {..., tenantId} çağrıları), ama bu ilişki
+  // filtresi savunma-derinliği: gelecekte doğrulamasız bir üçüncü çağıran eklenirse
+  // sessizce başka tenant'ın milestone'unu güncellemek yerine no-op'a düşer.
+  const milestone = await prisma.projectMilestone.findFirst({ where: { projectId, milestoneType: 'PROCUREMENT', project: { tenantId } } });
   if (!milestone) return;
   const wasAlreadySet = !!milestone.plannedEnd;
   if (wasAlreadySet && milestone.plannedEnd!.getTime() === expectedDate.getTime()) return;

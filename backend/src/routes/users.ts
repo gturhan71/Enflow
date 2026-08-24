@@ -89,7 +89,9 @@ router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Re
     return res.status(400).json({ error: 'Geçersiz düzen verisi.' });
   }
   const dashboardLayout = JSON.stringify({ widgets, order });
-  await prisma.user.update({ where: { id: req.userId }, data: { dashboardLayout } });
+  // id zaten req.userId (kendi kaydı, attacker-controlled değil) — tenantId burada
+  // savunma-derinliği: bir yerde req.userId/req.tenantId eşleşmezse no-op'a düşer.
+  await prisma.user.update({ where: { id: req.userId, tenantId: req.tenantId }, data: { dashboardLayout } });
   res.json({ dashboardLayout });
 }));
 
