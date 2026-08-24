@@ -2,12 +2,12 @@ import type { MutableRefObject } from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import {
   Shield, Plus, CheckSquare, Cpu, ExternalLink, CheckCircle2, ChevronDown, ChevronRight,
-  Loader2, Upload, Trash2, Tag, Landmark, X,
+  Loader2, Upload, Trash2, Tag, Landmark, X, Paperclip,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/apiService';
 import { GuaranteeLetter } from '../../types';
-import { sampleGuaranteeText } from '../../lib/guaranteeText';
+import { sampleGuaranteeText, uploadGuaranteeSampleFile } from '../../lib/guaranteeText';
 import { ContractWorkflow } from './types';
 import { DOC_TYPE_LABELS, DOC_STATUS_LABELS } from './constants';
 
@@ -24,6 +24,7 @@ function GuaranteeRequestSection({ selected }: { selected: ContractWorkflow }) {
   const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
   const [f, setF] = useState({ type: 'PERFORMANCE', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' });
+  const [sampleFile, setSampleFile] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -39,13 +40,17 @@ function GuaranteeRequestSection({ selected }: { selected: ContractWorkflow }) {
   const save = async () => {
     setSaving(true);
     try {
-      await apiService.createGuarantee({
+      const created = await apiService.createGuarantee({
         type: f.type, contractId: selected.id, amount: parseFloat(f.amount) || 0, currency: f.currency,
         expiryDate: f.indefinite ? null : (f.expiryDate || null), isIndefinite: f.indefinite,
         status: 'REQUESTED', sampleText: f.sampleText || null, requestNote: f.requestNote || null,
-      });
+      }) as GuaranteeLetter;
+      // Örnek teminat mektubu dosyası eklendiyse, kayıt oluştuktan hemen sonra yüklenir —
+      // Finans, banka ile teminat mektubunu düzenlerken metni doğrudan bu dosyadan alabilir.
+      if (sampleFile) await uploadGuaranteeSampleFile(created.id, sampleFile);
       setShowForm(false);
       setF({ type: 'PERFORMANCE', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' });
+      setSampleFile(null);
       load();
     } finally { setSaving(false); }
   };
@@ -70,9 +75,21 @@ function GuaranteeRequestSection({ selected }: { selected: ContractWorkflow }) {
               <span className="text-slate-700">{GTYPE_TR[g.type] || g.type} · {fmtAmount(g.amount, g.currency)}
                 {g.isIndefinite ? ' · Süresiz' : g.expiryDate ? ` · Vade: ${new Date(g.expiryDate).toLocaleDateString('tr-TR')}` : ''}
               </span>
-              <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
-                {GSTATUS_TR[g.status] || g.status}
-              </span>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {g.sampleFileUrl && (
+                  <a
+                    href={g.sampleFileUrl.startsWith('http') ? g.sampleFileUrl : `http://localhost:3002${g.sampleFileUrl}`}
+                    target="_blank" rel="noreferrer" title="Örnek teminat mektubu dosyasını gör"
+                    className="text-slate-400 hover:text-blue-600"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    <Paperclip className="w-3.5 h-3.5" />
+                  </a>
+                )}
+                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                  {GSTATUS_TR[g.status] || g.status}
+                </span>
+              </div>
             </div>
           ))}
         </div>
@@ -108,6 +125,24 @@ function GuaranteeRequestSection({ selected }: { selected: ContractWorkflow }) {
               </>}
               <label className="text-xs text-slate-500">Teminat mektubu metni örneği (Finans düzenler)</label>
               <textarea className="input-glass w-full text-xs" rows={5} value={f.sampleText} onChange={e => setF({ ...f, sampleText: e.target.value })} />
+              <label className="text-xs text-slate-500">Örnek teminat mektubu dosyası (opsiyonel — varsa Finans metni doğrudan bu dosyadan alır)</label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 flex items-center gap-2 input-glass text-xs cursor-pointer text-slate-500 hover:text-slate-700">
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{sampleFile ? sampleFile.name : 'Dosya seç (.pdf, .doc, .docx)'}</span>
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    className="hidden"
+                    onChange={e => setSampleFile(e.target.files?.[0] || null)}
+                  />
+                </label>
+                {sampleFile && (
+                  <button onClick={() => setSampleFile(null)} className="text-slate-400 hover:text-red-500 shrink-0" title="Kaldır">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <input className="input-glass w-full text-sm" placeholder="Talep notu (opsiyonel)" value={f.requestNote} onChange={e => setF({ ...f, requestNote: e.target.value })} />
               <button onClick={save} disabled={saving || !f.amount || (!f.indefinite && !f.expiryDate)} className="btn-primary w-full text-sm disabled:opacity-50">
                 {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : "Finans'a Talep Gönder"}

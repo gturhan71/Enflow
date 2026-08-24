@@ -4,6 +4,7 @@ import { FileText, Shield, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAIGate } from '../contexts/AIGateContext';
 import { useAuth } from '../contexts/AuthContext';
+import { Tender } from '../types/tender';
 import { ContractWorkflow, ContractWorkflowDoc, AiAnalysis, Props } from './contract-workflow/types';
 import { TabId } from './contract-workflow/constants';
 import { BASE, apiFetch } from './contract-workflow/helpers';
@@ -22,6 +23,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
   const [mode, setMode] = useState<'contracts' | 'legal'>('contracts');
   const [tab, setTab] = useState<TabId>('context');
   const [workflows, setWorkflows] = useState<ContractWorkflow[]>([]);
+  const [tenders, setTenders] = useState<Tender[]>([]);
   const [selected, setSelected] = useState<ContractWorkflow | null>(null);
   const [loading, setLoading] = useState(false);
   const [analysing, setAnalysing] = useState(false);
@@ -66,6 +68,11 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
   useEffect(() => { loadWorkflows(); }, [loadWorkflows]);
   useEffect(() => {
     apiService.getAIStatus().then(s => setAiConfigured(s.configured)).catch(() => setAiConfigured(false));
+  }, []);
+  // Sözleşmeye Hazır İşler formunda fırsat seçilince İhale adı/İKN otomatik dolabilsin diye
+  // (bkz. WorkflowListPanel.tsx) — yalnız WON ihaleler eşleştirilir.
+  useEffect(() => {
+    apiService.getTenders({ status: 'WON' }).then(t => setTenders(t as Tender[])).catch(() => setTenders([]));
   }, []);
 
   const selectWorkflow = (wf: ContractWorkflow) => {
@@ -499,6 +506,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
         setForm={setForm}
         opportunities={opportunities}
         proposals={proposals}
+        tenders={tenders}
         onCreate={handleCreate}
         loading={loading}
         workflows={workflows}

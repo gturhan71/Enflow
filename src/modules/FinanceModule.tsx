@@ -293,7 +293,18 @@ const GuaranteesTab = ({ items, onDelete, onChanged }: { items: GuaranteeLetter[
                   {expired && <span className="text-red-600 font-bold"> · Süresi doldu</span>}
                   {expiring && <span className="text-amber-600 font-bold"> · Yakında doluyor</span>}
                 </p>
-                {g.sampleText && <button onClick={() => setSampleView(g)} className="text-[11px] font-bold text-indigo-600 hover:underline">Örnek metni gör</button>}
+                <div className="flex items-center gap-3">
+                  {g.sampleText && <button onClick={() => setSampleView(g)} className="text-[11px] font-bold text-indigo-600 hover:underline">Örnek metni gör</button>}
+                  {g.sampleFileUrl && (
+                    <a
+                      href={g.sampleFileUrl.startsWith('http') ? g.sampleFileUrl : `http://localhost:3002${g.sampleFileUrl}`}
+                      target="_blank" rel="noreferrer"
+                      className="text-[11px] font-bold text-indigo-600 hover:underline"
+                    >
+                      Örnek dosyayı gör
+                    </a>
+                  )}
+                </div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <span className="text-lg font-black text-slate-900">{fmt(g.amount, g.currency)}</span>

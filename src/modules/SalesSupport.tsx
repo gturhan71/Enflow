@@ -2,14 +2,14 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   Gavel, Plus, Calendar, ClipboardCheck, ShieldCheck, Trash2,
   CheckCircle2, Clock, AlertTriangle, Upload, FileText, X, ExternalLink,
-  Sparkles, Building2, Loader2, FileSearch,
+  Sparkles, Building2, Loader2, FileSearch, Paperclip,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useAIGate } from '../contexts/AIGateContext';
 import { fmtCurrency as fmt } from '../lib/format';
-import { sampleGuaranteeText } from '../lib/guaranteeText';
+import { sampleGuaranteeText, uploadGuaranteeSampleFile } from '../lib/guaranteeText';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
 interface SalesSupportProps {
@@ -479,6 +479,7 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [f, setF] = useState({ type: 'BID_BOND', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' });
+  const [sampleFile, setSampleFile] = useState<File | null>(null);
 
   const load = useCallback(async () => {
     if (!tender) { setGuarantees([]); return; }
@@ -496,13 +497,16 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
 
   const save = async () => {
     if (!tender) return;
-    await apiService.createGuarantee({
+    const created = await apiService.createGuarantee({
       type: f.type, tenderId: tender.id, amount: parseFloat(f.amount) || 0, currency: f.currency,
       expiryDate: f.indefinite ? null : (f.expiryDate || null), isIndefinite: f.indefinite,
       status: 'REQUESTED', sampleText: f.sampleText || null,
       requestNote: f.requestNote || (userName ? `Talep eden: ${userName}` : null),
-    });
-    setShowForm(false); setF({ type: 'BID_BOND', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' }); load();
+    }) as GuaranteeLetter;
+    // Örnek teminat mektubu dosyası eklendiyse, kayıt oluştuktan hemen sonra yüklenir —
+    // Finans, banka ile teminat mektubunu düzenlerken metni doğrudan bu dosyadan alabilir.
+    if (sampleFile) await uploadGuaranteeSampleFile(created.id, sampleFile);
+    setShowForm(false); setF({ type: 'BID_BOND', amount: '', currency: 'TRY', expiryDate: '', indefinite: false, requestNote: '', sampleText: '' }); setSampleFile(null); load();
   };
 
   if (!tender)
@@ -527,7 +531,18 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
                   <p className="text-xs text-slate-500">{g.bankName ? `${g.bankName} · ` : ''}{g.isIndefinite ? 'Süresiz' : `Geçerlilik: ${fmtDate(g.expiryDate)}`}
                     {dleft !== null && <span className={`ml-1 font-bold ${dleft < 0 ? 'text-red-600' : dleft <= 30 ? 'text-amber-600' : 'text-slate-400'}`}>({dleft < 0 ? 'süresi doldu' : `${dleft} gün`})</span>}</p>
                 </div>
-                <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>{GUARANTEE_STATUS_TR[g.status] || g.status}</span>
+                <div className="flex items-center gap-2">
+                  {g.sampleFileUrl && (
+                    <a
+                      href={g.sampleFileUrl.startsWith('http') ? g.sampleFileUrl : `http://localhost:3002${g.sampleFileUrl}`}
+                      target="_blank" rel="noreferrer" title="Örnek teminat mektubu dosyasını gör"
+                      className="text-slate-400 hover:text-blue-600"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </a>
+                  )}
+                  <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${g.status === 'REQUESTED' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-emerald-100 text-emerald-700 border-emerald-200'}`}>{GUARANTEE_STATUS_TR[g.status] || g.status}</span>
+                </div>
               </div>
             );
           })}
@@ -554,6 +569,19 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
               </>}
               <label className="text-xs text-slate-500">Örnek teminat metni (şartnameden — Finans düzenler)</label>
               <textarea className="input-glass w-full text-xs" rows={5} value={f.sampleText} onChange={e => setF({ ...f, sampleText: e.target.value })} />
+              <label className="text-xs text-slate-500">Örnek teminat mektubu dosyası (opsiyonel — varsa Finans metni doğrudan bu dosyadan alır)</label>
+              <div className="flex items-center gap-2">
+                <label className="flex-1 flex items-center gap-2 input-glass text-xs cursor-pointer text-slate-500 hover:text-slate-700">
+                  <Upload className="w-3.5 h-3.5 shrink-0" />
+                  <span className="truncate">{sampleFile ? sampleFile.name : 'Dosya seç (.pdf, .doc, .docx)'}</span>
+                  <input type="file" accept=".pdf,.doc,.docx" className="hidden" onChange={e => setSampleFile(e.target.files?.[0] || null)} />
+                </label>
+                {sampleFile && (
+                  <button onClick={() => setSampleFile(null)} className="text-slate-400 hover:text-red-500 shrink-0" title="Kaldır">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <input className="input-glass w-full text-sm" placeholder="Talep notu (opsiyonel)" value={f.requestNote} onChange={e => setF({ ...f, requestNote: e.target.value })} />
               <button onClick={save} disabled={!f.amount || (!f.indefinite && !f.expiryDate)} className="btn-primary w-full text-sm disabled:opacity-50">Finans'a Talep Gönder</button>
             </div>

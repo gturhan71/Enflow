@@ -312,10 +312,14 @@ router.post(
     const record = await prisma.guaranteeLetter.findFirst({ where: { id, tenantId: req.tenantId } });
     if (!record) return res.status(404).json({ error: 'Teminat bulunamadı.' });
 
+    // target=sample → talep aşamasında eklenen örnek teminat mektubu dosyası
+    // (sampleFileUrl); varsayılan (target yok/=final) → Finans'ın banka'dan
+    // aldığı gerçek/imzalı mektup (fileUrl, mevcut davranış — geriye uyumlu).
+    const isSample = String(req.body?.target || '') === 'sample';
     const folder = slugify(record.refNo || record.id);
     const uploadDir = getUploadDir(GUARANTEE_UPLOADS_ROOT, folder);
     const ext = path.extname(req.file.originalname);
-    const safeName = `${id.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+    const safeName = `${id.slice(-8)}_${isSample ? 'ornek_' : ''}${slugify(path.basename(req.file.originalname, ext))}${ext}`;
     const localPath = path.join(uploadDir, safeName);
     fs.writeFileSync(localPath, req.file.buffer);
 
@@ -324,7 +328,10 @@ router.post(
     const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
     const fileUrl = ncUrl || localUrl;
 
-    const item = await prisma.guaranteeLetter.update({ where: { id }, data: { fileUrl } });
+    const item = await prisma.guaranteeLetter.update({
+      where: { id },
+      data: isSample ? { sampleFileUrl: fileUrl } : { fileUrl },
+    });
     res.json({ guarantee: item, localUrl, nextcloudUrl: ncUrl });
   })
 );

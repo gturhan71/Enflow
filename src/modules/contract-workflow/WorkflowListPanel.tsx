@@ -1,6 +1,7 @@
 import type { Dispatch, SetStateAction } from 'react';
 import { FileText, Plus, Loader2, AlertTriangle, Info } from 'lucide-react';
 import { Opportunity, Proposal } from '../../types';
+import { Tender } from '../../types/tender';
 import { ContractWorkflow } from './types';
 import { DOC_STATUS_STYLES, WORKFLOW_STATUS_STEPS, TERMINAL_STATUS_LABELS } from './constants';
 import { bestProposalPrice, computeDeadlineAlarm } from './helpers';
@@ -15,12 +16,13 @@ export interface WorkflowFormState {
 }
 
 export default function WorkflowListPanel({
-  form, setForm, opportunities, proposals, onCreate, loading, workflows, selectedId, onSelectWorkflow,
+  form, setForm, opportunities, proposals, tenders = [], onCreate, loading, workflows, selectedId, onSelectWorkflow,
 }: {
   form: WorkflowFormState;
   setForm: Dispatch<SetStateAction<WorkflowFormState>>;
   opportunities: Opportunity[];
   proposals: Proposal[];
+  tenders?: Tender[];
   onCreate: () => void;
   loading: boolean;
   workflows: ContractWorkflow[];
@@ -57,13 +59,24 @@ export default function WorkflowListPanel({
               const oppId = e.target.value;
               const price = oppId ? bestProposalPrice(oppId, proposals) : null;
               const opp = oppId ? opportunities.find(o => o.id === oppId) : null;
+              // Fırsat bir kazanılmış ihaleden geliyorsa (İhale/İSAB modülünde WON
+              // işaretlenmiş) İhale adı + İKN otomatik dolar — kullanıcı elle
+              // yazmak zorunda kalmasın, yalnız zaten boşsa (üzerine yazılmaz). Bedel
+              // öncelik: kazanılan teklifin alt toplamı (CRM'de varsa, daha güncel) →
+              // yoksa ihalenin tahmini/kazanılan bedeli (otomatik WON→Sözleşme akışıyla
+              // aynı kaynak, bkz. processEngine.ts createContractFromTender).
+              const tender = oppId ? tenders.find(t => t.opportunityId === oppId) : null;
+              const fallbackValue = price === null && tender?.estimatedValue ? tender.estimatedValue : null;
               setForm(f => ({
                 ...f,
                 opportunityId: oppId,
                 ...(price !== null && { contractValue: String(price) }),
+                ...(fallbackValue !== null && { contractValue: String(fallbackValue) }),
+                ...(tender && !f.tenderName.trim() && { tenderName: tender.name }),
+                ...(tender?.ikn && !f.tenderNo.trim() && { tenderNo: tender.ikn }),
                 // Fırsat seçilince başlık da otomatik önerilir — kullanıcı elle yazmak
                 // zorunda kalmasın; henüz bir şey girilmemişse doldurulur, üzerine yazılmaz.
-                ...(opp && !f.tenderName.trim() && !f.title.trim() && { title: opp.title }),
+                ...(opp && !f.tenderName.trim() && !f.title.trim() && { title: tender?.name || opp.title }),
               }));
             }}
           >
