@@ -15,19 +15,18 @@ import { prisma } from '../prismaClient';
  * Sayaç `DocumentSequence` üzerinde tenant+kategori+yıl bazında atomik
  * olarak (transaction içinde upsert + increment) artırılır.
  */
-export async function nextDocumentNumber(
+/**
+ * (tenant, kategori, yıl) bazında atomik sayaç artırımı — satır yoksa
+ * oluşturur, varsa lastNumber'ı 1 artırır. Transaction yarış koşulunu
+ * engeller. `nextDocumentNumber` ve `nextOpportunityTrackingCode` bu tek
+ * sayaç mekanizmasını paylaşır.
+ */
+export async function incrementDocumentSequence(
   tenantId: string,
-  categoryCode: string
-): Promise<string | null> {
-  const profile = await prisma.documentCodingProfile.findUnique({ where: { tenantId } });
-  if (!profile || !profile.isActive) return null;
-  if (!categoryCode) return null;
-
-  const year = new Date().getFullYear();
-
-  // Atomik sayaç: aynı (tenant, kategori, yıl) için satır yoksa oluştur,
-  // varsa lastNumber'ı 1 artır. Transaction yarış koşulunu engeller.
-  const seqNumber = await prisma.$transaction(async (tx) => {
+  categoryCode: string,
+  year: number
+): Promise<number> {
+  return prisma.$transaction(async (tx) => {
     const existing = await tx.documentSequence.findUnique({
       where: { tenantId_categoryCode_year: { tenantId, categoryCode, year } },
     });
@@ -43,6 +42,18 @@ export async function nextDocumentNumber(
     });
     return updated.lastNumber;
   });
+}
+
+export async function nextDocumentNumber(
+  tenantId: string,
+  categoryCode: string
+): Promise<string | null> {
+  const profile = await prisma.documentCodingProfile.findUnique({ where: { tenantId } });
+  if (!profile || !profile.isActive) return null;
+  if (!categoryCode) return null;
+
+  const year = new Date().getFullYear();
+  const seqNumber = await incrementDocumentSequence(tenantId, categoryCode, year);
 
   const sep = profile.separator || '-';
   const seq = String(seqNumber).padStart(Math.max(1, profile.sequenceDigits || 5), '0');
@@ -54,6 +65,42 @@ export async function nextDocumentNumber(
   parts.push(seq);
 
   return parts.join(sep);
+}
+
+/**
+ * Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu üretir.
+ * `nextDocumentNumber`'dan farkı: tenant'ın doküman kodlama profili
+ * yoksa/pasifse dahi ASLA null dönmez (her fırsat mutlaka bir kod alır) ve
+ * kod fırsatın açılış tarihini GÜN dahil (YYYYMMDD) içerir — yalnız yıl
+ * değil (iş kararı: fırsatın ne zaman açıldığı kod üzerinden görünür olmalı).
+ * Sayaç yine yıl bazında sıfırlanan `DocumentSequence`'i kullanır
+ * (categoryCode='OPP'); kod'daki tarih bölümü ise her zaman gerçek açılış
+ * gününü yansıtır.
+ */
+export async function nextOpportunityTrackingCode(
+  tenantId: string,
+  createdAt: Date = new Date()
+): Promise<string> {
+  const CATEGORY_CODE = 'OPP';
+  const year = createdAt.getFullYear();
+  const yyyymmdd = `${year}${String(createdAt.getMonth() + 1).padStart(2, '0')}${String(createdAt.getDate()).padStart(2, '0')}`;
+
+  const profile = await prisma.documentCodingProfile.findUnique({ where: { tenantId } });
+  const seqNumber = await incrementDocumentSequence(tenantId, CATEGORY_CODE, year);
+
+  if (profile && profile.isActive) {
+    const sep = profile.separator || '-';
+    const seq = String(seqNumber).padStart(Math.max(1, profile.sequenceDigits || 5), '0');
+    const parts: string[] = [];
+    if (profile.companyCode) parts.push(profile.companyCode);
+    parts.push(CATEGORY_CODE);
+    parts.push(yyyymmdd);
+    parts.push(seq);
+    return parts.join(sep);
+  }
+
+  const seq = String(seqNumber).padStart(5, '0');
+  return `${CATEGORY_CODE}-${yyyymmdd}-${seq}`;
 }
 
 /**

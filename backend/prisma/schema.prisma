@@ -210,8 +210,10 @@ model Contact {
 
 model Opportunity {
   id                String        @id @default(cuid())
+  trackingCode      String?       // benzersiz takip kodu (açılış tarihi dahil) — nextOpportunityTrackingCode ile üretilir, immutable
   title             String
   value             Float
+  currency          String        @default("TRY") // fırsatın tahmini bedeli hangi dövizde girildi
   probability       Int
   expectedCloseDate DateTime?
   status            String
@@ -244,9 +246,35 @@ model Opportunity {
   proposals         Proposal[]
   progressLogs      OpportunityProgressLog[]
   costAnalysisVersions CostAnalysisVersion[]
+  requiredDocs      OpportunityRequiredDoc[]
 
   @@index([tenantId, status])
   @@index([tenantId, assignedToId])
+  @@unique([tenantId, trackingCode])
+}
+
+// Fırsat oluşturulurken zorunlu 3 evrak (teknik şartname/idari şartname/sözleşme
+// taslağı) + serbest ek evraklar (OTHER). Fırsat evraksız da oluşturulabilir —
+// zorunluluk yalnız BoM girişinde (Presales) kontrol edilir, bkz. opportunities.ts
+// POST /:id/bom. 3 sabit satırın tekilliği DB-seviyeli değil, uygulama katmanında
+// (ilk GET'te seed) garanti edilir — OTHER tipinden birden çok kayıt eklenebilsin diye.
+model OpportunityRequiredDoc {
+  id            String      @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  docType       String      // TECH_SPEC | ADMIN_SPEC | CONTRACT_DRAFT | OTHER
+  name          String
+  status        String      @default("PENDING") // PENDING | UPLOADED
+  fileUrl       String?
+  fileName      String?
+  isRequired    Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, opportunityId])
 }
 
 // Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi

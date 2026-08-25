@@ -189,7 +189,7 @@ const CRMModule = ({
   const handleClearParent = () => customerForm.setValues(prev => ({ ...prev, parentId: null }));
 
   const opportunityForm = useForm<Partial<Opportunity>>({
-    title: '', value: 0, probability: 50, customerId: '', description: '', status: 'NEW',
+    title: '', value: 0, currency: 'TRY', probability: 50, customerId: '', description: '', status: 'NEW',
     procurementMethod: 'OPEN', targetBidDate: '', expectedCloseDate: ''
   });
 
@@ -512,6 +512,7 @@ const CRMModule = ({
     opportunityForm.setValues({
       title: opp.title,
       value: opp.value,
+      currency: opp.currency || 'TRY',
       probability: opp.probability,
       customerId: opp.customerId,
       description: opp.description || '',

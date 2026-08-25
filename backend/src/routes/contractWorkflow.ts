@@ -13,6 +13,7 @@ import { advanceProcess, ProcessNotConfiguredError } from '../services/processEn
 import { logActivity } from '../services/activityLog';
 import { checkStatusTransition, buildAutoTitle } from '../services/contractWorkflowState';
 import { similarityRatio } from '../utils/textSimilarity';
+import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -423,16 +424,30 @@ router.post(
     });
     if (!docOwned) return res.status(404).json({ error: 'Evrak bulunamadı.' });
 
-    const folder = contractFolder(wf);
-    const uploadDir = getUploadDir(folder);
-
     const ext = path.extname(req.file.originalname);
     const safeName = `${docId.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+
+    // Ortak Fırsat klasör kökü: wf.opportunityId ve fırsatın trackingCode'u varsa
+    // dosya oraya yazılır (bkz. opportunityFolderService.ts); yoksa eski
+    // contractFolder() davranışı korunur (geriye uyumluluk, forward-only).
+    let folder = contractFolder(wf);
+    let uploadDir = getUploadDir(folder);
+    let localUrl = `/uploads/contracts/${folder}/${safeName}`;
+    let remotePath = `/ENFLOW_DMS/Sozlesmeler/${folder}`;
+    if (wf.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({ where: { id: wf.opportunityId, tenantId: req.tenantId }, select: { trackingCode: true } });
+      if (opp?.trackingCode) {
+        const resolved = resolveOpportunityUploadDir(opp.trackingCode, 'contracts');
+        folder = resolved.folder;
+        uploadDir = resolved.dir;
+        localUrl = opportunityLocalUrl(opp.trackingCode, 'contracts', safeName);
+        remotePath = opportunityRemotePath(opp.trackingCode, 'contracts');
+      }
+    }
     const localPath = path.join(uploadDir, safeName);
 
     fs.writeFileSync(localPath, req.file.buffer);
 
-    const localUrl = `/uploads/contracts/${folder}/${safeName}`;
     let fileUrl = localUrl;
     let ncUrl: string | null = null;
 
@@ -443,7 +458,6 @@ router.post(
 
     if (NC_URL && NC_USER && NC_PASS && await checkLimit(req.tenantId, 'INTEGRATION_SYNC')) {
       try {
-        const remotePath = `/ENFLOW_DMS/Sozlesmeler/${folder}`;
         ncUrl = await uploadToNextcloud(req.file.buffer, safeName, remotePath, NC_URL, NC_USER, NC_PASS);
         fileUrl = ncUrl;
         await incrementUsage(req.tenantId, 'INTEGRATION_SYNC');

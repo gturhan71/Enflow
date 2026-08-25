@@ -3,8 +3,10 @@ import type { BoMItem, CostItem } from './presales';
 
 export interface Opportunity {
   id: string;
+  trackingCode?: string | null; // benzersiz takip kodu (açılış tarihi dahil, ör. OPP-20260825-00001) — immutable
   title: string;
   value: number;
+  currency?: string; // value hangi dövizde girildi (TRY|USD|EUR) — varsayılan TRY
   probability: number;
   expectedCloseDate?: string;
   status: 'NEW' | 'CONTACTED' | 'QUALIFIED' | 'PROPOSAL' | 'NEGOTIATION' | 'WON' | 'LOST' | 'WITHDRAWN';
@@ -39,6 +41,38 @@ export interface Opportunity {
 }
 
 // Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
+// Fırsat oluşturulurken zorunlu 3 evrak (teknik/idari şartname + sözleşme taslağı)
+// + serbest ek evraklar (OTHER). bkz. backend opportunityDocs.ts.
+export interface OpportunityRequiredDoc {
+  id: string;
+  tenantId?: string;
+  opportunityId: string;
+  docType: 'TECH_SPEC' | 'ADMIN_SPEC' | 'CONTRACT_DRAFT' | 'OTHER';
+  name: string;
+  status: 'PENDING' | 'UPLOADED';
+  fileUrl?: string | null;
+  fileName?: string | null;
+  isRequired: boolean;
+  sortOrder: number;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Fırsat→Proje boyunca üretilen tüm dökümanların (Fırsat Evrakı, Sözleşme, İhale,
+// BoM Teklifi, Proje Devir, Teminat) tek listede agregasyonu (bkz. backend
+// GET /opportunities/:id/documents, Faz D — mantıksal agregasyon, dosyalar fiziksel
+// olarak ortak Fırsat klasör kökünde de toplanır, bkz. opportunityFolderService.ts).
+export interface OpportunityDocumentRow {
+  id: string;
+  source: string;
+  name: string;
+  docType: string | null;
+  status: string;
+  fileUrl: string | null;
+  updatedAt: string;
+}
+
 export interface OpportunityProgressLog {
   id: string;
   tenantId: string;

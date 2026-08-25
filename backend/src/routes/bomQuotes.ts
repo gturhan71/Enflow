@@ -6,6 +6,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
+import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -120,12 +121,29 @@ router.post('/:qid/upload', quoteUpload.single('file'), enforceStorageLimit(), a
     return res.status(415).json({ error: `Desteklenmeyen format. İzinli: ${ALLOWED_EXT.join(', ')}` });
   }
 
-  const folder = slugify(`${quote.opportunityId}_${quote.lineKey}`);
-  const uploadDir = getUploadDir(QUOTE_UPLOADS_ROOT, folder);
   const safeName = `${qid.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
-  fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
-  const localUrl = `/uploads/bom-quotes/${folder}/${safeName}`;
-  const ncUrl = await tryUploadToNextcloud(tenantId, req.file.buffer, safeName, `/ENFLOW_DMS/BoM_Teklifleri/${folder}`);
+
+  // Ortak Fırsat klasör kökü: opportunityId her zaman doğrudan mevcut (schema'da
+  // zorunlu alan) — fırsatın trackingCode'u varsa dosya oraya yazılır, yoksa
+  // (backfill'den önce oluşmuş çok eski kayıt ihtimaline karşı) eski davranış korunur.
+  const opp = await prisma.opportunity.findFirst({ where: { id: quote.opportunityId, tenantId }, select: { trackingCode: true } });
+  let folder: string;
+  let localUrl: string;
+  let remotePath: string;
+  if (opp?.trackingCode) {
+    const resolved = resolveOpportunityUploadDir(opp.trackingCode, 'bom-quotes');
+    folder = resolved.folder;
+    fs.writeFileSync(path.join(resolved.dir, safeName), req.file.buffer);
+    localUrl = opportunityLocalUrl(opp.trackingCode, 'bom-quotes', safeName);
+    remotePath = opportunityRemotePath(opp.trackingCode, 'bom-quotes');
+  } else {
+    folder = slugify(`${quote.opportunityId}_${quote.lineKey}`);
+    const uploadDir = getUploadDir(QUOTE_UPLOADS_ROOT, folder);
+    fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
+    localUrl = `/uploads/bom-quotes/${folder}/${safeName}`;
+    remotePath = `/ENFLOW_DMS/BoM_Teklifleri/${folder}`;
+  }
+  const ncUrl = await tryUploadToNextcloud(tenantId, req.file.buffer, safeName, remotePath);
   const fileUrl = ncUrl || localUrl;
 
   const updated = await prisma.boMLineQuote.update({ where: { id: qid }, data: { fileUrl, fileName: req.file.originalname } });

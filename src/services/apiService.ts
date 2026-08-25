@@ -9,7 +9,8 @@ import { settingsService } from './settingsService';
 import {
   Customer, Opportunity, BoMItem, CostItem, Proposal, Contact,
   Project, TodoTask, CorporateDocument, ArchiveItem, Contract,
-  Unit, User, Notification, Workflow, ApprovalChain, ServiceTicket
+  Unit, User, Notification, Workflow, ApprovalChain, ServiceTicket,
+  OpportunityRequiredDoc, OpportunityDocumentRow
 } from '../types';
 
 class ApiService {
@@ -70,6 +71,38 @@ class ApiService {
   async updateBomQuote(qid: string, data: Record<string, unknown>) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'PUT', body: JSON.stringify(data) }); }
   async deleteBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}`, { method: 'DELETE' }); }
   async selectBomQuote(qid: string) { return apiClient.fetchWithAuth(`/bom-quotes/${qid}/select`, { method: 'POST' }); }
+  // --- FIRSAT ZORUNLU EVRAKLAR (teknik/idari şartname + sözleşme taslağı) ---
+  async getOpportunityRequiredDocs(oppId: string): Promise<OpportunityRequiredDoc[]> {
+    return apiClient.fetchWithAuth(`/opportunity-docs/${oppId}/required-docs`);
+  }
+  async addOpportunityExtraDoc(oppId: string, name: string): Promise<OpportunityRequiredDoc> {
+    return apiClient.fetchWithAuth(`/opportunity-docs/${oppId}/required-docs`, { method: 'POST', body: JSON.stringify({ name }) });
+  }
+  async deleteOpportunityRequiredDoc(oppId: string, docId: string) {
+    return apiClient.fetchWithAuth(`/opportunity-docs/${oppId}/required-docs/${docId}`, { method: 'DELETE' });
+  }
+  // FormData ile — apiClient.fetchWithAuth sabit 'Content-Type: application/json' eklediği için
+  // multipart yükleme için kullanılamaz (bkz. ContractWorkflowModule.tsx handleFileUpload deseni).
+  async uploadOpportunityRequiredDoc(oppId: string, docId: string, file: File): Promise<{ doc: OpportunityRequiredDoc; localUrl: string; nextcloudUrl: string | null; folder: string; fileName: string }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const tenantId = localStorage.getItem('enflow_active_tenant_id') || '';
+    const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
+    const res = await fetch(`/api/opportunity-docs/${oppId}/required-docs/${docId}/upload`, {
+      method: 'POST',
+      headers: { 'x-tenant-id': tenantId, 'Authorization': `Bearer ${token}` },
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error((data as { error?: string }).error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  // Fırsat→Proje boyunca üretilen tüm dökümanların tek listede agregasyonu
+  async getOpportunityDocuments(oppId: string): Promise<OpportunityDocumentRow[]> {
+    return apiClient.fetchWithAuth(`/opportunities/${oppId}/documents`);
+  }
+
   async getBomHandoffs(params?: { start?: string; end?: string }) {
     const qs = params?.start && params?.end ? `?start=${params.start}&end=${params.end}` : '';
     return apiClient.fetchWithAuth(`/reports/bom-handoffs${qs}`);

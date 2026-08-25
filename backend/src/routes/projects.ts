@@ -11,6 +11,7 @@ import { computeProjectOverhead, applyProjectOverhead } from '../services/overhe
 import { computeProjectProgress } from '../services/projectProgress';
 import { summarizeProject } from '../services/projectSummary';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
+import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -442,16 +443,28 @@ router.post(
     const project = await prisma.project.findFirst({ where: { id: projectId, tenantId: req.tenantId } });
     if (!project) return res.status(404).json({ error: 'Proje bulunamadı.' });
 
-    const folder = handoverFolder(project);
-    const uploadDir = getUploadDir(HANDOVER_UPLOADS_ROOT, folder);
-
     const ext = path.extname(req.file.originalname);
     const safeName = `${docId.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+
+    // Ortak Fırsat klasör kökü: project.opportunityId ve fırsatın trackingCode'u
+    // varsa dosya oraya yazılır; yoksa eski davranış korunur (geriye uyumluluk).
+    let folder = handoverFolder(project);
+    let uploadDir = getUploadDir(HANDOVER_UPLOADS_ROOT, folder);
+    let localUrl = `/uploads/project-handovers/${folder}/${safeName}`;
+    let remotePath = `/ENFLOW_DMS/ProjeDevir/${folder}`;
+    if (project.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({ where: { id: project.opportunityId, tenantId: req.tenantId }, select: { trackingCode: true } });
+      if (opp?.trackingCode) {
+        const resolved = resolveOpportunityUploadDir(opp.trackingCode, 'project-handover');
+        folder = resolved.folder;
+        uploadDir = resolved.dir;
+        localUrl = opportunityLocalUrl(opp.trackingCode, 'project-handover', safeName);
+        remotePath = opportunityRemotePath(opp.trackingCode, 'project-handover');
+      }
+    }
     const localPath = path.join(uploadDir, safeName);
     fs.writeFileSync(localPath, req.file.buffer);
 
-    const localUrl = `/uploads/project-handovers/${folder}/${safeName}`;
-    const remotePath = `/ENFLOW_DMS/ProjeDevir/${folder}`;
     const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
     const fileUrl = ncUrl || localUrl;
 

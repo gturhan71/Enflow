@@ -60,6 +60,16 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   const bomEligibleOpportunities = opportunities.filter(isBomEligible);
   const pendingTechEvalOpportunities = opportunities.filter(o => o.status !== 'WON' && o.status !== 'LOST' && !isBomEligible(o));
 
+  // Fırsat takip kodu (trackingCode) ile arama — çok sayıda fırsat arasında
+  // hızlı bulma (bkz. Opportunity.trackingCode, ör. ENF-OPP-20260825-00001).
+  const [oppSearch, setOppSearch] = useState('');
+  const filteredBomEligibleOpportunities = oppSearch.trim()
+    ? bomEligibleOpportunities.filter(o => {
+        const q = oppSearch.trim().toLowerCase();
+        return o.title.toLowerCase().includes(q) || (o.trackingCode || '').toLowerCase().includes(q);
+      })
+    : bomEligibleOpportunities;
+
   // Deep-link: dışarıdan gelen fırsatı otomatik seç (varsa ve listede ise).
   useEffect(() => {
     if (initialOppId && opportunities.some(o => o.id === initialOppId)) {
@@ -202,14 +212,21 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           <h3 className="text-2xl font-bold text-slate-900 font-sans">Presales & Dizayn</h3>
           <div className="flex items-center gap-3 mt-1">
             <p className="text-slate-500 whitespace-nowrap">BoM listesini fırsata bağlayın:</p>
+            <input
+              type="text"
+              value={oppSearch}
+              onChange={(e) => setOppSearch(e.target.value)}
+              placeholder="Başlık veya takip kodu ile ara…"
+              className="bg-white/50 border border-slate-200 rounded-lg px-3 py-1 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20 w-56"
+            />
             <select
               value={selectedOppId}
               onChange={(e) => setSelectedOppId(e.target.value)}
               className="bg-white/50 border border-slate-200 rounded-lg px-3 py-1 text-sm font-medium text-slate-700 outline-none focus:ring-2 focus:ring-indigo-500/20"
             >
               <option value="">Fırsat Seçin</option>
-              {bomEligibleOpportunities.map(opp => (
-                <option key={opp.id} value={opp.id}>{opp.title}</option>
+              {filteredBomEligibleOpportunities.map(opp => (
+                <option key={opp.id} value={opp.id}>{opp.trackingCode ? `${opp.trackingCode} — ${opp.title}` : opp.title}</option>
               ))}
             </select>
           </div>

@@ -8,6 +8,8 @@ import { SaveButton } from '../../components/SaveButton';
 import { PermissionGate } from '../../components/PermissionGate';
 import { PIPELINE_STAGES, STATUS_LABEL, getStatusStyle, PROPOSAL_STATUS_LABEL, proposalStatusTone } from './constants';
 import OpportunityHistoryPanel from './OpportunityHistoryPanel';
+import OpportunityRequiredDocsPanel from './OpportunityRequiredDocsPanel';
+import OpportunityDocumentsPanel from './OpportunityDocumentsPanel';
 import { printReportWindow, esc } from '../reporting/helpers';
 import { dleftBadge } from '../dashboard/helpers';
 
@@ -283,6 +285,9 @@ export default function OpportunitiesView({
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
                       <h5 className="font-black text-slate-900 text-sm leading-snug truncate">{opp.title}</h5>
+                      {opp.trackingCode && (
+                        <p className="text-[9px] text-slate-400 font-mono font-bold mt-0.5">{opp.trackingCode}</p>
+                      )}
                       {customer && (
                         <p className="text-[10px] text-slate-500 font-bold mt-0.5 flex items-center gap-1">
                           <Building size={10} />{customer.name}
@@ -304,7 +309,7 @@ export default function OpportunitiesView({
                   {opp.value > 0 && (
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400 font-medium">Değer</span>
-                      <span className="font-black text-slate-800">{opp.value.toLocaleString('tr-TR')} {customer?.currency || ''}</span>
+                      <span className="font-black text-slate-800">{opp.value.toLocaleString('tr-TR')} {opp.currency || customer?.currency || ''}</span>
                     </div>
                   )}
 
@@ -347,6 +352,9 @@ export default function OpportunitiesView({
                     onEditProposal={onEditProposal}
                     onGoToCostAnalysis={onGoToCostAnalysis}
                   />
+
+                  <OpportunityRequiredDocsPanel opportunityId={opp.id} />
+                  <OpportunityDocumentsPanel opportunityId={opp.id} />
 
                   {(opp.agentTriage?.igpd || opp.agentTriage?.crm) && (
                     <div className="flex flex-col gap-1">
@@ -467,7 +475,7 @@ export default function OpportunitiesView({
                       </span>
                     </td>
                     <td className="px-5 py-3 text-xs font-black text-slate-800 text-right whitespace-nowrap">
-                      {opp.value > 0 ? `${opp.value.toLocaleString('tr-TR')} ${customer?.currency || ''}` : '—'}
+                      {opp.value > 0 ? `${opp.value.toLocaleString('tr-TR')} ${opp.currency || customer?.currency || ''}` : '—'}
                     </td>
                     <td className="px-5 py-3 text-xs font-bold text-slate-600 text-right">{opp.probability > 0 ? `%${opp.probability}` : '—'}</td>
                     <td className="px-5 py-3 text-xs text-slate-500 font-medium whitespace-nowrap">{fmtShortDate(opp.createdAt) || '—'}</td>

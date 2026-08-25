@@ -9,6 +9,7 @@ import { computeSalesCosting, getSalesMarginFloor, SalesBoMItemInput, SalesManua
 import { buildBomEvaluationSnapshot, sumBomTotalsByCurrency } from '../services/bomHandoff';
 import { sweepOpportunityProgressReminders } from '../services/opportunityProgressReminders';
 import { recordProgressCheckIn, logAutoProgressChange, ProgressCheckInError } from '../services/opportunityProgressService';
+import { nextOpportunityTrackingCode } from '../services/documentNumberService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
@@ -55,7 +56,7 @@ const METHOD_LABELS: Record<string, string> = {
 };
 
 router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, assignedToId, description, expectedCloseDate, status, procurementMethod, targetBidDate } = req.body;
+  const { title, value, currency, probability, customerId, assignedToId, description, expectedCloseDate, status, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
 
   if (!title || !customerId) {
@@ -71,11 +72,14 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
   const finalAssignedId = assignedToId || firstUser.id;
   const finalCreatedById = req.body.createdById || firstUser.id;
   const bidDate = targetBidDate ? new Date(targetBidDate) : null;
+  const trackingCode = await nextOpportunityTrackingCode(tenantId);
 
   const opp = await prisma.opportunity.create({
     data: {
+      trackingCode,
       title,
       value: parseFloat(value as string) || 0,
+      currency: currency || 'TRY',
       probability: parseInt(probability as string) || 0,
       customerId,
       assignedToId: finalAssignedId,
@@ -140,7 +144,7 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
 const OPPORTUNITY_STATUSES = new Set(['NEW', 'CONTACTED', 'QUALIFIED', 'PROPOSAL', 'NEGOTIATION', 'WON', 'LOST', 'WITHDRAWN']);
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig, procurementMethod, targetBidDate } = req.body;
+  const { title, value, currency, probability, customerId, description, status, lostReason, expectedCloseDate, updatedBy, technicalStatus, costConfig, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
   const opportunityId = req.params.id as string;
 
@@ -154,6 +158,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const updateData: Record<string, unknown> = {};
   if (title !== undefined) updateData.title = title;
   if (value !== undefined) updateData.value = parseFloat(value as string) || 0;
+  if (currency !== undefined) updateData.currency = currency || 'TRY';
   if (probability !== undefined) updateData.probability = parseInt(probability as string) || 0;
   if (description !== undefined) updateData.description = description;
   if (status !== undefined) updateData.status = status;
@@ -258,6 +263,23 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
     });
     if (!techChain || techChain.status !== 'COMPLETED') {
       return res.status(403).json({ error: 'Bu fırsat için Presales Müdürü teknik değerlendirme onayı bekleniyor. BoM oluşturulamaz.' });
+    }
+
+    // Zorunlu evrak kapısı: teknik şartname/idari şartname/sözleşme taslağı
+    // yüklenmeden Presales BoM'a başlayamaz (bkz. opportunityDocs.ts). Fırsat
+    // evraksız oluşturulabilir — kapı yalnız burada, ilk BoM girişinde çalışır.
+    const REQUIRED_DOC_LABELS: Record<string, string> = {
+      TECH_SPEC: 'Teknik Şartname', ADMIN_SPEC: 'İdari Şartname', CONTRACT_DRAFT: 'Sözleşme Taslağı',
+    };
+    const requiredDocs = await prisma.opportunityRequiredDoc.findMany({
+      where: { tenantId, opportunityId, docType: { in: Object.keys(REQUIRED_DOC_LABELS) } },
+    });
+    const missingDocs = Object.keys(REQUIRED_DOC_LABELS).filter(
+      (dt) => requiredDocs.find((d) => d.docType === dt)?.status !== 'UPLOADED'
+    );
+    if (missingDocs.length > 0) {
+      const missingNames = missingDocs.map((dt) => REQUIRED_DOC_LABELS[dt]).join(', ');
+      return res.status(403).json({ error: `BoM oluşturulamaz: eksik zorunlu evrak(lar): ${missingNames}. Önce Fırsat detayından yükleyin.` });
     }
   }
 
@@ -516,6 +538,53 @@ router.get('/:id/cost-analysis-versions', tenantMiddleware, asyncHandler(async (
     costConfig: (() => { try { return JSON.parse(v.costConfig); } catch { return {}; } })(),
   }));
   res.json(parsed);
+}));
+
+// Fırsat→Proje boyunca tüm modüllerde üretilen dökümanların tek listede
+// agregasyonu (Faz D). Yalnız okuma — hiçbir dosya taşınmaz/yazılmaz.
+router.get('/:id/documents', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const opportunityId = String(req.params.id);
+  const tenantId = req.tenantId;
+  const opp = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
+  if (!opp) return res.status(404).json({ error: 'Fırsat bulunamadı.' });
+
+  type DocRow = { id: string; source: string; name: string; docType: string | null; status: string; fileUrl: string | null; updatedAt: Date };
+  const rows: DocRow[] = [];
+
+  const requiredDocs = await prisma.opportunityRequiredDoc.findMany({ where: { tenantId, opportunityId } });
+  requiredDocs.forEach((d) => rows.push({ id: d.id, source: 'Fırsat Evrakı', name: d.name, docType: d.docType, status: d.status, fileUrl: d.fileUrl, updatedAt: d.updatedAt }));
+
+  const workflows = await prisma.contractWorkflow.findMany({ where: { tenantId, opportunityId }, include: { documents: true } });
+  workflows.forEach((wf) => wf.documents.forEach((d) => {
+    if (d.fileUrl) rows.push({ id: d.id, source: 'Sözleşme', name: d.name, docType: d.docType, status: d.status, fileUrl: d.fileUrl, updatedAt: d.updatedAt });
+  }));
+
+  const tenders = await prisma.tender.findMany({ where: { tenantId, opportunityId }, include: { checklist: true } });
+  tenders.forEach((t) => t.checklist.forEach((c) => {
+    if (c.fileUrl) rows.push({ id: c.id, source: 'İhale', name: c.name, docType: c.docType, status: c.status, fileUrl: c.fileUrl, updatedAt: t.updatedAt });
+  }));
+
+  const quotes = await prisma.boMLineQuote.findMany({ where: { tenantId, opportunityId, fileUrl: { not: null } } });
+  quotes.forEach((q) => rows.push({ id: q.id, source: 'BoM Teklifi', name: q.componentName || q.vendorName, docType: 'VENDOR_QUOTE', status: q.isSelected ? 'SEÇİLİ' : 'PENDING', fileUrl: q.fileUrl, updatedAt: q.createdAt ? new Date(q.createdAt) : new Date() }));
+
+  const projects = await prisma.project.findMany({ where: { tenantId, opportunityId }, include: { handoverDocs: true } });
+  projects.forEach((p) => p.handoverDocs.forEach((d) => {
+    if (d.fileUrl) rows.push({ id: d.id, source: 'Proje Devir', name: d.name, docType: d.docType, status: d.status, fileUrl: d.fileUrl, updatedAt: d.updatedAt });
+  }));
+
+  const tenderIds = tenders.map((t) => t.id);
+  const projectIds = projects.map((p) => p.id);
+  if (tenderIds.length > 0 || projectIds.length > 0) {
+    const guarantees = await prisma.guaranteeLetter.findMany({
+      where: { tenantId, OR: [{ tenderId: { in: tenderIds } }, { projectId: { in: projectIds } }] },
+    });
+    guarantees.forEach((g) => {
+      if (g.fileUrl) rows.push({ id: g.id, source: 'Teminat', name: g.refNo || g.type, docType: g.type, status: g.status, fileUrl: g.fileUrl, updatedAt: g.updatedAt });
+    });
+  }
+
+  rows.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime());
+  res.json(rows);
 }));
 
 router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

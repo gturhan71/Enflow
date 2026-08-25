@@ -226,6 +226,44 @@ export const apiMatrix: ApiCase[] = [
     body: { title: "RBAC Test Fırsat", value: 0, status: "LEAD", probability: 10, customerId: "x", assignedToId: "x" },
     expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND },
   },
+  {
+    // Tüm dökümanların agregasyon görünümü — gate'siz GET (tenantMiddleware) → NA.
+    name: "Fırsat döküman agregasyonu",
+    method: "GET",
+    path: `/api/opportunities/${T1_IDS.opportunity}/documents`,
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
+  },
+
+  // --- Fırsat zorunlu evraklar (teknik/idari şartname + sözleşme taslağı) ---
+  {
+    // Gate'siz GET (tenantMiddleware) → Presales bu evraklara erişebilmeli → NA.
+    name: "Fırsat zorunlu evrak listesi",
+    method: "GET",
+    path: `/api/opportunity-docs/${T1_IDS.opportunity}/required-docs`,
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
+  },
+  {
+    // Yalnız GM+SALES_REP+SALES_MGR ekleyebilir (satışçı yükler, GM her zaman yetkili).
+    name: "Fırsat ek evrak ekle",
+    method: "POST",
+    path: `/api/opportunity-docs/${T1_IDS.opportunity}/required-docs`,
+    body: { name: "RBAC Test Evrak" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND, sales_mgr: "allow" },
+  },
+  {
+    // Var olmayan docId ile — "allow" rolleri için 404 kabul (yetki var, kayıt yok);
+    // "deny" rolleri için 401/403 zorunlu (bkz. api-permissions.spec.ts satır 9-10).
+    name: "Fırsat evrak yükle (rol kapısı)",
+    method: "POST",
+    path: `/api/opportunity-docs/${T1_IDS.opportunity}/required-docs/rbac-test-docid/upload`,
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND, sales_mgr: "allow" },
+  },
+  {
+    name: "Fırsat evrak sil (rol kapısı)",
+    method: "DELETE",
+    path: `/api/opportunity-docs/${T1_IDS.opportunity}/required-docs/rbac-test-docid`,
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND, sales_mgr: "allow" },
+  },
 
   // --- Teklifler ---
   {

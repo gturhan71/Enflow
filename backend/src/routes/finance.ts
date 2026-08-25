@@ -6,6 +6,7 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
+import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath, resolveOpportunityForEntity } from '../services/opportunityFolderService';
 import { logActivity } from '../services/activityLog';
 import { computeFinancingEffect, buildFinancingEvents } from '../services/financingEffect';
 import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
@@ -316,15 +317,26 @@ router.post(
     // (sampleFileUrl); varsayılan (target yok/=final) → Finans'ın banka'dan
     // aldığı gerçek/imzalı mektup (fileUrl, mevcut davranış — geriye uyumlu).
     const isSample = String(req.body?.target || '') === 'sample';
-    const folder = slugify(record.refNo || record.id);
-    const uploadDir = getUploadDir(GUARANTEE_UPLOADS_ROOT, folder);
     const ext = path.extname(req.file.originalname);
     const safeName = `${id.slice(-8)}_${isSample ? 'ornek_' : ''}${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+
+    // Ortak Fırsat klasör kökü: GuaranteeLetter → tenderId/projectId → Opportunity
+    // zinciri çözülebiliyorsa dosya oraya yazılır; yoksa eski davranış korunur.
+    let folder = slugify(record.refNo || record.id);
+    let uploadDir = getUploadDir(GUARANTEE_UPLOADS_ROOT, folder);
+    let localUrl = `/uploads/guarantees/${folder}/${safeName}`;
+    let remotePath = `/ENFLOW_DMS/Teminatlar/${folder}`;
+    const resolved = await resolveOpportunityForEntity('GUARANTEE_LETTER', { tenderId: record.tenderId, projectId: record.projectId }, req.tenantId);
+    if (resolved) {
+      const dir = resolveOpportunityUploadDir(resolved.trackingCode, 'guarantees');
+      folder = dir.folder;
+      uploadDir = dir.dir;
+      localUrl = opportunityLocalUrl(resolved.trackingCode, 'guarantees', safeName);
+      remotePath = opportunityRemotePath(resolved.trackingCode, 'guarantees');
+    }
     const localPath = path.join(uploadDir, safeName);
     fs.writeFileSync(localPath, req.file.buffer);
 
-    const localUrl = `/uploads/guarantees/${folder}/${safeName}`;
-    const remotePath = `/ENFLOW_DMS/Teminatlar/${folder}`;
     const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
     const fileUrl = ncUrl || localUrl;
 

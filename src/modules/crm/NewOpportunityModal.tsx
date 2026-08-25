@@ -5,6 +5,13 @@ import { cn } from '../../lib/utils';
 import { Customer, Opportunity } from '../../types';
 import { PROCUREMENT_METHODS } from '../../lib/procurementCosts';
 import { apiService } from '../../services/apiService';
+import MoneyInput from '../../components/MoneyInput';
+
+const CURRENCIES = [
+  { code: 'TRY', label: '₺ TRY' },
+  { code: 'USD', label: '$ USD' },
+  { code: 'EUR', label: '€ EUR' },
+];
 
 const VISIT_ENGAGEMENT_THRESHOLD = 3;
 
@@ -76,7 +83,23 @@ export default function NewOpportunityModal({
               {visitSummary.count >= VISIT_ENGAGEMENT_THRESHOLD ? ' — yüksek etkileşim' : ''}
             </div>
           )}
-          <input type="number" name="value" min={0} value={values.value ?? 0} onChange={handleChange} placeholder="Tahmini Bedel" className="w-full px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none" />
+          <div className="flex gap-3">
+            <MoneyInput
+              value={values.value ?? 0}
+              onChange={(n) => handleChange({ target: { name: 'value', value: String(n), type: 'number' } } as unknown as ChangeEvent<HTMLInputElement>)}
+              placeholder="Tahmini Bedel"
+              className="flex-1 min-w-0 px-6 py-4 bg-slate-50 border border-slate-200 rounded-2xl outline-none"
+            />
+            <select
+              name="currency"
+              value={values.currency ?? 'TRY'}
+              onChange={handleChange}
+              className="px-4 py-4 bg-slate-50 border border-slate-200 rounded-2xl text-sm outline-none w-28 shrink-0"
+              title="Para birimi"
+            >
+              {CURRENCIES.map(c => <option key={c.code} value={c.code}>{c.label}</option>)}
+            </select>
+          </div>
           <div>
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Muhtemel Kapanış Tarihi (bilgi amaçlı)</label>
             <input type="date" name="expectedCloseDate" value={values.expectedCloseDate ?? ''} onChange={handleChange}

@@ -7,6 +7,7 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
+import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
 import { analyzeSpec } from '../services/specAnalysis';
 import { sweepTenderReminders } from '../services/tenderReminders';
 import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
@@ -416,15 +417,28 @@ router.post(
     const record = await prisma.tenderChecklistItem.findFirst({ where: { id: itemId, tenderId: id } });
     if (!record) return res.status(404).json({ error: 'Evrak bulunamadı.' });
 
-    const folder = slugify(tender.name || tender.id);
-    const uploadDir = getUploadDir(TENDER_UPLOADS_ROOT, folder);
     const ext = path.extname(req.file.originalname);
     const safeName = `${itemId.slice(-8)}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+
+    // Ortak Fırsat klasör kökü: tender.opportunityId ve fırsatın trackingCode'u
+    // varsa dosya oraya yazılır; yoksa eski davranış korunur (geriye uyumluluk).
+    let folder = slugify(tender.name || tender.id);
+    let uploadDir = getUploadDir(TENDER_UPLOADS_ROOT, folder);
+    let localUrl = `/uploads/tenders/${folder}/${safeName}`;
+    let remotePath = `/ENFLOW_DMS/Ihale/${folder}`;
+    if (tender.opportunityId) {
+      const opp = await prisma.opportunity.findFirst({ where: { id: tender.opportunityId, tenantId: req.tenantId }, select: { trackingCode: true } });
+      if (opp?.trackingCode) {
+        const resolved = resolveOpportunityUploadDir(opp.trackingCode, 'tenders');
+        folder = resolved.folder;
+        uploadDir = resolved.dir;
+        localUrl = opportunityLocalUrl(opp.trackingCode, 'tenders', safeName);
+        remotePath = opportunityRemotePath(opp.trackingCode, 'tenders');
+      }
+    }
     const localPath = path.join(uploadDir, safeName);
     fs.writeFileSync(localPath, req.file.buffer);
 
-    const localUrl = `/uploads/tenders/${folder}/${safeName}`;
-    const remotePath = `/ENFLOW_DMS/Ihale/${folder}`;
     const ncUrl = await tryUploadToNextcloud(req.tenantId, req.file.buffer, safeName, remotePath);
     const fileUrl = ncUrl || localUrl;
 

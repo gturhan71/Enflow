@@ -17,3 +17,25 @@ export const fmtCurrencyOrDash = (amount: number | null | undefined, currency = 
   if (amount == null) return '—';
   return new Intl.NumberFormat('tr-TR', { style: 'currency', currency, minimumFractionDigits: 0 }).format(amount);
 };
+
+// Düzenlenebilir para input'ları için — döviz sembolü YOK, yalnız tr-TR yazım biçimi
+// (nokta binlik, virgül ondalık). Native <input type="number"> tarayıcı/OS locale'ine
+// göre ondalık ayırıcı dayattığı için (seçilen dövizden bağımsız, kafa karıştırıcı)
+// MoneyInput bu ikiliyi kullanarak kendi metin tabanlı girişini yönetir.
+export const formatMoneyInput = (n: number): string =>
+  n === 0 ? '' : n.toLocaleString('tr-TR', { maximumFractionDigits: 2 });
+
+// Kullanıcının yazdığı serbest metni (virgül/nokta ondalık, TR/EN yazım biçimleri
+// karışık olsa da) sayıya çevirir — SON virgül/nokta ondalık ayırıcı kabul edilir,
+// öncekiler binlik ayıracı sayılıp atılır (ör. "1.234,56" ve "1234,56" ikisi de 1234.56).
+export const parseMoneyInput = (raw: string): number => {
+  const cleaned = raw.trim();
+  if (!cleaned) return 0;
+  const decimalIndex = Math.max(cleaned.lastIndexOf(','), cleaned.lastIndexOf('.'));
+  const digitsOnly = (s: string) => s.replace(/[^0-9]/g, '');
+  const normalized = decimalIndex === -1
+    ? digitsOnly(cleaned)
+    : `${digitsOnly(cleaned.slice(0, decimalIndex))}.${digitsOnly(cleaned.slice(decimalIndex + 1))}`;
+  const n = parseFloat(normalized);
+  return Number.isFinite(n) ? n : 0;
+};
