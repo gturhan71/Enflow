@@ -363,28 +363,33 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+src/components/MoneyInput.tsx ← lib/format
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
-src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
-src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
+src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+src/types/crm.ts ← auth, presales
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
+backend/src/services/documentNumberService.ts ← prismaClient
+backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock
@@ -392,7 +397,6 @@ backend/src/utils/fileUpload.ts ← logger, usageService
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/HealthCards.tsx ← types, lib/format, InfoTooltip
-src/components/MoneyInput.tsx ← lib/format
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/SubscriptionSettings.tsx ← ../types
@@ -413,10 +417,10 @@ src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/crm/constants.ts ← ../types
+src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
-src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
-src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
@@ -426,7 +430,6 @@ src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/for
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
-src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
@@ -457,7 +460,6 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
-src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/agentProvenance.ts ← pluginCatalog
@@ -465,11 +467,9 @@ backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
-backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
-backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
@@ -519,15 +519,17 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 21 hours ago)
+## changes (last 10 commits — 23 seconds ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~birim
+src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
 src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
 src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowListPanel
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
-src/modules/crm/CustomersView.tsx             ~CustomersView
 src/modules/crm/NewOpportunityModal.tsx       ~NewOpportunityModal
+src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
+src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
 src/modules/reporting/OverviewTab.tsx         ~OverviewTab
 src/modules/SalesSupport.tsx                  ~GuaranteesTab
 src/services/apiService.ts                    ~ApiService
@@ -538,6 +540,8 @@ backend/src/services/backupScheduler.ts       ~tick
 backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/dashboardStream.ts       +getDashboardPingAt  ~subscribeDashboard  ~pingDashboard
 backend/src/services/deploymentGuard.ts       +checkDeploymentTopology
+backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
+backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
 backend/src/services/schedulerLock.ts         +acquireLock  +releaseLock
 backend/src/services/unitReportingService.ts  ~computeVisitPerformance
 backend/src/services/updateNotifier.ts        ~tick
@@ -566,6 +570,17 @@ INDEX Project_tenantId_status_idx ON Project
 INDEX PurchaseRequest_tenantId_status_idx ON PurchaseRequest
 INDEX TodoTask_tenantId_status_idx ON TodoTask
 INDEX TodoTask_tenantId_assignedToUserId_idx ON TodoTask
+```
+
+### backend/prisma/migrations/20260825131003_add_opportunity_tracking_code/migration.sql
+```
+INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
+```
+
+### backend/prisma/migrations/20260825131415_add_opportunity_required_doc/migration.sql
+```
+TABLE OpportunityRequiredDoc
+INDEX OpportunityRequiredDoc_tenantId_opportunityId_idx ON OpportunityRequiredDoc
 ```
 
 ### backend/scripts/loadtest/mixed-read.mjs
@@ -611,6 +626,23 @@ export async function getDashboardPingAt(tenantId) → Promise<number | null>  :
 ### backend/src/services/deploymentGuard.ts
 ```
 export function checkDeploymentTopology() → void  :15-30
+```
+
+### backend/src/services/documentNumberService.ts
+```
+export async function incrementDocumentSequence(tenantId, categoryCode, year) → Promise<number>  :24-45  # (tenant, kategori, yıl) bazında atomik sayaç artırımı — satı
+export async function nextDocumentNumber(tenantId, categoryCode) → Promise<string | null>  :47-68
+export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date()) → Promise<string>  :80-104  # Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu ü
+export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
+```
+
+### backend/src/services/opportunityFolderService.ts
+```
+export type OpportunityEntityType  :28-28
+export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # `backend/uploads/opportunities/{trackingCode}/{subfolder}/` 
+export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
+export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
+export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
 ```
 
 ### backend/src/services/schedulerLock.ts
@@ -748,17 +780,6 @@ TABLE new_Customer
 INDEX Customer_tenantId_parentId_idx ON Customer
 ```
 
-### backend/prisma/migrations/20260825131003_add_opportunity_tracking_code/migration.sql
-```
-INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
-```
-
-### backend/prisma/migrations/20260825131415_add_opportunity_required_doc/migration.sql
-```
-TABLE OpportunityRequiredDoc
-INDEX OpportunityRequiredDoc_tenantId_opportunityId_idx ON OpportunityRequiredDoc
-```
-
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
@@ -869,14 +890,6 @@ export function checkStatusTransition(currentStatus, nextStatus, role, cancelRea
 export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
-### backend/src/services/documentNumberService.ts
-```
-export async function incrementDocumentSequence(tenantId, categoryCode, year) → Promise<number>  :24-45  # (tenant, kategori, yıl) bazında atomik sayaç artırımı — satı
-export async function nextDocumentNumber(tenantId, categoryCode) → Promise<string | null>  :47-68
-export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date()) → Promise<string>  :80-104  # Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu ü
-export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
-```
-
 ### backend/src/services/governance.ts
 ```
 export interface ApprovalTier  :13-13
@@ -906,15 +919,6 @@ export interface CreateInvoiceInput  :9-27
   projectId?: string | null  :17-17
   … +9 more members  :9-9
 export async function createInvoiceRecord(tenantId, data, actorUserId?)  :29-72
-```
-
-### backend/src/services/opportunityFolderService.ts
-```
-export type OpportunityEntityType  :28-28
-export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # `backend/uploads/opportunities/{trackingCode}/{subfolder}/` 
-export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
-export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
-export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
 ```
 
 ### backend/src/services/opportunityProgressReminders.ts
@@ -1073,6 +1077,24 @@ handler onClick
 handler onChange
 ```
 
+### src/components/MoneyInput.tsx
+```
+component MoneyInput
+hook useState
+hook useRef
+hook useEffect
+handler onChange
+```
+
+### src/lib/format.ts
+```
+export const fmtCurrency = (n, currency = 'TRY') =>  :10-11
+export const fmtCurrencyExact = (v, currency = 'TRY') =>  :13-14
+export const fmtCurrencyOrDash = (amount, currency = 'TRY') =>  :16-19
+export const formatMoneyInput = (n) =>  :25-26
+export const parseMoneyInput = (raw) =>  :31-41
+```
+
 ### src/lib/guaranteeText.ts
 ```
 export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
@@ -1129,23 +1151,6 @@ handler onSendForApproval
 handler onRejectSignature
 ```
 
-### src/modules/crm/CustomersView.tsx
-```
-component CustomersView
-handler onChange
-handler onClick
-```
-
-### src/modules/crm/NewCustomerModal.tsx
-```
-component NewCustomerModal
-hook useState
-handler onClick
-handler onSubmit
-handler onChange
-handler onPick
-```
-
 ### src/modules/crm/NewOpportunityModal.tsx
 ```
 component NewOpportunityModal
@@ -1165,6 +1170,24 @@ handler onClick
 handler onChange
 handler onEditProposal
 handler onGoToCostAnalysis
+```
+
+### src/modules/crm/OpportunityDocumentsPanel.tsx
+```
+component OpportunityDocumentsPanel
+hook useState
+hook useCallback
+handler onClick
+```
+
+### src/modules/crm/OpportunityRequiredDocsPanel.tsx
+```
+component OpportunityRequiredDocsPanel
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+handler onChange
 ```
 
 ### src/modules/CRMModule.tsx
@@ -1265,6 +1288,22 @@ handler onDelete
 handler onReviewed
 ```
 
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useEffect
+hook useBoM
+hook useCallback
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+handler onSelected
+```
+
 ### src/modules/reporting/OverviewTab.tsx
 ```
 component OverviewTab
@@ -1310,6 +1349,35 @@ class ApiService  :16-70
   async createCustomer(data)  :44-44
   async updateCustomer(id, data)  :45-45
   … +22 more methods  :16-16
+```
+
+### src/types/crm.ts
+```
+export interface Opportunity  :4-41
+  id: string  :5-5
+  trackingCode?: string | null  :6-6
+  title: string  :7-7
+  value: number  :8-8
+  currency?: string  :9-9
+  probability: number  :10-10
+  expectedCloseDate?: string  :11-11
+  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :12-12
+  … +26 more members  :4-4
+export interface OpportunityRequiredDoc  :46-60
+  id: string  :47-47
+  tenantId?: string  :48-48
+  opportunityId: string  :49-49
+  docType: 'TECH_SPEC' | 'ADMIN_SPEC' | 'CONTR  :50-50
+  name: string  :51-51
+  status: 'PENDING' | 'UPLOADED'  :52-52
+  fileUrl?: string | null  :53-53
+  fileName?: string | null  :54-54
+  … +5 more members  :46-46
+export interface OpportunityDocumentRow  :66-74
+  id: string  :67-67
+  source: string  :68-68
+  name: string  :69-69
+  docType: string | null  :70-70
 ```
 
 ### src/types/dashboard.ts
@@ -1367,15 +1435,6 @@ export CustomerHealthCard
 ### src/components/InfoTooltip.tsx
 ```
 component InfoTooltip
-```
-
-### src/components/MoneyInput.tsx
-```
-component MoneyInput
-hook useState
-hook useRef
-hook useEffect
-handler onChange
 ```
 
 ### src/components/ProcessTriggerButton.tsx
@@ -1499,15 +1558,6 @@ export Sidebar
 handler onClick
 ```
 
-### src/lib/format.ts
-```
-export const fmtCurrency = (n, currency = 'TRY') =>  :10-11
-export const fmtCurrencyExact = (v, currency = 'TRY') =>  :13-14
-export const fmtCurrencyOrDash = (amount, currency = 'TRY') =>  :16-19
-export const formatMoneyInput = (n) =>  :25-26
-export const parseMoneyInput = (raw) =>  :31-41
-```
-
 ### src/lib/permissionTree.ts
 ```
 export interface PermChild  :15-18
@@ -1605,6 +1655,13 @@ export const proposalStatusTone = (status) =>  :16-32
 export const getStatusStyle = (status) =>  :21-32
 ```
 
+### src/modules/crm/CustomersView.tsx
+```
+component CustomersView
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/DashboardView.tsx
 ```
 component DashboardView
@@ -1612,12 +1669,14 @@ handler onOpps
 handler onValue
 ```
 
-### src/modules/crm/OpportunityDocumentsPanel.tsx
+### src/modules/crm/NewCustomerModal.tsx
 ```
-component OpportunityDocumentsPanel
+component NewCustomerModal
 hook useState
-hook useCallback
 handler onClick
+handler onSubmit
+handler onChange
+handler onPick
 ```
 
 ### src/modules/crm/OpportunityHistoryPanel.tsx
@@ -1625,16 +1684,6 @@ handler onClick
 component OpportunityHistoryPanel
 hook useState
 handler onClick
-```
-
-### src/modules/crm/OpportunityRequiredDocsPanel.tsx
-```
-component OpportunityRequiredDocsPanel
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-handler onChange
 ```
 
 ### src/modules/crm/ProgressCheckInModal.tsx
@@ -1766,22 +1815,6 @@ export PlatformTicketsModule
 handler onClick
 handler onChange
 handler onSubmit
-```
-
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useEffect
-hook useBoM
-hook useCallback
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
-handler onSelected
 ```
 
 ### src/modules/procurement/PRDetailDrawer.tsx
@@ -2097,35 +2130,6 @@ export interface ConcentrationReport  :22-26
   topCustomers: { name: string  :23-23
   hhi: number  :24-24
   totalRevenue: number  :25-25
-```
-
-### src/types/crm.ts
-```
-export interface Opportunity  :4-41
-  id: string  :5-5
-  trackingCode?: string | null  :6-6
-  title: string  :7-7
-  value: number  :8-8
-  currency?: string  :9-9
-  probability: number  :10-10
-  expectedCloseDate?: string  :11-11
-  status: 'NEW' | 'CONTACTED' | 'QUALIFIED' |  :12-12
-  … +26 more members  :4-4
-export interface OpportunityRequiredDoc  :46-60
-  id: string  :47-47
-  tenantId?: string  :48-48
-  opportunityId: string  :49-49
-  docType: 'TECH_SPEC' | 'ADMIN_SPEC' | 'CONTR  :50-50
-  name: string  :51-51
-  status: 'PENDING' | 'UPLOADED'  :52-52
-  fileUrl?: string | null  :53-53
-  fileName?: string | null  :54-54
-  … +5 more members  :46-46
-export interface OpportunityDocumentRow  :66-74
-  id: string  :67-67
-  source: string  :68-68
-  name: string  :69-69
-  docType: string | null  :70-70
 ```
 
 ### src/types/dmo.ts

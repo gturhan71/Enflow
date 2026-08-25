@@ -52,7 +52,10 @@ export const UserManagement = ({
       role,
       unitId: unitId === '' ? undefined : unitId,
       tenantId: activeTenantId,
-      permissions: ['DASHBOARD_VIEW'],
+      // permissions kasıtlı olarak gönderilmiyor — backend seçilen role göre
+      // ROLE_DEFAULT_PERMISSIONS'tan makul bir başlangıç seti atar (bkz.
+      // backend/src/services/roleDefaultPermissions.ts). Admin sonradan
+      // Ayarlar → Kullanıcı Yönetimi → İzin Ağacı'ndan elle genişletir/daraltır.
       status: 'ACTIVE' as const
     };
 

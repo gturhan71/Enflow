@@ -257,7 +257,7 @@ class ApiService {
   // --- USERS ---
   async getUsers() { return settingsService.getUsers(); }
   async getCurrentUser() { return settingsService.getCurrentUser(); }
-  async createUser(data: Omit<User, 'id'>) { return settingsService.createUser(data); }
+  async createUser(data: Omit<User, 'id' | 'permissions'> & { permissions?: string[] }) { return settingsService.createUser(data); }
   async updateUser(id: string, data: Partial<User>) { return settingsService.updateUser(id, data); }
   async deleteUser(id: string, opts?: { transferToUserId?: string; hardDelete?: boolean }) { return settingsService.deleteUser(id, opts); }
   async getOwnedItems(userId: string) { return settingsService.getOwnedItems(userId); }

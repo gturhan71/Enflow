@@ -5,6 +5,7 @@ import { logActivity } from '../services/activityLog';
 import { hashPassword } from '../services/auth';
 import { getOwnedItems, transferOwnership, deactivateUser, hardDeleteUser } from '../services/personnelTransferService';
 import { checkUserSeatLimit } from '../usageService';
+import { defaultPermissionsForRole } from '../services/roleDefaultPermissions';
 
 const GM = requireRole(['GENERAL_MANAGER']);
 const router: Router = Router();
@@ -46,7 +47,7 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
       name, email, role, unitId: unitId || null,
       password: await hashPassword(password),
       tenantId: req.tenantId,
-      permissions: typeof permissions === 'string' ? permissions : JSON.stringify(permissions || ['DASHBOARD_VIEW']),
+      permissions: typeof permissions === 'string' ? permissions : JSON.stringify(permissions || defaultPermissionsForRole(role)),
       status: 'ACTIVE'
     }
   });
