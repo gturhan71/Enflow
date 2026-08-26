@@ -252,12 +252,19 @@ const CostAnalysisModule = ({
 
   const foreignCurrencies = CURRENCIES.filter(c => c !== baseCurrency);
 
-  // Maliyet analizi yapılabilecek fırsatlar: kapanmış (WON/LOST) fırsatlar hariç —
-  // PresalesModule ile aynı temel filtre. Arama kutusu başlık/müşteri üzerinden filtreler.
+  // Maliyet analizi yapılabilecek fırsatlar: kapanmış (WON/LOST) hariç, BoM
+  // devredilmiş (Presales tamamlamış) ve henüz Satış Müdürü onayı almamış
+  // olmalı — genel listeden herkesin her fırsata girmesi yerine yalnız
+  // gerçekten "bekleyen" işler görünür. Veri izolasyonu (kim görebilir) zaten
+  // backend'den (GET /opportunities) geliyor — burada tekrar edilmiyor.
+  // PENDING_APPROVAL listede KALIR (Satış Müdürü'nün aşağıdaki onay/red
+  // butonları için); yalnız APPROVED (teklif aşamasına geçmiş) hariç tutulur.
   const analyzableOpps = useMemo(() => {
     const q = oppSearch.trim().toLocaleLowerCase('tr-TR');
     return opportunities
       .filter(o => o.status !== 'WON' && o.status !== 'LOST')
+      .filter(o => (o.bomItems?.length ?? 0) > 0)
+      .filter(o => o.technicalStatus !== 'APPROVED')
       .filter(o => !q || o.title.toLocaleLowerCase('tr-TR').includes(q) || (o.customer?.name || '').toLocaleLowerCase('tr-TR').includes(q));
   }, [opportunities, oppSearch]);
 

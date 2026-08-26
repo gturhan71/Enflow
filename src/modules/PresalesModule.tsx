@@ -32,6 +32,7 @@ import { useBoM } from '../hooks/useBoM';
 import { parseBoMFile } from '../utils/bomParser';
 import { SaveButton } from '../components/SaveButton';
 import { apiService } from '../services/apiService';
+import OpportunityRequiredDocsPanel from './crm/OpportunityRequiredDocsPanel';
 
 interface PresalesModuleProps {
   opportunities: Opportunity[];
@@ -161,29 +162,14 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     const opp = opportunities.find(o => o.id === selectedOppId);
     if (!opp) return;
 
-    // BoM kaydet + Satış'a devret (maliyet analizi Satış'ın işi — burada teklif/onay yok)
+    // BoM kaydet + Satış'a devret. "Maliyet analizi bekliyor" görevi artık
+    // backend'de (POST /:id/bom, handoff:true) Süreç Motoru — BOM_COST_ANALYSIS_HANDOFF —
+    // tarafından üretiliyor (fırsat sahibine doğrudan gider); burada ayrıca
+    // ad-hoc bir TodoTask oluşturulmuyor (iki kez görev oluşmasın diye).
     const success = await saveAndHandoff();
     if (!success) return;
 
     setShowApprovalPreview(false);
-
-    try {
-      // Satış'a "maliyet analizi yap" görevi (relatedModule = OPPORTUNITY)
-      const task = await apiService.createTask({
-        title: `Maliyet Analizi: ${opp.title}`,
-        description: `Presales BoM listesini tamamladı (${bomItems.length} kalem). Satış birimi maliyet/karlılık analizini yapıp Satış Müdürü onayına sunabilir.`,
-        unitId: 'unit_sales',
-        assignedBy: currentUser?.id || 'system',
-        priority: 'HIGH',
-        status: 'PENDING',
-        relatedModule: 'OPPORTUNITY',
-        relatedItemId: selectedOppId,
-        slaBusinessDays: 3,
-      });
-      if (setTasks) setTasks(prev => [task, ...prev]);
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'Satışa devir görevi oluşturulamadı.');
-    }
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -273,6 +259,14 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
               <h4 className="font-bold text-slate-900 flex items-center gap-2"><FileSearch size={20} className="text-indigo-600" />Şartname Maddeleri</h4>
             </div>
             <div className="flex-1 overflow-y-auto p-4 space-y-3">
+              {/* Satışçının fırsat oluştururken yüklediği zorunlu şartname evrakları
+                  (Teknik/İdari Şartname, Sözleşme Taslağı) — BoM bunlara göre
+                  hazırlanacağından Presales salt-okunur görüntüleyebilmeli. */}
+              {selectedOppId && (
+                <div className="p-4 rounded-2xl border border-slate-200 bg-white">
+                  <OpportunityRequiredDocsPanel opportunityId={selectedOppId} defaultExpanded readOnly />
+                </div>
+              )}
               <div className="p-4 rounded-2xl border border-slate-200 bg-white"><p className="text-sm font-medium text-slate-700">Analiz tamamlandığında maddeler burada listelenir.</p></div>
             </div>
           </div>

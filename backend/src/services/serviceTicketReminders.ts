@@ -6,6 +6,7 @@
 // bildirim üretir. GET /service-tickets çağrısında tetiklenir.
 
 import { prisma } from '../prismaClient';
+import { ENTITY_TYPE_TAB } from '../utils/entityTypeTab';
 
 const lastSweepByTenant = new Map<string, number>();
 
@@ -42,7 +43,7 @@ export async function sweepServiceTicketSla(tenantId: string): Promise<void> {
             tenantId, userId, type: 'WARNING',
             title: 'Servis talebi SLA aşıldı',
             message: `"${ticket.title}" (${ticket.project.name}) talebinin SLA süresi ${hoursOverdue > 0 ? `${hoursOverdue} saat` : ''} önce doldu ve hâlâ ${ticket.status === 'IN_PROGRESS' ? 'işlemde' : 'çözülmedi'}.`,
-            relatedModule: 'PROJECT', relatedItemId: ticket.projectId,
+            relatedModule: ENTITY_TYPE_TAB.PROJECT, relatedItemId: ticket.projectId,
           },
         }).catch(() => {});
       }

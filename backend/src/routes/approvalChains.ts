@@ -6,6 +6,7 @@ import { continueProcess } from '../services/processEngine';
 import { sweepApprovalSlaEscalations } from '../services/approvalSlaEscalation';
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
+import { ENTITY_TYPE_TAB } from '../utils/entityTypeTab';
 
 const router: Router = Router();
 
@@ -188,19 +189,24 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
     if (opp) {
       const salesMgrs = await prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'SALES_MGR', status: 'ACTIVE' } });
       await Promise.all(salesMgrs.map((u) => prisma.notification.create({
-        data: { tenantId: req.tenantId, userId: u.id, type: 'SUCCESS', title: 'Teknik değerlendirme onaylandı', message: `"${opp.title}" fırsatı Presales Müdürü tarafından teknik olarak onaylandı. BoM hazırlığı ${assignedEngineer.name}'e devredildi.`, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id },
+        data: { tenantId: req.tenantId, userId: u.id, type: 'SUCCESS', title: 'Teknik değerlendirme onaylandı', message: `"${opp.title}" fırsatı Presales Müdürü tarafından teknik olarak onaylandı. BoM hazırlığı ${assignedEngineer.name}'e devredildi.`, relatedModule: ENTITY_TYPE_TAB.OPPORTUNITY, relatedItemId: opp.id },
       }).catch(() => undefined)));
       // Birim-geneli yayın yerine seçilen mühendise doğrudan atama — hem bildirim
       // hem görev garanti ulaşır, hem de presalesId ileride birim utilizasyonu
       // ("kim kaç BoM üstlendi") raporlanabilir hale gelir.
       await prisma.notification.create({
-        data: { tenantId: req.tenantId, userId: assignedEngineer.id, type: 'APPROVAL', title: 'BoM hazırlığı size devredildi', message: `"${opp.title}" fırsatı teknik değerlendirmeden geçti. BoM hazırlayabilirsiniz.`, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id },
+        // Presales ekranına (BoM sekmesi) doğrudan gider — mühendisin yapması
+        // gereken eylem tam olarak orada (crm-opportunities değil).
+        data: { tenantId: req.tenantId, userId: assignedEngineer.id, type: 'APPROVAL', title: 'BoM hazırlığı size devredildi', message: `"${opp.title}" fırsatı teknik değerlendirmeden geçti. BoM hazırlayabilirsiniz.`, relatedModule: 'presales', relatedItemId: opp.id },
       }).catch(() => undefined);
       await prisma.todoTask.create({ data: {
         title: `BoM Hazırla: ${opp.title}`,
         description: 'Presales Müdürü teknik değerlendirmeyi onayladı ve bu fırsatı size devretti. BoM hazırlayın.',
         unitId: assignedEngineer.unitId || stage.unitId || '', assignedToUserId: assignedEngineer.id,
         assignedBy: req.userId || 'system', tenantId: req.tenantId,
+        // actionKey=BOM_PREPARE → "Git" butonu presales'e (BoM ekranı) gider,
+        // relatedModule=OPPORTUNITY fallback'inin götürdüğü crm-opportunities'e değil.
+        actionKey: 'BOM_PREPARE',
         relatedModule: 'OPPORTUNITY', relatedItemId: opp.id, priority: 'HIGH', status: 'PENDING',
       } }).catch(() => undefined);
       await prisma.opportunity.update({ where: { id: opp.id }, data: { presalesId: assignedEngineer.id } }).catch(() => undefined);
@@ -266,8 +272,8 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
       ]);
       const msg = `"${opp.title}" fırsatı teknik değerlendirmede reddedildi. Gerekçe: ${note}`;
       await Promise.all([
-        ...salesMgrs.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id } }).catch(() => undefined)),
-        ...gms.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: 'OPPORTUNITY', relatedItemId: opp.id } }).catch(() => undefined)),
+        ...salesMgrs.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: ENTITY_TYPE_TAB.OPPORTUNITY, relatedItemId: opp.id } }).catch(() => undefined)),
+        ...gms.map((u) => prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'Teknik değerlendirme reddedildi', message: msg, relatedModule: ENTITY_TYPE_TAB.OPPORTUNITY, relatedItemId: opp.id } }).catch(() => undefined)),
       ]);
       await prisma.lessonsLearned.create({
         data: {

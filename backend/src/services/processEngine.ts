@@ -21,6 +21,7 @@ import { computeSlaDueDate } from '../utils/businessDays';
 import { resolveGroupAfterDecision, autoSkipOrphanStages, resolveEffectiveApprover } from './approvalChainService';
 import { createProjectWithMilestones } from './projectFactory';
 import { createInvoiceRecord } from './invoiceService';
+import { entityTypeToTab } from '../utils/entityTypeTab';
 import type { ApprovalChain, ApprovalStage, User, WorkflowStep } from '@prisma/client';
 
 export class ProcessNotConfiguredError extends Error {
@@ -34,17 +35,34 @@ export interface StepRecipientQuery {
   unitId: string;
   role: string | null;
   delegateUserId?: string | null;
+  recipientField?: string | null;
 }
 
 /**
  * TEK paylaşımlı alıcı çözümleyici — TodoTask ataması, Notification fanout ve
- * ApprovalStage onaycı eşleşmesi bunu kullanır. Sıra: (1) o birimdeki (+varsa
- * role'e sahip) aktif kullanıcılar, (2) birim yöneticisi (rolü de eşleşiyorsa),
- * (3) VEKİL (`delegateUserId` — değişmez kural #2: birim boşsa/açılmadıysa
- * modülün kullanılabilmesi için vekil ataması zorunludur, sessiz atlama YOK).
- * Hiçbiri yoksa boş dizi döner (çağıran "orphan" olarak ele alır).
+ * ApprovalStage onaycı eşleşmesi bunu kullanır. Sıra: (0) `recipientField`
+ * doluysa işlenen kaydın o alanından (User ID, ör. Opportunity.assignedToId)
+ * DOĞRUDAN çöz — beyaz listede yoksa veya alan boş/kullanıcı pasifse aşağıdaki
+ * zincire düş. (1) o birimdeki (+varsa role'e sahip) aktif kullanıcılar,
+ * (2) birim yöneticisi (rolü de eşleşiyorsa), (3) VEKİL (`delegateUserId` —
+ * değişmez kural #2: birim boşsa/açılmadıysa modülün kullanılabilmesi için
+ * vekil ataması zorunludur, sessiz atlama YOK). Hiçbiri yoksa boş dizi döner
+ * (çağıran "orphan" olarak ele alır).
  */
-export async function resolveStepRecipients(tenantId: string, step: StepRecipientQuery): Promise<User[]> {
+export async function resolveStepRecipients(
+  tenantId: string,
+  step: StepRecipientQuery,
+  entity?: { entityType: string; entityId: string }
+): Promise<User[]> {
+  if (step.recipientField && entity && ENTITY_RECIPIENT_FIELDS[entity.entityType]?.some((f) => f.key === step.recipientField)) {
+    const record = await fetchEntityRecord(tenantId, entity.entityType, entity.entityId);
+    const userId = record?.[step.recipientField] as string | null | undefined;
+    if (userId) {
+      const direct = await prisma.user.findFirst({ where: { id: userId, tenantId, status: 'ACTIVE' } });
+      if (direct) return [direct];
+    }
+  }
+
   const where: { tenantId: string; unitId: string; status: string; role?: string } = {
     tenantId,
     unitId: step.unitId,
@@ -153,6 +171,18 @@ export const ENTITY_FIELD_SPECS: Record<string, FieldSpec[]> = {
 };
 export const ENTITY_TYPES = Object.keys(ENTITY_FIELD_SPECS);
 
+// ── Alıcı-alanı beyaz listesi (entity-alan-bazlı dinamik hedefleme) ─────────
+// `WorkflowStep.recipientField` yalnız burada kayıtlı (entityType,field)
+// çiftlerini kabul eder — client'tan keyfi bir alan adı asla doğrudan bir
+// kullanıcıya çözülmez. Yalnız gerçekten bir User ID taşıyan alanlar listelenir.
+export const ENTITY_RECIPIENT_FIELDS: Record<string, FieldSpec[]> = {
+  OPPORTUNITY: [
+    { key: 'assignedToId', label: 'Fırsat Sahibi (Satış Temsilcisi)' },
+    { key: 'presalesId', label: 'Atanan Presales Mühendisi' },
+    { key: 'createdById', label: 'Oluşturan Kullanıcı' },
+  ],
+};
+
 async function fetchEntityRecord(tenantId: string, entityType: string, entityId: string): Promise<Record<string, unknown> | null> {
   switch (entityType) {
     case 'OPPORTUNITY':
@@ -185,6 +215,45 @@ export async function readEntityFields(tenantId: string, entityType: string, ent
 }
 
 /**
+ * Genel kural — motorun ürettiği HER birimden-birime devirde, işi alan kişiye
+ * ek olarak onun biriminin yöneticisine de bir HATIRLATMA bildirimi gider
+ * (TodoTask değil, yalnız görünürlük — yöneticiden aksiyon beklenmez). Alıcı
+ * zaten yönetici ise (`unit.managerId === user.id`) tekrar bildirim atılmaz.
+ */
+async function notifyUnitManager(
+  tenantId: string,
+  user: User,
+  workflowName: string,
+  entityType: string,
+  entityId: string,
+  contextLabel: string,
+): Promise<void> {
+  if (!user.unitId) return;
+  const unit = await prisma.unit.findFirst({ where: { id: user.unitId, tenantId }, select: { managerId: true } });
+  if (!unit?.managerId || unit.managerId === user.id) return;
+
+  // Kaydın görünen adı (Fırsat başlığı, Proje adı vb.) — ENTITY_FIELD_SPECS'teki
+  // ilk alan her entity türü için "başlık/ad" alanıdır (title/name).
+  const nameField = ENTITY_FIELD_SPECS[entityType]?.[0]?.key;
+  const record = nameField ? await fetchEntityRecord(tenantId, entityType, entityId) : null;
+  const entityName = nameField && record ? (record[nameField] as string | undefined) : undefined;
+  const subject = entityName ? `"${entityName}"` : `"${workflowName}"`;
+
+  await prisma.notification.create({
+    data: {
+      tenantId,
+      userId: unit.managerId,
+      type: 'INFO',
+      title: 'Ekibinize iş devredildi',
+      message: `${subject} için "${workflowName}" sürecinde ${user.name} adlı ekip üyenize bir görev atandı${contextLabel ? ` (${contextLabel})` : ''}.`,
+      // Notification.relatedModule doğrudan activeTab olarak kullanılıyor
+      // (Header.tsx) — entityType'ı gerçek sekme id'sine çevirmeden yazma.
+      ...(entityTypeToTab(entityType) ? { relatedModule: entityTypeToTab(entityType), relatedItemId: entityId } : {}),
+    },
+  }).catch(() => undefined);
+}
+
+/**
  * Jenerik "veri aktarımı" AUTO eylemi — tenant, süreci kurgularken hangi
  * alanların kopyalanacağını seçer (adımın `actionConfig` JSON'unda
  * `{fields:[...]}`), kod yazmaya gerek kalmaz. Yalnız basit alan-kopyalama
@@ -204,7 +273,11 @@ async function copyFieldsToTask(ctx: StageActionCtx): Promise<void> {
   const picked = await readEntityFields(ctx.tenantId, ctx.entityType, ctx.entityId, fields);
   if (picked.length === 0) return;
 
-  const recipients = await resolveStepRecipients(ctx.tenantId, { unitId: ctx.step.unitId, role: ctx.step.role, delegateUserId: ctx.step.delegateUserId });
+  const recipients = await resolveStepRecipients(
+    ctx.tenantId,
+    { unitId: ctx.step.unitId, role: ctx.step.role, delegateUserId: ctx.step.delegateUserId, recipientField: ctx.step.recipientField },
+    { entityType: ctx.entityType, entityId: ctx.entityId },
+  );
   if (recipients.length === 0) return;
 
   const lines = picked.map((p) => `${p.label}: ${p.value ?? '—'}`).join('\n');
@@ -217,7 +290,10 @@ async function copyFieldsToTask(ctx: StageActionCtx): Promise<void> {
       unitId: ctx.step.unitId,
       assignedToUserId: recipients[0].id,
       assignedBy: ctx.actorUserId || 'system',
-      relatedModule: 'GENERAL',
+      // 'GENERAL' hardcode'u "Git" butonunu her zaman kırıyordu (MODULE_TARGET'ta
+      // karşılığı yok) — gerçek entityType (OPPORTUNITY/PROJECT/vb.) kaydın ait
+      // olduğu sekmeye doğru yönlendirir.
+      relatedModule: ctx.entityType,
       relatedItemId: ctx.entityId,
       priority: 'MEDIUM',
       status: 'PENDING',
@@ -228,6 +304,8 @@ async function copyFieldsToTask(ctx: StageActionCtx): Promise<void> {
   await Promise.all(recipients.map((u) => prisma.notification.create({
     data: { tenantId: ctx.tenantId, userId: u.id, type: 'INFO', title: 'Veri aktarımı', message: lines.slice(0, 300) },
   }).catch(() => {})));
+
+  await Promise.all(recipients.map((u) => notifyUnitManager(ctx.tenantId, u, ctx.step.description || ctx.entityType, ctx.entityType, ctx.entityId, ctx.step.description || '')));
 }
 
 async function createProjectFromEntity(ctx: StageActionCtx): Promise<void> {
@@ -397,7 +475,11 @@ async function createPurchaseRequestFromContract(ctx: StageActionCtx): Promise<v
   const bomItems = opp?.bomItems ?? [];
   const currency = bomItems[0]?.currency || 'TRY';
 
-  const recipients = await resolveStepRecipients(ctx.tenantId, { unitId: ctx.step.unitId, role: ctx.step.role, delegateUserId: ctx.step.delegateUserId });
+  const recipients = await resolveStepRecipients(
+    ctx.tenantId,
+    { unitId: ctx.step.unitId, role: ctx.step.role, delegateUserId: ctx.step.delegateUserId, recipientField: ctx.step.recipientField },
+    { entityType: ctx.entityType, entityId: ctx.entityId },
+  );
   const procUser = recipients[0];
 
   const descLines = [
@@ -462,6 +544,7 @@ async function createPurchaseRequestFromContract(ctx: StageActionCtx): Promise<v
         relatedModule: 'PROCUREMENT', relatedItemId: pr.id, priority: 'HIGH', status: 'PENDING', updatedAt: new Date(),
       },
     }).catch(() => {});
+    await notifyUnitManager(ctx.tenantId, procUser, `Sözleşme → Satınalma: ${wf.projectName || wf.title}`, 'PROCUREMENT', pr.id, '');
   }
 
   await logActivity({ tenantId: ctx.tenantId, userId: ctx.actorUserId, action: 'CONTRACT_TO_PROCUREMENT', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { purchaseRequestId: pr.id, items: pr.items.length } });
@@ -825,7 +908,11 @@ async function walkForward(
       const already = await prisma.todoTask.findFirst({ where: { tenantId, actionKey: marker } });
       if (already) continue;
 
-      const recipients = await resolveStepRecipients(tenantId, { unitId: step.unitId, role: step.role, delegateUserId: step.delegateUserId });
+      const recipients = await resolveStepRecipients(
+        tenantId,
+        { unitId: step.unitId, role: step.role, delegateUserId: step.delegateUserId, recipientField: step.recipientField },
+        { entityType, entityId },
+      );
       for (const user of recipients) {
         await prisma.todoTask.create({
           data: {
@@ -852,11 +939,14 @@ async function walkForward(
               type: 'APPROVAL',
               title: 'Onayınız bekleniyor',
               message: `"${workflowName}" sürecinde bir aşama onayınızı bekliyor.`,
-              relatedModule: entityType,
-              relatedItemId: entityId,
+              // Notification.relatedModule TodoTask'ın aksine (bkz. satır 922, taskTargetTab
+              // ile çevriliyor) Header.tsx'te ÇEVİRİSİZ doğrudan activeTab olarak kullanılıyor
+              // — burada gerçek sekme id'si gerekir, entityType değil.
+              ...(entityTypeToTab(entityType) ? { relatedModule: entityTypeToTab(entityType), relatedItemId: entityId } : {}),
             },
           })
           .catch(() => undefined);
+        await notifyUnitManager(tenantId, user, workflowName, entityType, entityId, step.description || '');
       }
     }
     break;

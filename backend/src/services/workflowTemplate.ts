@@ -17,6 +17,7 @@ interface TemplateStep {
   description: string;
   order: number;
   actionKey?: string | null;
+  recipientField?: string | null; // doluysa alıcı, unitKey/role yerine kaydın bu alanından çözülür — bkz. processEngine.ts ENTITY_RECIPIENT_FIELDS
 }
 
 interface TemplateProcess {
@@ -130,6 +131,16 @@ export const DEFAULT_WORKFLOW_TEMPLATE: Record<string, TemplateProcess> = {
       { unitKey: 'sales', role: 'SALES_MGR', type: 'MANUAL', description: "Teklif hazırlığı için Satış'a devir", order: 0 },
     ],
   },
+  BOM_COST_ANALYSIS_HANDOFF: {
+    name: 'BoM Oluşturuldu — Maliyet Analizi Devri',
+    entityType: 'OPPORTUNITY',
+    steps: [
+      // recipientField başarıyla çözülürse (fırsatın assignedToId'si) görev doğrudan
+      // fırsat sahibine gider; çözülemezse (uç durum) role:SALES_MGR fallback'i
+      // devreye girer — asla orphan kalmaz (bkz. processEngine.ts resolveStepRecipients).
+      { unitKey: 'sales', role: 'SALES_MGR', recipientField: 'assignedToId', type: 'MANUAL', description: 'Presales BoM listesini tamamladı, maliyet analizi bekleniyor', order: 0 },
+    ],
+  },
 };
 
 export interface ApplyTemplateResult {
@@ -186,6 +197,7 @@ export async function applyDefaultWorkflowTemplate(tenantId: string, actorUserId
               description: s.description,
               order: s.order,
               actionKey: s.actionKey ?? null,
+              recipientField: s.recipientField ?? null,
               approvalMode: 'ANY',
             };
           }),

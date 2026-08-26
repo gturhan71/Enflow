@@ -9,10 +9,14 @@ import { apiService } from '../../services/apiService';
 // oluşturulabilir; Presales BoM girişine geçmeden önce backend bu 3 evrağın
 // UPLOADED olmasını zorunlu kılar (bkz. opportunities.ts POST /:id/bom).
 export default function OpportunityRequiredDocsPanel({
-  opportunityId, defaultExpanded = false,
+  opportunityId, defaultExpanded = false, readOnly = false,
 }: {
   opportunityId: string;
   defaultExpanded?: boolean;
+  // Presales (BoM ekranı) için: satışçının yüklediği şartnameleri görüntüleyip
+  // okuyabilmeli ama yükleme/ekleme/silme yapamamalı (backend zaten
+  // GM/SALES_REP/SALES_MGR dışını 403'ler — burada UI'da hiç gösterilmez).
+  readOnly?: boolean;
 }) {
   const [expanded, setExpanded] = useState(defaultExpanded);
   const [docs, setDocs] = useState<OpportunityRequiredDoc[] | null>(null);
@@ -121,16 +125,18 @@ export default function OpportunityRequiredDocsPanel({
                     {doc.fileName || 'Dosya'}
                   </a>
                 )}
-                <label className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 cursor-pointer border border-slate-200 rounded-lg px-2 py-1">
-                  {uploadingId === doc.id ? '...' : doc.status === 'UPLOADED' ? 'Değiştir' : 'Yükle'}
-                  <input
-                    type="file"
-                    className="hidden"
-                    disabled={uploadingId === doc.id}
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileChange(doc, f); e.target.value = ''; }}
-                  />
-                </label>
-                {!doc.isRequired && (
+                {!readOnly && (
+                  <label className="text-[10px] font-bold text-slate-500 hover:text-indigo-600 cursor-pointer border border-slate-200 rounded-lg px-2 py-1">
+                    {uploadingId === doc.id ? '...' : doc.status === 'UPLOADED' ? 'Değiştir' : 'Yükle'}
+                    <input
+                      type="file"
+                      className="hidden"
+                      disabled={uploadingId === doc.id}
+                      onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileChange(doc, f); e.target.value = ''; }}
+                    />
+                  </label>
+                )}
+                {!doc.isRequired && !readOnly && (
                   <button onClick={() => handleDeleteExtraDoc(doc)} className="text-slate-300 hover:text-red-500" title="Sil">
                     <Trash2 size={13} />
                   </button>
@@ -139,7 +145,7 @@ export default function OpportunityRequiredDocsPanel({
             </div>
           ))}
 
-          {docs && (
+          {docs && !readOnly && (
             <div className="flex items-center gap-2 pt-1">
               <input
                 type="text"

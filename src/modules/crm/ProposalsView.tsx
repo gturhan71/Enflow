@@ -23,15 +23,13 @@ export default function ProposalsView({
   onWonProposal: (proposal: Proposal) => void;
   onLostProposal: (proposal: Proposal) => void;
 }) {
-  // Maliyet analizi tamamlanmış fırsatlar:
-  // technicalStatus='APPROVED' VEYA kaydedilmiş BoM/maliyet kalemleri var.
+  // Maliyet analizi tamamlanmış fırsatlar: Satış Müdürü'nün maliyet analizini
+  // ONAYLAMASI (technicalStatus==='APPROVED') zorunlu — yalnız BoM/maliyet
+  // kalemi varlığı yeterli değil, onaysız teklif oluşturma adımına geçilemez.
   // Sadece aktif (DRAFT/PENDING_APPROVAL/APPROVED/SENT) teklifi olmayan fırsatları göster;
   // REJECTED teklifi olan fırsatlar yeniden listeye girer.
   const readyForProposalOpps = opportunities.filter(opp => {
-    const hasCostAnalysis =
-      opp.technicalStatus === 'APPROVED' ||
-      (opp.bomItems && opp.bomItems.length > 0) ||
-      (opp.costItems && opp.costItems.length > 0);
+    const hasCostAnalysis = opp.technicalStatus === 'APPROVED';
     // Presales BoM onay teklifleri bloklucu sayılmaz;
     // sadece CRM'den oluşturulan gerçek müşteri teklifleri bloklucu.
     const isBoMApproval = (p: Proposal) => {

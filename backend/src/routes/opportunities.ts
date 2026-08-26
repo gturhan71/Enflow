@@ -12,13 +12,29 @@ import { recordProgressCheckIn, logAutoProgressChange, ProgressCheckInError } fr
 import { nextOpportunityTrackingCode } from '../services/documentNumberService';
 
 const GM = requireRole(['GENERAL_MANAGER']);
-const GM_OR_SALES = requireRole(['GENERAL_MANAGER', 'SALES_REP']);
+// Fırsat OLUŞTURMA yalnız satış temsilcisine ait — yönetici/GM oluşturursa
+// assignedToId otomatik kendisine yazılıyor ve veri izolasyonu (Adım D) o
+// fırsatı gerçek satış temsilcisinin listesinden gizliyordu. Yönetici/GM
+// düzenleme (PUT /:id) ve onay/atama işlemlerinde hâlâ tam yetkili — yalnız
+// yeni kayıt açma kapatıldı.
+const CAN_CREATE_OPPORTUNITY = requireRole(['SALES_REP']);
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   await sweepOpportunityProgressReminders(req.tenantId); // ilerleme teyidi zaman-eşiği hatırlatmaları (non-throwing)
+
+  // Veri izolasyonu: eş kullanıcılar birbirinin fırsatını görmemeli — SALES_REP
+  // yalnız kendi açtığı (assignedToId), PRESALES_ENG yalnız kendine atanan
+  // (presalesId) fırsatları görür. Yönetici rolleri (SALES_MGR/PRESALES_MGR/GM)
+  // ve onay zincirlerinde yer alan diğer roller onay/atama görevleri gereği
+  // filtresiz kalır (tasks.ts GET / ile aynı desen — bkz. plan Adım D).
+  const requester = req.userId ? await prisma.user.findUnique({ where: { id: req.userId }, select: { role: true } }) : null;
+  const where: { tenantId: string; assignedToId?: string; presalesId?: string } = { tenantId: req.tenantId };
+  if (requester?.role === 'SALES_REP') where.assignedToId = req.userId!;
+  else if (requester?.role === 'PRESALES_ENG') where.presalesId = req.userId!;
+
   const opps = await prisma.opportunity.findMany({
-    where: { tenantId: req.tenantId },
+    where,
     include: { customer: true, assignedTo: true, createdBy: true, bomItems: { include: { brand: true, category: true } }, costItems: true }
   });
 
@@ -55,8 +71,8 @@ const METHOD_LABELS: Record<string, string> = {
   DIRECT: 'Doğrudan Temin', PRIVATE: 'Özel/Ticari Teklif',
 };
 
-router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request, res: Response) => {
-  const { title, value, currency, probability, customerId, assignedToId, description, expectedCloseDate, status, procurementMethod, targetBidDate } = req.body;
+router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (req: Request, res: Response) => {
+  const { title, value, currency, probability, customerId, description, expectedCloseDate, status, procurementMethod, targetBidDate } = req.body;
   const tenantId = req.tenantId;
 
   if (!title || !customerId) {
@@ -66,11 +82,14 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
     return res.status(400).json({ error: `Geçersiz status: '${status}'. İzinli değerler: ${[...OPPORTUNITY_STATUSES].join(', ')}` });
   }
 
-  const firstUser = await prisma.user.findFirst({ where: { tenantId } });
-  if (!firstUser) return res.status(400).json({ error: 'Sistemde kayıtlı kullanıcı bulunamadı.' });
-
-  const finalAssignedId = assignedToId || firstUser.id;
-  const finalCreatedById = req.body.createdById || firstUser.id;
+  // Sahiplik artık İSTEMCİDEN gelmiyor — CAN_CREATE_OPPORTUNITY yalnız gerçek,
+  // kimliği doğrulanmış bir SALES_REP'in bu route'a ulaşmasına izin veriyor;
+  // fırsat her zaman OLUŞTURAN kişiye atanır (eski "assignedToId body'den /
+  // yoksa tenant'taki ilk kullanıcı" fallback'i, satışçı dışında biri
+  // oluşturduğunda — ya da assignedToId hiç gönderilmediğinde — rastgele bir
+  // kullanıcıya düşüp veri izolasyonunu/görev yönlendirmesini bozuyordu).
+  const finalAssignedId = req.userId!;
+  const finalCreatedById = req.userId!;
   const bidDate = targetBidDate ? new Date(targetBidDate) : null;
   const trackingCode = await nextOpportunityTrackingCode(tenantId);
 
@@ -118,6 +137,10 @@ router.post('/', tenantMiddleware, GM_OR_SALES, asyncHandler(async (req: Request
         title: `İhale dosyası: ${title}`,
         description: `Fırsat ${label} usulüyle teklife dönüşecek (son teklif: ${dateStr}). Dosya hazırlığını teklifle paralel yürütün.`,
         unitId: salesSupport.unitId, assignedBy: finalCreatedById, tenantId,
+        // actionKey=TENDER_FILE_PREP → "Git" butonu sales-support'a (İhale/İSAB
+        // ekranı) gider, relatedModule=OPPORTUNITY fallback'inin götürdüğü
+        // crm-opportunities'e değil (iş fiilen orada yapılıyor).
+        actionKey: 'TENDER_FILE_PREP',
         relatedModule: 'OPPORTUNITY', relatedItemId: opp.id, priority: 'HIGH', status: 'PENDING',
         ...(bidDate ? { dueDate: bidDate } : {}),
       } }).catch(() => {});
@@ -370,6 +393,17 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
       },
     }).catch(() => {});
     await logActivity({ tenantId, userId: req.userId, action: 'BOM_HANDED_OFF', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { itemCount: result.length } });
+
+    // BoM tamamlandı → maliyet analizi için fırsat sahibine devir (Süreç Motoru).
+    // Alıcı Tasarımcı'daki BOM_COST_ANALYSIS_HANDOFF adımından çözülür (varsayılan:
+    // recipientField=assignedToId → doğrudan fırsat sahibi, bulunamazsa SALES_MGR
+    // fallback'i). Tenant henüz kurgulamadıysa (ProcessNotConfiguredError) BoM kaydı
+    // engellenmez, sessizce atlanır.
+    try {
+      await advanceProcess(tenantId, 'BOM_COST_ANALYSIS_HANDOFF', 'OPPORTUNITY', opportunityId, { actorUserId: req.userId });
+    } catch (e) {
+      if (!(e instanceof ProcessNotConfiguredError)) throw e;
+    }
   }
 
   res.json(result);
@@ -509,11 +543,17 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
       title: `Maliyet analizi onayı: ${opp.title}`,
       description: `Maliyet analizi tamamlandı, Satış Müdürü onayı bekleniyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ` (eşik %${result.marginFloorPct} ALTINDA)` : ''}.`,
       unitId: salesMgr.unitId, assignedBy: opp.assignedToId, tenantId,
+      // actionKey=COST_ANALYSIS → "Git" butonu taskTargetTab() ile doğrudan
+      // Maliyet Analizi ekranına (crm-cost), bu fırsat seçili halde götürür.
+      actionKey: 'COST_ANALYSIS',
       relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, priority: result.belowFloor ? 'URGENT' : 'HIGH', status: 'PENDING',
     } }).catch(() => {});
   }
-  await notify(tenantId, salesMgr?.id, 'Maliyet onayı bekliyor', `"${opp.title}" maliyet analizi onayınızı bekliyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ' — eşik altında!' : ''}`, result.belowFloor ? 'WARNING' : 'APPROVAL');
-  await notify(tenantId, opp.assignedToId, 'Maliyet analizi onaya gönderildi', `"${opp.title}" maliyet analiziniz Satış Müdürü onayına gönderildi.`, 'INFO');
+  // Notification.relatedModule, Header.tsx'te taskTargetTab() üzerinden DEĞİL
+  // doğrudan activeTab olarak kullanılıyor (bkz. handleNotificationClick) —
+  // burada gerçek tab id'si ('crm-cost') geçilir, domain adı değil.
+  await notify(tenantId, salesMgr?.id, 'Maliyet onayı bekliyor', `"${opp.title}" maliyet analizi onayınızı bekliyor. Marj: %${result.marginPct.toFixed(1)}${result.belowFloor ? ' — eşik altında!' : ''}`, result.belowFloor ? 'WARNING' : 'APPROVAL', 'crm-cost', opportunityId);
+  await notify(tenantId, opp.assignedToId, 'Maliyet analizi onaya gönderildi', `"${opp.title}" maliyet analiziniz Satış Müdürü onayına gönderildi.`, 'INFO', 'crm-cost', opportunityId);
 
   await logActivity({ tenantId, userId: req.userId, action: 'SUBMIT_COST_APPROVAL', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, marginPct: result.marginPct, belowFloor: result.belowFloor } });
 
@@ -615,9 +655,15 @@ router.post('/:id/request-approval', tenantMiddleware, asyncHandler(async (req: 
 }));
 
 // ── Maliyet analizi → Satış Müdürü onayı + satış temsilcisine bilgilendirme ───
-async function notify(tenantId: string, userId: string | null | undefined, title: string, message: string, type = 'INFO') {
+// relatedModule/relatedItemId verilirse bildirim tıklanınca Header.tsx doğrudan
+// o modüle+kayda deep-link yapabiliyor (bkz. handleNotificationClick) — aksi
+// halde bildirim yalnız okundu işaretlenir, hiçbir yere yönlendirmez.
+async function notify(
+  tenantId: string, userId: string | null | undefined, title: string, message: string, type = 'INFO',
+  relatedModule?: string, relatedItemId?: string,
+) {
   if (!userId) return;
-  await prisma.notification.create({ data: { tenantId, userId, title, message, type } }).catch(() => {});
+  await prisma.notification.create({ data: { tenantId, userId, title, message, type, relatedModule, relatedItemId } }).catch(() => {});
 }
 
 // Maliyet analizi kaydedildikten sonra Satış Müdürü onayına gönder
@@ -650,12 +696,13 @@ router.post('/:id/submit-cost-approval', tenantMiddleware, asyncHandler(async (r
       title: `Maliyet analizi onayı: ${opp.title}`,
       description: 'Maliyet analizi tamamlandı, Satış Müdürü onayı bekleniyor.',
       unitId: salesMgr.unitId, assignedBy: opp.assignedToId, tenantId,
+      actionKey: 'COST_ANALYSIS',
       relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId, priority: 'HIGH', status: 'PENDING',
     } }).catch(() => {});
   }
-  await notify(tenantId, salesMgr?.id, 'Maliyet onayı bekliyor', `"${opp.title}" maliyet analizi onayınızı bekliyor.`, 'APPROVAL');
+  await notify(tenantId, salesMgr?.id, 'Maliyet onayı bekliyor', `"${opp.title}" maliyet analizi onayınızı bekliyor.`, 'APPROVAL', 'crm-cost', opportunityId);
   // Fırsat sahibi satış temsilcisine bilgilendirme
-  await notify(tenantId, opp.assignedToId, 'Maliyet analizi onaya gönderildi', `"${opp.title}" maliyet analiziniz Satış Müdürü onayına gönderildi.`, 'INFO');
+  await notify(tenantId, opp.assignedToId, 'Maliyet analizi onaya gönderildi', `"${opp.title}" maliyet analiziniz Satış Müdürü onayına gönderildi.`, 'INFO', 'crm-cost', opportunityId);
 
   await logActivity({ tenantId, userId: req.userId, action: 'SUBMIT_COST_APPROVAL', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title } });
   res.json({ ok: true, technicalStatus: 'PENDING_APPROVAL', approverId: salesMgr?.id ?? null });
@@ -696,11 +743,34 @@ router.post('/:id/approve-cost', tenantMiddleware, requireRole(['GENERAL_MANAGER
     await prisma.costAnalysisVersion.update({ where: { id: latestVersion.id }, data: { status: newStatus } }).catch(() => {});
   }
 
+  // Onaylandıysa satış temsilcisine "Teklif Hazırla" görevi düşer — akıştaki
+  // diğer her devrin (BoM devri, maliyet gönderimi) izlediği desenle tutarlı;
+  // yalnız bildirime güvenmek (kolayca gözden kaçabiliyordu) yetersizdi.
+  if (decision === 'APPROVE') {
+    const owner = await prisma.user.findFirst({ where: { id: opp.assignedToId, tenantId }, select: { unitId: true } });
+    if (owner?.unitId) {
+      await prisma.todoTask.create({ data: {
+        title: `Teklif Hazırla: ${opp.title}`,
+        description: `Maliyet analizi Satış Müdürü tarafından onaylandı${latestVersion ? ` (Marj: %${latestVersion.marginPct.toFixed(1)})` : ''}.${note ? ' Not: ' + note : ''} Teklif hazırlayabilirsiniz.`,
+        unitId: owner.unitId, assignedToUserId: opp.assignedToId, assignedBy: req.userId || 'system', tenantId,
+        actionKey: 'PROPOSAL_PREPARE', relatedModule: 'OPPORTUNITY', relatedItemId: opportunityId,
+        priority: 'HIGH', status: 'PENDING',
+      } }).catch(() => {});
+    }
+  }
+
   // Fırsat sahibi satış temsilcisine sonuç bildirimi
   const msg = decision === 'APPROVE'
     ? `"${opp.title}" maliyet analizi onaylandı. Teklif hazırlayabilirsiniz.${note ? ' Not: ' + note : ''}`
     : `"${opp.title}" maliyet analizi reddedildi.${note ? ' Not: ' + note : ''} Lütfen revize edin.`;
-  await notify(tenantId, opp.assignedToId, decision === 'APPROVE' ? 'Maliyet analizi onaylandı' : 'Maliyet analizi reddedildi', msg, decision === 'APPROVE' ? 'SUCCESS' : 'WARNING');
+  // Onaylandıysa sıradaki adım (teklif hazırlama) sekmesine, reddedildiyse
+  // revize edebileceği Maliyet Analizi ekranına yönlendirir.
+  await notify(
+    tenantId, opp.assignedToId,
+    decision === 'APPROVE' ? 'Maliyet analizi onaylandı' : 'Maliyet analizi reddedildi',
+    msg, decision === 'APPROVE' ? 'SUCCESS' : 'WARNING',
+    decision === 'APPROVE' ? 'crm-proposals' : 'crm-cost', opportunityId,
+  );
 
   await logActivity({ tenantId, userId: req.userId, action: decision === 'APPROVE' ? 'APPROVE_COST' : 'REJECT_COST', entityType: 'OPPORTUNITY', entityId: opportunityId, details: { title: opp.title, note } });
   res.json({ ok: true, technicalStatus: newStatus });

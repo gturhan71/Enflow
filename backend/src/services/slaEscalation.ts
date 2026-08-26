@@ -6,6 +6,7 @@
 // GET /tasks çağrısında tetiklenir.
 
 import { prisma } from '../prismaClient';
+import { entityTypeToTab } from '../utils/entityTypeTab';
 
 // Tenant başına en fazla 60sn'de bir sweep (gereksiz DB yükünü önler)
 const lastSweepByTenant = new Map<string, number>();
@@ -46,13 +47,17 @@ export async function sweepSlaEscalations(tenantId: string): Promise<void> {
     for (const task of overdue) {
       const daysOverdue = Math.floor((now - task.dueDate!.getTime()) / 86_400_000);
       const recipients = await resolveEscalationTarget(task.unitId || null);
+      // task.relatedModule TodoTask'ın domain-stili alanıdır (OPPORTUNITY/PROJECT/vb.)
+      // — Notification.relatedModule ise gerçek sekme id'si beklediğinden çevrilir;
+      // eşleşme yoksa (ör. GENERAL) hiç set edilmez (kırık bir sekmeye gitmektense no-op).
+      const tab = entityTypeToTab(task.relatedModule);
       for (const userId of [...new Set(recipients)]) {
         await prisma.notification.create({
           data: {
             tenantId, userId, type: 'WARNING',
             title: 'SLA aşıldı — eskalasyon',
             message: `"${task.title}" görevi ${daysOverdue > 0 ? `${daysOverdue} gün` : 'süresi'} önce son tarihi geçti ve hâlâ ${task.status === 'IN_PROGRESS' ? 'devam ediyor' : 'başlanmadı'}.`,
-            relatedModule: task.relatedModule || 'GENERAL', relatedItemId: task.relatedItemId || task.id,
+            ...(tab ? { relatedModule: tab, relatedItemId: task.relatedItemId || task.id } : {}),
           },
         }).catch(() => {});
       }

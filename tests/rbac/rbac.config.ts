@@ -220,11 +220,14 @@ export const apiMatrix: ApiCase[] = [
     expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
   {
+    // Fırsat oluşturma yalnız SALES_REP'e açık (2026-08-26) — GM/yönetici
+    // oluşturursa assignedToId kendisine yazılıp veri izolasyonunu (Adım D)
+    // bozuyordu; yönetici/GM artık yalnız görebilir/düzenleyebilir, oluşturamaz.
     name: "Yeni fırsat oluştur",
     method: "POST",
     path: "/api/opportunities",
     body: { title: "RBAC Test Fırsat", value: 0, status: "LEAD", probability: 10, customerId: "x", assignedToId: "x" },
-    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "allow", ...ND },
+    expect: { general_manager: "deny", presales_eng: "deny", sales_rep: "allow", ...ND },
   },
   {
     // Tüm dökümanların agregasyon görünümü — gate'siz GET (tenantMiddleware) → NA.

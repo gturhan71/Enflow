@@ -6,6 +6,7 @@ import { cn } from '../../lib/utils';
 import { Opportunity, Customer, Proposal } from '../../types';
 import { SaveButton } from '../../components/SaveButton';
 import { PermissionGate } from '../../components/PermissionGate';
+import { useAuth } from '../../contexts/AuthContext';
 import { PIPELINE_STAGES, STATUS_LABEL, getStatusStyle, PROPOSAL_STATUS_LABEL, proposalStatusTone } from './constants';
 import OpportunityHistoryPanel from './OpportunityHistoryPanel';
 import OpportunityRequiredDocsPanel from './OpportunityRequiredDocsPanel';
@@ -43,6 +44,14 @@ export default function OpportunitiesView({
   onEditProposal: (proposal: Proposal) => void;
   onGoToCostAnalysis: (opp: Opportunity) => void;
 }) {
+  // Fırsat OLUŞTURMA yalnız satış temsilcisine ait (backend CAN_CREATE_OPPORTUNITY
+  // ile aynı kural) — GM normalde tüm PermissionGate'leri atlar (superuser), bu
+  // yüzden burada AYRICA rol kontrolü gerekiyor; aksi halde GM butonu görüp
+  // tıklayınca backend'den 403 alırdı. Yönetici/GM fırsatı görmeye/düzenlemeye
+  // devam eder, yalnız yeni kayıt açamaz.
+  const { currentUser } = useAuth();
+  const canCreateOpportunity = currentUser?.role === 'SALES_REP';
+
   // Açılış (createdAt — otomatik/mühürlenmiş) ve muhtemel kapanış (expectedCloseDate —
   // bilgi amaçlı) tarihlerine göre arama/listeleme + 30/60/90 günlük periyot raporu.
   const [openFrom, setOpenFrom] = useState('');
@@ -158,14 +167,16 @@ export default function OpportunitiesView({
             <Download size={15} /> Excel'e Aktar
           </button>
           <SaveButton onClick={onSaveAll} loading={loading} />
-          <PermissionGate permission="CRM_EDIT">
-            <button
-              onClick={onNewOpportunity}
-              className="flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all"
-            >
-              <Plus size={18} /> Yeni Fırsat
-            </button>
-          </PermissionGate>
+          {canCreateOpportunity && (
+            <PermissionGate permission="CRM_EDIT">
+              <button
+                onClick={onNewOpportunity}
+                className="flex items-center gap-2 bg-primary text-white px-8 py-3.5 rounded-2xl text-xs font-black shadow-lg hover:bg-primary/90 transition-all"
+              >
+                <Plus size={18} /> Yeni Fırsat
+              </button>
+            </PermissionGate>
+          )}
         </div>
       </div>
 

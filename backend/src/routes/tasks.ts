@@ -11,14 +11,20 @@ const router: Router = Router();
 const ACTION_TARGET: Record<string, string> = {
   BOM_PREPARE: 'presales', SPEC_ANALYSIS: 'presales',
   COST_ANALYSIS: 'crm-cost', PROPOSAL_PREPARE: 'crm-proposals', NEGOTIATION: 'crm-negotiation',
+  TENDER_FILE_PREP: 'sales-support',
   MILESTONE_UPDATE: 'project-mgmt', HANDOVER_DOCS: 'project-mgmt', COST_ENTRY: 'project-mgmt',
   VENDOR_QUOTE: 'procurement', PO_ISSUE: 'procurement', DELIVERY_RECORD: 'procurement',
   DOC_PREPARE: 'contract-workflow', SIGN_APPROVE: 'contract-workflow',
   CONTRACT_REVIEW: 'contract-workflow', CASE_OPEN: 'contract-workflow', OPINION: 'contract-workflow',
 };
+// src/modules/todo/helpers.ts taskTargetTab() ile birebir aynı tutulmalı (frontend
+// mirror'ı) — biri güncellenip diğeri unutulursa Notification/TodoTask "Git" hedefleri
+// birbirinden sapar.
 const MODULE_TARGET: Record<string, string> = {
   OPPORTUNITY: 'crm-opportunities', PROJECT: 'project-mgmt', PROCUREMENT: 'procurement',
   CONTRACT: 'contract-workflow', LEGAL: 'contract-workflow',
+  CONTRACT_WORKFLOW_SIGNING: 'contract-workflow', PURCHASE_REQUEST: 'procurement', TENDER: 'sales-support',
+  PROJECT_COST: 'finance', LEGAL_CASE: 'contract-workflow', PROPOSAL: 'crm-proposals',
 };
 const targetTab = (actionKey?: string | null, relatedModule?: string | null): string | null =>
   (actionKey ? ACTION_TARGET[actionKey] : undefined) || (relatedModule ? MODULE_TARGET[relatedModule] : undefined) || null;

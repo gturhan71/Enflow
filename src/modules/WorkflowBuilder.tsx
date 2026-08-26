@@ -11,7 +11,7 @@ import { Unit, User, Workflow, WorkflowStep } from '../types';
 import {
   PROCESS_KEYS, PROCESS_KEY_LABEL, LIVE_PROCESS_KEYS, ProcessKey,
   STAGE_ACTION_KEYS, STAGE_ACTION_LABEL, LIVE_STAGE_ACTION_KEYS,
-  ENTITY_TYPES, ENTITY_TYPE_LABEL, ENTITY_FIELD_SPECS, EntityType,
+  ENTITY_TYPES, ENTITY_TYPE_LABEL, ENTITY_FIELD_SPECS, EntityType, ENTITY_RECIPIENT_FIELDS,
 } from '../types/workflow';
 import { ROLE_LABELS } from '../constants';
 import { apiService } from '../services/apiService';
@@ -562,6 +562,28 @@ const WorkflowBuilder = ({ units = [], users = [] }: { units?: Unit[]; users?: U
                               {Object.entries(ROLE_LABELS).map(([code, label]) => <option key={code} value={code}>{label}</option>)}
                             </select>
                           </div>
+
+                          {/* Entity-alan-bazlı dinamik alıcı — doluysa görev, kaydın kendi
+                              alanından (ör. fırsat sahibi) doğrudan çözülür; bulunamazsa
+                              yukarıdaki Birim+Rol'e (ve Vekil'e) fallback yapar. */}
+                          {activeWorkflow?.entityType && ENTITY_RECIPIENT_FIELDS[activeWorkflow.entityType as EntityType] && (
+                            <div className="space-y-2">
+                              <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Alıcı: Kaydın Belirli Bir Alanı (opsiyonel)</label>
+                              <select
+                                value={step.recipientField || ''}
+                                onChange={(e) => handleUpdateStep(step.id, { recipientField: e.target.value || null })}
+                                className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-4 py-3 text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-primary/20 transition-all appearance-none cursor-pointer"
+                              >
+                                <option value="">Yok — yalnız Birim/Rol'e göre gider</option>
+                                {ENTITY_RECIPIENT_FIELDS[activeWorkflow.entityType as EntityType]!.map((f) => (
+                                  <option key={f.key} value={f.key}>{f.label}</option>
+                                ))}
+                              </select>
+                              {step.recipientField && (
+                                <p className="text-[10px] text-slate-400 px-1">Bu alan doluyken görev önce kaydın sahibine gider; bulunamazsa (ör. kullanıcı pasif) yukarıdaki Birim/Rol'e düşer.</p>
+                              )}
+                            </div>
+                          )}
 
                           {/* Değişmez kural #2 — birim boşsa (aktif kimse yoksa/hiç açılmadıysa)
                               modülün çalışabilmesi için bir VEKİL atanması zorunludur; sessiz

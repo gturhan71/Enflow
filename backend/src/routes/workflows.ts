@@ -21,6 +21,7 @@ interface IncomingStep {
   actionKey?: string | null;
   actionConfig?: string | null;
   order?: number;
+  recipientField?: string | null;
 }
 
 // Not: `order` artık istemciden gelebilir (aynı order'ı paylaşan birden çok
@@ -40,6 +41,7 @@ const mapStep = (step: IncomingStep, index: number) => ({
   approvalMode: step.approvalMode ?? 'ANY',
   actionKey: step.actionKey ?? null,
   actionConfig: step.actionConfig ?? null,
+  recipientField: step.recipientField ?? null,
 });
 
 // Sabit taksonomideki süreçler (bkz. src/types/workflow.ts PROCESS_KEYS) —
@@ -50,6 +52,7 @@ const KNOWN_PROCESS_KEYS = new Set([
   'OPPORTUNITY_APPROVAL', 'CONTRACT_SIGNING', 'TENDER_SUBMIT_APPROVAL', 'TENDER_TO_CONTRACT',
   'CONTRACT_TO_PROJECT', 'CONTRACT_TO_PROCUREMENT', 'OPPORTUNITY_TO_PROJECT', 'PURCHASE_APPROVAL',
   'PURCHASE_TO_COST_ITEM', 'PURCHASE_TO_INVOICE', 'PROJECT_TO_INVOICE', 'CRM_HANDOFF', 'PRESALES_HANDOFF',
+  'BOM_COST_ANALYSIS_HANDOFF',
 ]);
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

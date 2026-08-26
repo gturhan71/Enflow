@@ -9,6 +9,7 @@ export const TASK_ACTIONS: Record<string, { key: string; label: string }[]> = {
     { key: 'SPEC_ANALYSIS', label: 'Şartname analizi yap' },
     { key: 'PROPOSAL_PREPARE', label: 'Teklif hazırla' },
     { key: 'NEGOTIATION', label: 'Pazarlık yürüt' },
+    { key: 'TENDER_FILE_PREP', label: 'İhale/dosya hazırlığı yap' },
   ],
   PROJECT: [
     { key: 'MILESTONE_UPDATE', label: 'Milestone güncelle' },
@@ -35,15 +36,21 @@ export const TASK_ACTIONS: Record<string, { key: string; label: string }[]> = {
 const ACTION_TARGET: Record<string, string> = {
   BOM_PREPARE: 'presales', SPEC_ANALYSIS: 'presales',
   COST_ANALYSIS: 'crm-cost', PROPOSAL_PREPARE: 'crm-proposals', NEGOTIATION: 'crm-negotiation',
+  TENDER_FILE_PREP: 'sales-support',
   MILESTONE_UPDATE: 'project-mgmt', HANDOVER_DOCS: 'project-mgmt', COST_ENTRY: 'project-mgmt',
   VENDOR_QUOTE: 'procurement', PO_ISSUE: 'procurement', DELIVERY_RECORD: 'procurement',
   DOC_PREPARE: 'contract-workflow', SIGN_APPROVE: 'contract-workflow',
   CONTRACT_REVIEW: 'contract-workflow', CASE_OPEN: 'contract-workflow', OPINION: 'contract-workflow',
 };
-// Eylem yoksa modüle göre kaba hedef.
+// Eylem yoksa modüle göre kaba hedef. CONTRACT_WORKFLOW_SIGNING/PURCHASE_REQUEST/
+// TENDER — Süreç Motoru'nun (processEngine.ts) entityType değerleri; PROJECT_COST/
+// LEGAL_CASE/PROPOSAL — sanal agent görevlerinin (virtualAgentService.ts) entityType
+// değerleri. bkz. backend/src/utils/entityTypeTab.ts (Notification için aynı eşleme).
 const MODULE_TARGET: Record<string, string> = {
   OPPORTUNITY: 'crm-opportunities', PROJECT: 'project-mgmt', PROCUREMENT: 'procurement',
   CONTRACT: 'contract-workflow', LEGAL: 'contract-workflow',
+  CONTRACT_WORKFLOW_SIGNING: 'contract-workflow', PURCHASE_REQUEST: 'procurement', TENDER: 'sales-support',
+  PROJECT_COST: 'finance', LEGAL_CASE: 'contract-workflow', PROPOSAL: 'crm-proposals',
 };
 // Bir görevin gidilecek modül sekmesi (eylem önce, sonra modül).
 export const taskTargetTab = (t: { actionKey?: string | null; relatedModule?: string | null }): string | null =>

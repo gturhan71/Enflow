@@ -792,6 +792,7 @@ model WorkflowStep {
   unit               Unit     @relation(fields: [unitId], references: [id])
   role               String?  // unitId içinde belirli bir role kısıtla; null = birimdeki herkes
   delegateUserId     String?  // VEKİL — birimde aktif kullanıcı yoksa (boş koltuk) düşülecek kişi; resolveStepRecipients bunu unit üyeleri/yöneticisinden sonra dener
+  recipientField     String?  // doluysa alıcı Unit/Role yerine işlenen kaydın bu alanından (User ID, ör. 'assignedToId') çözülür — beyaz liste: processEngine.ts ENTITY_RECIPIENT_FIELDS. Bulunamazsa role/unit/delegate zincirine düşer.
   approvalMode       String   @default("ANY") // ANY|ALL — aynı (workflowId, order) değerini paylaşan satırlar için
   actionKey          String?  // type=AUTO adımlarda çalıştırılacak kayıtlı eylem anahtarı (processEngine.ts STAGE_ACTIONS)
   actionConfig       String?  // actionKey'e özel yapılandırma (JSON string) — örn. COPY_FIELDS_TO_TASK için {"fields":["title","value"]}

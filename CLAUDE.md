@@ -364,11 +364,12 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/components/MoneyInput.tsx ← lib/format
+src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
-src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, constants
+src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
@@ -401,7 +402,6 @@ src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, type
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
-src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
@@ -416,6 +416,7 @@ src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, cons
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
@@ -423,6 +424,7 @@ src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobo
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
+src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/useDashboardStream.ts ← ../services/apiClient
@@ -461,22 +463,21 @@ src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
-backend/src/services/activityLog.ts ← prismaClient, activityLogSummary, dashboardStream
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/governance.ts ← prismaClient
-backend/src/services/guaranteeReminders.ts ← prismaClient, dashboardStream
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
+backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
+backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/tenantEncryption.ts ← prismaClient
-backend/src/services/tenderReminders.ts ← prismaClient, dashboardStream
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
@@ -516,10 +517,10 @@ xlsx@0.18.5
 
 ## todos
 ```
-backend/src/services/processEngine.ts:818  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
+backend/src/services/processEngine.ts:901  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 23 seconds ago)
+## changes (last 10 commits — 27 hours ago)
 ```
 src/components/HandOffModal.tsx               +birim  ~birim
 src/components/MoneyInput.tsx                 +MoneyInput
@@ -542,6 +543,7 @@ backend/src/services/dashboardStream.ts       +getDashboardPingAt  ~subscribeDas
 backend/src/services/deploymentGuard.ts       +checkDeploymentTopology
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
+backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/schedulerLock.ts         +acquireLock  +releaseLock
 backend/src/services/unitReportingService.ts  ~computeVisitPerformance
 backend/src/services/updateNotifier.ts        ~tick
@@ -643,6 +645,11 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/roleDefaultPermissions.ts
+```
+export function defaultPermissionsForRole(role) → string[]  :61-63
 ```
 
 ### backend/src/services/schedulerLock.ts
@@ -797,20 +804,6 @@ export const requireEntitlement = (pluginKey) =>  :109-116
 export type PlanId  :5-5
 ```
 
-### backend/src/services/activityLog.ts
-```
-export interface LogActivityParams  :13-22
-  tenantId: string  :14-14
-  userId?: string  :15-15
-  action: string  :16-16
-  entityType: string  :17-17
-  entityId: string  :18-18
-  details?: Record<string, unknown> | null  :19-19
-  actorType?: 'HUMAN' | 'AGENT'  :20-20
-  agentRunId?: string | null  :21-21
-export async function logActivity(p) → Promise<void>  :24-52
-```
-
 ### backend/src/services/agentProvenance.ts
 ```
 export function agentActorId(pluginKey) → string  :17-19  # Bir agent eklentisi için kanonik aktör kimliği üretir
@@ -901,11 +894,6 @@ export async function resolveEntityCreator(entityType, entityId) → Promise<str
 export async function sodViolation(tenantId, actorUserId, entityType, entityId,) → Promise<string | null>  :72-85  # SoD ihlali varsa açıklama döner; ihlal yoksa/kapalıysa/çözül
 ```
 
-### backend/src/services/guaranteeReminders.ts
-```
-export async function sweepGuaranteeReminders(tenantId) → Promise<void>  :20-63
-```
-
 ### backend/src/services/invoiceService.ts
 ```
 export interface CreateInvoiceInput  :9-27
@@ -939,31 +927,31 @@ export async function logAutoProgressChange(tenantId, opportunityId, userId, bef
 
 ### backend/src/services/processEngine.ts
 ```
-export interface StepRecipientQuery  :33-37
-  unitId: string  :34-34
-  role: string | null  :35-35
-  delegateUserId?: string | null  :36-36
-export interface StageActionCtx  :100-110
-  tenantId: string  :101-101
-  entityType: string  :102-102
-  entityId: string  :103-103
-  step: WorkflowStep  :104-104
-  actorUserId?: string  :105-105
-  input?: Record<string, unknown>  :109-109
-export interface FieldSpec  :116-116
-  key: string  :116-116
-export interface AdvanceProcessOpts  :585-593
-  actorUserId?: string  :586-586
-  stageId?: string  :587-587
-  decision?: 'APPROVE' | 'REJECT'  :588-588
-  note?: string  :589-589
-  input?: Record<string, unknown>  :592-592
-export interface AdvanceProcessResult  :595-599
-  chain: ApprovalChain & { stages: ApprovalS  :596-596
-  advancedToOrder: number | null  :597-597
-  actionsInvoked: string[]  :598-598
-export class ProcessNotConfiguredError  :26-31
-  constructor(public processKey)  :27-30
+export interface StepRecipientQuery  :34-39
+  unitId: string  :35-35
+  role: string | null  :36-36
+  delegateUserId?: string | null  :37-37
+  recipientField?: string | null  :38-38
+export interface StageActionCtx  :118-128
+  tenantId: string  :119-119
+  entityType: string  :120-120
+  entityId: string  :121-121
+  step: WorkflowStep  :122-122
+  actorUserId?: string  :123-123
+  input?: Record<string, unknown>  :127-127
+export interface FieldSpec  :134-134
+  key: string  :134-134
+export interface AdvanceProcessOpts  :668-676
+  actorUserId?: string  :669-669
+  stageId?: string  :670-670
+  decision?: 'APPROVE' | 'REJECT'  :671-671
+  note?: string  :672-672
+  input?: Record<string, unknown>  :675-675
+export interface AdvanceProcessResult  :678-682
+  chain: ApprovalChain & { stages: ApprovalS  :679-679
+  advancedToOrder: number | null  :680-680
+  actionsInvoked: string[]  :681-681
+export class ProcessNotConfiguredError  :27-32
 ```
 
 ### backend/src/services/restoreService.ts
@@ -973,11 +961,6 @@ export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTena
 export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :152-156  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
 export async function applyLogicalRestore(restoreId, actor?) → Promise<  :245-245  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
 export async function stageStateRestore(restoreId) → Promise<  :282-282  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
-```
-
-### backend/src/services/roleDefaultPermissions.ts
-```
-export function defaultPermissionsForRole(role) → string[]  :61-63
 ```
 
 ### backend/src/services/salesCosting.ts
@@ -1009,16 +992,21 @@ export interface SalesBoMItemInput  :28-38
 export interface SalesManualCostItemInput  :40-45
 ```
 
+### backend/src/services/serviceTicketReminders.ts
+```
+export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
+```
+
 ### backend/src/services/tenantEncryption.ts
 ```
 export async function encryptForTenant(tenantId, plaintext) → Promise<string | null>  :85-89
 export async function decryptForTenant(tenantId, value) → Promise<string | null>  :91-96
 export function isEncrypted(value) → boolean  :98-100
-```
-
-### backend/src/services/tenderReminders.ts
-```
-export async function sweepTenderReminders(tenantId) → Promise<void>  :21-63
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1039,11 +1027,11 @@ export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir ala
 
 ### backend/src/services/workflowTemplate.ts
 ```
-export interface ApplyTemplateResult  :135-139
-  addedUnits: string[]  :136-136
-  createdProcesses: string[]  :137-137
-  skippedProcesses: string[]  :138-138
-export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :147-204  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
+export interface ApplyTemplateResult  :146-150
+  addedUnits: string[]  :147-147
+  createdProcesses: string[]  :148-148
+  skippedProcesses: string[]  :149-149
+export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :158-216  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
 ### backend/src/usageService.ts
@@ -1051,6 +1039,11 @@ export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → P
 export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
 export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
 export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
+```
+
+### backend/src/utils/entityTypeTab.ts
+```
+export function entityTypeToTab(entityType?) → string | undefined  :25-27
 ```
 
 ### backend/src/utils/secureUpload.ts
@@ -1084,6 +1077,15 @@ hook useState
 hook useRef
 hook useEffect
 handler onChange
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+export UserManagement
+handler onSubmit
+handler onConfirm
 ```
 
 ### src/lib/format.ts
@@ -1164,6 +1166,7 @@ handler onChange
 ### src/modules/crm/OpportunitiesView.tsx
 ```
 component OpportunitiesView
+hook useAuth
 hook useState
 hook useMemo
 handler onClick
@@ -1470,15 +1473,6 @@ handler onSubmit
 handler onChange
 ```
 
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-export UserManagement
-handler onSubmit
-handler onConfirm
-```
-
 ### src/content/helpArticles.ts
 ```
 export interface HelpArticleSection  :8-11
@@ -1649,6 +1643,17 @@ component TransferTab
 handler onClick
 ```
 
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/constants.ts
 ```
 export const proposalStatusTone = (status) =>  :16-32
@@ -1698,6 +1703,11 @@ handler onClick
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
+```
+
+### src/modules/dashboard/CriticalAlertsStrip.tsx
+```
+export CriticalAlertsStrip
 ```
 
 ### src/modules/dashboard/DrawerShell.tsx
@@ -1992,29 +2002,29 @@ handler onData
 
 ### src/modules/todo/helpers.ts
 ```
-export interface ProposalDetailItem  :141-149
-  partNumber: string  :142-142
-  description: string  :143-143
-  quantity: number  :144-144
-  purchaseCost?: number  :145-145
-  unitSalePrice?: number  :146-146
-  totalSalePrice?: number  :147-147
-  marginPercentage?: number  :148-148
-export interface ProposalDetail  :151-160
-  price: string  :152-152
-  totalPrice: number  :153-153
-  totalCost: number  :154-154
-  items: ProposalDetailItem[]  :155-155
-  description: string  :156-156
-  terms: string  :157-157
-  version: number  :158-158
-  opportunityTitle: string  :159-159
-export const taskTargetTab = (t) =>  :49-58
-export const fmtCompletedAt = (d?) =>  :69-70
-export const getPriorityColor = (priority) =>  :72-79
-export const composedTitle = (newTask, taskAction, ctx) =>  :92-103
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :105-139
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :162-208
+export interface ProposalDetailItem  :148-156
+  partNumber: string  :149-149
+  description: string  :150-150
+  quantity: number  :151-151
+  purchaseCost?: number  :152-152
+  unitSalePrice?: number  :153-153
+  totalSalePrice?: number  :154-154
+  marginPercentage?: number  :155-155
+export interface ProposalDetail  :158-167
+  price: string  :159-159
+  totalPrice: number  :160-160
+  totalCost: number  :161-161
+  items: ProposalDetailItem[]  :162-162
+  description: string  :163-163
+  terms: string  :164-164
+  version: number  :165-165
+  opportunityTitle: string  :166-166
+export const taskTargetTab = (t) =>  :56-65
+export const fmtCompletedAt = (d?) =>  :76-77
+export const getPriorityColor = (priority) =>  :79-86
+export const composedTitle = (newTask, taskAction, ctx) =>  :99-110
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :112-146
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :169-215
 ```
 
 ### src/modules/todo/PendingChainApprovals.tsx
@@ -2277,31 +2287,31 @@ export interface Project  :53-83
 
 ### src/types/workflow.ts
 ```
-export interface EntityFieldSpec  :85-85
-  key: string  :85-85
-export interface WorkflowStep  :124-142
-  id: string  :125-125
-  workflowId?: string  :126-126
-  unitId: string  :127-127
-  role?: string | null  :128-128
-  delegateUserId?: string | null  :130-130
-  approvalMode?: ApprovalMode  :131-131
-  actionKey?: string | null  :132-132
-  actionConfig?: string | null  :134-134
-  … +7 more members  :124-124
-export interface ApprovalStage  :143-157
-  id: string  :144-144
-  role: string | null  :145-145
-  unitId?: string | null  :146-146
-  delegateUserId?: string | null  :147-147
-  mode?: ApprovalMode  :148-148
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :149-149
-  approverId?: string  :150-150
-  note?: string  :151-151
-  … +5 more members  :143-143
-export interface Workflow  :158-168
-  id: string  :159-159
-  name: string  :160-160
+export interface EntityFieldSpec  :88-88
+  key: string  :88-88
+export interface WorkflowStep  :138-159
+  id: string  :139-139
+  workflowId?: string  :140-140
+  unitId: string  :141-141
+  role?: string | null  :142-142
+  delegateUserId?: string | null  :144-144
+  recipientField?: string | null  :147-147
+  approvalMode?: ApprovalMode  :148-148
+  actionKey?: string | null  :149-149
+  … +8 more members  :138-138
+export interface ApprovalStage  :160-174
+  id: string  :161-161
+  role: string | null  :162-162
+  unitId?: string | null  :163-163
+  delegateUserId?: string | null  :164-164
+  mode?: ApprovalMode  :165-165
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :166-166
+  approverId?: string  :167-167
+  note?: string  :168-168
+  … +5 more members  :160-160
+export interface Workflow  :175-185
+  id: string  :176-176
+  name: string  :177-177
 ```
 
 ### src/utils/textSimilarity.ts

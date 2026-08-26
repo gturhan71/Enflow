@@ -18,6 +18,7 @@ export const PROCESS_KEYS = [
   'OPPORTUNITY_TO_PROJECT',
   'CRM_HANDOFF',
   'PRESALES_HANDOFF',
+  'BOM_COST_ANALYSIS_HANDOFF',
 ] as const;
 export type ProcessKey = typeof PROCESS_KEYS[number];
 export const PROCESS_KEY_LABEL: Record<ProcessKey, string> = {
@@ -34,12 +35,14 @@ export const PROCESS_KEY_LABEL: Record<ProcessKey, string> = {
   OPPORTUNITY_TO_PROJECT: 'Fırsat → Proje',
   CRM_HANDOFF: 'CRM Devri (birimler arası)',
   PRESALES_HANDOFF: 'Presales Devri (teknik analiz sonrası)',
+  BOM_COST_ANALYSIS_HANDOFF: 'BoM Oluşturuldu — Maliyet Analizi Devri',
 };
 // advanceProcess tarafından gerçekten çağrılan (canlı) süreçler.
 export const LIVE_PROCESS_KEYS: ProcessKey[] = [
   'OPPORTUNITY_APPROVAL', 'CONTRACT_SIGNING', 'TENDER_SUBMIT_APPROVAL', 'TENDER_TO_CONTRACT',
   'CONTRACT_TO_PROJECT', 'CONTRACT_TO_PROCUREMENT', 'OPPORTUNITY_TO_PROJECT', 'PURCHASE_APPROVAL',
   'PURCHASE_TO_COST_ITEM', 'PURCHASE_TO_INVOICE', 'PROJECT_TO_INVOICE', 'CRM_HANDOFF', 'PRESALES_HANDOFF',
+  'BOM_COST_ANALYSIS_HANDOFF',
 ];
 
 // Süreç motorunun AUTO adımlarda çalıştırabileceği kayıtlı eylemler
@@ -121,6 +124,17 @@ export const ENTITY_FIELD_SPECS: Record<EntityType, EntityFieldSpec[]> = {
   ],
 };
 
+// Entity-alan-bazlı dinamik alıcı beyaz listesi — backend'deki processEngine.ts
+// ENTITY_RECIPIENT_FIELDS ile birebir aynı. Yalnız gerçekten bir User ID taşıyan
+// alanlar listelenir.
+export const ENTITY_RECIPIENT_FIELDS: Partial<Record<EntityType, EntityFieldSpec[]>> = {
+  OPPORTUNITY: [
+    { key: 'assignedToId', label: 'Fırsat Sahibi (Satış Temsilcisi)' },
+    { key: 'presalesId', label: 'Atanan Presales Mühendisi' },
+    { key: 'createdById', label: 'Oluşturan Kullanıcı' },
+  ],
+};
+
 export interface WorkflowStep {
   id: string;
   workflowId?: string;
@@ -128,6 +142,9 @@ export interface WorkflowStep {
   role?: string | null;
   // VEKİL — birim boşsa (aktif kimse yoksa) düşülecek kişi (değişmez kural #2).
   delegateUserId?: string | null;
+  // Doluysa alıcı Unit/Role yerine kaydın bu alanından (User ID) çözülür —
+  // bulunamazsa role/unit/delegate zincirine düşer (bkz. ENTITY_RECIPIENT_FIELDS).
+  recipientField?: string | null;
   approvalMode?: ApprovalMode;
   actionKey?: string | null;
   // actionKey'e özel yapılandırma (JSON string) — örn. COPY_FIELDS_TO_TASK için {"fields":["title","value"]}
