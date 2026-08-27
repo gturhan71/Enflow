@@ -15,18 +15,13 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
-import * as mammoth from 'mammoth';
-import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as pdfjs from 'pdfjs-dist';
 import { apiService } from '../services/apiService';
+import { extractTextFromFile } from '../lib/docText';
 import { useAIGate } from '../contexts/AIGateContext';
 import { logger } from '../utils/logger';
 import { AnalysisResult } from '../types';
-
-// Configure PDF.js worker using a reliable CDN with modern mjs support
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
 
 const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
   const bytes = new Uint8Array(buffer);
@@ -64,38 +59,6 @@ const SpecAnalysis = ({ opportunityId, onTransferToBoM }: SpecAnalysisProps) => 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
       setFiles(Array.from(e.target.files));
-    }
-  };
-
-  const extractTextFromFile = async (file: File): Promise<string> => {
-    const extension = file.name.split('.').pop()?.toLowerCase();
-    
-    if (extension === 'docx') {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      return result.value;
-    } else if (extension === 'xlsx' || extension === 'xls') {
-      const arrayBuffer = await file.arrayBuffer();
-      const workbook = XLSX.read(arrayBuffer);
-      let fullText = '';
-      workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        fullText += XLSX.utils.sheet_to_txt(sheet);
-      });
-      return fullText;
-    } else if (extension === 'pdf') {
-      const arrayBuffer = await file.arrayBuffer();
-      const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
-      const pdf = await loadingTask.promise;
-      let fullText = '';
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        fullText += textContent.items.map((item) => (item as { str: string }).str).join(' ');
-      }
-      return fullText;
-    } else {
-      return '';
     }
   };
 

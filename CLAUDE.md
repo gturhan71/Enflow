@@ -116,7 +116,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 | `crm-customers` | `CRMModule` | Müşteriler |
 | `crm-proposals` | `CRMModule` | Teklifler |
 | `crm-negotiation` | `CRMModule` | Canlı Pazarlıklar |
-| `presales` | `PresalesModule` | BoM (malzeme listesi) + maliyet analizi |
+| `presales` | `PresalesModule` | BoM (malzeme listesi) + maliyet analizi + Şartname Analizi + **Şartname ↔ Ürün Uygunluk** (`SpecComplianceMatrix` — teknik şartname maddeleri vs. ürün specsheet'leri, YZ uygunluk matrisi + xlsx; yalnız YZ anahtarı varsa) |
 | `negotiation` | `NegotiationModule` | Müzakere + anlaşma |
 | `contract` | `ContractModule` | Eski sözleşme modülü |
 | `project-mgmt` | `ProjectManagementModule` | Tam proje yaşam döngüsü — milestone, maliyet, karlılık, devir paketi |
@@ -215,7 +215,7 @@ const STATUS_RANK = { APPROVED: 4, ACCEPTED: 3, SENT: 2, PENDING_APPROVAL: 1, DR
 - **Portlar** — dev frontend **3000**, backend **3002** (vite.config server.port=5173 default, `--port 3000` ile çalıştırılır)
 - **Servis yeniden kullanımı** — proje oluşturma `backend/src/services/projectFactory.ts` `createProjectWithMilestones` (projects.ts POST + contractWorkflow `/transfer` ortak); create metod imzaları `Partial<X>`
 - **Denetim-izi** — mutasyon sonrası `logActivity({ tenantId, userId, action, entityType, entityId, details? })` (`backend/src/services/activityLog.ts`, **non-throwing** — ana akışı bozmaz); okuma `GET /api/activity-logs`. Agent işlemleri `actorType:'AGENT'`+`agentRunId` (Faz 8.3). Yeni mutasyon endpoint'i = logActivity çağrısı ekle.
-- **YZ entegrasyonu — sağlayıcıdan bağımsız** — Tüm YZ çağrıları `backend/src/services/aiClient.ts` (`chatJSON`, **OpenAI-uyumlu `/chat/completions`** `fetch`) üzerinden. Sağlayıcı **hard-code edilmez** ("istenilen YZ"): tenant kendi `{ baseUrl, apiKey, model }` değerini **Ayarlar→Entegrasyonlar**'dan girer → `Tenant.moduleSettings.ai`. Route: `GET/PUT /api/tenants/ai-settings` (GM-only; key **maskeli**, GET'te yalnız `hasKey`, **asla loglanmaz/echo edilmez**). Kullanan: `specAnalysis.analyzeSpec` (sözleşme/ihale) + `POST /api/presales/spec-extract` (şartname→ürün). Config yoksa/hata → deterministik **mock fallback**. **Client-side YZ çağrısı yasak** (eski Gemini/`@google/genai` kaldırıldı; `@anthropic-ai/sdk` de kaldırıldı).
+- **YZ entegrasyonu — sağlayıcıdan bağımsız** — Tüm YZ çağrıları `backend/src/services/aiClient.ts` (`chatJSON`, **OpenAI-uyumlu `/chat/completions`** `fetch`) üzerinden. Sağlayıcı **hard-code edilmez** ("istenilen YZ"): tenant kendi `{ baseUrl, apiKey, model }` değerini **Ayarlar→Entegrasyonlar**'dan girer → `Tenant.moduleSettings.ai`. Route: `GET/PUT /api/tenants/ai-settings` (GM-only; key **maskeli**, GET'te yalnız `hasKey`, **asla loglanmaz/echo edilmez**). Kullanan: `specAnalysis.analyzeSpec` (sözleşme/ihale) + `POST /api/presales/spec-extract` (şartname→ürün) + `POST /api/presales/spec-compliance` (şartname maddeleri ↔ ürün specsheet uygunluk matrisi; grup başına 1 `chatJSON`; **deterministik fallback YOK** — YZ yoksa `{usedAI:false, groups:[], message}` döner, istemci "Karşılaştır"ı pasifleştirir; sonuç istemcide xlsx'e dönüşür, DB'ye yazılmaz). Config yoksa/hata → deterministik **mock fallback** (yalnız fallback'i olan çağrılar; spec-compliance hariç). **Client-side YZ çağrısı yasak** (eski Gemini/`@google/genai` kaldırıldı; `@anthropic-ai/sdk` de kaldırıldı).
 - **Tenant verisi şifreleme** (Faz 12) — `backend/src/services/tenantEncryption.ts`: `encryptForTenant`/`decryptForTenant`, AES-256-GCM, tenant-başına DEK (envelope, `Tenant.dekWrapped`, master key `DATA_ENCRYPTION_MASTER_KEY`). Şifreli değer öneki `enc:v1:` — önek yoksa düz metin kabul edilir (kademeli geçiş, decrypt kırılmaz). Kapsam: YZ `apiKey` + `Vendor.iban`/`bankName` + `Customer.taxNumber`/`taxOffice`. Yeni alan eklerken: route'ta `encryptForTenant` (yazım) / `decryptForTenant` (okuma) çağır, **genel Prisma `$extends`'e ekleme** (money-rounding hot path'i tüm modeller için uniform, alan şifreleme seçici — ayrı tutulmalı). `Tenant` döndüren route'larda `dekWrapped` **her zaman** `omit` edilmeli. bkz. `docs/TENANT_DATA_ENCRYPTION_PLAN.md`.
 
 ## Proje Yönetimi Modülü — Mimari
@@ -331,6 +331,7 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 
 **Kalan / gelecek iyileştirmeler (zemin):**
 
+- [x] **Presales — Şartname ↔ Ürün Specsheet Uygunluk Karşılaştırması** (2026-08-27) — Presales'e yeni `Şartname ↔ Ürün Uygunluk` sekmesi (`src/modules/SpecComplianceMatrix.tsx`). Teknik şartname + ürün başına bir/çok ürün specsheet'i yüklenir; şartnamede birden fazla ürün varsa her biri ayrı **grup**, aynı ürün için rakip markalar aynı grupta **aday** kolonlarıdır. Teknik/idari şartname fırsat oluşturulurken girildiyse (`OpportunityRequiredDoc` `TECH_SPEC`/`ADMIN_SPEC` UPLOADED) fırsattan **otomatik** gelir — client `getOpportunityRequiredDocs` → `fileUrl`'i doğrudan `fetch` edip `docText.extractTextFromFile` ile metnini çıkarır (bunun için `vite.config.ts` proxy'sine `/uploads` eklendi; prod'da zaten aynı origin). Uzak-depo (Nextcloud mutlak URL) evrakı client'tan okunamazsa uyarı verir, elle yükleme yolu açık kalır. `POST /api/presales/spec-compliance` (`backend/src/routes/presales.ts`, `tenantMiddleware`-only, `aiClient.chatJSON` **grup başına 1 çağrı**) her (madde × aday) için `MEETS|PARTIAL|FAILS|UNKNOWN` + kanıt alıntısı + ürün başına "önerilen marka" üretir. Sonuç istemcide **xlsx**'e (Özet + grup başına sayfa) dönüşür (`XLSX`, kurulu); öneri tek tıkla BoM'a kalem olur (mevcut `onTransferToBoM` — PresalesModule'de `transferToBoM` olarak ortaklaştı). **Yalnız YZ anahtarı tanımlıysa çalışır** — deterministik fallback YOK; anahtar yoksa `{usedAI:false, groups:[], message}` döner ve UI'da kalıcı sarı not + "Karşılaştır" pasif + `useAIGate().requireAI` popup. **Stateless** — yeni Prisma modeli/migration yok, dosyalar diske yazılmaz. Metin çıkarımı `src/lib/docText.ts`'e taşındı (SpecAnalysis'ten refactor, DRY). ActivityLog: `PRESALES_SPEC_COMPLIANCE`. Not katmanları: `helpArticles.ts` presales makalesi + `walkthrough.md` §7/§27 (+`wiki/index.html`).
 - [x] **Yönetim Dashboard'u — Ziyaret Performansı widget'ı** (2026-08-09, Faz 11) — Satış ekibinin ziyaret planı/gerçekleşme performansı önceden yalnız Ziyaret Planı sekmesinde/rapor konsolidasyonunda görünüyordu; artık KURUMSAL KOKPİT'e taşındı. `computeVisitPerformance` (`unitReportingService.ts`) `computeConsolidation`'ın hafif bir alt kümesi (DailyReport matrisi hesaplamıyor, 45sn'lik Dashboard polling'ine uygun): bu ayki planlanan/gerçekleşen/coveragePct + son 180 günden, penceresi (60 gün) dolmuş "olgun" tamamlanmış ziyaretler üzerinden ziyaret→fırsat dönüşüm oranı (Visit↔Opportunity arasında FK yok, heuristik: ziyaretten sonraki 60 gün içinde aynı müşteriye açılan Opportunity "dönüşüm" sayılır; bir müşteri dönem içinde en fazla bir kez sayılır, en erken eşleşen ziyarete atıf yapılır — çifte sayım engellenir). `resolveUnitStaff`/`getVisitTargetRate` yardımcıları `computeConsolidation`'dan çıkarılıp paylaşıldı (davranış değişmedi). `GET /api/reports/dashboard` → `management.visitPerformance`; `widgetCatalog.ts` `visitPerformance` GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi, "Detay" temsilci bazlı dökümü gösterir. Yeni Prisma modeli/migration yok.
 - [x] **Fırsat kartı — Teklif & Maliyet Analizi geçmişi** (2026-08-09, Faz 10, migration `add_cost_analysis_version`) — Daha önce maliyet analizi hiç versiyonlanmıyordu (her `POST /:id/cost-analysis` BoM/CostItem/costConfig'i silip yeniden yazıyordu, geçmiş kayboluyordu). Yeni `CostAnalysisVersion` modeli her kayıtta bir anlık görüntü (BoM+gider+costConfig+marj+teklif) tutar; `GET /:id/cost-analysis-versions` ile listelenir. Fırsat kartına (`OpportunitiesView.tsx`) eklenen `OpportunityHistoryPanel.tsx` genişletilebilir bölüm: **Teklifler** (zaten versiyonlu `Proposal` kayıtlarından, kronolojik + "Düzenle" — seçilen versiyonun içeriği editöre yüklenir, kaydedince mevcut mantıkla tutarlı şekilde yeni versiyon oluşturur) ve **Maliyet Analizleri** (yeni tablo, kronolojik, salt-okunur özet + "Güncel Analize Git" ile `crm-cost` sekmesine deep-link). `CRMModule` yeni `onNavigate` prop'u (App.tsx `navigate` fonksiyonu) ile itemId'li geçiş sağlar; `editingProposalId` state'i belirli bir teklif versiyonunu editöre yükler.
 - [x] **Enflow-Wiki — CANLI** — yazılımı hiç bilmeyene anlatan **statik how-to/referans** sayfası. `wiki/build.mjs` (bağımlılıksız üretici) `walkthrough.md §27`'den `wiki/index.html` üretir; GitHub Pages'e otomatik deploy edilir (`.github/workflows/wiki-pages.yml`) ve backend `GET /wiki` ile de sunulur (açılışta best-effort yeniden üretim). Akış değişince önce §27 güncellenir, sonra `node wiki/build.mjs` çalıştırılır.
@@ -368,19 +369,23 @@ src/components/settings/UserManagement.tsx ← ../types, ../constants, ../servic
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
-src/modules/PresalesModule.tsx ← types, SpecAnalysis, contexts/AuthContext, components/PermissionGate, hooks/useBoM
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
+src/modules/todo/helpers.ts ← ../types
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
@@ -391,9 +396,13 @@ backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
+backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/schedulerLock.ts ← prismaClient
+backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
+backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock
+backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -416,15 +425,12 @@ src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, cons
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
-src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/dashboard/CriticalAlertsStrip.tsx ← ../types, criticalAlerts
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/useDashboardStream.ts ← ../services/apiClient
@@ -454,14 +460,14 @@ src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../co
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/modules/todo/helpers.ts ← ../types
+src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
+src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
-src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/analyticsService.ts ← prismaClient
@@ -472,16 +478,13 @@ backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
-backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
-backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
-backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
-backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/secureUpload.ts ← usageService
+tests/e2e-scenario/helpers.ts ← playwright
 ```
 
 ## versions (installed direct deps)
@@ -517,12 +520,11 @@ xlsx@0.18.5
 
 ## todos
 ```
-backend/src/services/processEngine.ts:901  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
+backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 27 hours ago)
+## changes (last 10 commits — 26 hours ago)
 ```
-src/components/HandOffModal.tsx               +birim  ~birim
 src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
 src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
@@ -543,10 +545,15 @@ backend/src/services/dashboardStream.ts       +getDashboardPingAt  ~subscribeDas
 backend/src/services/deploymentGuard.ts       +checkDeploymentTopology
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
+backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/schedulerLock.ts         +acquireLock  +releaseLock
+backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
+backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
 backend/src/services/unitReportingService.ts  ~computeVisitPerformance
 backend/src/services/updateNotifier.ts        ~tick
+backend/src/services/workflowTemplate.ts      ~applyDefaultWorkflowTemplate
+backend/src/utils/entityTypeTab.ts            +entityTypeToTab
 backend/src/utils/fileUpload.ts               ~tryUploadToNextcloud
 ```
 
@@ -647,15 +654,54 @@ export function opportunityRemotePath(trackingCode, subfolder) → string  :24-2
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
 ```
 
+### backend/src/services/processEngine.ts
+```
+export interface StepRecipientQuery  :34-39
+  unitId: string  :35-35
+  role: string | null  :36-36
+  delegateUserId?: string | null  :37-37
+  recipientField?: string | null  :38-38
+export interface StageActionCtx  :118-128
+  tenantId: string  :119-119
+  entityType: string  :120-120
+  entityId: string  :121-121
+  step: WorkflowStep  :122-122
+  actorUserId?: string  :123-123
+  input?: Record<string, unknown>  :127-127
+export interface FieldSpec  :134-134
+  key: string  :134-134
+export interface AdvanceProcessOpts  :697-705
+  actorUserId?: string  :698-698
+  stageId?: string  :699-699
+  decision?: 'APPROVE' | 'REJECT'  :700-700
+  note?: string  :701-701
+  input?: Record<string, unknown>  :704-704
+export interface AdvanceProcessResult  :707-711
+  chain: ApprovalChain & { stages: ApprovalS  :708-708
+  advancedToOrder: number | null  :709-709
+  actionsInvoked: string[]  :710-710
+export class ProcessNotConfiguredError  :27-32
+```
+
 ### backend/src/services/roleDefaultPermissions.ts
 ```
-export function defaultPermissionsForRole(role) → string[]  :61-63
+export function defaultPermissionsForRole(role) → string[]  :64-66
 ```
 
 ### backend/src/services/schedulerLock.ts
 ```
 export async function acquireLock(name, ttlMs) → Promise<boolean>  :23-42  # Kilidi devralmayı dener
 export async function releaseLock(name) → Promise<void>  :45-50  # İş bitince kilidi hemen serbest bırakır (expiresAt'i geçmişe
+```
+
+### backend/src/services/serviceTicketReminders.ts
+```
+export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
 ```
 
 ### backend/src/services/unitReportingService.ts
@@ -702,6 +748,20 @@ export interface UpdateStatus  :17-32
 export function enflowHome() → string  :35-37  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
 export function readUpdateStatus() → UpdateStatus | null  :39-45
 export function startUpdateNotifier() → void  :118-122
+```
+
+### backend/src/services/workflowTemplate.ts
+```
+export interface ApplyTemplateResult  :152-156
+  addedUnits: string[]  :153-153
+  createdProcesses: string[]  :154-154
+  skippedProcesses: string[]  :155-155
+export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
+```
+
+### backend/src/utils/entityTypeTab.ts
+```
+export function entityTypeToTab(entityType?) → string | undefined  :25-27
 ```
 
 ### backend/src/utils/fileUpload.ts
@@ -844,11 +904,11 @@ export interface BidScorecard  :237-241
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
-export async function autoSkipOrphanStages(tenantId, chainId)  :74-169  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
-export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :201-213  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
-export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :226-244  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
-export async function resolveGroupAfterDecision(tenantId, chainId)  :254-311  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
-export async function resetApprovalChain(tenantId, entityType, entityId)  :314-327  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+export async function autoSkipOrphanStages(tenantId, chainId)  :74-154  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
+export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :216-228  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
+export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :241-259  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
+export async function resolveGroupAfterDecision(tenantId, chainId)  :269-326  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
+export async function resetApprovalChain(tenantId, entityType, entityId)  :329-342  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
 ```
 
 ### backend/src/services/approvalSlaEscalation.ts
@@ -925,35 +985,6 @@ export async function recordProgressCheckIn(tenantId, opportunityId, userId, inp
 export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
-### backend/src/services/processEngine.ts
-```
-export interface StepRecipientQuery  :34-39
-  unitId: string  :35-35
-  role: string | null  :36-36
-  delegateUserId?: string | null  :37-37
-  recipientField?: string | null  :38-38
-export interface StageActionCtx  :118-128
-  tenantId: string  :119-119
-  entityType: string  :120-120
-  entityId: string  :121-121
-  step: WorkflowStep  :122-122
-  actorUserId?: string  :123-123
-  input?: Record<string, unknown>  :127-127
-export interface FieldSpec  :134-134
-  key: string  :134-134
-export interface AdvanceProcessOpts  :668-676
-  actorUserId?: string  :669-669
-  stageId?: string  :670-670
-  decision?: 'APPROVE' | 'REJECT'  :671-671
-  note?: string  :672-672
-  input?: Record<string, unknown>  :675-675
-export interface AdvanceProcessResult  :678-682
-  chain: ApprovalChain & { stages: ApprovalS  :679-679
-  advancedToOrder: number | null  :680-680
-  actionsInvoked: string[]  :681-681
-export class ProcessNotConfiguredError  :27-32
-```
-
 ### backend/src/services/restoreService.ts
 ```
 export type LogicalPayloadData  :19-19
@@ -992,16 +1023,6 @@ export interface SalesBoMItemInput  :28-38
 export interface SalesManualCostItemInput  :40-45
 ```
 
-### backend/src/services/serviceTicketReminders.ts
-```
-export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
-```
-
-### backend/src/services/slaEscalation.ts
-```
-export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
-```
-
 ### backend/src/services/tenantEncryption.ts
 ```
 export async function encryptForTenant(tenantId, plaintext) → Promise<string | null>  :85-89
@@ -1025,25 +1046,11 @@ export async function runAgent(params) → Promise<  :513-518  # Bir agent eklen
 export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
 ```
 
-### backend/src/services/workflowTemplate.ts
-```
-export interface ApplyTemplateResult  :146-150
-  addedUnits: string[]  :147-147
-  createdProcesses: string[]  :148-148
-  skippedProcesses: string[]  :149-149
-export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :158-216  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
-```
-
 ### backend/src/usageService.ts
 ```
 export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
 export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
 export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
-```
-
-### backend/src/utils/entityTypeTab.ts
-```
-export function entityTypeToTab(entityType?) → string | undefined  :25-27
 ```
 
 ### backend/src/utils/secureUpload.ts
@@ -1060,15 +1067,6 @@ export function similarityRatio(a, b) → number  :39-43  # 0 (tamamen farklı) 
 ```
 
 ## src
-
-### src/components/HandOffModal.tsx
-```
-props HandOffModalProps
-hook useState
-export HandOffModal
-handler onClick
-handler onChange
-```
 
 ### src/components/MoneyInput.tsx
 ```
@@ -1153,6 +1151,17 @@ handler onSendForApproval
 handler onRejectSignature
 ```
 
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/NewOpportunityModal.tsx
 ```
 component NewOpportunityModal
@@ -1193,6 +1202,11 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/crm/ProposalsView.tsx
+```
+component ProposalsView
+```
+
 ### src/modules/CRMModule.tsx
 ```
 hook useAuth
@@ -1212,6 +1226,7 @@ handler onEdit
 handler onCheckIn
 handler onEditProposal
 handler onGoToCostAnalysis
+handler onRequestApproval
 handler onOpenReport
 handler onOpenContacts
 handler onEditCustomer
@@ -1219,7 +1234,6 @@ handler onDeleteCustomer
 handler onCreateProposal
 handler onWonOpportunity
 handler onLostOpportunity
-handler onSendForApproval
 ```
 
 ### src/modules/dashboard/KpiDetailDrawer.tsx
@@ -1340,18 +1354,57 @@ handler onKeyDown
 handler onClose
 ```
 
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :148-156
+  partNumber: string  :149-149
+  description: string  :150-150
+  quantity: number  :151-151
+  purchaseCost?: number  :152-152
+  unitSalePrice?: number  :153-153
+  totalSalePrice?: number  :154-154
+  marginPercentage?: number  :155-155
+export interface ProposalDetail  :158-167
+  price: string  :159-159
+  totalPrice: number  :160-160
+  totalCost: number  :161-161
+  items: ProposalDetailItem[]  :162-162
+  description: string  :163-163
+  terms: string  :164-164
+  version: number  :165-165
+  opportunityTitle: string  :166-166
+export const taskTargetTab = (t) =>  :56-65
+export const fmtCompletedAt = (d?) =>  :76-77
+export const getPriorityColor = (priority) =>  :79-86
+export const composedTitle = (newTask, taskAction, ctx) =>  :99-110
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :112-146
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :169-215
+```
+
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useMemo
+hook useEffect
+export WorkflowBuilder
+handler onConfig
+handler onClick
+handler onChange
+```
+
 ### src/services/apiService.ts
 ```
-class ApiService  :16-70
-  setAuth(tenantId, token)  :17-19
-  async login(email, password)  :21-23
-  async forgotPassword(email)  :25-27
-  async getSetupStatus() → Promise<  :30-30
-  async runSetup(payload) → Promise<  :35-35
-  async getCustomers()  :43-43
-  async createCustomer(data)  :44-44
-  async updateCustomer(id, data)  :45-45
-  … +22 more methods  :16-16
+class ApiService  :17-71
+  setAuth(tenantId, token)  :18-20
+  async login(email, password)  :22-24
+  async forgotPassword(email)  :26-28
+  async getSetupStatus() → Promise<  :31-31
+  async runSetup(payload) → Promise<  :36-36
+  async getCustomers()  :44-44
+  async createCustomer(data)  :45-45
+  async updateCustomer(id, data)  :46-46
+  … +23 more methods  :17-17
 ```
 
 ### src/types/crm.ts
@@ -1397,6 +1450,35 @@ export interface DashboardPayload  :1-35
   … +19 more members  :1-1
 ```
 
+### src/types/workflow.ts
+```
+export interface EntityFieldSpec  :88-88
+  key: string  :88-88
+export interface WorkflowStep  :138-159
+  id: string  :139-139
+  workflowId?: string  :140-140
+  unitId: string  :141-141
+  role?: string | null  :142-142
+  delegateUserId?: string | null  :144-144
+  recipientField?: string | null  :147-147
+  approvalMode?: ApprovalMode  :148-148
+  actionKey?: string | null  :149-149
+  … +8 more members  :138-138
+export interface ApprovalStage  :160-174
+  id: string  :161-161
+  role: string | null  :162-162
+  unitId?: string | null  :163-163
+  delegateUserId?: string | null  :164-164
+  mode?: ApprovalMode  :165-165
+  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :166-166
+  approverId?: string  :167-167
+  note?: string  :168-168
+  … +5 more members  :160-160
+export interface Workflow  :175-185
+  id: string  :176-176
+  name: string  :177-177
+```
+
 ### src/App.tsx
 ```
 hook useState
@@ -1424,6 +1506,15 @@ handler onLogin
 component CustomerCombobox
 hook useState
 hook useMemo
+handler onChange
+```
+
+### src/components/HandOffModal.tsx
+```
+props HandOffModalProps
+hook useState
+export HandOffModal
+handler onClick
 handler onChange
 ```
 
@@ -1483,7 +1574,7 @@ export interface HelpArticle  :13-18
   summary: string  :15-15
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
-export const getHelpArticle = (moduleId) =>  :183-183
+export const getHelpArticle = (moduleId) =>  :184-184
 ```
 
 ### src/contexts/AuthContext.tsx
@@ -1643,17 +1734,6 @@ component TransferTab
 handler onClick
 ```
 
-### src/modules/CostAnalysisModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/crm/constants.ts
 ```
 export const proposalStatusTone = (status) =>  :16-32
@@ -1698,16 +1778,6 @@ hook useState
 hook useEffect
 handler onChange
 handler onClick
-```
-
-### src/modules/crm/ProposalsView.tsx
-```
-component ProposalsView
-```
-
-### src/modules/dashboard/CriticalAlertsStrip.tsx
-```
-export CriticalAlertsStrip
 ```
 
 ### src/modules/dashboard/DrawerShell.tsx
@@ -2000,31 +2070,26 @@ handler onClick
 handler onData
 ```
 
-### src/modules/todo/helpers.ts
+### src/modules/SpecAnalysis.tsx
 ```
-export interface ProposalDetailItem  :148-156
-  partNumber: string  :149-149
-  description: string  :150-150
-  quantity: number  :151-151
-  purchaseCost?: number  :152-152
-  unitSalePrice?: number  :153-153
-  totalSalePrice?: number  :154-154
-  marginPercentage?: number  :155-155
-export interface ProposalDetail  :158-167
-  price: string  :159-159
-  totalPrice: number  :160-160
-  totalCost: number  :161-161
-  items: ProposalDetailItem[]  :162-162
-  description: string  :163-163
-  terms: string  :164-164
-  version: number  :165-165
-  opportunityTitle: string  :166-166
-export const taskTargetTab = (t) =>  :56-65
-export const fmtCompletedAt = (d?) =>  :76-77
-export const getPriorityColor = (priority) =>  :79-86
-export const composedTitle = (newTask, taskAction, ctx) =>  :99-110
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :112-146
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :169-215
+props SpecAnalysisProps
+hook useAIGate
+hook useState
+export SpecAnalysis
+handler onChange
+handler onClick
+```
+
+### src/modules/SpecComplianceMatrix.tsx
+```
+props SpecComplianceMatrixProps
+hook useAIGate
+hook useState
+hook useEffect
+hook useCallback
+export SpecComplianceMatrix
+handler onChange
+handler onClick
 ```
 
 ### src/modules/todo/PendingChainApprovals.tsx
@@ -2089,28 +2154,6 @@ export VisitPlanModule
 handler onChange
 handler onClick
 handler onBlur
-```
-
-### src/modules/WorkflowBuilder.tsx
-```
-hook useUnsavedChanges
-hook useState
-hook useMemo
-hook useEffect
-export WorkflowBuilder
-handler onConfig
-handler onClick
-handler onChange
-```
-
-### src/services/apiClient.ts
-```
-class ApiClient  :3-100
-  setAuth(tenantId, token)  :7-10
-  async fetchWithAuth(endpoint, options = {})  :12-44
-  async streamDashboard(onMessage, signal) → Promise<void>  :49-70
-  async login(email, password)  :72-85
-  async forgotPassword(email)  :87-99
 ```
 
 ### src/types/analytics.ts
@@ -2285,40 +2328,41 @@ export interface Project  :53-83
   type: ProjectType  :57-57
 ```
 
-### src/types/workflow.ts
-```
-export interface EntityFieldSpec  :88-88
-  key: string  :88-88
-export interface WorkflowStep  :138-159
-  id: string  :139-139
-  workflowId?: string  :140-140
-  unitId: string  :141-141
-  role?: string | null  :142-142
-  delegateUserId?: string | null  :144-144
-  recipientField?: string | null  :147-147
-  approvalMode?: ApprovalMode  :148-148
-  actionKey?: string | null  :149-149
-  … +8 more members  :138-138
-export interface ApprovalStage  :160-174
-  id: string  :161-161
-  role: string | null  :162-162
-  unitId?: string | null  :163-163
-  delegateUserId?: string | null  :164-164
-  mode?: ApprovalMode  :165-165
-  status: 'PENDING' | 'APPROVED' | 'REJECTED'  :166-166
-  approverId?: string  :167-167
-  note?: string  :168-168
-  … +5 more members  :160-160
-export interface Workflow  :175-185
-  id: string  :176-176
-  name: string  :177-177
-```
-
 ### src/utils/textSimilarity.ts
 ```
 export function normalizeCompanyName(name) → string  :10-17  # Karşılaştırma için şirket adını sadeleştirir: küçük harf, no
 export function levenshteinDistance(a, b) → number  :20-39  # Standart düzenleme mesafesi (dinamik programlama)
 export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) — 1 (aynı) arası benzerlik oranı
+```
+
+## tests
+
+### tests/e2e-scenario/cleanup.sh
+```
+# Test verisi temizliği — tekrarlı senaryo koşuları arasında SCADA Yenileme test
+```
+
+### tests/e2e-scenario/helpers.ts
+```
+export interface StepLogEntry  :34-41
+  step: string  :35-35
+  role: string  :36-36
+  action: string  :37-37
+  note?: string  :38-38
+  screenshot: string  :39-39
+  ts: string  :40-40
+export async function loginAs(page, role) → Promise<void>  :60-91  # Gerçek /api/auth/login çağrısı yapıp dönen JWT'yi localStora
+export async function loginViaForm(page, role) → Promise<void>  :94-102  # Gerçek login formunu (e-posta/şifre yazıp Giriş Yap) kullana
+export async function step(page, role, action, note?) → Promise<string>  :105-115  # Ekran görüntüsü alır + adım log'una yazar
+export async function apiCall(page, method, apiPath, body?) → Promise<T>  :118-145  # UI'da tetiklenemeyen (bulgu) uçlar için doğrudan authenticat
+export function armDialogAccept(text) → void  :150-152  # Reddet gibi window
+export function installDialogLogger(page) → void  :156-169  # Test başında bir kez çağrılır: tüm native dialog'ları (alert
+export function writeSampleFile(dir, name, content) → string  :171-175
+```
+
+### tests/e2e-scenario/pnpm-lock.yaml
+```
+keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
 ## upgrade-tool

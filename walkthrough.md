@@ -399,6 +399,14 @@ Modül açılışında fırsat dropdown'u görünür. Kaydedilmemiş değişikli
 - Yapılandırılan YZ (istenilen sağlayıcı) gereksinimleri çıkarır
 - Çıkarılan ürün listesi BoM'a ekleme için sunulur
 
+#### Şartname ↔ Ürün Uygunluk (AI)
+
+**Şartname ↔ Ürün Uygunluk sekmesi:** Teknik şartname + ürün başına bir/çok ürün specsheet'i (broşür) yüklenir. Teknik/idari şartname fırsat oluşturulurken girildiyse fırsattan **otomatik** gelir (checkbox ile seçilir; elle ek dosya da yüklenebilir).
+- Şartnamede birden fazla ürün varsa her ürün ayrı grup; aynı ürün için rakip markaların specsheet'leri aday olarak yan yana eklenir.
+- Her (şartname maddesi × aday) için YZ **Karşılıyor / Kısmen / Karşılamıyor / Belirsiz** + kanıt alıntısı üretir; ürün başına "önerilen marka" işaretlenir.
+- Çıktı ekrandaki matris + indirilebilir **xlsx** (Özet + ürün başına sayfa); öneri tek tıkla BoM'a kalem olarak aktarılabilir.
+- **Yalnızca Ayarlar → Entegrasyonlar'da bir YZ API anahtarı tanımlıysa çalışır** (anahtar yoksa "Karşılaştır" pasif; deterministik fallback yoktur). Sonuç saklanmaz (stateless).
+
 #### Yöneticiye Gönderme
 
 **Onaya Gönder:**
@@ -1391,7 +1399,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Contact/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter/FxAdjustment · LegalCase · ServiceTicket → ilgili modüller (+ Garanti & Servis) → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal`,`/service-tickets` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
-| **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis/ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/tenants/ai-settings` |
+| **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis / SpecComplianceMatrix (Şartname↔Ürün specsheet uygunluk matrisi + xlsx, yalnız YZ anahtarı varsa) / ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/presales/spec-compliance`, `/tenants/ai-settings` |
 | **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri → `/sync`, `/admin/security-test` |
 | **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt + kur farkı) → `/tenants/governance-settings`, `/finance/calc`. **İşletme maliyeti:** OperatingCostPool/UnitBudget/ProjectUnitParticipation → `overheadService` (şirket% + birim katsayı 2-katmanlı dağıtım, tam-yüklü net marj) → proje detayında Overhead paneli. **DMO Kataloğu (paralel kanal):** DmoCatalogItem/DmoFrameworkAgreement/DmoExchangeRate/DmoOrder/DmoOrderItem → `dmoCosting` (kur açığı+risturn+komisyon) → DmoModule → `/dmo`. **Uygulama-içi Yardım:** statik makale seti (`src/content/helpArticles.ts`) → HelpModule (Header'daki Yardım ikonu) → rol-duyarlı, bağlamsal kullanım kılavuzu; harici genel-tanıtım için bu wiki'ye link verir. |
 
@@ -1420,7 +1428,7 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Dashboard | Role göre kişisel kokpit: KPI, zamana-duyarlı işler, bekleyen onaylar | Herkes |
 | Ziyaret Planı | Haftalık ziyaret + günlük rapor; plan↔gerçekleşen mutabakatı | Satış / Saha |
 | CRM | Müşteri & fırsat, teklif, pazarlık; Maliyet Analizi (forward-kur + marj, müdür onayı) | Satış |
-| Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) → Satışa devir | Presales / Teknik |
+| Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) + Şartname↔Ürün specsheet uygunluk matrisi/xlsx (yalnız YZ anahtarı varsa) → Satışa devir | Presales / Teknik |
 | Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İYB |
 | Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir | KSU + Yönetim |
 | Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı | Proje |
