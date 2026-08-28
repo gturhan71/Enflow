@@ -147,6 +147,13 @@ export const crmService = {
     });
   },
 
+  // OPPORTUNITY_APPROVAL sürecini (SALES_MGR → İGB → GM) başlatır/yeniden başlatır.
+  async requestOpportunityApproval(opportunityId: string) {
+    return apiClient.fetchWithAuth(`/opportunities/${opportunityId}/request-approval`, {
+      method: 'POST'
+    });
+  },
+
   // Süreç Motoru (Faz C) — devir hedefi artık serbestçe seçilmez, tenant'ın İş
   // Akışı Tasarımcısı'nda kurguladığı haritaya göre motor çözer. processKey:
   // 'CRM_HANDOFF' | 'PRESALES_HANDOFF'. Süreç kurgulanmadıysa 409 fırlatır.

@@ -114,6 +114,10 @@ router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (r
   });
 
   // Satınalma usulü seçildiyse: Satış Destek için otomatik İhale/dosya takibi + uyarı (her usulde)
+  // B-13 düzeltmesi: bu arka plan kaydı önceden arayüzde hiç belirtilmiyordu — kullanıcı
+  // yalnız fırsatı oluşturuyor sanıyordu, aslında ayrı bir DRAFT İhale kaydı da açılıyordu.
+  // `autoTenderCreated` yanıta eklenir; frontend bunu görünür bir bilgilendirmeye çevirir.
+  let autoTenderCreated = false;
   if (procurementMethod) {
     const owner = await prisma.user.findFirst({ where: { id: finalAssignedId } });
     const tender = await prisma.tender.create({
@@ -123,6 +127,7 @@ router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (r
         currency: 'TRY', opportunityId: opp.id, ownerId: finalAssignedId, ownerName: owner?.name || null,
       },
     }).catch(() => null);
+    autoTenderCreated = !!tender;
 
     const salesSupport = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_SUPPORT' } });
     const label = METHOD_LABELS[procurementMethod] || procurementMethod;
@@ -159,7 +164,7 @@ router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (r
     if (!(e instanceof ProcessNotConfiguredError)) throw e;
   }
 
-  res.json(opp);
+  res.json({ ...opp, autoTenderCreated });
 }));
 
 // B-17 — status serbest string (enum değil, DB kısıtı yok); frontend'in kendi
@@ -818,8 +823,18 @@ router.post('/:id/approve', tenantMiddleware, GM, asyncHandler(async (req: Reque
     throw e;
   }
 
+  // B-12 düzeltmesi: zincir tamamlandığında status'u koşulsuz 'PROPOSAL'a çekmek,
+  // fırsat bu onaya gelmeden ÖNCE zaten WON (ya da LOST/WITHDRAWN) işaretlenmişse
+  // o kararı sessizce geri alıyordu. status yalnız hâlâ "teklif öncesi/aşamasında"
+  // ise ilerletilir; WON/LOST/WITHDRAWN gibi zaten sonuçlanmış bir durum korunur.
   const updated = result.chain.status === 'COMPLETED'
-    ? await prisma.opportunity.update({ where: { id: opportunityId }, data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' } })
+    ? await prisma.opportunity.update({
+        where: { id: opportunityId },
+        data: {
+          technicalStatus: 'APPROVED',
+          ...(['WON', 'LOST', 'WITHDRAWN'].includes(record.status) ? {} : { status: 'PROPOSAL' }),
+        },
+      })
     : await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId } });
 
   res.json(updated);

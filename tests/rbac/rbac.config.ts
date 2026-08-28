@@ -604,7 +604,9 @@ export const uiMatrix: UiCase[] = [
   {
     name: "Satın Alma menüsü",
     sidebarText: "Satın Alma",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "visible", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+    // B-11 düzeltmesi: FINANCE_MGR artık PROCUREMENT_VIEW'a sahip — PURCHASE_TO_INVOICE
+    // zincirinde onayladığı talebi görüp kapatabilsin diye (roleDefaultPermissions.ts).
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "visible", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
   },
   {
     name: "Garanti & Servis menüsü",

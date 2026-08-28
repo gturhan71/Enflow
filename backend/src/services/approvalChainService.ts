@@ -78,10 +78,25 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
   });
   if (!chain || chain.status !== 'PENDING') return chain;
 
+  // Motor tarafından üretilen zincirlerde AUTO adımların ApprovalStage karşılığı
+  // bir "koltuk" DEĞİLDİR: aktif kullanıcısı yok diye SKIP ya da agent-onay
+  // edilirse STAGE_ACTIONS yan etkisi (sözleşme/proje/fatura yaratma) hiç
+  // koşmaz. Bu aşamalar PENDING bırakılır; processEngine.walkForward onları
+  // AUTO dalında yürütür.
+  const autoStepKeys = new Set<string>();
+  if (chain.processKey) {
+    const wf = await prisma.workflow.findFirst({
+      where: { tenantId, processKey: chain.processKey, isActive: true },
+      include: { steps: { where: { type: 'AUTO' } } },
+    });
+    for (const st of wf?.steps ?? []) autoStepKeys.add(`${st.order}|${st.unitId}|${st.role ?? ''}`);
+  }
+
   const pendingStages = chain.stages.filter(s => s.status === 'PENDING');
   const orphanStages: typeof pendingStages = [];
   for (const stage of pendingStages) {
     if (!stage.role && !stage.unitId) continue; // kapsamsız aşama — savunma amaçlı, orphan sayılmaz
+    if (autoStepKeys.has(`${stage.order}|${stage.unitId}|${stage.role ?? ''}`)) continue; // AUTO adım — koltuk değil, atlanmaz
     const where: { tenantId: string; status: string; unitId?: string; role?: string } = { tenantId, status: 'ACTIVE' };
     if (stage.unitId) where.unitId = stage.unitId;
     if (stage.role) where.role = stage.role;

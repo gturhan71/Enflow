@@ -10,7 +10,8 @@ import {
   Customer, Opportunity, BoMItem, CostItem, Proposal, Contact,
   Project, TodoTask, CorporateDocument, ArchiveItem, Contract,
   Unit, User, Notification, Workflow, ApprovalChain, ServiceTicket,
-  OpportunityRequiredDoc, OpportunityDocumentRow
+  OpportunityRequiredDoc, OpportunityDocumentRow,
+  SpecComplianceRequest, SpecComplianceResult
 } from '../types';
 
 class ApiService {
@@ -65,6 +66,7 @@ class ApiService {
   async requestProposalApproval(oppId: string, data: { note: string; managerId: string }) { return crmService.requestProposalApproval(oppId, data); }
   async approveProposal(oppId: string, data: { note: string }) { return crmService.approveProposal(oppId, data); }
   async revertOpportunityApproval(oppId: string) { return crmService.revertOpportunityApproval(oppId); }
+  async requestOpportunityApproval(oppId: string) { return crmService.requestOpportunityApproval(oppId); }
   async handoffOpportunity(oppId: string, processKey: string, note?: string) { return crmService.handoffOpportunity(oppId, processKey, note); }
   async getBomQuotes(oppId: string) { return apiClient.fetchWithAuth(`/bom-quotes?opportunityId=${encodeURIComponent(oppId)}`); }
   async addBomQuote(data: Record<string, unknown>) { return apiClient.fetchWithAuth('/bom-quotes', { method: 'POST', body: JSON.stringify(data) }); }
@@ -315,6 +317,10 @@ class ApiService {
   }
   async presalesSpecExtract(data: { text: string; opportunityId?: string }): Promise<{ usedAI: boolean; title: string; summary: string; specDetails: string; extractedProducts: { pn: string; description: string; quantity: number }[] }> {
     return apiClient.fetchWithAuth('/presales/spec-extract', { method: 'POST', body: JSON.stringify(data) });
+  }
+  // Şartname ↔ ürün specsheet uygunluk karşılaştırması (yalnız YZ anahtarı tanımlıysa çalışır).
+  async presalesSpecCompliance(data: SpecComplianceRequest): Promise<SpecComplianceResult> {
+    return apiClient.fetchWithAuth('/presales/spec-compliance', { method: 'POST', body: JSON.stringify(data) });
   }
 
   // --- YEDEKLEME / GERİ YÜKLEME (Backup Admin) ---

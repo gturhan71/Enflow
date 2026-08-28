@@ -109,3 +109,56 @@ export interface AnalysisResult {
   specDetails: string;
   extractedProducts: AnalysisResultProduct[];
 }
+
+// ── Şartname ↔ Ürün Specsheet Uygunluk Karşılaştırması ────────────────────────
+// Yalnız YZ anahtarı tanımlıysa çalışır (bkz. backend POST /presales/spec-compliance).
+export type SpecComplianceStatus = 'MEETS' | 'PARTIAL' | 'FAILS' | 'UNKNOWN';
+
+/** İstek: bir şartname + N ürün grubu, her grupta rakip specsheet adayları. */
+export interface SpecComplianceCandidateInput {
+  key: string;
+  label: string;   // marka / model
+  text: string;    // specsheet düz metni
+}
+export interface SpecComplianceGroupInput {
+  key: string;
+  name: string;                 // şartnamedeki ürün
+  requirements?: string[];      // boşsa backend şartnameden çıkarır
+  candidates: SpecComplianceCandidateInput[];
+}
+export interface SpecComplianceRequest {
+  opportunityId?: string;
+  specText: string;
+  groups: SpecComplianceGroupInput[];
+}
+
+/** Yanıt. */
+export interface SpecComplianceCell {
+  requirementKey: string;
+  candidateKey: string;
+  status: SpecComplianceStatus;
+  evidence: string;   // specsheet'ten alıntı / sayfa (birden çok kaynak olabilir)
+  note: string;
+}
+export interface SpecComplianceCandidateSummary {
+  candidateKey: string;
+  score: number;      // MEETS=1, PARTIAL=0.5
+  meets: number;
+  partial: number;
+  fails: number;
+  unknown: number;
+}
+export interface SpecComplianceGroupResult {
+  key: string;
+  name: string;
+  requirements: { key: string; text: string }[];
+  candidates: { key: string; label: string }[];
+  cells: SpecComplianceCell[];
+  summary: SpecComplianceCandidateSummary[];
+  recommendation: { candidateKey: string | null; rationale: string };
+}
+export interface SpecComplianceResult {
+  usedAI: boolean;
+  message?: string;
+  groups: SpecComplianceGroupResult[];
+}

@@ -38,6 +38,12 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
   const [invoicePending, setInvoicePending] = useState(false);
 
   const canApprove = () => {
+    // B-07 düzeltmesi: backend POST /:id/approve DRAFT→PENDING_UNIT geçişini rol
+    // kısıtlaması olmadan destekliyor, ama bu durum hiç ele alınmadığı için yeni
+    // oluşan/otomatik aktarılan hiçbir talebe "Onayla" butonu çıkmıyordu. Birim
+    // onayı aşamasıyla aynı role (SALES_MGR/GM) açılıyor — talebi ilk onaya açan
+    // adım da fiilen "birim onayı" aşamasının bir parçası.
+    if (pr.status === 'DRAFT' && (currentUserRole === 'SALES_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
     if (pr.status === 'PENDING_UNIT' && (currentUserRole === 'SALES_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
     if (pr.status === 'PENDING_PROCUREMENT' && (currentUserRole === 'PROCUREMENT_MGR' || currentUserRole === 'GENERAL_MANAGER')) return true;
     if (pr.status === 'PENDING_GM' && currentUserRole === 'GENERAL_MANAGER') return true;
@@ -604,6 +610,7 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
                   className="flex-1 py-2 btn-primary text-sm rounded-xl disabled:opacity-50 flex items-center justify-center gap-2">
                   {loading ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
                   Onayla → {STATUS_CONFIG[{
+                    DRAFT: 'PENDING_UNIT',
                     PENDING_UNIT: 'PENDING_PROCUREMENT',
                     PENDING_PROCUREMENT: 'PENDING_GM',
                     PENDING_GM: 'PO_ISSUED',

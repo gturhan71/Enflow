@@ -363,6 +363,38 @@ const CRMModule = ({
     setLostReasonModal({ opp });
   };
 
+  // B-01 düzeltmesi: OPPORTUNITY_APPROVAL sürecini (SALES_MGR → İGB → GM)
+  // tetikleyen tek arayüz kontrolü — önceden bu uç noktayı hiçbir buton çağırmıyordu.
+  const handleRequestApproval = async (opp: Opportunity) => {
+    if (!window.confirm(`"${opp.title}" fırsatı onay zincirine (Satış Müdürü → İGB → Genel Müdür) gönderilecek. Devam edilsin mi?`)) return;
+    setLoading(true);
+    try {
+      await apiService.requestOpportunityApproval(opp.id);
+      setOpportunities(prev => prev.map(o => o.id === opp.id ? { ...o, technicalStatus: 'WAITING_APPROVAL' } : o));
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // B-02 düzeltmesi: bu iki görev eskiden gerçek bir Unit'e karşılık gelmeyen
+  // sahte bir unitId ('unit_management') ile oluşuyordu — GET /api/tasks yalnız
+  // GENERAL_MANAGER için birim filtresini atladığından görev fiilen sadece GM'e
+  // görünüyordu (başka hiçbir yöneticiye değil). Artık GM'in GERÇEK unitId'si
+  // çözülüyor; GM'in birimi yoksa (yapılandırma eksikse) görev sessizce atlanır.
+  // NOT: GET /api/users GM-only olduğundan (users.ts) burada — PendingChainApprovals.tsx'teki
+  // aynı desende — herkese açık /users/lookup ucu kullanılır; SALES_REP gibi GM
+  // olmayan bir rol bu akışı tetiklediğinde de çalışır.
+  const resolveGmUnitId = async (): Promise<string | null> => {
+    try {
+      const list = await apiService.getUsersByRole('GENERAL_MANAGER') as { unitId: string | null }[];
+      return list.find(u => u.unitId)?.unitId ?? null;
+    } catch {
+      return null;
+    }
+  };
+
   const handleMarkDelivered = async (proposal: Proposal, delivered: boolean) => {
     const contentJson = getContentJson(proposal);
     const newContent = { ...contentJson, deliveredToCustomer: delivered };
@@ -372,28 +404,31 @@ const CRMModule = ({
 
       // İletildi olarak işaretlendiğinde birim yöneticisine bildirim oluştur
       if (delivered) {
-        const opp = opportunities.find(o => o.id === proposal.opportunityId);
-        const cust = customers.find(cu => cu.id === (opp?.customerId ?? proposal.customerId));
-        const totalPrice = contentJson.totalPrice as number | undefined;
-        const currency = cust?.currency ?? 'TRY';
-        const priceLabel = totalPrice != null
-          ? `${totalPrice.toLocaleString('tr-TR')} ${currency}`
-          : '';
-        const newTask = await apiService.createTask({
-          title: `Teklif Müşteriye İletildi: ${opp?.title ?? 'Fırsat'}`,
-          description: [
-            `Müşteri: ${cust?.name ?? 'Bilinmiyor'}`,
-            priceLabel ? `Tutar: ${priceLabel}` : '',
-            `İletilme: ${new Date().toLocaleString('tr-TR')}`,
-          ].filter(Boolean).join(' · '),
-          unitId: 'unit_management',
-          assignedBy: currentUser?.id || 'system',
-          priority: 'MEDIUM',
-          status: 'PENDING',
-          relatedModule: 'DELIVERY',
-          relatedItemId: proposal.id,
-        });
-        if (setTasks) setTasks(prev => [newTask, ...prev]);
+        const gmUnitId = await resolveGmUnitId();
+        if (gmUnitId) {
+          const opp = opportunities.find(o => o.id === proposal.opportunityId);
+          const cust = customers.find(cu => cu.id === (opp?.customerId ?? proposal.customerId));
+          const totalPrice = contentJson.totalPrice as number | undefined;
+          const currency = cust?.currency ?? 'TRY';
+          const priceLabel = totalPrice != null
+            ? `${totalPrice.toLocaleString('tr-TR')} ${currency}`
+            : '';
+          const newTask = await apiService.createTask({
+            title: `Teklif Müşteriye İletildi: ${opp?.title ?? 'Fırsat'}`,
+            description: [
+              `Müşteri: ${cust?.name ?? 'Bilinmiyor'}`,
+              priceLabel ? `Tutar: ${priceLabel}` : '',
+              `İletilme: ${new Date().toLocaleString('tr-TR')}`,
+            ].filter(Boolean).join(' · '),
+            unitId: gmUnitId,
+            assignedBy: currentUser?.id || 'system',
+            priority: 'MEDIUM',
+            status: 'PENDING',
+            relatedModule: 'DELIVERY',
+            relatedItemId: proposal.id,
+          });
+          if (setTasks) setTasks(prev => [newTask, ...prev]);
+        }
       }
     } catch {
       alert('Güncelleme başarısız.');
@@ -406,6 +441,8 @@ const CRMModule = ({
     } catch { /* persist failure is non-blocking */ }
     setProposals(prev => prev.map(p => p.id === proposal.id ? { ...p, status: 'PENDING_APPROVAL' } : p));
     try {
+      const gmUnitId = await resolveGmUnitId();
+      if (!gmUnitId) { alert('Onay görevi oluşturulamadı: Genel Müdür birimi tanımlı değil.'); return; }
       const o = opportunities.find(o => o.id === proposal.opportunityId);
       const cust = customers.find(c => c.id === proposal.customerId);
       const currency = cust?.currency || 'TRY';
@@ -417,7 +454,7 @@ const CRMModule = ({
       const newTask = await apiService.createTask({
         title: `Teklif Onayı: ${o?.title ?? 'Fırsat'}`,
         description: priceLabel ? `Toplam Tutar: ${priceLabel}` : 'Yeni bir teklif onayınızı bekliyor.',
-        unitId: 'unit_management',
+        unitId: gmUnitId,
         assignedBy: currentUser?.id || 'admin',
         priority: 'HIGH',
         status: 'PENDING',
@@ -496,6 +533,11 @@ const CRMModule = ({
           createdById: currentUser?.id
         });
         setOpportunities(prev => [...prev, saved]);
+        // B-13 düzeltmesi: satınalma usulü seçilen fırsatlarda arka planda otomatik
+        // açılan İhale/dosya takip kaydı önceden hiç belirtilmiyordu.
+        if ((saved as Opportunity & { autoTenderCreated?: boolean }).autoTenderCreated) {
+          alert('Fırsat oluşturuldu. Seçilen satınalma usulü nedeniyle Satış Destek → İhale Listesi\'nde otomatik bir dosya takip kaydı da açıldı.');
+        }
       }
       setShowNewOpportunityModal(false);
       setIsEditingOpp(false);
@@ -625,6 +667,7 @@ const CRMModule = ({
           onCheckIn={(opp) => setCheckInTarget(opp)}
           onEditProposal={handleEditProposal}
           onGoToCostAnalysis={handleGoToCostAnalysis}
+          onRequestApproval={handleRequestApproval}
         />
       ) : activeTab === 'crm-customers' ? (
         <CustomersView

@@ -26,6 +26,7 @@ import {
   BrandSource
 } from '../types';
 import SpecAnalysis from './SpecAnalysis';
+import SpecComplianceMatrix from './SpecComplianceMatrix';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
 import { useBoM } from '../hooks/useBoM';
@@ -48,7 +49,7 @@ interface PresalesModuleProps {
 const PresalesModule = ({ opportunities, setOpportunities, units, users, setTasks, initialOppId }: PresalesModuleProps) => {
   const { currentUser } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS' | 'HANDOFFS'>('BOM');
+  const [moduleView, setModuleView] = useState<'BOM' | 'ANALYSIS' | 'COMPLIANCE' | 'HANDOFFS'>('BOM');
   const isPresalesMgr = currentUser?.role === 'PRESALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
   const [selectedOppId, setSelectedOppId] = useState<string>('');
 
@@ -172,6 +173,15 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     setShowApprovalPreview(false);
   };
 
+  // Şartname Analizi / Şartname↔Ürün Uygunluk ekranlarından BoM'a kalem aktarımı (ortak).
+  const transferToBoM = (prods: { pn: string; description: string; quantity: number }[]) => {
+    setBomItems([
+      ...prods.map(p => ({ pn: p.pn, desc: p.description, qty: p.quantity, cost: 0, margin: 15, currency: bomCurrency, lineKey: undefined })),
+      ...bomItems,
+    ]);
+    setModuleView('BOM');
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -246,6 +256,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
           <div className="flex bg-slate-200/50 p-1 rounded-2xl">
             <button onClick={() => setModuleView('BOM')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'BOM' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><LayoutDashboard size={16} />BoM Oluşturma</button>
             <button onClick={() => setModuleView('ANALYSIS')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'ANALYSIS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><FileSearch size={16} />Şartname Analizi</button>
+            <button onClick={() => setModuleView('COMPLIANCE')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'COMPLIANCE' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><FileSearch size={16} />Şartname ↔ Ürün Uygunluk</button>
             {isPresalesMgr && <button onClick={() => setModuleView('HANDOFFS')} className={cn("px-6 py-2 rounded-xl text-sm font-bold transition-all flex items-center gap-2", moduleView === 'HANDOFFS' ? "bg-white text-indigo-600 shadow-sm" : "text-slate-500 hover:text-slate-700")}><LayoutDashboard size={16} />Devredilen BoM'lar</button>}
           </div>
         </div>
@@ -380,8 +391,10 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
         </div>
       ) : moduleView === 'HANDOFFS' ? (
         <BomHandoffsView />
+      ) : moduleView === 'COMPLIANCE' ? (
+        <SpecComplianceMatrix opportunityId={selectedOppId} onTransferToBoM={transferToBoM} />
       ) : (
-        <SpecAnalysis opportunityId={selectedOppId} onTransferToBoM={(prods) => { setBomItems([...prods.map(p => ({pn: p.pn, desc: p.description, qty: p.quantity, cost: 0, margin: 15, currency: bomCurrency, lineKey: undefined})), ...bomItems]); setModuleView('BOM'); }} />
+        <SpecAnalysis opportunityId={selectedOppId} onTransferToBoM={transferToBoM} />
       )}
 
       {/* Hand-off Modal */}

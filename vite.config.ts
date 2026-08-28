@@ -70,6 +70,14 @@ export default defineConfig(({mode}) => {
           changeOrigin: true,
           secure: false,
         },
+        // Yüklenen dosyalar (fırsat şartname evrakları vb.) backend'den servis
+        // edilir; prod'da aynı origin, dev'de proxy şart — SpecComplianceMatrix
+        // fırsat evrakını doğrudan fetch edip metnini çıkarır.
+        '/uploads': {
+          target: 'http://localhost:3002',
+          changeOrigin: true,
+          secure: false,
+        },
       },
     },
   };

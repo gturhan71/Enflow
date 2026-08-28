@@ -45,3 +45,16 @@ install/.tools/
 
 # SigMap yerel önbellek/kullanım telemetrisi (context regen hook'u üretir — makineye özel)
 .context/
+
+# graphify bilgi grafiği çıktısı (araç üretir — makineye özel, ~100k satır)
+graphify-out/
+
+# Kök dizin dev DB'si (prisma relative URL çözümlemesi kökte boş eş dosya bırakabilir)
+/dev.db
+/dev.db-shm
+/dev.db-wal
+
+# Playwright uçtan uca senaryo çalışma-zamanı çıktısı (trace/screenshot — MB'larca)
+tests/e2e-scenario/test-results/
+tests/e2e-scenario/dev.db
+tests/e2e-scenario/node_modules/

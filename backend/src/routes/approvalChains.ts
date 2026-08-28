@@ -7,6 +7,7 @@ import { sweepApprovalSlaEscalations } from '../services/approvalSlaEscalation';
 import { sodViolation } from '../services/governance';
 import { logActivity } from '../services/activityLog';
 import { ENTITY_TYPE_TAB } from '../utils/entityTypeTab';
+import { logger } from '../utils/logger';
 
 const router: Router = Router();
 
@@ -26,7 +27,16 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
     });
     // Self-heal: tenant'ta aktif olmayan role sahip öncü aşamaları atla, böylece
     // "sırası gelmiş" aşama doğru role düşer ve kaldırılan rol swimlane'i tıkamaz.
-    const healed = await Promise.all(chains.map(c => autoSkipOrphanStages(req.tenantId, c.id)));
+    let healed = await Promise.all(chains.map(c => autoSkipOrphanStages(req.tenantId, c.id)));
+    // Boş koltuklar çözüldükten sonra motor zincirlerinde sıradaki AUTO adımları
+    // da yürüt: agent'la kapanan MANUAL ön-ekten sonra gelen sözleşme/proje/fatura
+    // yaratma adımları normalde yalnız onay rotasındaki continueProcess ile
+    // pompalanıyordu — worklist yüklemesi de aynı ilerlemeyi tetiklemeli.
+    healed = await Promise.all(healed.map(async (c) => {
+      if (!c || c.status !== 'PENDING' || !c.processKey) return c;
+      await continueProcess(req.tenantId, c.entityType, c.entityId, c.processKey).catch(() => undefined);
+      return autoSkipOrphanStages(req.tenantId, c.id);
+    }));
     // B-08 — vekalet: kendi rolüne ek olarak, kendisine vekalet verilmiş rollerin
     // bekleyen onayları da "sırası gelmiş" listesine dahil edilir.
     const delegatedRoles = await getDelegatedRoles(req.tenantId, req.userId);
@@ -48,7 +58,42 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
         (!!s.escalatedToRole && effectiveRoles.has(s.escalatedToRole))
       ));
     });
-    return res.json(myTurn);
+    // B-05 düzeltmesi: yalnız OPPORTUNITY zincirleri fırsat başlığıyla eşleşiyordu
+    // (frontend'de ayrıca çözülüyor); TENDER/CONTRACT_WORKFLOW_SIGNING/PURCHASE_REQUEST/
+    // PROJECT kartlarında hiçbir ayırt edici isim yoktu — yoğun bir tenant'ta aynı role
+    // ait birden fazla bekleyen kart varken hangisinin hangi kayda ait olduğu belli
+    // olmuyordu. Burada tek tek sorgu yerine entityType'a göre gruplayıp toplu (batch)
+    // okunuyor ve `entityLabel` alanı olarak zincire eklenip döndürülüyor.
+    const idsByType = new Map<string, Set<string>>();
+    for (const c of myTurn) {
+      if (c.entityType === 'OPPORTUNITY') continue; // frontend zaten çözüyor
+      if (!idsByType.has(c.entityType)) idsByType.set(c.entityType, new Set());
+      idsByType.get(c.entityType)!.add(c.entityId);
+    }
+    const labelById = new Map<string, string>();
+    const tenderIds = [...(idsByType.get('TENDER') ?? [])];
+    if (tenderIds.length) {
+      const rows = await prisma.tender.findMany({ where: { id: { in: tenderIds } }, select: { id: true, name: true, ikn: true } });
+      rows.forEach((r) => labelById.set(r.id, r.ikn ? `${r.name} · İKN: ${r.ikn}` : r.name));
+    }
+    const cwIds = [...(idsByType.get('CONTRACT_WORKFLOW_SIGNING') ?? [])];
+    if (cwIds.length) {
+      const rows = await prisma.contractWorkflow.findMany({ where: { id: { in: cwIds } }, select: { id: true, title: true } });
+      rows.forEach((r) => labelById.set(r.id, r.title));
+    }
+    const prIds = [...(idsByType.get('PURCHASE_REQUEST') ?? [])];
+    if (prIds.length) {
+      const rows = await prisma.purchaseRequest.findMany({ where: { id: { in: prIds } }, select: { id: true, title: true } });
+      rows.forEach((r) => labelById.set(r.id, r.title));
+    }
+    const projIds = [...(idsByType.get('PROJECT') ?? [])];
+    if (projIds.length) {
+      const rows = await prisma.project.findMany({ where: { id: { in: projIds } }, select: { id: true, name: true, code: true } });
+      rows.forEach((r) => labelById.set(r.id, r.code ? `${r.name} (${r.code})` : r.name));
+    }
+    const withLabels = myTurn.map((c) => ({ ...c, entityLabel: labelById.get(c.entityId) ?? null }));
+
+    return res.json(withLabels);
   }
 
   const where: Record<string, unknown> = { tenantId: req.tenantId };
@@ -160,7 +205,14 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   // — dönüş değeri `updated`'a yansıtılır ki hem yanıt hem B-09 senkronu güncel
   // durumu görsün, `autoSkipOrphanStages`'in DÖNÜŞ ANINDAKİ eski görüntüsünü değil).
   if (updated) {
-    const continued = await continueProcess(req.tenantId, updated.entityType, updated.entityId, updated.processKey).catch(() => null);
+    // B-10 düzeltmesi: bir AUTO adım burada patlarsa (approve işlemi başarılıyken)
+    // eskiden tamamen sessizce yutuluyordu — hiçbir yerde iz kalmıyordu. Onaylayan
+    // kişinin yanıtı yine bloklanmaz (aşama onayı geçerli), ama hata artık en azından
+    // sunucu loguna düşer.
+    const continued = await continueProcess(req.tenantId, updated.entityType, updated.entityId, updated.processKey).catch((e) => {
+      logger.error('continueProcess AUTO adımı başarısız', { chainId: id, entityType: updated?.entityType, entityId: updated?.entityId, processKey: updated?.processKey, error: e instanceof Error ? e.message : e });
+      return null;
+    });
     if (continued) updated = continued.chain;
   }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STAGE_APPROVE', entityType: 'APPROVAL_STAGE', entityId: stageId, details: { chainId: id, role: stage.role, chainStatus: updated?.status } });
@@ -176,7 +228,16 @@ router.post('/:id/stages/:stageId/approve', tenantMiddleware, asyncHandler(async
   if (updated?.status === 'COMPLETED' && chain.entityType === 'OPPORTUNITY' && chain.processKey === 'OPPORTUNITY_APPROVAL') {
     await prisma.opportunity.updateMany({
       where: { id: chain.entityId, technicalStatus: { not: 'APPROVED' } },
-      data: { technicalStatus: 'APPROVED', status: 'PROPOSAL' },
+      data: { technicalStatus: 'APPROVED' },
+    });
+    // B-12 düzeltmesi: bu, opportunities.ts POST /:id/approve'daki AYNI senkronun
+    // burada (generic /approval-chains onay ucu — gerçek UI'nin (PendingChainApprovals)
+    // kullandığı yol) unutulan bir kopyasıydı. status'u koşulsuz 'PROPOSAL'a çekmek,
+    // fırsat bu onaya gelmeden ÖNCE zaten WON/LOST/WITHDRAWN işaretlenmişse o kararı
+    // sessizce geri alıyordu — status yalnız hâlâ teklif-öncesi aşamadaysa ilerletilir.
+    await prisma.opportunity.updateMany({
+      where: { id: chain.entityId, status: { notIn: ['WON', 'LOST', 'WITHDRAWN'] } },
+      data: { status: 'PROPOSAL' },
     });
   }
 

@@ -23,5 +23,10 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["vite/client"]
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "tests"
+  ]
 }
