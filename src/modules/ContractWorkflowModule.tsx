@@ -381,6 +381,19 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
     finally { setLoading(false); }
   };
 
+  // B-06 düzeltmesi: transfer ucu, AI analizi görev üretmişse (normal durum) gerçek
+  // bir unitId zorunlu tutuyor — eskiden her iki çağrı da hep unitId:null gönderdiği
+  // için bu durumda 400 ile sessizce (yalnız toast) başarısız oluyor, sözleşme SIGNED'da
+  // takılı kalıyordu. Görevler proje devrinin parçası olduğundan hedef birim PROJECT_MGR'ın
+  // gerçek birimine çözülür; PROJECT_MGR/birimi tanımlı değilse backend zaten (görev varsa)
+  // açık bir hata döner — sessiz bir fallback icat edilmiyor.
+  const resolveProjectMgrUnitId = async (): Promise<string | null> => {
+    try {
+      const list = await apiService.getUsersByRole('PROJECT_MGR') as { unitId: string | null }[];
+      return list.find(u => u.unitId)?.unitId ?? null;
+    } catch { return null; }
+  };
+
   const handleApproveSignature = async () => {
     if (!selected) return;
     setTransferring(true);
@@ -390,10 +403,11 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'SIGNED' }),
       });
+      const targetUnitId = await resolveProjectMgrUnitId();
       const result = await apiFetch(`${BASE}/${selected.id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unitId: null, assignedById: null }),
+        body: JSON.stringify({ unitId: targetUnitId, assignedById: null }),
       });
       const finalWf = await apiFetch(`${BASE}/${selected.id}`);
       selectWorkflow(finalWf);
@@ -445,10 +459,11 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
     if (selected.status !== 'SIGNED') { notify('Sözleşme önce imzalanmalı.', true); return; }
     setTransferring(true);
     try {
+      const targetUnitId = await resolveProjectMgrUnitId();
       const result = await apiFetch(`${BASE}/${selected.id}/transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ unitId: null, assignedById: null }),
+        body: JSON.stringify({ unitId: targetUnitId, assignedById: null }),
       });
       const wf = await apiFetch(`${BASE}/${selected.id}`);
       selectWorkflow(wf);

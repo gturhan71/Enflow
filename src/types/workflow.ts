@@ -195,6 +195,9 @@ export interface ApprovalChain {
   processKey?: string | null; // süreç motoru tarafından üretildiyse — ör. CRM_HANDOFF, OPPORTUNITY_APPROVAL
   stages: ApprovalStage[];
   status: 'PENDING' | 'COMPLETED' | 'REJECTED';
+  // GET /approval-chains?pendingForRole=... yalnız — TENDER/CONTRACT_WORKFLOW_SIGNING/
+  // PURCHASE_REQUEST/PROJECT için sunucu tarafında çözülen ayırt edici isim (B-05).
+  entityLabel?: string | null;
 }
 export interface WorkflowLog {
   id: string;

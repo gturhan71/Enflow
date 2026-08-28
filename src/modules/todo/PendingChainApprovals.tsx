@@ -103,6 +103,12 @@ export default function PendingChainApprovals({
                     </div>
                   </div>
                 )}
+                {/* B-05 düzeltmesi: OPPORTUNITY dışındaki varlıklar için sunucunun
+                    çözdüğü ayırt edici isim (İhale adı/İKN, Sözleşme başlığı, Satınalma
+                    Talebi başlığı, Proje adı+kodu) — önceden yalnız tür etiketi vardı. */}
+                {!opp && chain.entityLabel && (
+                  <p className="pt-1 text-sm font-black text-slate-800 truncate">{chain.entityLabel}</p>
+                )}
                 <p className="text-xs text-slate-500 font-bold mt-1">
                   Zincir: {chain.stages.map(s => stageLabel(s.role)).join(' → ')}
                 </p>

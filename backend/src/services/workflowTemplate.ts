@@ -107,6 +107,12 @@ export const DEFAULT_WORKFLOW_TEMPLATE: Record<string, TemplateProcess> = {
     entityType: 'PURCHASE_REQUEST',
     steps: [
       { unitKey: 'finance', role: 'FINANCE_MGR', type: 'MANUAL', description: 'Fatura kaydı yetkisi', order: 0 },
+      // B-09 düzeltmesi: bu AUTO adım hiç tanımlı değildi — FINANCE_MGR onayı tek
+      // başına PurchaseRequest.status'u hiçbir zaman INVOICED'a ilerletmiyordu.
+      // finalizePurchaseInvoice (CREATE_INVOICE_FROM_PURCHASE) veriyi ctx.input yerine
+      // doğrudan PurchaseRequest kaydından okuduğu için tenant'ın kaç MANUAL onay
+      // aşaması koyduğundan bağımsız, asenkron onaylarda da güvenle çalışır.
+      { unitKey: 'finance', role: null, type: 'AUTO', description: 'Satınalma faturasını sonlandır', order: 1, actionKey: 'CREATE_INVOICE_FROM_PURCHASE' },
     ],
   },
   PROJECT_TO_INVOICE: {

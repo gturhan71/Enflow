@@ -29,6 +29,7 @@ const fmtShortDate = (iso?: string) => iso ? new Date(iso).toLocaleDateString('t
 export default function OpportunitiesView({
   filteredOpportunities, customers, proposals, loading, onSaveAll, onNewOpportunity,
   onProgressStatus, onMarkLost, onHandOff, onEdit, onCheckIn, onEditProposal, onGoToCostAnalysis,
+  onRequestApproval,
 }: {
   filteredOpportunities: Opportunity[];
   customers: Customer[];
@@ -43,6 +44,7 @@ export default function OpportunitiesView({
   onCheckIn: (opp: Opportunity) => void;
   onEditProposal: (proposal: Proposal) => void;
   onGoToCostAnalysis: (opp: Opportunity) => void;
+  onRequestApproval: (opp: Opportunity) => void;
 }) {
   // Fırsat OLUŞTURMA yalnız satış temsilcisine ait (backend CAN_CREATE_OPPORTUNITY
   // ile aynı kural) — GM normalde tüm PermissionGate'leri atlar (superuser), bu
@@ -402,7 +404,35 @@ export default function OpportunitiesView({
                     </div>
                   )}
 
+                  {opp.status === 'WON' && (
+                    <div className="flex flex-col gap-1">
+                      {(!opp.technicalStatus || opp.technicalStatus === 'PENDING' || opp.technicalStatus === 'REJECTED') && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-500 bg-slate-50 border border-slate-100 rounded-full px-2 py-0.5 self-start">
+                          Fırsat Onayı: gönderilmedi
+                        </span>
+                      )}
+                      {opp.technicalStatus === 'WAITING_APPROVAL' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-100 rounded-full px-2 py-0.5 self-start">
+                          ⏳ Fırsat Onayı: Satış Müdürü → İGB → GM zincirinde
+                        </span>
+                      )}
+                      {opp.technicalStatus === 'APPROVED' && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-2 py-0.5 self-start">
+                          ✓ Fırsat Onayı tamamlandı
+                        </span>
+                      )}
+                    </div>
+                  )}
+
                   <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-slate-100">
+                    {opp.status === 'WON' && opp.technicalStatus !== 'WAITING_APPROVAL' && opp.technicalStatus !== 'APPROVED' && (
+                      <button
+                        onClick={() => onRequestApproval(opp)}
+                        className="flex items-center gap-1 bg-primary/10 text-primary hover:bg-primary hover:text-white px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all"
+                      >
+                        <ClipboardCheck size={11} /> Fırsat Onayına Gönder
+                      </button>
+                    )}
                     {opp.status !== 'WON' && opp.status !== 'LOST' && (
                       <button
                         onClick={() => onCheckIn(opp)}

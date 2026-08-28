@@ -379,9 +379,7 @@ src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, componen
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
-src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
-src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
@@ -437,6 +435,7 @@ src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widget
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
+src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
@@ -456,6 +455,7 @@ src/modules/reporting/DocPortfolioCard.tsx ← ../types, ../components/InfoToolt
 src/modules/reporting/ForecastCard.tsx ← ../services/apiService, ../contexts/AuthContext, ../types, helpers, ../lib/format
 src/modules/reporting/FunnelCard.tsx ← ../types, helpers, ../components/InfoTooltip
 src/modules/reporting/helpers.ts ← ../constants, ../types
+src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
@@ -523,7 +523,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 11 hours ago)
+## changes (last 10 commits — 58 seconds ago)
 ```
 src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
@@ -532,7 +532,6 @@ src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowListPanel
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
 src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
-src/modules/reporting/OverviewTab.tsx         ~OverviewTab
 src/modules/SalesSupport.tsx                  ~GuaranteesTab
 src/services/apiService.ts                    ~ApiService
 backend/scripts/loadtest/mixed-read.mjs       +login  +main
@@ -1290,21 +1289,6 @@ handler onBlur
 handler onClose
 ```
 
-### src/modules/ManagementReportingModule.tsx
-```
-component ManagementReportingModule
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-handler onChange
-handler onClick
-handler onEdit
-handler onSubmit
-handler onDelete
-handler onReviewed
-```
-
 ### src/modules/PresalesModule.tsx
 ```
 props PresalesModuleProps
@@ -1319,11 +1303,6 @@ handler onChange
 handler onClick
 handler onTransferToBoM
 handler onSelected
-```
-
-### src/modules/reporting/OverviewTab.tsx
-```
-component OverviewTab
 ```
 
 ### src/modules/SalesSupport.tsx
@@ -1919,6 +1898,21 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/ManagementReportingModule.tsx
+```
+component ManagementReportingModule
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+handler onChange
+handler onClick
+handler onEdit
+handler onSubmit
+handler onDelete
+handler onReviewed
+```
+
 ### src/modules/PlatformTicketsModule.tsx
 ```
 component PlatformTicketsModule
@@ -2065,6 +2059,11 @@ export function printUnitReport(r)  :121-141
 export function printOverview(overview, start, end)  :143-153
 export const pct = (n) =>  :4-6
 export const esc = (s) =>  :69-69
+```
+
+### src/modules/reporting/OverviewTab.tsx
+```
+component OverviewTab
 ```
 
 ### src/modules/reporting/TenderCard.tsx

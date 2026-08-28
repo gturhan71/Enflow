@@ -273,8 +273,9 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
 
 router.post('/:id/reject', asyncHandler(async (req: Request, res: Response) => {
   const { rejectedBy, rejectionNote } = req.body;
+  const id = String(req.params.id);
   const updated = await prisma.purchaseRequest.update({
-    where: { id: String(req.params.id), tenantId: req.tenantId },
+    where: { id, tenantId: req.tenantId },
     data: {
       status: 'REJECTED',
       rejectedBy: rejectedBy || req.userId,
@@ -282,7 +283,28 @@ router.post('/:id/reject', asyncHandler(async (req: Request, res: Response) => {
     },
     include: { items: { include: { brand: true } }, quotes: { include: { vendor: true, items: true } }, deliveries: true },
   });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_REJECTED', entityType: 'PURCHASE_REQUEST', entityId: String(req.params.id), details: { rejectionNote: rejectionNote || null } });
+
+  // B-08 düzeltmesi: bu uç, PurchaseRequest.status'u Süreç Motorunu HİÇ çağırmadan
+  // doğrudan REJECTED'e çekiyordu — altındaki ApprovalChain PENDING kalıyordu.
+  // /resubmit sonrası ikinci turda advanceProcess() bu ESKİ (bir önceki turdan kalma
+  // aşama durumlarını taşıyan) zinciri PENDING bulup yeniden kullanıyor, bu da onayı
+  // yanlış role yönlendirip talebi kalıcı olarak askıda bırakabiliyordu. Diğer tüm
+  // süreçlerin (OPPORTUNITY_APPROVAL, CONTRACT_SIGNING, ...) izlediği desenle tutarlı
+  // olarak zincir + tüm bekleyen aşamaları burada da REJECTED işaretlenir — bir sonraki
+  // advanceProcess çağrısı (resubmit sonrası ilk onay) artık PENDING bir zincir bulamayıp
+  // baştan temiz bir zincir kurar.
+  const chain = await prisma.approvalChain.findFirst({
+    where: { tenantId: req.tenantId, entityType: 'PURCHASE_REQUEST', entityId: id, processKey: 'PURCHASE_APPROVAL', status: 'PENDING' },
+  });
+  if (chain) {
+    await prisma.approvalStage.updateMany({
+      where: { chainId: chain.id, status: 'PENDING' },
+      data: { status: 'REJECTED', approverId: rejectedBy || req.userId, note: rejectionNote || null, approvedAt: new Date() },
+    });
+    await prisma.approvalChain.update({ where: { id: chain.id }, data: { status: 'REJECTED' } });
+  }
+
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_REJECTED', entityType: 'PURCHASE_REQUEST', entityId: id, details: { rejectionNote: rejectionNote || null } });
   res.json(updated);
 }));
 

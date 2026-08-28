@@ -577,20 +577,49 @@ async function createSalesInvoiceForProject(ctx: StageActionCtx): Promise<void> 
   if (ctx.entityType !== 'PROJECT') {
     throw new Error(`CREATE_SALES_INVOICE_FOR_PROJECT bu entityType için henüz desteklenmiyor: ${ctx.entityType}`);
   }
+  // B-10 düzeltmesi: bu adım eskiden tutar/müşteri bilgisini YALNIZ zinciri tamamlatan
+  // HTTP isteğinin gövdesinden (ctx.input) okuyordu. Zincir birden fazla MANUAL onay
+  // aşaması içerdiğinde (normal durum), aradaki/son onaylar `continueProcess` üzerinden
+  // BOŞ gövdeyle geçer (walkForward — bkz. finalizePurchaseInvoice'daki aynı sorunun
+  // PURCHASE_TO_INVOICE tarafındaki çözümü) — bu da her asenkron onayda "Fatura tutarı
+  // zorunlu." hatasıyla sessizce (approvalChains.ts .catch) başarısız oluyordu. Artık
+  // ctx.input boşsa (ya da amount taşımıyorsa) tutar/müşteri, halihazırda projede
+  // güvenle mevcut olan alanlardan (totalValue = sözleşme bedeli, customerId/Name)
+  // türetilir — proje kapanış faturasının doğal beklenen değeri zaten budur.
   const input = (ctx.input || {}) as Record<string, unknown>;
+  const hasAmount = input.amount !== undefined && input.amount !== null && input.amount !== '';
+  let amount = input.amount as number | string | undefined;
+  let currency = input.currency as string | undefined;
+  let customerId = input.customerId as string | undefined;
+  let customerName = input.customerName as string | undefined;
+  if (!hasAmount || !customerId) {
+    const project = await prisma.project.findFirst({
+      where: { id: ctx.entityId, tenantId: ctx.tenantId },
+      select: { totalValue: true, contractCurrency: true, customerId: true, customerName: true },
+    });
+    if (!project) throw new Error('Proje bulunamadı.');
+    if (!hasAmount) { amount = project.totalValue; currency = currency || project.contractCurrency; }
+    if (!customerId) { customerId = project.customerId || undefined; customerName = customerName || project.customerName || undefined; }
+  }
+  // input.status boşsa (asenkron onaydan sonraki normal durum) createInvoiceRecord'un
+  // kendi 'DRAFT' varsayılanına düşülmez: DRAFT bir fatura invoiceEngine.recalcInvoice
+  // tarafından KASITLI OLARAK dondurulur (tam ödense bile asla PAID'e ilerlemez) — bu
+  // yüzden tahsilat kalıcı olarak DRAFT bir faturaya karşı boşa düşerdi. Manuel "Yeni
+  // Fatura" formunun kendi varsayılanı ISSUED'dır; otomatik yol da aynı varsayılanı kullanır.
+  const status = (input.status as string | undefined) || 'ISSUED';
   await createInvoiceRecord(ctx.tenantId, {
     type: 'SALES',
     invoiceNo: input.invoiceNo as string | undefined,
-    amount: input.amount as number | string,
-    currency: input.currency as string | undefined,
+    amount: amount as number | string,
+    currency,
     issueDate: input.issueDate as string | undefined,
     dueDate: input.dueDate as string | undefined,
-    status: input.status as string | undefined,
+    status,
     projectId: ctx.entityId,
     contractId: input.contractId as string | undefined,
     milestoneId: input.milestoneId as string | undefined,
-    customerId: input.customerId as string | undefined,
-    customerName: input.customerName as string | undefined,
+    customerId,
+    customerName,
     notes: input.notes as string | undefined,
     categoryCode: input.categoryCode as string | undefined,
     issueRateToTRY: input.issueRateToTRY as number | string | undefined,
@@ -892,6 +921,21 @@ async function walkForward(
         entityId,
         details: { order: minOrder, actionsInvoked },
       });
+      continue;
+    }
+
+    // Boş koltuk (orphan) çözümü — insan kararı beklemeden ÖNCE. Bu MANUAL grupta
+    // aktif kullanıcısı olmayan roller lisanslı otonom agent'la onaylanır ya da
+    // SKIP edilir. Bir şey çözüldüyse döngüyü baştan işlet: böylece agent'la
+    // kapatılan MANUAL ön-eklerden sonra gelen AUTO adımlar da AYNI tetiklemede
+    // koşar (önceden zincir görünürde ilerliyor ama AUTO yan etkisi —
+    // sözleşme/proje/fatura yaratma — hiç çalışmıyordu; yalnız /approval-chains
+    // onay rotasından gelen çağrılar continueProcess ile pompalanıyordu).
+    const pendingCountBefore = chain.stages.filter(s => s.status === 'PENDING').length;
+    const healed = await autoSkipOrphanStages(tenantId, chain.id);
+    if (healed && (healed.status !== 'PENDING'
+      || healed.stages.filter(s => s.status === 'PENDING').length < pendingCountBefore)) {
+      chain = healed as typeof chain;
       continue;
     }
 

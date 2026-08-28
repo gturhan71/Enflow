@@ -89,6 +89,9 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 
   const selected = useMemo(() => tenders.find(t => t.id === selectedId) || null, [tenders, selectedId]);
   const isGM = currentUser?.role === 'GENERAL_MANAGER';
+  // Backend WON_TRANSITION_ROLES (tenders.ts) ile birebir — sonuç (Kazanıldı/
+  // Kaybedildi) kararı yalnız bu rollere ait.
+  const canDecideResult = ['GENERAL_MANAGER', 'ISAB_MGR', 'SALES_MGR'].includes(currentUser?.role || '');
   const [withdrawTarget, setWithdrawTarget] = useState<Tender | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
@@ -135,7 +138,7 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
       {tab === 'calendar' && <TenderCalendar tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} />}
       {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
-      {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} />}
+      {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} onChanged={load} canDecideResult={canDecideResult} />}
 
       <AnimatePresence>
         {withdrawTarget && (
@@ -594,14 +597,29 @@ function GuaranteesTab({ tender, tenders, onSelectTender, userName }: {
 
 // ── Yardımcılar ──────────────────────────────────────────────────────────────────
 // ── Girilen İhaleler (arşiv: teklif iletilmiş/sonuçlanmış dosyalar) ───────────────
-function SubmittedTenders({ tenders }: { tenders: Tender[] }) {
+function SubmittedTenders({ tenders, onChanged, canDecideResult }: { tenders: Tender[]; onChanged?: () => void; canDecideResult?: boolean }) {
+  const [deciding, setDeciding] = useState<string | null>(null);
+
+  const decide = async (t: Tender, status: 'WON' | 'LOST') => {
+    if (status === 'WON' && !window.confirm(`"${t.name}" ihalesi KAZANILDI olarak işaretlenecek ve sözleşme sürecine otomatik aktarılacak. Devam edilsin mi?`)) return;
+    setDeciding(t.id);
+    try {
+      await apiService.updateTender(t.id, { status });
+      await onChanged?.();
+    } catch (e) {
+      alert('İşlem hatası: ' + (e instanceof Error ? e.message : ''));
+    } finally {
+      setDeciding(null);
+    }
+  };
+
   if (tenders.length === 0)
     return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz teklif iletilen ihale yok. Uygunluk Denetimi'nde "Teklif İletildi" ile dosyayı buraya taşıyın.</div>;
   return (
     <div className="space-y-3">
       <p className="text-xs text-slate-500 px-1">Sonuçlanan/teslim dosyalar İKN + işin adı ile arşivlenir. İş <strong>kazanılırsa</strong> teklif detay raporu + açık BoM + maliyet analizi Satınalma ve Proje Yönetimi'ne devredilir. <strong>İştirak Edilmedi</strong> kayıtları yönetimsel karardır — kayıp sayılmaz, KPI'yı etkilemez.</p>
       {tenders.map(t => (
-        <div key={t.id} className="glass-card p-5 flex items-start justify-between gap-4">
+        <div key={t.id} className="glass-card p-5 flex items-start justify-between gap-4 flex-wrap">
           <div className="space-y-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
@@ -612,6 +630,18 @@ function SubmittedTenders({ tenders }: { tenders: Tender[] }) {
               ? <p className="text-[11px] text-slate-500">İştirak edilmedi: {fmtDate(t.withdrawnAt)} · Gerekçe: {t.withdrawReason || '—'}</p>
               : <p className="text-[11px] text-slate-400">Teklif iletildi: {fmtDate(t.submittedAt)} · Dosyalama: {t.ikn || '—'} / {t.name}</p>}
           </div>
+          {canDecideResult && (t.status === 'SUBMITTED' || t.status === 'EVALUATING') && (
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button onClick={() => decide(t, 'WON')} disabled={deciding === t.id}
+                className="text-xs font-bold px-3 py-2 rounded-xl bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-50 flex items-center gap-1.5">
+                {deciding === t.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Kazanıldı
+              </button>
+              <button onClick={() => decide(t, 'LOST')} disabled={deciding === t.id}
+                className="text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:opacity-50">
+                Kaybedildi
+              </button>
+            </div>
+          )}
         </div>
       ))}
     </div>
