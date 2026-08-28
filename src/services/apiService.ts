@@ -168,6 +168,14 @@ class ApiService {
   async takeProfitabilitySnapshot(): Promise<import('../types').SnapshotTakeResult> {
     return apiClient.fetchWithAuth('/profitability/snapshot', { method: 'POST' });
   }
+  async getProfitabilityDmo(params: { grain?: import('../types').DmoProfitGrain; year?: number; asOf?: string } = {}): Promise<import('../types').DmoProfitResult> {
+    const q = new URLSearchParams();
+    if (params.grain) q.set('grain', params.grain);
+    if (params.year) q.set('year', String(params.year));
+    if (params.asOf) q.set('asOf', params.asOf);
+    const qs = q.toString();
+    return apiClient.fetchWithAuth(`/profitability/dmo${qs ? `?${qs}` : ''}`);
+  }
   async getProfitabilityInstruments(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string; overhead?: string } = {}): Promise<import('../types').InstrumentsResult> {
     const qs = profQuery(params);
     return apiClient.fetchWithAuth(`/profitability/instruments${qs ? `?${qs}` : ''}`);

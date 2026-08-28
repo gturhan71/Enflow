@@ -12,6 +12,7 @@ import {
 import { apiService } from '../services/apiService';
 import { fmtCurrency } from '../lib/format';
 import MarginBadge from './project-mgmt/MarginBadge';
+import DmoChannelTab from './profitability/DmoChannelTab';
 import type {
   ProfitGrain, ProfitPeriodRow, ProfitSummaryResult, CashflowResult, TreasuryResult, PlanDriftSeries,
   InstrumentsResult,
@@ -27,6 +28,8 @@ const GRAINS: { key: ProfitGrain; label: string }[] = [
 const todayISO = () => new Date().toISOString().slice(0, 10);
 
 export default function ProfitabilityModule() {
+  const [mainTab, setMainTab] = useState<'projects' | 'dmo'>('projects');
+  const [dmoEntitled, setDmoEntitled] = useState(false);
   const [grain, setGrain] = useState<ProfitGrain>('QUARTER');
   const [asOf, setAsOf] = useState<string>(todayISO());
   const [year, setYear] = useState<number | ''>(new Date().getUTCFullYear());
@@ -92,6 +95,19 @@ export default function ProfitabilityModule() {
 
   useEffect(() => { void load(); }, [load]);
 
+  useEffect(() => {
+    let alive = true;
+    apiService.getPluginEntitlements()
+      .then((rows) => {
+        if (!alive) return;
+        const set = new Set((rows as { plugin: { key: string }; active: boolean }[] | undefined ?? [])
+          .filter((r) => r.active).map((r) => r.plugin.key));
+        setDmoEntitled(set.has('DMO_MODULE'));
+      })
+      .catch(() => { /* entitlement alınamazsa DMO sekmesi gizli kalır */ });
+    return () => { alive = false; };
+  }, []);
+
   const rows = data?.rows ?? [];
 
   const totals = useMemo(() => {
@@ -134,8 +150,18 @@ export default function ProfitabilityModule() {
     [cashflow],
   );
 
+  if (mainTab === 'dmo') {
+    return (
+      <div className="p-4 sm:p-6 space-y-5">
+        <MainTabs tab={mainTab} onTab={setMainTab} dmoEntitled={dmoEntitled} />
+        <DmoChannelTab />
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 sm:p-6 space-y-5">
+      <MainTabs tab={mainTab} onTab={setMainTab} dmoEntitled={dmoEntitled} />
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-black text-slate-900">Kârlılık Analizi</h1>
@@ -455,6 +481,23 @@ export default function ProfitabilityModule() {
         (overhead) hem plana hem gerçekleşene simetrik uygulanır; yalnız proje kartında “İşletme
         maliyetini uygula” açık olan projeleri etkiler. Rakamlar gösterge; kur/faiz ayarları Ayarlar → Finans.
       </p>
+    </div>
+  );
+}
+
+function MainTabs({ tab, onTab, dmoEntitled }: { tab: 'projects' | 'dmo'; onTab: (t: 'projects' | 'dmo') => void; dmoEntitled: boolean }) {
+  if (!dmoEntitled) return null;
+  return (
+    <div className="flex gap-1 border-b border-slate-200">
+      {([['projects', 'Projeler'], ['dmo', 'DMO Kanalı']] as const).map(([k, label]) => (
+        <button
+          key={k}
+          onClick={() => onTab(k)}
+          className={`px-4 py-2 text-sm font-bold border-b-2 -mb-px ${tab === k ? 'border-slate-900 text-slate-900' : 'border-transparent text-slate-400 hover:text-slate-600'}`}
+        >
+          {label}
+        </button>
+      ))}
     </div>
   );
 }

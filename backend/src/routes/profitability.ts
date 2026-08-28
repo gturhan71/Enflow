@@ -6,10 +6,11 @@
 // bkz. docs/KARLILIK_ANALIZI_PLAN.md §5
 
 import { Router, Request, Response } from 'express';
-import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole, requireEntitlement } from '../middleware';
 import {
   getLedger, getSummary, getCashflow, getTreasury, getInstruments, parseFxParam, parseScopeParam,
 } from '../services/profitabilityService';
+import { getDmoProfitability, type DmoGrain } from '../services/profitabilityDmo';
 import { takeSnapshot, listSnapshots, getPlanDrift } from '../services/profitabilitySnapshot';
 import { logActivity } from '../services/activityLog';
 import type { Grain } from '../services/profitabilityRollup';
@@ -120,6 +121,22 @@ router.get('/instruments', requireRole(VIEW_ROLES), asyncHandler(async (req: Req
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
     includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
     params: cleaned,
+  });
+  res.json(result);
+}));
+
+// ── GET /api/profitability/dmo (Faz E) — DMO kanalı, lisanslı, kümülatif DIŞI
+// DMO ekonomisi (risturn + komisyon + kur açığı) proje marjından farklı → ayrı.
+// requireEntitlement: DMO_MODULE lisansı yoksa 402.
+const DMO_GRAINS: DmoGrain[] = ['MONTH', 'QUARTER', 'YEAR', 'INSTITUTION'];
+router.get('/dmo', requireRole(VIEW_ROLES), requireEntitlement('DMO_MODULE'), asyncHandler(async (req: Request, res: Response) => {
+  const gRaw = String(req.query.grain || 'QUARTER').toUpperCase() as DmoGrain;
+  const grain: DmoGrain = DMO_GRAINS.includes(gRaw) ? gRaw : 'QUARTER';
+  const yearRaw = req.query.year ? parseInt(String(req.query.year), 10) : undefined;
+  const result = await getDmoProfitability(req.tenantId, {
+    grain,
+    year: yearRaw && Number.isFinite(yearRaw) ? yearRaw : undefined,
+    asOf: parseDate(req.query.asOf ? String(req.query.asOf) : undefined),
   });
   res.json(result);
 }));

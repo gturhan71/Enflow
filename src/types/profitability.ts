@@ -173,3 +173,31 @@ export interface InstrumentsResult {
   scenarios: InstrumentScenario[];
   totalOpportunity: number;
 }
+
+// ── Faz E: DMO kanalı kârlılığı (lisanslı, kümülatif dışı) ────────────────
+
+export type DmoProfitGrain = 'MONTH' | 'QUARTER' | 'YEAR' | 'INSTITUTION';
+
+export interface DmoProfitPeriodRow {
+  periodKey: string;
+  label: string;
+  orderCount: number;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  risturn: number;
+  commission: number;
+  netProfit: number;
+  netMarginPct: number;
+  unprofitableCount: number;
+}
+
+export interface DmoProfitResult {
+  grain: DmoProfitGrain;
+  year: number | null;
+  asOf: string;
+  rows: DmoProfitPeriodRow[];
+  totals: Omit<DmoProfitPeriodRow, 'periodKey' | 'label'>;
+  pipeline: { evaluationCount: number; evaluationValue: number };
+  currency: string;
+}
