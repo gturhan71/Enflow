@@ -514,7 +514,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 48 minutes ago)
+## changes (last 10 commits — 18 minutes ago)
 ```
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
@@ -537,23 +537,14 @@ src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
 src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
 src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~GuaranteesTab
-backend/scripts/loadtest/mixed-read.mjs       +login  +main
-backend/src/services/activityLogArchiveScheduler.ts ~tick
-backend/src/services/aiClient.ts              +isInCooldown  +recordFailure  +recordSuccess  ~chatJSON
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
-backend/src/services/backupScheduler.ts       ~tick
-backend/src/services/dashboardStream.ts       +getDashboardPingAt  ~subscribeDashboard  ~pingDashboard
-backend/src/services/deploymentGuard.ts       +checkDeploymentTopology
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
-backend/src/services/schedulerLock.ts         +acquireLock  +releaseLock
 backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
 backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
-backend/src/services/updateNotifier.ts        ~tick
 backend/src/services/workflowTemplate.ts      ~applyDefaultWorkflowTemplate
 backend/src/utils/entityTypeTab.ts            +entityTypeToTab
-backend/src/utils/fileUpload.ts               ~tryUploadToNextcloud
 ```
 
 ## backend

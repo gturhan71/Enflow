@@ -18,7 +18,13 @@ const DRY = process.argv.includes('--dry');
 // email → rol modelinde OLMAYAN, kaldırılacak izinler
 const OFF_MODEL: Record<string, string[]> = {
   'mehmetkoc@enflow.com': ['DMO_VIEW', 'SERVICE_TICKETS_VIEW'], // SALES_REP
-  'backup@t-ecosystem.com': ['DMO_VIEW'],                       // BACKUP_ADMIN
+  // BACKUP_ADMIN salt-okunur gözlemci — SETTINGS_* / *_EDIT rol modelinde yok
+  'backup@t-ecosystem.com': [
+    'DMO_VIEW', 'ARCHIVE_EDIT', 'PRESALES_EDIT',
+    'SETTINGS_VIEW', 'SETTINGS_COMPANY', 'SETTINGS_UNITS', 'SETTINGS_USERS',
+    'SETTINGS_PERMISSIONS', 'SETTINGS_INTEGRATIONS',
+  ],
+  'hukuk.muduru@enflow.com': ['SALES_SUPPORT_VIEW'],            // LEGAL_MGR
 };
 
 function parsePerms(raw: unknown): string[] {
