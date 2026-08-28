@@ -345,7 +345,7 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 - [x] **Agent otonomi 2 — CRM + İGPD deterministik triyaj** (2026-06-21, migration `faz9_agent_triage`) — İlke: yalnız **insan eli değmeden deterministik üretilebilen** çıktı otonom olur. CRM (kural-bazlı `recommendation` + issues) ve İGPD (`expectedValue = round(probability/100 × value)` + `valueTier` + `recommendation`) otonom modda triyajlarını yeni nullable `Opportunity.agentTriage` JSON alanına **annotation** olarak yazar — `value/probability/status/lostReason` gibi kritik alanlara **asla dokunmaz**, geri-alınabilir + idempotent (`mergeTriage` her agentın kendi bölümünü günceller, diğerini korur). `runAgent` **değişmedi** (Faz 9.1 altyapısı kullanıldı); `actionTaken` + `AGENT_ACTION` log + handoff görevi. Frontend: `Opportunity.agentTriage` tipi + CRM fırsat kartında 🤖 triyaj rozeti; `opportunities` GET parse. **Tender/Project/Presales tasarım gereği danışman** — deterministik-güvenli mutasyonları yok (checklist/devir evrakı kanıt ister; BoM/milestone insan kararı). Para/Hukuk `allowedModes:['ADVISORY']` kapsam dışı.
   - **Doğrulama:** curl — ADVISORY→agentTriage null; AUTONOMOUS İGPD→`igpd.expectedValue=360000` (0.6×600k), value/prob/status değişmedi; CRM→`crm` yazıldı + `igpd` korundu (merge); rerun idempotent; WON fırsatta NO_ACTION→eylem yok; yanlış tenant=404. AGENT_ACTION logları actorType=AGENT. Playwright (GM) CRM kartında 🤖 BD/CRM rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
 - [ ] **Entegrasyon katmanı doğrulaması** — Nextcloud DMS / Exchange e-posta / WhatsApp (denetimlerde kapsanmadı).
-- [x] **Zamana duyarlı Kârlılık & Nakit/Hazine analizi** (2026-08-28, branch `feat/profitability-analysis`, tek kaynak `docs/KARLILIK_ANALIZI_PLAN.md`) — **Faz A+B+C+D tamam (plan kapsamının tümü):** `profitabilityLedger.ts` (proje verisini tarihli `ProfitEvent[]`'e indirger — PLAN + ACTUAL üreticiler, saf) + `profitabilityRollup.ts` (`bucketBy` → proje/aylık/çeyreklik/yıllık `PeriodRow`; planlanan+gerçekleşen bağımsız kolon, tahakkuk+nakit ayrık, EAC = geçmiş-gerçekleşen + gelecek-plan, FX oranı olmayan döviz TRY başlığına katılmaz + `fxWarnings`) + `profitabilityCashflow.ts` (as-of birleştirme [geçmiş=gerçekleşen, gelecek=plan] → konsolide nakit pozisyonu serisi + açık pencereleri; `computeTreasury` nakit eğrisini zaman üzerinde integre eder → açık finansman maliyeti + fazla getirisi = hazine katkısı, Faz 1 faiz) + `profitabilityService.ts` (Prisma birleştirme) + `routes/profitability.ts` (`GET /ledger` `/summary` `/cashflow` `/treasury` — salt-okur, `requireRole` GM/FINANCE_MGR/PROJECT_MGR/SALES_MGR). Faiz oranı tek kaynak `financingEffect.DEFAULT_INTEREST_RATES` (`finance.ts` de içe aktarır); tenant override `moduleSettings.finance.interestRates`/`fxRates`. Yeni `PROFITABILITY_VIEW` izni: `roleDefaultPermissions.ts` + `governance/role-matrix.ts` (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN) + `rbac.config.ts` uiMatrix "Kârlılık menüsü". Frontend `ProfitabilityModule.tsx` (`profitability` sekmesi): grain switcher + Plan↔Gerçek↔İkisi + as-of + yıl + özet kartları + dönem net kârlılık grafiği + dönem tablosu (`MarginBadge`) + konsolide nakit pozisyonu grafiği (recharts LineChart, sıfır çizgisi) + hazine katkı paneli. **Faz C:** `ProfitabilitySnapshot` modeli + migration `add_profitability_snapshot` + `profitabilitySnapshot.ts` (`takeSnapshot` upsert-idempotent aylık `asOfKey` + `listSnapshots` + `getPlanDrift`) + `profitabilitySnapshotScheduler.ts` (aylık, 6sa tarama, `schedulerLock`) + `POST /snapshot` (GM/FINANCE_MGR, ActivityLog `PROFITABILITY_SNAPSHOT`) + `GET /snapshots` `/plan-drift` + modülde "Plan snapshot al" + plan-drift tablosu. **Sürüm artırılmadı** (kullanıcı kararı 2026-08-28 — Faz C mimari değişiklik olsa da `APP_VERSION` v2.4.0'da kaldı). **Faz D:** `profitabilityInstruments.ts` (saf) — FACTORING (gelecek tahsilatı öne çekme: finansman rahatlaması − tenor-ölçekli komisyon), DEPOSIT (nakit fazlası vade-spread'i), FORWARD_FX (döviz akışı kilidi carry'si, kapsanmış faiz paritesi) → baz duruma karşı gösterge delta; `GET /instruments` (ayarlanabilir `factoringDiscountPct`/`depositRatePct`/`forwardHorizonDays`/…) + modülde senaryo kartları. **Faz B.1 (işletme maliyeti simetrisi):** overhead artık gerçekleşen tarafta da (`overheadEvents` ortak helper — `buildPlanEvents` tüm süre, `buildActualEvents` `asOf`'a kadar absorbe edilmiş pay, EAC'de çift sayım yok); tüm GET uçlarında `?overhead=0` + modülde "İşletme maliyeti Dahil/Hariç" toggle'ı (`stripOverhead` servis katmanında `category:'OVERHEAD'` süzer); yalnız `Project.applyOverhead=true` projeleri etkiler. Birim testleri 36 (`__tests__/profitability{Ledger,Rollup,Cashflow,Snapshot,Instruments}.test.ts`), backend unit 166/166, tsc 0, audit 0/0.
+- [x] **Zamana duyarlı Kârlılık & Nakit/Hazine analizi** (2026-08-28, branch `feat/profitability-analysis`, tek kaynak `docs/KARLILIK_ANALIZI_PLAN.md`) — **Faz A+B+C+D tamam (plan kapsamının tümü):** `profitabilityLedger.ts` (proje verisini tarihli `ProfitEvent[]`'e indirger — PLAN + ACTUAL üreticiler, saf) + `profitabilityRollup.ts` (`bucketBy` → proje/aylık/çeyreklik/yıllık `PeriodRow`; planlanan+gerçekleşen bağımsız kolon, tahakkuk+nakit ayrık, EAC = geçmiş-gerçekleşen + gelecek-plan, FX oranı olmayan döviz TRY başlığına katılmaz + `fxWarnings`) + `profitabilityCashflow.ts` (as-of birleştirme [geçmiş=gerçekleşen, gelecek=plan] → konsolide nakit pozisyonu serisi + açık pencereleri; `computeTreasury` nakit eğrisini zaman üzerinde integre eder → açık finansman maliyeti + fazla getirisi = hazine katkısı, Faz 1 faiz) + `profitabilityService.ts` (Prisma birleştirme) + `routes/profitability.ts` (`GET /ledger` `/summary` `/cashflow` `/treasury` — salt-okur, `requireRole` GM/FINANCE_MGR/PROJECT_MGR/SALES_MGR). Faiz oranı tek kaynak `financingEffect.DEFAULT_INTEREST_RATES` (`finance.ts` de içe aktarır); tenant override `moduleSettings.finance.interestRates`/`fxRates`. Yeni `PROFITABILITY_VIEW` izni: `roleDefaultPermissions.ts` + `governance/role-matrix.ts` (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN) + `rbac.config.ts` uiMatrix "Kârlılık menüsü". Yeni izin yalnız kullanıcı oluşturulurken atandığından var olan kurulumlar için `backfill-profitability-view-permission.ts` (idempotent, matrix-kaynaklı, additive). RBAC `ui-access` "Kârlılık menüsü" 20/20. Frontend `ProfitabilityModule.tsx` (`profitability` sekmesi): grain switcher + Plan↔Gerçek↔İkisi + as-of + yıl + özet kartları + dönem net kârlılık grafiği + dönem tablosu (`MarginBadge`) + konsolide nakit pozisyonu grafiği (recharts LineChart, sıfır çizgisi) + hazine katkı paneli. **Faz C:** `ProfitabilitySnapshot` modeli + migration `add_profitability_snapshot` + `profitabilitySnapshot.ts` (`takeSnapshot` upsert-idempotent aylık `asOfKey` + `listSnapshots` + `getPlanDrift`) + `profitabilitySnapshotScheduler.ts` (aylık, 6sa tarama, `schedulerLock`) + `POST /snapshot` (GM/FINANCE_MGR, ActivityLog `PROFITABILITY_SNAPSHOT`) + `GET /snapshots` `/plan-drift` + modülde "Plan snapshot al" + plan-drift tablosu. **Sürüm artırılmadı** (kullanıcı kararı 2026-08-28 — Faz C mimari değişiklik olsa da `APP_VERSION` v2.4.0'da kaldı). **Faz D:** `profitabilityInstruments.ts` (saf) — FACTORING (gelecek tahsilatı öne çekme: finansman rahatlaması − tenor-ölçekli komisyon), DEPOSIT (nakit fazlası vade-spread'i), FORWARD_FX (döviz akışı kilidi carry'si, kapsanmış faiz paritesi) → baz duruma karşı gösterge delta; `GET /instruments` (ayarlanabilir `factoringDiscountPct`/`depositRatePct`/`forwardHorizonDays`/…) + modülde senaryo kartları. **Faz B.1 (işletme maliyeti simetrisi):** overhead artık gerçekleşen tarafta da (`overheadEvents` ortak helper — `buildPlanEvents` tüm süre, `buildActualEvents` `asOf`'a kadar absorbe edilmiş pay, EAC'de çift sayım yok); tüm GET uçlarında `?overhead=0` + modülde "İşletme maliyeti Dahil/Hariç" toggle'ı (`stripOverhead` servis katmanında `category:'OVERHEAD'` süzer); yalnız `Project.applyOverhead=true` projeleri etkiler. Birim testleri 36 (`__tests__/profitability{Ledger,Rollup,Cashflow,Snapshot,Instruments}.test.ts`), backend unit 166/166, tsc 0, audit 0/0.
 
 ---
 
@@ -368,31 +368,26 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
-src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
-src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
-src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
+src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
-src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
-src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
+backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
-backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
-backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
@@ -416,13 +411,16 @@ src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
+src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
+src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
+src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
@@ -434,18 +432,19 @@ src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/Auth
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
-src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
+src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
+src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
@@ -464,10 +463,11 @@ backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNu
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
-backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/schedulerLock.ts ← prismaClient
+backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
+backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/tenantEncryption.ts ← prismaClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock
@@ -514,27 +514,24 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 10 minutes ago)
+## changes (last 10 commits — 39 minutes ago)
 ```
 src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
-src/modules/crm/OpportunityRequiredDocsPanel.tsx ~OpportunityRequiredDocsPanel
-src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +TreasuryRow  +SummaryCard
+src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
+src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
 src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~GuaranteesTab
 src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
-backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
+backend/src/services/processEngine.ts         ~createSalesInvoiceForProject  ~walkForward
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
+backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
 backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
 backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
 backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
 backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
 backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
-backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
-backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
-backend/src/services/workflowTemplate.ts      ~applyDefaultWorkflowTemplate
-backend/src/utils/entityTypeTab.ts            +entityTypeToTab
 ```
 
 ## backend
@@ -638,6 +635,30 @@ export interface CashflowResult  :43-50
   byCurrency: CashSeries[]  :46-46
   consolidatedTRY: CashSeries  :47-47
   deficitWindows: DeficitWindow[]  :48-48
+```
+
+### backend/src/services/profitabilityDmo.ts
+```
+export interface DmoPeriodRow  :24-36
+  periodKey: string  :25-25
+  label: string  :26-26
+  orderCount: number  :27-27
+  revenue: number  :28-28
+  cost: number  :29-29
+  grossProfit: number  :30-30
+  risturn: number  :31-31
+  commission: number  :32-32
+  … +3 more members  :24-24
+export interface DmoProfitResult  :38-46
+  grain: DmoGrain  :39-39
+  year: number | null  :40-40
+  asOf: string  :41-41
+  rows: DmoPeriodRow[]  :42-42
+  totals: Omit<DmoPeriodRow, 'periodKey' | 'l  :43-43
+  pipeline: { evaluationCount: number  :44-44
+  currency: string  :45-45
+export type DmoGrain  :16-16
+export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
 ```
 
 ### backend/src/services/profitabilityInstruments.ts
@@ -785,16 +806,6 @@ export function startProfitabilitySnapshotScheduler() → void  :41-44
 export function defaultPermissionsForRole(role) → string[]  :64-66
 ```
 
-### backend/src/services/serviceTicketReminders.ts
-```
-export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
-```
-
-### backend/src/services/slaEscalation.ts
-```
-export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
-```
-
 ### backend/src/services/workflowTemplate.ts
 ```
 export interface ApplyTemplateResult  :152-156
@@ -802,11 +813,6 @@ export interface ApplyTemplateResult  :152-156
   createdProcesses: string[]  :154-154
   skippedProcesses: string[]  :155-155
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
-```
-
-### backend/src/utils/entityTypeTab.ts
-```
-export function entityTypeToTab(entityType?) → string | undefined  :25-27
 ```
 
 ### backend/pnpm-lock.yaml
@@ -1089,30 +1095,6 @@ export async function recordProgressCheckIn(tenantId, opportunityId, userId, inp
 export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
-### backend/src/services/profitabilityDmo.ts
-```
-export interface DmoPeriodRow  :24-36
-  periodKey: string  :25-25
-  label: string  :26-26
-  orderCount: number  :27-27
-  revenue: number  :28-28
-  cost: number  :29-29
-  grossProfit: number  :30-30
-  risturn: number  :31-31
-  commission: number  :32-32
-  … +3 more members  :24-24
-export interface DmoProfitResult  :38-46
-  grain: DmoGrain  :39-39
-  year: number | null  :40-40
-  asOf: string  :41-41
-  rows: DmoPeriodRow[]  :42-42
-  totals: Omit<DmoPeriodRow, 'periodKey' | 'l  :43-43
-  pipeline: { evaluationCount: number  :44-44
-  currency: string  :45-45
-export type DmoGrain  :16-16
-export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
-```
-
 ### backend/src/services/restoreService.ts
 ```
 export type LogicalPayloadData  :19-19
@@ -1155,6 +1137,16 @@ export interface SalesManualCostItemInput  :40-45
 ```
 export async function acquireLock(name, ttlMs) → Promise<boolean>  :23-42  # Kilidi devralmayı dener
 export async function releaseLock(name) → Promise<void>  :45-50  # İş bitince kilidi hemen serbest bırakır (expiresAt'i geçmişe
+```
+
+### backend/src/services/serviceTicketReminders.ts
+```
+export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
 ```
 
 ### backend/src/services/tenantEncryption.ts
@@ -1231,6 +1223,11 @@ export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir ala
 export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
 export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
 export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
+```
+
+### backend/src/utils/entityTypeTab.ts
+```
+export function entityTypeToTab(entityType?) → string | undefined  :25-27
 ```
 
 ### backend/src/utils/fileUpload.ts
@@ -1348,17 +1345,6 @@ handler onSendForApproval
 handler onRejectSignature
 ```
 
-### src/modules/CostAnalysisModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useMemo
-export CostAnalysisModule
-handler onChange
-handler onClick
-```
-
 ### src/modules/crm/OpportunitiesView.tsx
 ```
 component OpportunitiesView
@@ -1369,21 +1355,6 @@ handler onClick
 handler onChange
 handler onEditProposal
 handler onGoToCostAnalysis
-```
-
-### src/modules/crm/OpportunityRequiredDocsPanel.tsx
-```
-component OpportunityRequiredDocsPanel
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-handler onChange
-```
-
-### src/modules/crm/ProposalsView.tsx
-```
-component ProposalsView
 ```
 
 ### src/modules/CRMModule.tsx
@@ -1437,6 +1408,17 @@ props PRDetailDrawerProps
 hook useState
 export PRDetailDrawer
 handler onClick
+handler onChange
+```
+
+### src/modules/profitability/DmoChannelTab.tsx
+```
+component DmoChannelTab
+component Card
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
 handler onChange
 ```
 
@@ -1504,50 +1486,11 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/todo/helpers.ts
-```
-export interface ProposalDetailItem  :148-156
-  partNumber: string  :149-149
-  description: string  :150-150
-  quantity: number  :151-151
-  purchaseCost?: number  :152-152
-  unitSalePrice?: number  :153-153
-  totalSalePrice?: number  :154-154
-  marginPercentage?: number  :155-155
-export interface ProposalDetail  :158-167
-  price: string  :159-159
-  totalPrice: number  :160-160
-  totalCost: number  :161-161
-  items: ProposalDetailItem[]  :162-162
-  description: string  :163-163
-  terms: string  :164-164
-  version: number  :165-165
-  opportunityTitle: string  :166-166
-export const taskTargetTab = (t) =>  :56-65
-export const fmtCompletedAt = (d?) =>  :76-77
-export const getPriorityColor = (priority) =>  :79-86
-export const composedTitle = (newTask, taskAction, ctx) =>  :99-110
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :112-146
-export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :169-215
-```
-
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
 hook useState
 hook useEffect
-handler onChange
-```
-
-### src/modules/WorkflowBuilder.tsx
-```
-hook useUnsavedChanges
-hook useState
-hook useMemo
-hook useEffect
-export WorkflowBuilder
-handler onConfig
-handler onClick
 handler onChange
 ```
 
@@ -1894,6 +1837,17 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/CostAnalysisModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useMemo
+export CostAnalysisModule
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/constants.ts
 ```
 export const proposalStatusTone = (status) =>  :16-32
@@ -1942,6 +1896,16 @@ hook useState
 handler onClick
 ```
 
+### src/modules/crm/OpportunityRequiredDocsPanel.tsx
+```
+component OpportunityRequiredDocsPanel
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+handler onChange
+```
+
 ### src/modules/crm/ProgressCheckInModal.tsx
 ```
 component ProgressCheckInModal
@@ -1949,6 +1913,11 @@ hook useState
 hook useEffect
 handler onChange
 handler onClick
+```
+
+### src/modules/crm/ProposalsView.tsx
+```
+component ProposalsView
 ```
 
 ### src/modules/dashboard/KpiDetailDrawer.tsx
@@ -2112,17 +2081,6 @@ props VendorsTabProps
 export VendorsTab
 ```
 
-### src/modules/profitability/DmoChannelTab.tsx
-```
-component DmoChannelTab
-component Card
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-handler onChange
-```
-
 ### src/modules/ProposalEditor.tsx
 ```
 props ProposalEditorProps
@@ -2181,6 +2139,33 @@ handler onClick
 handler onData
 ```
 
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :148-156
+  partNumber: string  :149-149
+  description: string  :150-150
+  quantity: number  :151-151
+  purchaseCost?: number  :152-152
+  unitSalePrice?: number  :153-153
+  totalSalePrice?: number  :154-154
+  marginPercentage?: number  :155-155
+export interface ProposalDetail  :158-167
+  price: string  :159-159
+  totalPrice: number  :160-160
+  totalCost: number  :161-161
+  items: ProposalDetailItem[]  :162-162
+  description: string  :163-163
+  terms: string  :164-164
+  version: number  :165-165
+  opportunityTitle: string  :166-166
+export const taskTargetTab = (t) =>  :56-65
+export const fmtCompletedAt = (d?) =>  :76-77
+export const getPriorityColor = (priority) =>  :79-86
+export const composedTitle = (newTask, taskAction, ctx) =>  :99-110
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :112-146
+export const getProposalDetail = (todo, { proposals, opportunities, projects, contracts }) =>  :169-215
+```
+
 ### src/modules/todo/TaskList.tsx
 ```
 component TaskList
@@ -2235,6 +2220,18 @@ export VisitPlanModule
 handler onChange
 handler onClick
 handler onBlur
+```
+
+### src/modules/WorkflowBuilder.tsx
+```
+hook useUnsavedChanges
+hook useState
+hook useMemo
+hook useEffect
+export WorkflowBuilder
+handler onConfig
+handler onClick
+handler onChange
 ```
 
 ### src/types/analytics.ts
