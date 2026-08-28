@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import {
-  getLedger, getSummary, parseFxParam, parseScopeParam,
+  getLedger, getSummary, getCashflow, getTreasury, parseFxParam, parseScopeParam,
 } from '../services/profitabilityService';
 import type { Grain } from '../services/profitabilityRollup';
 
@@ -50,6 +50,33 @@ router.get('/summary', requireRole(VIEW_ROLES), asyncHandler(async (req: Request
     year: yearRaw && Number.isFinite(yearRaw) ? yearRaw : undefined,
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
     reportCurrency: req.query.currency ? String(req.query.currency).toUpperCase() : undefined,
+  });
+  res.json(result);
+}));
+
+// ── GET /api/profitability/cashflow (Faz B) ─────────────────────────────────
+// Konsolide nakit pozisyonu serisi + açık pencereleri. As-of birleştirme:
+// geçmiş = gerçekleşen, gelecek = plan.
+router.get('/cashflow', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const scope = parseScopeParam(req.query.scope ? String(req.query.scope) : undefined);
+  const result = await getCashflow(req.tenantId, scope, {
+    asOf: parseDate(req.query.asOf ? String(req.query.asOf) : undefined),
+    from: parseDate(req.query.from ? String(req.query.from) : undefined),
+    to: parseDate(req.query.to ? String(req.query.to) : undefined),
+    fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+  });
+  res.json(result);
+}));
+
+// ── GET /api/profitability/treasury (Faz B — Faz 1: faiz) ───────────────────
+// Nakit açığı finansman maliyeti + fazla değerlendirme getirisi → hazine katkısı.
+router.get('/treasury', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const scope = parseScopeParam(req.query.scope ? String(req.query.scope) : undefined);
+  const result = await getTreasury(req.tenantId, scope, {
+    asOf: parseDate(req.query.asOf ? String(req.query.asOf) : undefined),
+    from: parseDate(req.query.from ? String(req.query.from) : undefined),
+    to: parseDate(req.query.to ? String(req.query.to) : undefined),
+    fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
   });
   res.json(result);
 }));

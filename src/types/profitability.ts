@@ -57,3 +57,61 @@ export interface ProfitLedgerResult {
   plan: ProfitEvent[];
   actual: ProfitEvent[];
 }
+
+// ── Faz B: nakit pozisyonu + hazine ────────────────────────────────────────
+
+export interface CashPoint {
+  date: string;
+  inflow: number;
+  outflow: number;
+  cumulative: number;
+  label: string;
+  source: 'PLAN' | 'ACTUAL';
+}
+
+export interface CashSeries {
+  currency: string;
+  points: CashPoint[];
+  maxDeficit: number;
+  troughDate: string | null;
+  endingPosition: number;
+}
+
+export interface DeficitWindow {
+  currency: string;
+  from: string;
+  to: string;
+  troughDate: string;
+  troughAmount: number;
+}
+
+export interface CashflowResult {
+  scope: ProfitScope;
+  asOf: string;
+  fxRates: Record<string, number>;
+  byCurrency: CashSeries[];
+  consolidatedTRY: CashSeries;
+  deficitWindows: DeficitWindow[];
+  fxWarnings: string[];
+}
+
+export interface TreasuryLine {
+  currency: string;
+  ratePct: number;
+  financingCost: number;
+  financingBenefit: number;
+  treasuryNet: number;
+  timeWeightedDeficit: number;
+  timeWeightedSurplus: number;
+}
+
+export interface TreasuryResult {
+  scope: ProfitScope;
+  asOf: string;
+  horizon: string;
+  byCurrency: TreasuryLine[];
+  totalTRY: TreasuryLine;
+  interestRates: Record<string, number>;
+  fxRates: Record<string, number>;
+  fxWarnings: string[];
+}

@@ -8,7 +8,7 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath, resolveOpportunityForEntity } from '../services/opportunityFolderService';
 import { logActivity } from '../services/activityLog';
-import { computeFinancingEffect, buildFinancingEvents } from '../services/financingEffect';
+import { computeFinancingEffect, buildFinancingEvents, DEFAULT_INTEREST_RATES } from '../services/financingEffect';
 import { sumByCurrency, presentBreakdown, LineInput, computeFxGainLoss } from '../services/financeEngine';
 import { sweepGuaranteeReminders } from '../services/guaranteeReminders';
 import { recalcInvoice } from '../services/invoiceEngine';
@@ -17,7 +17,8 @@ import { computeAgingReport } from '../services/agingReport';
 import { createInvoiceRecord } from '../services/invoiceService';
 import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
 
-const DEFAULT_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
+// Tek kaynak: financingEffect.DEFAULT_INTEREST_RATES (profitabilityService de içe aktarır)
+const DEFAULT_RATES = DEFAULT_INTEREST_RATES;
 
 const router: Router = Router();
 

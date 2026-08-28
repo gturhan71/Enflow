@@ -153,6 +153,24 @@ class ApiService {
     if (params.fx) q.set('fx', params.fx);
     return apiClient.fetchWithAuth(`/profitability/ledger?${q.toString()}`);
   }
+  async getProfitabilityCashflow(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string }): Promise<import('../types').CashflowResult> {
+    const q = new URLSearchParams();
+    if (params.scope) q.set('scope', params.scope);
+    if (params.asOf) q.set('asOf', params.asOf);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.fx) q.set('fx', params.fx);
+    return apiClient.fetchWithAuth(`/profitability/cashflow?${q.toString()}`);
+  }
+  async getProfitabilityTreasury(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string }): Promise<import('../types').TreasuryResult> {
+    const q = new URLSearchParams();
+    if (params.scope) q.set('scope', params.scope);
+    if (params.asOf) q.set('asOf', params.asOf);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.fx) q.set('fx', params.fx);
+    return apiClient.fetchWithAuth(`/profitability/treasury?${q.toString()}`);
+  }
   // İşletme maliyeti (overhead) + birim bütçe
   async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
   async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }

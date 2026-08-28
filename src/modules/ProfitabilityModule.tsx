@@ -6,11 +6,13 @@
 // bkz. docs/KARLILIK_ANALIZI_PLAN.md §6
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from 'recharts';
+import {
+  BarChart, Bar, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine,
+} from 'recharts';
 import { apiService } from '../services/apiService';
 import { fmtCurrency } from '../lib/format';
 import MarginBadge from './project-mgmt/MarginBadge';
-import type { ProfitGrain, ProfitPeriodRow, ProfitSummaryResult } from '../types';
+import type { ProfitGrain, ProfitPeriodRow, ProfitSummaryResult, CashflowResult, TreasuryResult } from '../types';
 
 const GRAINS: { key: ProfitGrain; label: string }[] = [
   { key: 'PROJECT', label: 'Proje' },
@@ -27,22 +29,33 @@ export default function ProfitabilityModule() {
   const [year, setYear] = useState<number | ''>(new Date().getUTCFullYear());
   const [view, setView] = useState<'PLAN' | 'ACTUAL' | 'BOTH'>('BOTH');
   const [data, setData] = useState<ProfitSummaryResult | null>(null);
+  const [cashflow, setCashflow] = useState<CashflowResult | null>(null);
+  const [treasury, setTreasury] = useState<TreasuryResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
+    const asOfISO = new Date(asOf).toISOString();
+    const yr = grain === 'PROJECT' ? undefined : (year === '' ? undefined : Number(year));
+    const range = yr
+      ? { from: new Date(Date.UTC(yr, 0, 1)).toISOString(), to: new Date(Date.UTC(yr, 11, 31)).toISOString() }
+      : {};
     try {
-      const res = await apiService.getProfitabilitySummary({
-        grain,
-        asOf: new Date(asOf).toISOString(),
-        year: grain === 'PROJECT' ? undefined : (year === '' ? undefined : Number(year)),
-      });
-      setData(res as ProfitSummaryResult);
+      const [sum, cf, tr] = await Promise.all([
+        apiService.getProfitabilitySummary({ grain, asOf: asOfISO, year: yr }),
+        apiService.getProfitabilityCashflow({ asOf: asOfISO, ...range }),
+        apiService.getProfitabilityTreasury({ asOf: asOfISO, ...range }),
+      ]);
+      setData(sum as ProfitSummaryResult);
+      setCashflow(cf as CashflowResult);
+      setTreasury(tr as TreasuryResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kârlılık verisi alınamadı.');
       setData(null);
+      setCashflow(null);
+      setTreasury(null);
     } finally {
       setLoading(false);
     }
@@ -79,8 +92,18 @@ export default function ProfitabilityModule() {
   const fxWarnings = useMemo(() => {
     const s = new Set<string>();
     for (const r of rows) r.fxWarnings.forEach((w) => s.add(w));
+    (cashflow?.fxWarnings ?? []).forEach((w) => s.add(w));
     return [...s];
-  }, [rows]);
+  }, [rows, cashflow]);
+
+  const cashChartData = useMemo(
+    () => (cashflow?.consolidatedTRY.points ?? []).map((p) => ({
+      date: p.date.slice(0, 10),
+      Pozisyon: Math.round(p.cumulative),
+      kind: p.source,
+    })),
+    [cashflow],
+  );
 
   return (
     <div className="p-4 sm:p-6 space-y-5">
@@ -227,10 +250,82 @@ export default function ProfitabilityModule() {
         </table>
       </div>
 
+      {/* ── Nakit pozisyonu & Hazine (Faz B) ───────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="glass-card p-4 lg:col-span-2">
+          <h3 className="text-sm font-black text-slate-900 mb-1">Konsolide nakit pozisyonu (TRY)</h3>
+          <p className="text-[11px] text-slate-400 mb-3">
+            Geçmiş = gerçekleşen, gelecek = plan (as-of {asOf}). Sıfırın altı = finansman ihtiyacı.
+          </p>
+          {cashChartData.length > 0 ? (
+            <div style={{ width: '100%', height: 240 }}>
+              <ResponsiveContainer>
+                <LineChart data={cashChartData} margin={{ top: 4, right: 8, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="date" tick={{ fontSize: 10 }} />
+                  <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => `${Math.round(v / 1000)}k`} />
+                  <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', fontSize: '11px', fontWeight: 700 }} />
+                  <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="4 2" />
+                  <Line type="monotone" dataKey="Pozisyon" stroke="#0f172a" strokeWidth={2} dot={{ r: 2 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400 py-8 text-center">Nakit olayı yok.</p>
+          )}
+          {cashflow && cashflow.deficitWindows.length > 0 && (
+            <div className="mt-3 text-[11px] text-amber-700">
+              <span className="font-bold">Açık pencereleri:</span>{' '}
+              {cashflow.deficitWindows.slice(0, 4).map((w, i) => (
+                <span key={i}>
+                  {w.currency} {w.from.slice(0, 10)}→{w.to.slice(0, 10)} (en dip {fmtCurrency(w.troughAmount, w.currency)})
+                  {i < Math.min(cashflow.deficitWindows.length, 4) - 1 ? ' · ' : ''}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="glass-card p-4">
+          <h3 className="text-sm font-black text-slate-900 mb-1">Hazine katkısı</h3>
+          <p className="text-[11px] text-slate-400 mb-3">
+            Nakit açığı/fazlası × faiz (yıllık %{treasury?.totalTRY.ratePct ?? '–'}). Finansal enstrüman
+            senaryoları Faz D.
+          </p>
+          {treasury ? (
+            <div className="space-y-2 text-xs">
+              <TreasuryRow label="Finansman maliyeti (açık)" value={-treasury.totalTRY.financingCost} negativeIsBad />
+              <TreasuryRow label="Getiri (fazla)" value={treasury.totalTRY.financingBenefit} />
+              <div className="border-t border-slate-200 pt-2 flex items-center justify-between font-black">
+                <span>Net hazine katkısı</span>
+                <span className={treasury.totalTRY.treasuryNet < 0 ? 'text-red-600' : 'text-emerald-600'}>
+                  {fmtCurrency(treasury.totalTRY.treasuryNet)}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 pt-1">
+                Ort. açık {fmtCurrency(treasury.totalTRY.timeWeightedDeficit)} · ort. fazla {fmtCurrency(treasury.totalTRY.timeWeightedSurplus)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-xs text-slate-400">—</p>
+          )}
+        </div>
+      </div>
+
       <p className="text-[11px] text-slate-400">
-        Faz A — canlı plan, tahakkuk + nakit paralel. Konsolide nakit pozisyonu grafiği, hazine
-        (finansal enstrüman) katkı paneli ve aylık plan-snapshot Faz B/C'de eklenecek.
+        Faz A–B — canlı plan, tahakkuk + nakit paralel, konsolide nakit pozisyonu + faiz-bazlı hazine
+        katkısı. Aylık plan-snapshot (plan-drift) Faz C; finansal enstrüman senaryoları Faz D.
       </p>
+    </div>
+  );
+}
+
+function TreasuryRow({ label, value, negativeIsBad }: { label: string; value: number; negativeIsBad?: boolean }) {
+  const tone = value < 0 ? (negativeIsBad ? 'text-red-600' : 'text-slate-700') : 'text-emerald-600';
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-slate-500">{label}</span>
+      <span className={`tabular-nums font-semibold ${tone}`}>{fmtCurrency(value)}</span>
     </div>
   );
 }

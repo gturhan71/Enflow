@@ -1,6 +1,10 @@
 # Enflow — Zamana Duyarlı Kârlılık & Nakit/Hazine Analizi Planı
 
-> Durum: **Faz A tamam** (2026-08-28) — `profitabilityLedger` + `profitabilityRollup` + `profitabilityService` + `routes/profitability.ts` (`/ledger`, `/summary`) + `PROFITABILITY_VIEW` izni + `ProfitabilityModule.tsx`. Birim testleri 18, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 148/148. **Sıradaki: Faz B** (nakit pozisyonu + hazine/faiz paneli).
+> Durum: **Faz A + B tamam** (2026-08-28).
+> - Faz A: `profitabilityLedger` + `profitabilityRollup` + `profitabilityService` + `routes/profitability.ts` (`/ledger`, `/summary`) + `PROFITABILITY_VIEW` izni + `ProfitabilityModule.tsx`.
+> - Faz B: `profitabilityCashflow.ts` (konsolide nakit pozisyonu serisi + açık pencereleri + faiz-bazlı hazine katkısı) + `/cashflow` + `/treasury` + modülde nakit pozisyonu grafiği (recharts LineChart) + hazine katkı paneli. `financingEffect.DEFAULT_INTEREST_RATES` tek kaynağa çekildi (finance.ts de içe aktarır).
+> - Birim testleri 26, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 156/156.
+> - **Sıradaki: Faz C** (`ProfitabilitySnapshot` modeli + migration + aylık cron + plan-drift UI → MINOR v2.5.0).
 > Branch: `feat/profitability-analysis`
 > Tek doğruluk kaynağı bu dosyadır — değişiklik önce burada yapılır, sonra koda/CLAUDE.md'ye yansıtılır.
 

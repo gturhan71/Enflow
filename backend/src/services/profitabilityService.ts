@@ -10,6 +10,10 @@ import {
   buildPlanEvents, buildActualEvents, type ProfitEvent, type LedgerProject,
 } from './profitabilityLedger';
 import { bucketBy, type Grain, type PeriodRow } from './profitabilityRollup';
+import { DEFAULT_INTEREST_RATES } from './financingEffect';
+import {
+  buildCashflow, buildTreasury, type CashflowResult, type TreasuryResult,
+} from './profitabilityCashflow';
 
 export interface ProfitScope { kind: 'ALL' | 'PROJECT'; projectId?: string }
 
@@ -24,6 +28,17 @@ async function resolveFxRates(tenantId: string, override?: Record<string, number
     return { TRY: 1, ...(ms.finance?.fxRates || {}) };
   } catch {
     return { TRY: 1 };
+  }
+}
+
+/** moduleSettings.finance.interestRates → yıllık faiz %. Yoksa DEFAULT_INTEREST_RATES. */
+async function resolveInterestRates(tenantId: string): Promise<Record<string, number>> {
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { moduleSettings: true } });
+  try {
+    const ms = JSON.parse(tenant?.moduleSettings || '{}') as { finance?: { interestRates?: Record<string, number> } };
+    return { ...DEFAULT_INTEREST_RATES, ...(ms.finance?.interestRates || {}) };
+  } catch {
+    return { ...DEFAULT_INTEREST_RATES };
   }
 }
 
@@ -157,6 +172,42 @@ export async function getSummary(
 
   const rows = bucketBy(events, { grain, asOf, fxRates, reportCurrency: opts.reportCurrency, projectNames });
   return { scope, grain, asOf: asOf.toISOString(), reportCurrency: opts.reportCurrency || 'TRY', fxRates, rows };
+}
+
+// ── Faz B: Nakit pozisyonu + Hazine etkisi ─────────────────────────────────
+
+async function gatherAllEvents(tenantId: string, scope: ProfitScope): Promise<ProfitEvent[]> {
+  const ids = await scopedProjectIds(tenantId, scope);
+  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id)))).filter(Boolean) as AssembledProject[];
+  return [...assembled.flatMap((a) => a.planEvents), ...assembled.flatMap((a) => a.actualEvents)];
+}
+
+export interface CashflowApiResult extends CashflowResult { scope: ProfitScope }
+export interface TreasuryApiResult extends TreasuryResult { scope: ProfitScope }
+
+export async function getCashflow(
+  tenantId: string, scope: ProfitScope,
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number> } = {},
+): Promise<CashflowApiResult> {
+  const asOf = opts.asOf ?? new Date();
+  const fxRates = await resolveFxRates(tenantId, opts.fxRates);
+  const events = await gatherAllEvents(tenantId, scope);
+  const cf = buildCashflow(events, { asOf, from: opts.from, to: opts.to, fxRates });
+  return { ...cf, scope };
+}
+
+export async function getTreasury(
+  tenantId: string, scope: ProfitScope,
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number> } = {},
+): Promise<TreasuryApiResult> {
+  const asOf = opts.asOf ?? new Date();
+  const fxRates = await resolveFxRates(tenantId, opts.fxRates);
+  const interestRates = await resolveInterestRates(tenantId);
+  const events = await gatherAllEvents(tenantId, scope);
+  const cfOpts = { asOf, from: opts.from, to: opts.to, fxRates };
+  const cf = buildCashflow(events, cfOpts);
+  const tr = buildTreasury(cf, interestRates, cfOpts);
+  return { ...tr, scope };
 }
 
 /** "USD:40,EUR:44" → { USD: 40, EUR: 44 } */
