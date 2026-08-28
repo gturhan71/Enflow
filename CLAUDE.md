@@ -512,7 +512,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 hours ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
 src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
@@ -859,32 +859,6 @@ export async function getDashboardPingAt(tenantId) → Promise<number | null>  :
 ### backend/src/services/deploymentGuard.ts
 ```
 export function checkDeploymentTopology() → void  :15-30
-```
-
-### backend/src/services/financingEffect.ts
-```
-export interface CashEvent  :7-13
-  kind: 'PAYMENT' | 'COLLECTION'  :8-8
-  label: string  :9-9
-  date: string  :10-10
-  amount: number  :11-11
-  currency: string  :12-12
-export interface FinancingResultLine  :15-17
-  effect: number  :16-16
-export interface FinancingResult  :19-24
-  closingDate: string  :20-20
-  byCurrency: Record<string, { cost: number  :21-21
-  events: FinancingResultLine[]  :22-22
-  cashFlowGap: { currency: string  :23-23
-export interface FinancingBomInput  :72-72
-  partNumber: string  :72-72
-export interface FinancingCostInput  :73-73
-  description: string  :73-73
-export interface FinancingInstallmentInput  :74-74
-  note: string | null  :74-74
-export function computeFinancingEffect(events, interestRates, referenceStart?,) → FinancingResult  :32-64
-export function paymentDate(referenceStart, termDays) → string  :67-70  # referans tarihten gün vade ile ödeme tarihi (ISO)
-export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :82-108  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
 ```
 
 ### backend/src/services/governance.ts
