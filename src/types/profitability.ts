@@ -115,3 +115,41 @@ export interface TreasuryResult {
   fxRates: Record<string, number>;
   fxWarnings: string[];
 }
+
+// ── Faz C: planlı-defter snapshot (plan-drift) ─────────────────────────────
+
+export interface ProfitSnapshotRow {
+  id: string;
+  scope: string;
+  projectKey: string;
+  asOf: string;
+  asOfKey: string;
+  periodKey: string;
+  currency: string;
+  plannedRevenue: number;
+  plannedCost: number;
+  plannedMargin: number;
+  cashInPlanned: number;
+  cashOutPlanned: number;
+  createdAt: string;
+}
+
+export interface PlanDriftPoint {
+  asOfKey: string;
+  asOf: string;
+  plannedRevenue: number;
+  plannedCost: number;
+  plannedMargin: number;
+}
+
+export interface PlanDriftSeries {
+  periodKey: string;
+  points: PlanDriftPoint[];
+}
+
+export interface SnapshotTakeResult {
+  asOf: string;
+  asOfKey: string;
+  written: number;
+  periodKeys: string[];
+}

@@ -86,7 +86,7 @@ cd backend && pnpm dev
 **Upload:** `multer` memoryStorage → lokal `backend/uploads/contracts/{folder}/` + opsiyonel Nextcloud WebDAV  
 **Static dosyalar:** `GET /uploads/...` → `backend/uploads/` dizini
 
-## Veritabanı Modelleri (Prisma) — 74 model, katmanlı
+## Veritabanı Modelleri (Prisma) — 78 model, katmanlı
 
 Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prisma/schema.prisma`.)
 
@@ -123,7 +123,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 | `procurement` | `ProcurementModule` | Satınalma talebi → tedarikçi → PO → teslimat → fatura (9 statü) |
 | `sales-support` | `SalesSupport` | **İhale/İSAB** — Tender CRUD + uygunluk checklist + teminat (backend destekli) |
 | `finance` | `FinanceModule` | Fatura/tahsilat/teminat/maliyet onayı/özet (FINANCE_VIEW) |
-| `profitability` | `ProfitabilityModule` | **Kârlılık** — zamana duyarlı proje/aylık/çeyreklik/yıllık kârlılık; planlanan (öngörü) + gerçekleşen paralel, tahakkuk + nakit esası paralel, as-of tarihli, EAC. Faz A/B: canlı plan + `/api/profitability/{ledger,summary,cashflow,treasury}` (tarihli-defter `profitabilityLedger.ts` → `bucketBy` `profitabilityRollup.ts`; nakit pozisyonu + faiz-bazlı hazine katkısı `profitabilityCashflow.ts`). Nakit pozisyonu grafiği + hazine katkı paneli var; aylık `ProfitabilitySnapshot` (plan-drift) Faz C, finansal enstrüman senaryoları Faz D. Yeni `PROFITABILITY_VIEW` izni (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN). Tek kaynak: `docs/KARLILIK_ANALIZI_PLAN.md` |
+| `profitability` | `ProfitabilityModule` | **Kârlılık** — zamana duyarlı proje/aylık/çeyreklik/yıllık kârlılık; planlanan (öngörü) + gerçekleşen paralel, tahakkuk + nakit esası paralel, as-of tarihli, EAC. Faz A–C: canlı plan + `/api/profitability/{ledger,summary,cashflow,treasury,snapshots,plan-drift}` + `POST /snapshot` (tarihli-defter `profitabilityLedger.ts` → `bucketBy` `profitabilityRollup.ts`; nakit pozisyonu + faiz-bazlı hazine katkısı `profitabilityCashflow.ts`; aylık plan-drift `ProfitabilitySnapshot` + `profitabilitySnapshot.ts` + aylık cron `profitabilitySnapshotScheduler.ts`). Nakit pozisyonu grafiği + hazine katkı paneli + plan-drift tablosu; finansal enstrüman senaryoları Faz D. Yeni `PROFITABILITY_VIEW` izni (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN). Tek kaynak: `docs/KARLILIK_ANALIZI_PLAN.md` |
 | `management-reports` | `ManagementReportingModule` | Yönetim Raporları — birim metrik + darboğaz + UnitReport + yazdırma (MANAGEMENT_REPORTS_VIEW) |
 | `corporate-governance` | `CorporateGovernanceModule` | Genel Hususlar — dersler/risk/KPI/dış doküman + doküman kodlama (CORPORATE_GOV_VIEW) |
 | `todo` | `TodoModule` | Görev yönetimi + "Bekleyen Onaylarım" onay swimlane |
@@ -345,7 +345,7 @@ Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md
 - [x] **Agent otonomi 2 — CRM + İGPD deterministik triyaj** (2026-06-21, migration `faz9_agent_triage`) — İlke: yalnız **insan eli değmeden deterministik üretilebilen** çıktı otonom olur. CRM (kural-bazlı `recommendation` + issues) ve İGPD (`expectedValue = round(probability/100 × value)` + `valueTier` + `recommendation`) otonom modda triyajlarını yeni nullable `Opportunity.agentTriage` JSON alanına **annotation** olarak yazar — `value/probability/status/lostReason` gibi kritik alanlara **asla dokunmaz**, geri-alınabilir + idempotent (`mergeTriage` her agentın kendi bölümünü günceller, diğerini korur). `runAgent` **değişmedi** (Faz 9.1 altyapısı kullanıldı); `actionTaken` + `AGENT_ACTION` log + handoff görevi. Frontend: `Opportunity.agentTriage` tipi + CRM fırsat kartında 🤖 triyaj rozeti; `opportunities` GET parse. **Tender/Project/Presales tasarım gereği danışman** — deterministik-güvenli mutasyonları yok (checklist/devir evrakı kanıt ister; BoM/milestone insan kararı). Para/Hukuk `allowedModes:['ADVISORY']` kapsam dışı.
   - **Doğrulama:** curl — ADVISORY→agentTriage null; AUTONOMOUS İGPD→`igpd.expectedValue=360000` (0.6×600k), value/prob/status değişmedi; CRM→`crm` yazıldı + `igpd` korundu (merge); rerun idempotent; WON fırsatta NO_ACTION→eylem yok; yanlış tenant=404. AGENT_ACTION logları actorType=AGENT. Playwright (GM) CRM kartında 🤖 BD/CRM rozeti, 0 page-error. RBAC 69/69, tsc 0. Test verisi temizlendi.
 - [ ] **Entegrasyon katmanı doğrulaması** — Nextcloud DMS / Exchange e-posta / WhatsApp (denetimlerde kapsanmadı).
-- [~] **Zamana duyarlı Kârlılık & Nakit/Hazine analizi** (2026-08-28, branch `feat/profitability-analysis`, tek kaynak `docs/KARLILIK_ANALIZI_PLAN.md`) — **Faz A+B tamam:** `profitabilityLedger.ts` (proje verisini tarihli `ProfitEvent[]`'e indirger — PLAN + ACTUAL üreticiler, saf) + `profitabilityRollup.ts` (`bucketBy` → proje/aylık/çeyreklik/yıllık `PeriodRow`; planlanan+gerçekleşen bağımsız kolon, tahakkuk+nakit ayrık, EAC = geçmiş-gerçekleşen + gelecek-plan, FX oranı olmayan döviz TRY başlığına katılmaz + `fxWarnings`) + `profitabilityCashflow.ts` (as-of birleştirme [geçmiş=gerçekleşen, gelecek=plan] → konsolide nakit pozisyonu serisi + açık pencereleri; `computeTreasury` nakit eğrisini zaman üzerinde integre eder → açık finansman maliyeti + fazla getirisi = hazine katkısı, Faz 1 faiz) + `profitabilityService.ts` (Prisma birleştirme) + `routes/profitability.ts` (`GET /ledger` `/summary` `/cashflow` `/treasury` — salt-okur, `requireRole` GM/FINANCE_MGR/PROJECT_MGR/SALES_MGR). Faiz oranı tek kaynak `financingEffect.DEFAULT_INTEREST_RATES` (`finance.ts` de içe aktarır); tenant override `moduleSettings.finance.interestRates`/`fxRates`. Yeni `PROFITABILITY_VIEW` izni: `roleDefaultPermissions.ts` + `governance/role-matrix.ts` (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN) + `rbac.config.ts` uiMatrix "Kârlılık menüsü". Frontend `ProfitabilityModule.tsx` (`profitability` sekmesi): grain switcher + Plan↔Gerçek↔İkisi + as-of + yıl + özet kartları + dönem net kârlılık grafiği + dönem tablosu (`MarginBadge`) + konsolide nakit pozisyonu grafiği (recharts LineChart, sıfır çizgisi) + hazine katkı paneli. Birim testleri 26 (`__tests__/profitability{Ledger,Rollup,Cashflow}.test.ts`). **Faz C (MINOR → v2.5.0):** `ProfitabilitySnapshot` modeli + migration + aylık cron + plan-drift UI. **Faz D:** finansal enstrüman senaryoları (faktoring/forward FX/teminat/mevduat).
+- [~] **Zamana duyarlı Kârlılık & Nakit/Hazine analizi** (2026-08-28, branch `feat/profitability-analysis`, tek kaynak `docs/KARLILIK_ANALIZI_PLAN.md`) — **Faz A+B+C tamam:** `profitabilityLedger.ts` (proje verisini tarihli `ProfitEvent[]`'e indirger — PLAN + ACTUAL üreticiler, saf) + `profitabilityRollup.ts` (`bucketBy` → proje/aylık/çeyreklik/yıllık `PeriodRow`; planlanan+gerçekleşen bağımsız kolon, tahakkuk+nakit ayrık, EAC = geçmiş-gerçekleşen + gelecek-plan, FX oranı olmayan döviz TRY başlığına katılmaz + `fxWarnings`) + `profitabilityCashflow.ts` (as-of birleştirme [geçmiş=gerçekleşen, gelecek=plan] → konsolide nakit pozisyonu serisi + açık pencereleri; `computeTreasury` nakit eğrisini zaman üzerinde integre eder → açık finansman maliyeti + fazla getirisi = hazine katkısı, Faz 1 faiz) + `profitabilityService.ts` (Prisma birleştirme) + `routes/profitability.ts` (`GET /ledger` `/summary` `/cashflow` `/treasury` — salt-okur, `requireRole` GM/FINANCE_MGR/PROJECT_MGR/SALES_MGR). Faiz oranı tek kaynak `financingEffect.DEFAULT_INTEREST_RATES` (`finance.ts` de içe aktarır); tenant override `moduleSettings.finance.interestRates`/`fxRates`. Yeni `PROFITABILITY_VIEW` izni: `roleDefaultPermissions.ts` + `governance/role-matrix.ts` (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN) + `rbac.config.ts` uiMatrix "Kârlılık menüsü". Frontend `ProfitabilityModule.tsx` (`profitability` sekmesi): grain switcher + Plan↔Gerçek↔İkisi + as-of + yıl + özet kartları + dönem net kârlılık grafiği + dönem tablosu (`MarginBadge`) + konsolide nakit pozisyonu grafiği (recharts LineChart, sıfır çizgisi) + hazine katkı paneli. **Faz C:** `ProfitabilitySnapshot` modeli + migration `add_profitability_snapshot` + `profitabilitySnapshot.ts` (`takeSnapshot` upsert-idempotent aylık `asOfKey` + `listSnapshots` + `getPlanDrift`) + `profitabilitySnapshotScheduler.ts` (aylık, 6sa tarama, `schedulerLock`) + `POST /snapshot` (GM/FINANCE_MGR, ActivityLog `PROFITABILITY_SNAPSHOT`) + `GET /snapshots` `/plan-drift` + modülde "Plan snapshot al" + plan-drift tablosu. **Sürüm artırılmadı** (kullanıcı kararı 2026-08-28 — Faz C mimari değişiklik olsa da `APP_VERSION` v2.4.0'da kaldı). Birim testleri 28 (`__tests__/profitability{Ledger,Rollup,Cashflow,Snapshot}.test.ts`). **Faz D:** finansal enstrüman senaryoları (faktoring/forward FX/teminat/mevduat).
 
 ---
 
@@ -369,8 +369,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
-src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
@@ -379,7 +377,6 @@ src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../ser
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, types
@@ -395,6 +392,7 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
+backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
@@ -413,23 +411,23 @@ src/lib/permissionTree.ts ← constants
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
+src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
 src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
+src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
-src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
-src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
-src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
@@ -462,7 +460,8 @@ backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
-backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
+backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/schedulerLock.ts ← prismaClient
@@ -512,26 +511,24 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 10 minutes ago)
+## changes (last 10 commits — 7 minutes ago)
 ```
 src/components/MoneyInput.tsx                 +MoneyInput
-src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
-src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
-src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowListPanel
 src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
 src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
-src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +SummaryCard
+src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +TreasuryRow  +SummaryCard
 src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~GuaranteesTab
 src/services/apiService.ts                    ~ApiService
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
+backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
 backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +buildPlanEvents
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
-backend/src/services/profitabilityService.ts  +resolveFxRates  +assembleProject  +scopedProjectIds  +getLedger
+backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +assembleProject  +scopedProjectIds
 backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
 backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
@@ -570,6 +567,32 @@ export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date
 export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
 ```
 
+### backend/src/services/financingEffect.ts
+```
+export interface CashEvent  :13-19
+  kind: 'PAYMENT' | 'COLLECTION'  :14-14
+  label: string  :15-15
+  date: string  :16-16
+  amount: number  :17-17
+  currency: string  :18-18
+export interface FinancingResultLine  :21-23
+  effect: number  :22-22
+export interface FinancingResult  :25-30
+  closingDate: string  :26-26
+  byCurrency: Record<string, { cost: number  :27-27
+  events: FinancingResultLine[]  :28-28
+  cashFlowGap: { currency: string  :29-29
+export interface FinancingBomInput  :78-78
+  partNumber: string  :78-78
+export interface FinancingCostInput  :79-79
+  description: string  :79-79
+export interface FinancingInstallmentInput  :80-80
+  note: string | null  :80-80
+export function computeFinancingEffect(events, interestRates, referenceStart?,) → FinancingResult  :38-70
+export function paymentDate(referenceStart, termDays) → string  :73-76  # referans tarihten gün vade ile ödeme tarihi (ISO)
+export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :88-114  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
+```
+
 ### backend/src/services/opportunityFolderService.ts
 ```
 export type OpportunityEntityType  :28-28
@@ -606,6 +629,35 @@ export interface AdvanceProcessResult  :707-711
   advancedToOrder: number | null  :709-709
   actionsInvoked: string[]  :710-710
 export class ProcessNotConfiguredError  :27-32
+```
+
+### backend/src/services/profitabilityCashflow.ts
+```
+export interface CashPoint  :18-25
+  date: string  :19-19
+  inflow: number  :20-20
+  outflow: number  :21-21
+  cumulative: number  :22-22
+  label: string  :23-23
+  source: 'PLAN' | 'ACTUAL'  :24-24
+export interface CashSeries  :27-33
+  currency: string  :28-28
+  points: CashPoint[]  :29-29
+  maxDeficit: number  :30-30
+  troughDate: string | null  :31-31
+  endingPosition: number  :32-32
+export interface DeficitWindow  :35-41
+  currency: string  :36-36
+  from: string  :37-37
+  to: string  :38-38
+  troughDate: string  :39-39
+  troughAmount: number  :40-40
+export interface CashflowResult  :43-50
+  asOf: string  :44-44
+  fxRates: Record<string, number>  :45-45
+  byCurrency: CashSeries[]  :46-46
+  consolidatedTRY: CashSeries  :47-47
+  deficitWindows: DeficitWindow[]  :48-48
 ```
 
 ### backend/src/services/profitabilityLedger.ts
@@ -816,6 +868,13 @@ INDEX TodoTask_tenantId_status_idx ON TodoTask
 INDEX TodoTask_tenantId_assignedToUserId_idx ON TodoTask
 ```
 
+### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
+```
+TABLE ProfitabilitySnapshot
+INDEX ProfitabilitySnapshot_tenantId_periodKey_idx ON ProfitabilitySnapshot
+INDEX ProfitabilitySnapshot_tenantId_scope_projectKey_periodKey_asOfKey_key ON ProfitabilitySnapshot
+```
+
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
@@ -947,32 +1006,6 @@ export async function getDashboardPingAt(tenantId) → Promise<number | null>  :
 export function checkDeploymentTopology() → void  :15-30
 ```
 
-### backend/src/services/financingEffect.ts
-```
-export interface CashEvent  :13-19
-  kind: 'PAYMENT' | 'COLLECTION'  :14-14
-  label: string  :15-15
-  date: string  :16-16
-  amount: number  :17-17
-  currency: string  :18-18
-export interface FinancingResultLine  :21-23
-  effect: number  :22-22
-export interface FinancingResult  :25-30
-  closingDate: string  :26-26
-  byCurrency: Record<string, { cost: number  :27-27
-  events: FinancingResultLine[]  :28-28
-  cashFlowGap: { currency: string  :29-29
-export interface FinancingBomInput  :78-78
-  partNumber: string  :78-78
-export interface FinancingCostInput  :79-79
-  description: string  :79-79
-export interface FinancingInstallmentInput  :80-80
-  note: string | null  :80-80
-export function computeFinancingEffect(events, interestRates, referenceStart?,) → FinancingResult  :38-70
-export function paymentDate(referenceStart, termDays) → string  :73-76  # referans tarihten gün vade ile ödeme tarihi (ISO)
-export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :88-114  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
-```
-
 ### backend/src/services/governance.ts
 ```
 export interface ApprovalTier  :13-13
@@ -1015,33 +1048,36 @@ export async function recordProgressCheckIn(tenantId, opportunityId, userId, inp
 export async function logAutoProgressChange(tenantId, opportunityId, userId, before, after,) → Promise<void>  :115-129
 ```
 
-### backend/src/services/profitabilityCashflow.ts
+### backend/src/services/profitabilitySnapshot.ts
 ```
-export interface CashPoint  :18-25
-  date: string  :19-19
-  inflow: number  :20-20
-  outflow: number  :21-21
-  cumulative: number  :22-22
-  label: string  :23-23
-  source: 'PLAN' | 'ACTUAL'  :24-24
-export interface CashSeries  :27-33
-  currency: string  :28-28
-  points: CashPoint[]  :29-29
-  maxDeficit: number  :30-30
-  troughDate: string | null  :31-31
-  endingPosition: number  :32-32
-export interface DeficitWindow  :35-41
-  currency: string  :36-36
-  from: string  :37-37
-  to: string  :38-38
-  troughDate: string  :39-39
-  troughAmount: number  :40-40
-export interface CashflowResult  :43-50
-  asOf: string  :44-44
-  fxRates: Record<string, number>  :45-45
-  byCurrency: CashSeries[]  :46-46
-  consolidatedTRY: CashSeries  :47-47
-  deficitWindows: DeficitWindow[]  :48-48
+export interface SnapshotResult  :17-22
+  asOf: string  :18-18
+  asOfKey: string  :19-19
+  written: number  :20-20
+  periodKeys: string[]  :21-21
+export interface SnapshotRow  :67-81
+  id: string  :68-68
+  scope: string  :69-69
+  projectKey: string  :70-70
+  asOf: string  :71-71
+  asOfKey: string  :72-72
+  periodKey: string  :73-73
+  currency: string  :74-74
+  plannedRevenue: number  :75-75
+  … +5 more members  :67-67
+export interface PlanDriftPoint  :104-104
+  asOfKey: string  :104-104
+export interface PlanDriftSeries  :105-105
+  periodKey: string  :105-105
+export function asOfKeyOf(d) → string  :13-15
+export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
+export async function listSnapshots(tenantId, filter = {},) → Promise<SnapshotRow[]>  :83-102
+export async function getPlanDrift(tenantId, opts = {}) → Promise<PlanDriftSeries[]>  :111-127  # Her hedef dönem için, o dönemin planlı tahmininin snapshot'l
+```
+
+### backend/src/services/profitabilitySnapshotScheduler.ts
+```
+export function startProfitabilitySnapshotScheduler() → void  :41-44
 ```
 
 ### backend/src/services/restoreService.ts
@@ -1277,33 +1313,6 @@ export const formatMoneyInput = (n) =>  :25-26
 export const parseMoneyInput = (raw) =>  :31-41
 ```
 
-### src/lib/guaranteeText.ts
-```
-export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
-export async function uploadGuaranteeSampleFile(guaranteeId, file) → Promise<void>  :25-40  # Talep aşamasında eklenen örnek teminat mektubu dosyasını Gua
-```
-
-### src/modules/contract-workflow/DocumentsTab.tsx
-```
-component GuaranteeRequestSection
-component DocumentsTab
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-handler onChange
-handler onBlur
-```
-
-### src/modules/contract-workflow/WorkflowListPanel.tsx
-```
-component WorkflowListPanel
-component WorkflowCard
-export WorkflowFormState
-handler onChange
-handler onClick
-```
-
 ### src/modules/ContractWorkflowModule.tsx
 ```
 component ContractWorkflowModule
@@ -1416,24 +1425,6 @@ handler onDeleteCustomer
 handler onCreateProposal
 handler onWonOpportunity
 handler onLostOpportunity
-```
-
-### src/modules/FinanceModule.tsx
-```
-component OverheadPoolTab
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -1797,6 +1788,12 @@ export Sidebar
 handler onClick
 ```
 
+### src/lib/guaranteeText.ts
+```
+export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
+export async function uploadGuaranteeSampleFile(guaranteeId, file) → Promise<void>  :25-40  # Talep aşamasında eklenen örnek teminat mektubu dosyasını Gua
+```
+
 ### src/lib/permissionTree.ts
 ```
 export interface PermChild  :15-18
@@ -1841,6 +1838,18 @@ handler onClick
 ```
 component DetailHeader
 handler onClick
+```
+
+### src/modules/contract-workflow/DocumentsTab.tsx
+```
+component GuaranteeRequestSection
+component DocumentsTab
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
+handler onChange
+handler onBlur
 ```
 
 ### src/modules/contract-workflow/helpers.ts
@@ -1888,6 +1897,15 @@ component TransferTab
 handler onClick
 ```
 
+### src/modules/contract-workflow/WorkflowListPanel.tsx
+```
+component WorkflowListPanel
+component WorkflowCard
+export WorkflowFormState
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/constants.ts
 ```
 export const proposalStatusTone = (status) =>  :16-32
@@ -1899,13 +1917,6 @@ export const getStatusStyle = (status) =>  :21-32
 component CustomersView
 handler onChange
 handler onClick
-```
-
-### src/modules/crm/DashboardView.tsx
-```
-component DashboardView
-handler onOpps
-handler onValue
 ```
 
 ### src/modules/crm/NewCustomerModal.tsx
@@ -1940,31 +1951,6 @@ props Props
 export KpiKey
 export KpiDetailDrawer
 handler onClose
-handler onClick
-```
-
-### src/modules/dashboard/LayoutEditor.tsx
-```
-props Props
-hook useState
-hook useDragReorder
-export LayoutEditor
-handler onClick
-handler onDragOver
-handler onDragEnd
-handler onDrop
-```
-
-### src/modules/dashboard/RoleTemplateEditor.tsx
-```
-hook useState
-hook useDragReorder
-hook useEffect
-export RoleTemplateEditor
-handler onChange
-handler onDragOver
-handler onDragEnd
-handler onDrop
 handler onClick
 ```
 
@@ -2043,6 +2029,24 @@ handler onDelete
 handler onSaved
 handler onClose
 handler onChange
+```
+
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
 ```
 
 ### src/modules/IntegrationWizard.tsx

@@ -10,6 +10,8 @@ import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import {
   getLedger, getSummary, getCashflow, getTreasury, parseFxParam, parseScopeParam,
 } from '../services/profitabilityService';
+import { takeSnapshot, listSnapshots, getPlanDrift } from '../services/profitabilitySnapshot';
+import { logActivity } from '../services/activityLog';
 import type { Grain } from '../services/profitabilityRollup';
 
 const router: Router = Router();
@@ -17,6 +19,7 @@ router.use(tenantMiddleware);
 
 // Backend rol kapısı — frontend ayrıca PROFITABILITY_VIEW izniyle gizler.
 const VIEW_ROLES = ['GENERAL_MANAGER', 'FINANCE_MGR', 'PROJECT_MGR', 'SALES_MGR'];
+const SNAPSHOT_ROLES = ['GENERAL_MANAGER', 'FINANCE_MGR'];
 
 const VALID_GRAINS: Grain[] = ['PROJECT', 'MONTH', 'QUARTER', 'YEAR'];
 
@@ -79,6 +82,37 @@ router.get('/treasury', requireRole(VIEW_ROLES), asyncHandler(async (req: Reques
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
   });
   res.json(result);
+}));
+
+// ── Faz C: planlı-defter anlık görüntüsü (plan-drift) ───────────────────────
+
+// GET /api/profitability/snapshots?periodKey=&scope=
+router.get('/snapshots', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const rows = await listSnapshots(req.tenantId, {
+    periodKey: req.query.periodKey ? String(req.query.periodKey) : undefined,
+    scope: req.query.scope ? String(req.query.scope) : undefined,
+    limit: req.query.limit ? parseInt(String(req.query.limit), 10) : undefined,
+  });
+  res.json({ rows });
+}));
+
+// GET /api/profitability/plan-drift?periodKey=  — planın dönem tahmini asOf ekseninde nasıl kaydı
+router.get('/plan-drift', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const series = await getPlanDrift(req.tenantId, {
+    periodKey: req.query.periodKey ? String(req.query.periodKey) : undefined,
+  });
+  res.json({ series });
+}));
+
+// POST /api/profitability/snapshot  — anlık snapshot al (GM/FINANCE_MGR)
+router.post('/snapshot', requireRole(SNAPSHOT_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const result = await takeSnapshot(req.tenantId, {});
+  await logActivity({
+    tenantId: req.tenantId, userId: req.userId, action: 'PROFITABILITY_SNAPSHOT',
+    entityType: 'PROFITABILITY', entityId: result.asOfKey,
+    details: { written: result.written, periodKeys: result.periodKeys },
+  });
+  res.status(201).json(result);
 }));
 
 export default router;

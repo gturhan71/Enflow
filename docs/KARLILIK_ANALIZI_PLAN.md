@@ -1,10 +1,11 @@
 # Enflow — Zamana Duyarlı Kârlılık & Nakit/Hazine Analizi Planı
 
-> Durum: **Faz A + B tamam** (2026-08-28).
+> Durum: **Faz A + B + C tamam** (2026-08-28). **Sürüm artırılmadı** — kullanıcı kararı 2026-08-28: kod Faz C'yi içerse de `APP_VERSION` v2.4.0'da kalır (bump ayrıca konuşulacak).
 > - Faz A: `profitabilityLedger` + `profitabilityRollup` + `profitabilityService` + `routes/profitability.ts` (`/ledger`, `/summary`) + `PROFITABILITY_VIEW` izni + `ProfitabilityModule.tsx`.
-> - Faz B: `profitabilityCashflow.ts` (konsolide nakit pozisyonu serisi + açık pencereleri + faiz-bazlı hazine katkısı) + `/cashflow` + `/treasury` + modülde nakit pozisyonu grafiği (recharts LineChart) + hazine katkı paneli. `financingEffect.DEFAULT_INTEREST_RATES` tek kaynağa çekildi (finance.ts de içe aktarır).
-> - Birim testleri 26, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 156/156.
-> - **Sıradaki: Faz C** (`ProfitabilitySnapshot` modeli + migration + aylık cron + plan-drift UI → MINOR v2.5.0).
+> - Faz B: `profitabilityCashflow.ts` (konsolide nakit pozisyonu serisi + açık pencereleri + faiz-bazlı hazine katkısı) + `/cashflow` + `/treasury` + modülde nakit pozisyonu grafiği + hazine katkı paneli. `financingEffect.DEFAULT_INTEREST_RATES` tek kaynağa çekildi.
+> - Faz C: `ProfitabilitySnapshot` modeli + migration `add_profitability_snapshot` + `profitabilitySnapshot.ts` (takeSnapshot upsert-idempotent + listSnapshots + getPlanDrift) + `profitabilitySnapshotScheduler.ts` (aylık, schedulerLock) + `POST /snapshot` (GM/FINANCE_MGR, ActivityLog `PROFITABILITY_SNAPSHOT`) + `GET /snapshots` + `GET /plan-drift` + modülde "Plan snapshot al" butonu + plan-drift tablosu.
+> - Birim testleri 28, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 158/158.
+> - **Sıradaki: Faz D** (finansal enstrüman senaryoları — faktoring / forward FX / teminat / mevduat; migration yok).
 > Branch: `feat/profitability-analysis`
 > Tek doğruluk kaynağı bu dosyadır — değişiklik önce burada yapılır, sonra koda/CLAUDE.md'ye yansıtılır.
 

@@ -24,6 +24,7 @@ import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
 import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
+import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import { checkDeploymentTopology } from './services/deploymentGuard';
 import projectsRouter from './routes/projects';
@@ -219,6 +220,7 @@ app.listen(port, () => {
   checkDeploymentTopology();
   startBackupScheduler();
   startActivityLogArchiveScheduler();
+  startProfitabilitySnapshotScheduler();
   startUpdateNotifier();
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
   // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.

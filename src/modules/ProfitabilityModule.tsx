@@ -12,7 +12,9 @@ import {
 import { apiService } from '../services/apiService';
 import { fmtCurrency } from '../lib/format';
 import MarginBadge from './project-mgmt/MarginBadge';
-import type { ProfitGrain, ProfitPeriodRow, ProfitSummaryResult, CashflowResult, TreasuryResult } from '../types';
+import type {
+  ProfitGrain, ProfitPeriodRow, ProfitSummaryResult, CashflowResult, TreasuryResult, PlanDriftSeries,
+} from '../types';
 
 const GRAINS: { key: ProfitGrain; label: string }[] = [
   { key: 'PROJECT', label: 'Proje' },
@@ -31,8 +33,11 @@ export default function ProfitabilityModule() {
   const [data, setData] = useState<ProfitSummaryResult | null>(null);
   const [cashflow, setCashflow] = useState<CashflowResult | null>(null);
   const [treasury, setTreasury] = useState<TreasuryResult | null>(null);
+  const [planDrift, setPlanDrift] = useState<PlanDriftSeries[]>([]);
   const [loading, setLoading] = useState(false);
+  const [snapping, setSnapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -43,14 +48,16 @@ export default function ProfitabilityModule() {
       ? { from: new Date(Date.UTC(yr, 0, 1)).toISOString(), to: new Date(Date.UTC(yr, 11, 31)).toISOString() }
       : {};
     try {
-      const [sum, cf, tr] = await Promise.all([
+      const [sum, cf, tr, drift] = await Promise.all([
         apiService.getProfitabilitySummary({ grain, asOf: asOfISO, year: yr }),
         apiService.getProfitabilityCashflow({ asOf: asOfISO, ...range }),
         apiService.getProfitabilityTreasury({ asOf: asOfISO, ...range }),
+        apiService.getProfitabilityPlanDrift(),
       ]);
       setData(sum as ProfitSummaryResult);
       setCashflow(cf as CashflowResult);
       setTreasury(tr as TreasuryResult);
+      setPlanDrift((drift?.series ?? []).filter((s) => s.points.length > 1));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kârlılık verisi alınamadı.');
       setData(null);
@@ -60,6 +67,21 @@ export default function ProfitabilityModule() {
       setLoading(false);
     }
   }, [grain, asOf, year]);
+
+  const takeSnapshot = useCallback(async () => {
+    setSnapping(true);
+    setNotice(null);
+    setError(null);
+    try {
+      const r = await apiService.takeProfitabilitySnapshot();
+      setNotice(`Snapshot alındı (${r.asOfKey}) — ${r.written} dönem donduruldu.`);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Snapshot alınamadı (GM / Finans Md. yetkisi gerekir).');
+    } finally {
+      setSnapping(false);
+    }
+  }, [load]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -114,10 +136,17 @@ export default function ProfitabilityModule() {
             Planlanan (öngörü) ve gerçekleşen — tahakkuk + nakit paralel · as-of {asOf}
           </p>
         </div>
-        <button onClick={() => void load()} className="btn-secondary text-xs" disabled={loading}>
-          {loading ? 'Yükleniyor…' : 'Yenile'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => void takeSnapshot()} className="btn-secondary text-xs" disabled={snapping} title="Planın bugünkü halini dondur (plan-drift izlemesi)">
+            {snapping ? 'Alınıyor…' : 'Plan snapshot al'}
+          </button>
+          <button onClick={() => void load()} className="btn-secondary text-xs" disabled={loading}>
+            {loading ? 'Yükleniyor…' : 'Yenile'}
+          </button>
+        </div>
       </header>
+
+      {notice && <div className="glass-card p-3 text-sm text-emerald-700 border border-emerald-200">{notice}</div>}
 
       {/* Kontrol çubuğu */}
       <div className="glass-card p-3 flex flex-wrap items-end gap-4">
@@ -312,9 +341,58 @@ export default function ProfitabilityModule() {
         </div>
       </div>
 
+      {/* ── Plan sapması (drift) — Faz C ────────────────────────────────── */}
+      <div className="glass-card p-4">
+        <h3 className="text-sm font-black text-slate-900 mb-1">Plan sapması (drift)</h3>
+        <p className="text-[11px] text-slate-400 mb-3">
+          Aylık plan snapshot'ları — bir dönemin planlı marj tahmininin zamanla nasıl kaydığı.
+          {planDrift.length === 0 && ' Karşılaştırma için en az iki farklı aya ait snapshot gerekir.'}
+        </p>
+        {planDrift.length === 0 ? (
+          <p className="text-xs text-slate-400 py-3 text-center">
+            Henüz çoklu-ay snapshot yok. Her ay otomatik alınır; şimdi almak için “Plan snapshot al”.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-500 border-b border-slate-200">
+                  <th className="px-3 py-2 font-bold">Dönem</th>
+                  <th className="px-3 py-2 font-bold">Planlı marj — snapshot dizisi (asOf → %)</th>
+                  <th className="px-3 py-2 font-bold text-right">Toplam kayma</th>
+                </tr>
+              </thead>
+              <tbody>
+                {planDrift.map((s) => {
+                  const first = s.points[0].plannedMargin;
+                  const last = s.points[s.points.length - 1].plannedMargin;
+                  return (
+                    <tr key={s.periodKey} className="border-b border-slate-100">
+                      <td className="px-3 py-2 font-semibold text-slate-800">{s.periodKey}</td>
+                      <td className="px-3 py-2 text-slate-600">
+                        {s.points.map((p, i) => (
+                          <span key={p.asOfKey}>
+                            {i > 0 && ' → '}
+                            <span className="text-slate-400">{p.asOfKey}</span> %{p.plannedMargin.toFixed(1)}
+                          </span>
+                        ))}
+                      </td>
+                      <td className={`px-3 py-2 text-right font-bold ${last - first < 0 ? 'text-red-600' : last - first > 0 ? 'text-emerald-600' : 'text-slate-500'}`}>
+                        {last - first >= 0 ? '+' : ''}{(last - first).toFixed(1)} p
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <p className="text-[11px] text-slate-400">
-        Faz A–B — canlı plan, tahakkuk + nakit paralel, konsolide nakit pozisyonu + faiz-bazlı hazine
-        katkısı. Aylık plan-snapshot (plan-drift) Faz C; finansal enstrüman senaryoları Faz D.
+        Faz A–C — canlı plan (tahakkuk + nakit paralel), konsolide nakit pozisyonu + faiz-bazlı hazine
+        katkısı, aylık plan snapshot ile plan-drift. Finansal enstrüman senaryoları (faktoring / forward
+        FX / teminat / mevduat) Faz D.
       </p>
     </div>
   );

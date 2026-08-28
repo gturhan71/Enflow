@@ -171,6 +171,13 @@ class ApiService {
     if (params.fx) q.set('fx', params.fx);
     return apiClient.fetchWithAuth(`/profitability/treasury?${q.toString()}`);
   }
+  async getProfitabilityPlanDrift(periodKey?: string): Promise<{ series: import('../types').PlanDriftSeries[] }> {
+    const q = periodKey ? `?periodKey=${encodeURIComponent(periodKey)}` : '';
+    return apiClient.fetchWithAuth(`/profitability/plan-drift${q}`);
+  }
+  async takeProfitabilitySnapshot(): Promise<import('../types').SnapshotTakeResult> {
+    return apiClient.fetchWithAuth('/profitability/snapshot', { method: 'POST' });
+  }
   // İşletme maliyeti (overhead) + birim bütçe
   async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
   async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }
