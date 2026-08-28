@@ -377,13 +377,14 @@ src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
-src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
+src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
+src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/helpers.ts ← ../types
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
@@ -391,7 +392,6 @@ src/types/crm.ts ← auth, presales
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
@@ -400,7 +400,6 @@ backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSla
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
-backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
@@ -434,6 +433,7 @@ src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services
 src/modules/dashboard/LayoutEditor.tsx ← widgetCatalog, useDragReorder
 src/modules/dashboard/RoleTemplateEditor.tsx ← ../services/apiService, ../constants, widgetCatalog, useDragReorder
 src/modules/dashboard/useDashboardStream.ts ← ../services/apiClient
+src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
@@ -460,8 +460,6 @@ src/modules/reporting/TenderCard.tsx ← ../types, helpers, ../lib/format, ../co
 src/modules/reporting/UnitAbsorptionCard.tsx ← ../types, helpers, ../lib/format, ../components/InfoTooltip
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
-src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
-src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
 src/modules/todo/TaskList.tsx ← ../types, helpers, icons, ../components/AgentTag, ../lib/agentProvenance
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
@@ -474,6 +472,7 @@ backend/src/services/analyticsService.ts ← prismaClient
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
+backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboardStream, utils/businessDays, opportunityProgressService
@@ -481,6 +480,7 @@ backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/tenantEncryption.ts ← prismaClient
+backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/secureUpload.ts ← usageService
@@ -523,14 +523,13 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 26 hours ago)
+## changes (last 10 commits — 11 hours ago)
 ```
 src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
 src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
 src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowListPanel
 src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
-src/modules/crm/NewOpportunityModal.tsx       ~NewOpportunityModal
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
 src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
 src/modules/reporting/OverviewTab.tsx         ~OverviewTab
@@ -540,7 +539,6 @@ backend/scripts/loadtest/mixed-read.mjs       +login  +main
 backend/src/services/activityLogArchiveScheduler.ts ~tick
 backend/src/services/aiClient.ts              +isInCooldown  +recordFailure  +recordSuccess  ~chatJSON
 backend/src/services/backupScheduler.ts       ~tick
-backend/src/services/dashboardService.ts      ~computeDashboard
 backend/src/services/dashboardStream.ts       +getDashboardPingAt  ~subscribeDashboard  ~pingDashboard
 backend/src/services/deploymentGuard.ts       +checkDeploymentTopology
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
@@ -550,7 +548,6 @@ backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/schedulerLock.ts         +acquireLock  +releaseLock
 backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
 backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
-backend/src/services/unitReportingService.ts  ~computeVisitPerformance
 backend/src/services/updateNotifier.ts        ~tick
 backend/src/services/workflowTemplate.ts      ~applyDefaultWorkflowTemplate
 backend/src/utils/entityTypeTab.ts            +entityTypeToTab
@@ -619,11 +616,6 @@ export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant Y
 ### backend/src/services/backupScheduler.ts
 ```
 export function startBackupScheduler() → void  :61-65
-```
-
-### backend/src/services/dashboardService.ts
-```
-export async function computeDashboard(tenantId, userId?)  :15-70
 ```
 
 ### backend/src/services/dashboardStream.ts
@@ -702,35 +694,6 @@ export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
 ### backend/src/services/slaEscalation.ts
 ```
 export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
-```
-
-### backend/src/services/unitReportingService.ts
-```
-export interface UnitDefinition  :6-10
-  key: string  :7-7
-  label: string  :8-8
-  role: string  :9-9
-export interface Period  :52-55
-  start: Date  :53-53
-  end: Date  :54-54
-export interface Metric  :76-82
-  label: string  :77-77
-  value: number | string  :78-78
-  unit?: string  :79-79
-  hint?: string  :80-80
-  tone?: 'default' | 'positive' | 'warning'   :81-81
-export interface ChartSeries  :84-88
-  title: string  :85-85
-  type: 'bar' | 'pie' | 'line'  :86-86
-  data: { name: string  :87-87
-export interface UnitMetricsResult  :90-97
-  unitKey: string  :91-91
-  label: string  :92-92
-  role: string  :93-93
-  period: { start: string  :94-94
-  metrics: Metric[]  :95-95
-  charts: ChartSeries[]  :96-96
-export interface WorkflowBottleneck  :457-461
 ```
 
 ### backend/src/services/updateNotifier.ts
@@ -943,6 +906,11 @@ export function checkStatusTransition(currentStatus, nextStatus, role, cancelRea
 export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
+### backend/src/services/dashboardService.ts
+```
+export async function computeDashboard(tenantId, userId?)  :15-70
+```
+
 ### backend/src/services/governance.ts
 ```
 export interface ApprovalTier  :13-13
@@ -1030,6 +998,35 @@ export async function decryptForTenant(tenantId, value) → Promise<string | nul
 export function isEncrypted(value) → boolean  :98-100
 ```
 
+### backend/src/services/unitReportingService.ts
+```
+export interface UnitDefinition  :6-10
+  key: string  :7-7
+  label: string  :8-8
+  role: string  :9-9
+export interface Period  :52-55
+  start: Date  :53-53
+  end: Date  :54-54
+export interface Metric  :76-82
+  label: string  :77-77
+  value: number | string  :78-78
+  unit?: string  :79-79
+  hint?: string  :80-80
+  tone?: 'default' | 'positive' | 'warning'   :81-81
+export interface ChartSeries  :84-88
+  title: string  :85-85
+  type: 'bar' | 'pie' | 'line'  :86-86
+  data: { name: string  :87-87
+export interface UnitMetricsResult  :90-97
+  unitKey: string  :91-91
+  label: string  :92-92
+  role: string  :93-93
+  period: { start: string  :94-94
+  metrics: Metric[]  :95-95
+  charts: ChartSeries[]  :96-96
+export interface WorkflowBottleneck  :457-461
+```
+
 ### backend/src/services/virtualAgentService.ts
 ```
 export interface AgentOutput  :13-25
@@ -1084,6 +1081,19 @@ hook useState
 export UserManagement
 handler onSubmit
 handler onConfirm
+```
+
+### src/content/helpArticles.ts
+```
+export interface HelpArticleSection  :8-11
+  heading: string  :9-9
+  body: string  :10-10
+export interface HelpArticle  :13-18
+  moduleId: string  :14-14
+  summary: string  :15-15
+  audience: string  :16-16
+  sections: HelpArticleSection[]  :17-17
+export const getHelpArticle = (moduleId) =>  :184-184
 ```
 
 ### src/lib/format.ts
@@ -1245,16 +1255,6 @@ handler onClose
 handler onClick
 ```
 
-### src/modules/dashboard/WidgetDetailDrawer.tsx
-```
-component Rows
-component Row
-props Props
-export WidgetDetailDrawer
-handler onClose
-handler onNavigate
-```
-
 ### src/modules/Dashboard.tsx
 ```
 hook useState
@@ -1354,6 +1354,28 @@ handler onKeyDown
 handler onClose
 ```
 
+### src/modules/SpecAnalysis.tsx
+```
+props SpecAnalysisProps
+hook useAIGate
+hook useState
+export SpecAnalysis
+handler onChange
+handler onClick
+```
+
+### src/modules/SpecComplianceMatrix.tsx
+```
+props SpecComplianceMatrixProps
+hook useAIGate
+hook useState
+hook useEffect
+hook useCallback
+export SpecComplianceMatrix
+handler onChange
+handler onClick
+```
+
 ### src/modules/todo/helpers.ts
 ```
 export interface ProposalDetailItem  :148-156
@@ -1436,18 +1458,33 @@ export interface OpportunityDocumentRow  :66-74
   docType: string | null  :70-70
 ```
 
-### src/types/dashboard.ts
+### src/types/presales.ts
 ```
-export interface DashboardPayload  :1-35
-  kpis: { winRate: number  :2-2
-  timeSensitive: { tenderDeadlines: { id: string  :3-4
-  guaranteeExpiries: { id: string  :5-5
-  guaranteeRequests: { id: string  :6-6
-  costApprovalsPending: { id: string  :7-7
-  invoicesDue: { id: string  :8-8
-  milestonesDue: { id: string  :9-9
-  contractDeadlines: { id: string  :10-10
-  … +19 more members  :1-1
+export interface CostRequirement  :1-10
+  id: string  :2-2
+  projectId: string  :3-3
+  description: string  :4-4
+  category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' |   :5-5
+  identifiedBy: string  :6-6
+  costedBy?: string  :7-7
+  estimatedCost?: number  :8-8
+  status: 'IDENTIFIED' | 'COSTED' | 'APPROVED  :9-9
+export interface BoMItem  :11-32
+  id: string  :12-12
+  lineKey?: string  :13-13
+  opportunityId?: string  :14-14
+  projectId?: string  :15-15
+  partNumber: string  :16-16
+  description: string  :17-17
+  quantity: number  :18-18
+  purchaseCost: number  :19-19
+  … +12 more members  :11-11
+export interface BomHandoff  :35-48
+  id: string  :36-36
+  opportunityId: string  :37-37
+  oppTitle: string  :38-38
+  customerName?: string | null  :39-39
+  handedOffById?: string | null  :40-40
 ```
 
 ### src/types/workflow.ts
@@ -1562,19 +1599,6 @@ export UnitManagement
 handler onClick
 handler onSubmit
 handler onChange
-```
-
-### src/content/helpArticles.ts
-```
-export interface HelpArticleSection  :8-11
-  heading: string  :9-9
-  body: string  :10-10
-export interface HelpArticle  :13-18
-  moduleId: string  :14-14
-  summary: string  :15-15
-  audience: string  :16-16
-  sections: HelpArticleSection[]  :17-17
-export const getHelpArticle = (moduleId) =>  :184-184
 ```
 
 ### src/contexts/AuthContext.tsx
@@ -1838,6 +1862,16 @@ export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → 
 export function buildEditableLayout(role, saved, roleTemplateOverride?)  :223-223
 ```
 
+### src/modules/dashboard/WidgetDetailDrawer.tsx
+```
+component Rows
+component Row
+props Props
+export WidgetDetailDrawer
+handler onClose
+handler onNavigate
+```
+
 ### src/modules/DmoModule.tsx
 ```
 component DmoModule
@@ -2070,28 +2104,6 @@ handler onClick
 handler onData
 ```
 
-### src/modules/SpecAnalysis.tsx
-```
-props SpecAnalysisProps
-hook useAIGate
-hook useState
-export SpecAnalysis
-handler onChange
-handler onClick
-```
-
-### src/modules/SpecComplianceMatrix.tsx
-```
-props SpecComplianceMatrixProps
-hook useAIGate
-hook useState
-hook useEffect
-hook useCallback
-export SpecComplianceMatrix
-handler onChange
-handler onClick
-```
-
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
@@ -2185,6 +2197,20 @@ export interface ConcentrationReport  :22-26
   totalRevenue: number  :25-25
 ```
 
+### src/types/dashboard.ts
+```
+export interface DashboardPayload  :1-35
+  kpis: { winRate: number  :2-2
+  timeSensitive: { tenderDeadlines: { id: string  :3-4
+  guaranteeExpiries: { id: string  :5-5
+  guaranteeRequests: { id: string  :6-6
+  costApprovalsPending: { id: string  :7-7
+  invoicesDue: { id: string  :8-8
+  milestonesDue: { id: string  :9-9
+  contractDeadlines: { id: string  :10-10
+  … +19 more members  :1-1
+```
+
 ### src/types/dmo.ts
 ```
 export interface DmoCatalogItem  :2-8
@@ -2212,35 +2238,6 @@ export interface DmoOrder  :21-31
   commissionType: string  :28-28
   grossProfit: number  :29-29
   … +1 more members  :21-21
-```
-
-### src/types/presales.ts
-```
-export interface CostRequirement  :1-10
-  id: string  :2-2
-  projectId: string  :3-3
-  description: string  :4-4
-  category: 'LABOR' | 'LOGISTICS' | 'TRAVEL' |   :5-5
-  identifiedBy: string  :6-6
-  costedBy?: string  :7-7
-  estimatedCost?: number  :8-8
-  status: 'IDENTIFIED' | 'COSTED' | 'APPROVED  :9-9
-export interface BoMItem  :11-32
-  id: string  :12-12
-  lineKey?: string  :13-13
-  opportunityId?: string  :14-14
-  projectId?: string  :15-15
-  partNumber: string  :16-16
-  description: string  :17-17
-  quantity: number  :18-18
-  purchaseCost: number  :19-19
-  … +12 more members  :11-11
-export interface BomHandoff  :35-48
-  id: string  :36-36
-  opportunityId: string  :37-37
-  oppTitle: string  :38-38
-  customerName?: string | null  :39-39
-  handedOffById?: string | null  :40-40
 ```
 
 ### src/types/procurement.ts
