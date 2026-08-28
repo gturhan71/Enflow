@@ -619,6 +619,12 @@ export const uiMatrix: UiCase[] = [
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
   },
   {
+    // Kârlılık (Faz A) — PROFITABILITY_VIEW: GM + SALES_MGR + FINANCE_MGR + PROJECT_MGR + BACKUP_ADMIN (salt-okur gözlemci)
+    name: "Kârlılık menüsü",
+    sidebarText: "Kârlılık",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+  },
+  {
     name: "Görevler & Takip menüsü",
     sidebarText: "Görevler & Takip",
     expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "hidden", presales_mgr: "visible", technical_spec: "visible", operations_mgr: "visible", hr_mgr: "visible", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },

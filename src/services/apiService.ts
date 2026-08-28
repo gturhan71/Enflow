@@ -14,6 +14,13 @@ import {
   SpecComplianceRequest, SpecComplianceResult
 } from '../types';
 
+/** Kârlılık uçları için ortak query-string üreticisi (scope/asOf/from/to/fx/overhead). */
+function profQuery(params: Record<string, string | undefined>): string {
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(params)) if (v) q.set(k, v);
+  return q.toString();
+}
+
 class ApiService {
   setAuth(tenantId: string, token: string) {
     apiClient.setAuth(tenantId, token);
@@ -133,6 +140,46 @@ class ApiService {
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
   async getBrandCategoryAnalytics(): Promise<import('../types').BrandCategoryAnalytics> { return apiClient.fetchWithAuth('/reports/brand-category-analytics'); }
+
+  // Kârlılık analizi (Faz A) — zamana duyarlı, planlanan + gerçekleşen paralel
+  async getProfitabilitySummary(params: { grain: import('../types').ProfitGrain; scope?: string; asOf?: string; year?: number; currency?: string; fx?: string; overhead?: string }): Promise<import('../types').ProfitSummaryResult> {
+    const q = new URLSearchParams({ grain: params.grain });
+    if (params.scope) q.set('scope', params.scope);
+    if (params.asOf) q.set('asOf', params.asOf);
+    if (params.year) q.set('year', String(params.year));
+    if (params.currency) q.set('currency', params.currency);
+    if (params.fx) q.set('fx', params.fx);
+    if (params.overhead) q.set('overhead', params.overhead);
+    return apiClient.fetchWithAuth(`/profitability/summary?${q.toString()}`);
+  }
+  async getProfitabilityLedger(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string; overhead?: string }): Promise<import('../types').ProfitLedgerResult> {
+    return apiClient.fetchWithAuth(`/profitability/ledger?${profQuery(params)}`);
+  }
+  async getProfitabilityCashflow(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string; overhead?: string }): Promise<import('../types').CashflowResult> {
+    return apiClient.fetchWithAuth(`/profitability/cashflow?${profQuery(params)}`);
+  }
+  async getProfitabilityTreasury(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string; overhead?: string }): Promise<import('../types').TreasuryResult> {
+    return apiClient.fetchWithAuth(`/profitability/treasury?${profQuery(params)}`);
+  }
+  async getProfitabilityPlanDrift(periodKey?: string): Promise<{ series: import('../types').PlanDriftSeries[] }> {
+    const q = periodKey ? `?periodKey=${encodeURIComponent(periodKey)}` : '';
+    return apiClient.fetchWithAuth(`/profitability/plan-drift${q}`);
+  }
+  async takeProfitabilitySnapshot(): Promise<import('../types').SnapshotTakeResult> {
+    return apiClient.fetchWithAuth('/profitability/snapshot', { method: 'POST' });
+  }
+  async getProfitabilityDmo(params: { grain?: import('../types').DmoProfitGrain; year?: number; asOf?: string } = {}): Promise<import('../types').DmoProfitResult> {
+    const q = new URLSearchParams();
+    if (params.grain) q.set('grain', params.grain);
+    if (params.year) q.set('year', String(params.year));
+    if (params.asOf) q.set('asOf', params.asOf);
+    const qs = q.toString();
+    return apiClient.fetchWithAuth(`/profitability/dmo${qs ? `?${qs}` : ''}`);
+  }
+  async getProfitabilityInstruments(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string; overhead?: string } = {}): Promise<import('../types').InstrumentsResult> {
+    const qs = profQuery(params);
+    return apiClient.fetchWithAuth(`/profitability/instruments${qs ? `?${qs}` : ''}`);
+  }
   // İşletme maliyeti (overhead) + birim bütçe
   async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
   async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }

@@ -56,7 +56,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
   {
     role: 'GENERAL_MANAGER', unit: 'Üst Yönetim', kind: 'MANAGER', staffing: 'HUMAN',
     modules: ['*'], // superuser: AuthContext.hasPermission GM için her zaman true
-    endpointDomains: ['adminTest', 'archive', 'contractWorkflow', 'customers', 'opportunities', 'plugins', 'tenants', 'units', 'users'],
+    endpointDomains: ['adminTest', 'archive', 'contractWorkflow', 'customers', 'opportunities', 'plugins', 'profitability', 'tenants', 'units', 'users'],
     decisionRights: [
       { decision: 'Fırsat onayı (swimlane son onay)', via: 'approvalChain:OPPORTUNITY' },
       { decision: 'Teklif onayı (swimlane son onay)', via: 'approvalChain:PROPOSAL' },
@@ -76,7 +76,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     // driftı (menü gizli, API'ye doğrudan istekle erişilebiliyordu). Mevcut backend yetkisi
     // korunarak (daraltma DEĞİL) menü görünür hale getirildi — DMO_MODULE entitlement
     // kapısı zaten ayrıca var (lisanssız tenant'ta hâlâ gizli kalır).
-    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'COST_ANALYSIS_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW', 'DMO_VIEW'],
+    modules: ['DASHBOARD_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'COST_ANALYSIS_VIEW', 'SALES_SUPPORT_VIEW', 'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'PROFITABILITY_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW', 'DMO_VIEW'],
     endpointDomains: ['contractWorkflow', 'dmo'],
     decisionRights: [
       { decision: 'Satınalma talebi birim onayı', via: 'statusTransition:PENDING_UNIT→PENDING_PROCUREMENT (ProcurementModule: SALES_MGR|GM)' },
@@ -157,8 +157,8 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'PROJECT_MGR', unit: 'Proje', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: ['contractWorkflow', 'serviceTickets'],
+    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'PROFITABILITY_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['contractWorkflow', 'serviceTickets', 'profitability'],
     decisionRights: [
       { decision: 'Milestone ilerleme/onay yönetimi', via: 'endpoint:projects/:id/milestones' },
       { decision: 'Proje devir paketi (11 evrak) kontrolü', via: 'endpoint:projects/:id/handover-docs' },
@@ -196,8 +196,8 @@ export const ROLE_MATRIX: RoleSpec[] = [
   },
   {
     role: 'FINANCE_MGR', unit: 'Finans', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'FINANCE_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: ['contractWorkflow'],
+    modules: ['DASHBOARD_VIEW', 'FINANCE_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'PROFITABILITY_VIEW', 'CONTRACTS_VIEW', 'DOCUMENTS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['contractWorkflow', 'profitability'],
     decisionRights: [
       { decision: 'Fırsat finansal onayı (swimlane 1. aşama)', via: 'approvalChain:OPPORTUNITY' },
       { decision: 'Teklif finansal onayı (swimlane 1. aşama)', via: 'approvalChain:PROPOSAL' },
@@ -300,7 +300,7 @@ export const ROLE_MATRIX: RoleSpec[] = [
     modules: [
       'DASHBOARD_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'VISIT_PLAN_VIEW', 'CRM_VIEW', 'CRM_OPPS_VIEW',
       'COST_ANALYSIS_VIEW', 'CRM_PROPOSALS_VIEW', 'CRM_CUSTOMERS_VIEW', 'PRESALES_VIEW', 'SALES_SUPPORT_VIEW',
-      'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'FINANCE_VIEW', 'TODO_VIEW',
+      'CONTRACTS_VIEW', 'PROCUREMENT_VIEW', 'PROJECT_MGMT_VIEW', 'FINANCE_VIEW', 'PROFITABILITY_VIEW', 'TODO_VIEW',
       'DOCUMENTS_VIEW', 'ARCHIVE_VIEW', 'CORPORATE_GOV_VIEW', 'BACKUP_VIEW',
     ],
     endpointDomains: ['backup'],

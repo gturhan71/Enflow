@@ -1,0 +1,203 @@
+// Enflow — Kârlılık analizi tipleri (backend profitabilityRollup/Service ile eş)
+// bkz. docs/KARLILIK_ANALIZI_PLAN.md §3
+
+export type ProfitGrain = 'PROJECT' | 'MONTH' | 'QUARTER' | 'YEAR';
+
+export interface ProfitEvent {
+  date: string;
+  amount: number;
+  currency: string;
+  direction: 'IN' | 'OUT';
+  basis: 'ACCRUAL' | 'CASH';
+  source: 'PLAN' | 'ACTUAL';
+  category: string;
+  projectId: string | null;
+  opportunityId: string | null;
+  ref: string;
+  confidence: 'FIRM' | 'ESTIMATED';
+  label: string;
+}
+
+export interface ProfitCurrencyBreak {
+  plannedRevenue: number; plannedCost: number;
+  actualRevenue: number; actualCost: number;
+}
+
+export interface ProfitPeriodRow {
+  periodKey: string;
+  label: string;
+  currency: string;
+  plannedRevenue: number; plannedCost: number; plannedMarginPct: number;
+  actualRevenue: number; actualCost: number; actualMarginPct: number;
+  plannedCashIn: number; plannedCashOut: number; plannedCashNet: number;
+  actualCashIn: number; actualCashOut: number; actualCashNet: number;
+  eacCost: number; eacMarginPct: number;
+  varianceMarginPct: number;
+  eventCount: number;
+  byCurrency: Record<string, ProfitCurrencyBreak>;
+  fxAssumptions: Record<string, number>;
+  fxWarnings: string[];
+}
+
+export interface ProfitScope { kind: 'ALL' | 'PROJECT'; projectId?: string }
+
+export interface ProfitSummaryResult {
+  scope: ProfitScope;
+  grain: ProfitGrain;
+  asOf: string;
+  reportCurrency: string;
+  fxRates: Record<string, number>;
+  rows: ProfitPeriodRow[];
+}
+
+export interface ProfitLedgerResult {
+  scope: ProfitScope;
+  asOf: string;
+  fxRates: Record<string, number>;
+  plan: ProfitEvent[];
+  actual: ProfitEvent[];
+}
+
+// ── Faz B: nakit pozisyonu + hazine ────────────────────────────────────────
+
+export interface CashPoint {
+  date: string;
+  inflow: number;
+  outflow: number;
+  cumulative: number;
+  label: string;
+  source: 'PLAN' | 'ACTUAL';
+}
+
+export interface CashSeries {
+  currency: string;
+  points: CashPoint[];
+  maxDeficit: number;
+  troughDate: string | null;
+  endingPosition: number;
+}
+
+export interface DeficitWindow {
+  currency: string;
+  from: string;
+  to: string;
+  troughDate: string;
+  troughAmount: number;
+}
+
+export interface CashflowResult {
+  scope: ProfitScope;
+  asOf: string;
+  fxRates: Record<string, number>;
+  byCurrency: CashSeries[];
+  consolidatedTRY: CashSeries;
+  deficitWindows: DeficitWindow[];
+  fxWarnings: string[];
+}
+
+export interface TreasuryLine {
+  currency: string;
+  ratePct: number;
+  financingCost: number;
+  financingBenefit: number;
+  treasuryNet: number;
+  timeWeightedDeficit: number;
+  timeWeightedSurplus: number;
+}
+
+export interface TreasuryResult {
+  scope: ProfitScope;
+  asOf: string;
+  horizon: string;
+  byCurrency: TreasuryLine[];
+  totalTRY: TreasuryLine;
+  interestRates: Record<string, number>;
+  fxRates: Record<string, number>;
+  fxWarnings: string[];
+}
+
+// ── Faz C: planlı-defter snapshot (plan-drift) ─────────────────────────────
+
+export interface ProfitSnapshotRow {
+  id: string;
+  scope: string;
+  projectKey: string;
+  asOf: string;
+  asOfKey: string;
+  periodKey: string;
+  currency: string;
+  plannedRevenue: number;
+  plannedCost: number;
+  plannedMargin: number;
+  cashInPlanned: number;
+  cashOutPlanned: number;
+  createdAt: string;
+}
+
+export interface PlanDriftPoint {
+  asOfKey: string;
+  asOf: string;
+  plannedRevenue: number;
+  plannedCost: number;
+  plannedMargin: number;
+}
+
+export interface PlanDriftSeries {
+  periodKey: string;
+  points: PlanDriftPoint[];
+}
+
+export interface SnapshotTakeResult {
+  asOf: string;
+  asOfKey: string;
+  written: number;
+  periodKeys: string[];
+}
+
+// ── Faz D: finansal enstrüman senaryoları ─────────────────────────────────
+
+export interface InstrumentScenario {
+  instrument: 'FACTORING' | 'DEPOSIT' | 'FORWARD_FX';
+  label: string;
+  description: string;
+  delta: number;
+  detail: Record<string, number>;
+  assumptions: Record<string, number>;
+  reversible: boolean;
+}
+
+export interface InstrumentsResult {
+  scope: ProfitScope;
+  asOf: string;
+  baseline: { treasuryNet: number; maxDeficitTRY: number; endingPositionTRY: number };
+  scenarios: InstrumentScenario[];
+  totalOpportunity: number;
+}
+
+// ── Faz E: DMO kanalı kârlılığı (lisanslı, kümülatif dışı) ────────────────
+
+export type DmoProfitGrain = 'MONTH' | 'QUARTER' | 'YEAR' | 'INSTITUTION';
+
+export interface DmoProfitPeriodRow {
+  periodKey: string;
+  label: string;
+  orderCount: number;
+  revenue: number;
+  cost: number;
+  grossProfit: number;
+  risturn: number;
+  commission: number;
+  netProfit: number;
+  netMarginPct: number;
+  unprofitableCount: number;
+}
+
+export interface DmoProfitResult {
+  grain: DmoProfitGrain;
+  year: number | null;
+  asOf: string;
+  rows: DmoProfitPeriodRow[];
+  totals: Omit<DmoProfitPeriodRow, 'periodKey' | 'label'>;
+  pipeline: { evaluationCount: number; evaluationValue: number };
+  currency: string;
+}

@@ -4,6 +4,12 @@
 // finansman maliyeti/getirisini hesaplar. Para birimleri AYRIŞIK tutulur (kur
 // karışıklığı = kritik risk). Çıkış erken → maliyet (+); giriş erken → getiri (−).
 
+/**
+ * Tenant kur/faiz ayarı yoksa kullanılan yıllık banka faiz oranları (%).
+ * Tek kaynak — `routes/finance.ts` ve `profitabilityService.ts` bunu içe aktarır.
+ */
+export const DEFAULT_INTEREST_RATES: Record<string, number> = { TRY: 50, USD: 10, EUR: 8 };
+
 export interface CashEvent {
   kind: 'PAYMENT' | 'COLLECTION';
   label: string;

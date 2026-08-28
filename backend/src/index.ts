@@ -24,6 +24,7 @@ import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
 import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
+import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import { checkDeploymentTopology } from './services/deploymentGuard';
 import projectsRouter from './routes/projects';
@@ -50,6 +51,7 @@ import financeRouter from './routes/finance';
 import legalRouter from './routes/legal';
 import tendersRouter from './routes/tenders';
 import reportsRouter from './routes/reports';
+import profitabilityRouter from './routes/profitability';
 import pluginsRouter from './routes/plugins';
 import dmoRouter from './routes/dmo';
 
@@ -185,6 +187,7 @@ app.use('/api/finance', financeRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/profitability', profitabilityRouter);
 app.use('/api/plugins', pluginsRouter);
 app.use('/api/dmo', tenantMiddleware, requireEntitlement('DMO_MODULE'), dmoRouter); // ayrı lisanslı modül
 
@@ -217,6 +220,7 @@ app.listen(port, () => {
   checkDeploymentTopology();
   startBackupScheduler();
   startActivityLogArchiveScheduler();
+  startProfitabilitySnapshotScheduler();
   startUpdateNotifier();
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
   // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.

@@ -30,7 +30,8 @@ import {
   DatabaseBackup,
   Wrench,
   HelpCircle,
-  MessageSquarePlus
+  MessageSquarePlus,
+  TrendingUp
 } from 'lucide-react';
 
 export const APP_VERSION = 'v2.4.0';
@@ -94,6 +95,7 @@ export const NAV_ITEMS = [
   { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'service-tickets',   label: 'Garanti & Servis',    icon: Wrench,        requiredPermission: 'SERVICE_TICKETS_VIEW' },
   { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
+  { id: 'profitability',     label: 'Kârlılık',            icon: TrendingUp,    requiredPermission: 'PROFITABILITY_VIEW' },
   { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW', requiredEntitlement: 'DMO_MODULE' },
   { id: 'todo',              label: 'Görevler & Takip',    icon: ListTodo,      requiredPermission: 'TODO_VIEW' },
   // ── Raporlama & yönetişim (akış adımı değil, destek katmanı) ─────────────
