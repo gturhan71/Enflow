@@ -5,7 +5,8 @@
 > - Faz B: `profitabilityCashflow.ts` (konsolide nakit pozisyonu serisi + açık pencereleri + faiz-bazlı hazine katkısı) + `/cashflow` + `/treasury` + modülde nakit pozisyonu grafiği + hazine katkı paneli. `financingEffect.DEFAULT_INTEREST_RATES` tek kaynağa çekildi.
 > - Faz C: `ProfitabilitySnapshot` modeli + migration `add_profitability_snapshot` + `profitabilitySnapshot.ts` (takeSnapshot upsert-idempotent + listSnapshots + getPlanDrift) + `profitabilitySnapshotScheduler.ts` (aylık, schedulerLock) + `POST /snapshot` + `GET /snapshots` + `GET /plan-drift` + modülde "Plan snapshot al" + plan-drift tablosu.
 > - Faz D: `profitabilityInstruments.ts` (saf) — FACTORING (gelecek tahsilatları öne çekme: finansman rahatlaması − tenor-ölçekli komisyon), DEPOSIT (nakit fazlası spread'i, vade tutan segmentler), FORWARD_FX (döviz akışlarını forward kurla kilitleme carry'si, kapsanmış faiz paritesi). `GET /instruments` (ayarlanabilir param'lar) + modülde senaryo kartları + toplam fırsat. Rakamlar GÖSTERGE.
-> - Birim testleri 34, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 164/164.
+> - Faz B.1 (işletme maliyeti simetrisi): overhead artık **gerçekleşen** tarafta da (`buildActualEvents`, `overheadEvents` ortak helper) — `asOf`'a kadar absorbe edilmiş pay; plan tüm süreyi, gerçekleşen elapsed kısmı yazar, EAC'de çift sayım yok. Yeni `?overhead=0` param'ı (tüm GET uçları) + modülde "İşletme maliyeti: Dahil/Hariç" toggle'ı — `stripOverhead` servis katmanında `category:'OVERHEAD'` olaylarını süzer. Yalnız `Project.applyOverhead=true` projeleri etkiler.
+> - Birim testleri 36, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 166/166.
 > Branch: `feat/profitability-analysis`
 > Tek doğruluk kaynağı bu dosyadır — değişiklik önce burada yapılır, sonra koda/CLAUDE.md'ye yansıtılır.
 
@@ -187,5 +188,5 @@ Her faz sonunda: `tsc` 0 (fe+be) · `audit:roles` 0 ERROR/WARN · backend unit y
 
 - Milestone `plannedEnd` çoğu projede boş → gelir tanımada fallback zinciri kritik; test verisi hem dolu hem boş senaryoyu kapsamalı.
 - Karışık kur → her `PeriodRow` TRY + döviz kırılımı; TRY dönüşüm varsayımları `fxAssumptions`'da şeffaf.
-- Overhead yalnız `applyOverhead=true` projelerde → kârlılık raporu bu bayrağı satır bazında göstermeli (net vs direkt marj ayrımı).
+- Overhead yalnız `applyOverhead=true` projelerde. **Faz B.1'de çözüldü:** hem plan hem gerçekleşen tarafında simetrik (`overheadEvents` ortak helper) + `?overhead=0` / UI toggle ile doğrudan-marj görünümü. `stripOverhead` servis katmanında süzer.
 - Snapshot `payloadJson` büyüyebilir → yalnız özet alanlar indeksli; ayrıntı JSON'da, sıkıştırma gerekirse Faz C'de değerlendirilir.

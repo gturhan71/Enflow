@@ -51,7 +51,12 @@ interface AssembledProject {
   actualEvents: ProfitEvent[];
 }
 
-async function assembleProject(tenantId: string, projectId: string): Promise<AssembledProject | null> {
+/** includeOverhead=false ise `category:'OVERHEAD'` olayları düşer (doğrudan/katkı marjı görünümü). */
+function stripOverhead(events: ProfitEvent[], include: boolean): ProfitEvent[] {
+  return include ? events : events.filter((e) => e.category !== 'OVERHEAD');
+}
+
+async function assembleProject(tenantId: string, projectId: string, asOf: Date): Promise<AssembledProject | null> {
   const p = await prisma.project.findFirst({
     where: { id: projectId, tenantId },
     include: { milestones: true, projectCostItems: true },
@@ -102,6 +107,8 @@ async function assembleProject(tenantId: string, projectId: string): Promise<Ass
       issueDate: inv.issueDate, dueDate: inv.dueDate, paidAmount: inv.paidAmount, paidAt: inv.paidAt,
     })),
     payments,
+    asOf,
+    opportunityWonAt,
     projectCostItems: p.projectCostItems.map((pc) => ({
       id: pc.id, description: pc.description, category: pc.category,
       plannedAmount: pc.plannedAmount, actualAmount: pc.actualAmount, amountTRY: pc.amountTRY,
@@ -130,19 +137,21 @@ export interface LedgerResult {
 }
 
 export async function getLedger(
-  tenantId: string, scope: ProfitScope, opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number> } = {},
+  tenantId: string, scope: ProfitScope,
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; includeOverhead?: boolean } = {},
 ): Promise<LedgerResult> {
   const asOf = opts.asOf ?? new Date();
+  const inc = opts.includeOverhead !== false;
   const fxRates = await resolveFxRates(tenantId, opts.fxRates);
   const ids = await scopedProjectIds(tenantId, scope);
 
-  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id)))).filter(Boolean) as AssembledProject[];
+  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id, asOf)))).filter(Boolean) as AssembledProject[];
   const inRange = (e: ProfitEvent) =>
     (!opts.from || e.date.getTime() >= opts.from.getTime()) &&
     (!opts.to || e.date.getTime() <= opts.to.getTime());
 
-  const plan = assembled.flatMap((a) => a.planEvents).filter(inRange);
-  const actual = assembled.flatMap((a) => a.actualEvents).filter(inRange);
+  const plan = stripOverhead(assembled.flatMap((a) => a.planEvents), inc).filter(inRange);
+  const actual = stripOverhead(assembled.flatMap((a) => a.actualEvents), inc).filter(inRange);
 
   return { scope, asOf: asOf.toISOString(), fxRates, plan, actual };
 }
@@ -158,17 +167,18 @@ export interface SummaryResult {
 
 export async function getSummary(
   tenantId: string, scope: ProfitScope, grain: Grain,
-  opts: { asOf?: Date; year?: number; fxRates?: Record<string, number>; reportCurrency?: string } = {},
+  opts: { asOf?: Date; year?: number; fxRates?: Record<string, number>; reportCurrency?: string; includeOverhead?: boolean } = {},
 ): Promise<SummaryResult> {
   const asOf = opts.asOf ?? new Date();
+  const inc = opts.includeOverhead !== false;
   const fxRates = await resolveFxRates(tenantId, opts.fxRates);
   const ids = await scopedProjectIds(tenantId, scope);
-  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id)))).filter(Boolean) as AssembledProject[];
+  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id, asOf)))).filter(Boolean) as AssembledProject[];
 
   const projectNames: Record<string, string> = {};
   for (const a of assembled) projectNames[a.ledger.id] = a.ledger.name;
 
-  let events = [...assembled.flatMap((a) => a.planEvents), ...assembled.flatMap((a) => a.actualEvents)];
+  let events = stripOverhead([...assembled.flatMap((a) => a.planEvents), ...assembled.flatMap((a) => a.actualEvents)], inc);
   if (opts.year) {
     events = events.filter((e) => e.date.getUTCFullYear() === opts.year);
   }
@@ -179,10 +189,10 @@ export async function getSummary(
 
 // ── Faz B: Nakit pozisyonu + Hazine etkisi ─────────────────────────────────
 
-async function gatherAllEvents(tenantId: string, scope: ProfitScope): Promise<ProfitEvent[]> {
+async function gatherAllEvents(tenantId: string, scope: ProfitScope, asOf: Date, includeOverhead = true): Promise<ProfitEvent[]> {
   const ids = await scopedProjectIds(tenantId, scope);
-  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id)))).filter(Boolean) as AssembledProject[];
-  return [...assembled.flatMap((a) => a.planEvents), ...assembled.flatMap((a) => a.actualEvents)];
+  const assembled = (await Promise.all(ids.map((id) => assembleProject(tenantId, id, asOf)))).filter(Boolean) as AssembledProject[];
+  return stripOverhead([...assembled.flatMap((a) => a.planEvents), ...assembled.flatMap((a) => a.actualEvents)], includeOverhead);
 }
 
 export interface CashflowApiResult extends CashflowResult { scope: ProfitScope }
@@ -190,23 +200,23 @@ export interface TreasuryApiResult extends TreasuryResult { scope: ProfitScope }
 
 export async function getCashflow(
   tenantId: string, scope: ProfitScope,
-  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number> } = {},
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; includeOverhead?: boolean } = {},
 ): Promise<CashflowApiResult> {
   const asOf = opts.asOf ?? new Date();
   const fxRates = await resolveFxRates(tenantId, opts.fxRates);
-  const events = await gatherAllEvents(tenantId, scope);
+  const events = await gatherAllEvents(tenantId, scope, asOf, opts.includeOverhead !== false);
   const cf = buildCashflow(events, { asOf, from: opts.from, to: opts.to, fxRates });
   return { ...cf, scope };
 }
 
 export async function getTreasury(
   tenantId: string, scope: ProfitScope,
-  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number> } = {},
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; includeOverhead?: boolean } = {},
 ): Promise<TreasuryApiResult> {
   const asOf = opts.asOf ?? new Date();
   const fxRates = await resolveFxRates(tenantId, opts.fxRates);
   const interestRates = await resolveInterestRates(tenantId);
-  const events = await gatherAllEvents(tenantId, scope);
+  const events = await gatherAllEvents(tenantId, scope, asOf, opts.includeOverhead !== false);
   const cfOpts = { asOf, from: opts.from, to: opts.to, fxRates };
   const cf = buildCashflow(events, cfOpts);
   const tr = buildTreasury(cf, interestRates, cfOpts);
@@ -217,12 +227,12 @@ export interface InstrumentsApiResult extends InstrumentsResult { scope: ProfitS
 
 export async function getInstruments(
   tenantId: string, scope: ProfitScope,
-  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; params?: Partial<InstrumentParams> } = {},
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; includeOverhead?: boolean; params?: Partial<InstrumentParams> } = {},
 ): Promise<InstrumentsApiResult> {
   const asOf = opts.asOf ?? new Date();
   const fxRates = await resolveFxRates(tenantId, opts.fxRates);
   const interestRates = await resolveInterestRates(tenantId);
-  const events = await gatherAllEvents(tenantId, scope);
+  const events = await gatherAllEvents(tenantId, scope, asOf, opts.includeOverhead !== false);
   const result = buildInstrumentScenarios(events, { asOf, from: opts.from, to: opts.to, fxRates }, interestRates, opts.params ?? {});
   return { ...result, scope };
 }

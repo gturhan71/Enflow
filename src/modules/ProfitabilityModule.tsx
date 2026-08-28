@@ -31,6 +31,7 @@ export default function ProfitabilityModule() {
   const [asOf, setAsOf] = useState<string>(todayISO());
   const [year, setYear] = useState<number | ''>(new Date().getUTCFullYear());
   const [view, setView] = useState<'PLAN' | 'ACTUAL' | 'BOTH'>('BOTH');
+  const [includeOverhead, setIncludeOverhead] = useState(true);
   const [data, setData] = useState<ProfitSummaryResult | null>(null);
   const [cashflow, setCashflow] = useState<CashflowResult | null>(null);
   const [treasury, setTreasury] = useState<TreasuryResult | null>(null);
@@ -49,13 +50,14 @@ export default function ProfitabilityModule() {
     const range = yr
       ? { from: new Date(Date.UTC(yr, 0, 1)).toISOString(), to: new Date(Date.UTC(yr, 11, 31)).toISOString() }
       : {};
+    const ovh = includeOverhead ? undefined : '0';
     try {
       const [sum, cf, tr, drift, inst] = await Promise.all([
-        apiService.getProfitabilitySummary({ grain, asOf: asOfISO, year: yr }),
-        apiService.getProfitabilityCashflow({ asOf: asOfISO, ...range }),
-        apiService.getProfitabilityTreasury({ asOf: asOfISO, ...range }),
+        apiService.getProfitabilitySummary({ grain, asOf: asOfISO, year: yr, overhead: ovh }),
+        apiService.getProfitabilityCashflow({ asOf: asOfISO, ...range, overhead: ovh }),
+        apiService.getProfitabilityTreasury({ asOf: asOfISO, ...range, overhead: ovh }),
         apiService.getProfitabilityPlanDrift(),
-        apiService.getProfitabilityInstruments({ asOf: asOfISO, ...range }),
+        apiService.getProfitabilityInstruments({ asOf: asOfISO, ...range, overhead: ovh }),
       ]);
       setData(sum as ProfitSummaryResult);
       setCashflow(cf as CashflowResult);
@@ -71,7 +73,7 @@ export default function ProfitabilityModule() {
     } finally {
       setLoading(false);
     }
-  }, [grain, asOf, year]);
+  }, [grain, asOf, year, includeOverhead]);
 
   const takeSnapshot = useCallback(async () => {
     setSnapping(true);
@@ -202,6 +204,26 @@ export default function ProfitabilityModule() {
             />
           </div>
         )}
+
+        <div>
+          <label className="block text-[11px] font-bold text-slate-500 mb-1">İşletme maliyeti</label>
+          <div className="flex rounded-lg overflow-hidden border border-slate-200">
+            <button
+              onClick={() => setIncludeOverhead(true)}
+              className={`px-3 py-1.5 text-xs font-semibold ${includeOverhead ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              title="Tam-yüklü marj — işletme maliyeti (overhead) payı dahil"
+            >
+              Dahil
+            </button>
+            <button
+              onClick={() => setIncludeOverhead(false)}
+              className={`px-3 py-1.5 text-xs font-semibold ${!includeOverhead ? 'bg-slate-900 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'}`}
+              title="Doğrudan / katkı marjı — yalnız proje maliyetleri"
+            >
+              Hariç
+            </button>
+          </div>
+        </div>
       </div>
 
       {error && <div className="glass-card p-3 text-sm text-red-600 border border-red-200">{error}</div>}
@@ -429,8 +451,9 @@ export default function ProfitabilityModule() {
 
       <p className="text-[11px] text-slate-400">
         Faz A–D — canlı plan (tahakkuk + nakit paralel), konsolide nakit pozisyonu + faiz-bazlı hazine
-        katkısı, aylık plan snapshot ile plan-drift, finansal enstrüman senaryoları (faktoring / vadeli
-        mevduat / forward FX). Rakamlar gösterge; tenant kur/faiz ayarları Ayarlar → Finans.
+        katkısı, aylık plan snapshot ile plan-drift, finansal enstrüman senaryoları. İşletme maliyeti
+        (overhead) hem plana hem gerçekleşene simetrik uygulanır; yalnız proje kartında “İşletme
+        maliyetini uygula” açık olan projeleri etkiler. Rakamlar gösterge; kur/faiz ayarları Ayarlar → Finans.
       </p>
     </div>
   );

@@ -29,6 +29,11 @@ function parseDate(raw?: string): Date | undefined {
   return Number.isNaN(d.getTime()) ? undefined : d;
 }
 
+// ?overhead=0|false → işletme maliyetini hesaba KATMA (doğrudan/katkı marjı). Varsayılan: dahil.
+function parseOverhead(raw?: string): boolean {
+  return !(raw === '0' || raw === 'false' || raw === 'no');
+}
+
 // ── GET /api/profitability/ledger ───────────────────────────────────────────
 router.get('/ledger', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
   const scope = parseScopeParam(req.query.scope ? String(req.query.scope) : undefined);
@@ -37,6 +42,7 @@ router.get('/ledger', requireRole(VIEW_ROLES), asyncHandler(async (req: Request,
     from: parseDate(req.query.from ? String(req.query.from) : undefined),
     to: parseDate(req.query.to ? String(req.query.to) : undefined),
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+    includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
   });
   res.json(result);
 }));
@@ -53,6 +59,7 @@ router.get('/summary', requireRole(VIEW_ROLES), asyncHandler(async (req: Request
     year: yearRaw && Number.isFinite(yearRaw) ? yearRaw : undefined,
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
     reportCurrency: req.query.currency ? String(req.query.currency).toUpperCase() : undefined,
+    includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
   });
   res.json(result);
 }));
@@ -67,6 +74,7 @@ router.get('/cashflow', requireRole(VIEW_ROLES), asyncHandler(async (req: Reques
     from: parseDate(req.query.from ? String(req.query.from) : undefined),
     to: parseDate(req.query.to ? String(req.query.to) : undefined),
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+    includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
   });
   res.json(result);
 }));
@@ -80,6 +88,7 @@ router.get('/treasury', requireRole(VIEW_ROLES), asyncHandler(async (req: Reques
     from: parseDate(req.query.from ? String(req.query.from) : undefined),
     to: parseDate(req.query.to ? String(req.query.to) : undefined),
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+    includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
   });
   res.json(result);
 }));
@@ -109,6 +118,7 @@ router.get('/instruments', requireRole(VIEW_ROLES), asyncHandler(async (req: Req
     from: parseDate(req.query.from ? String(req.query.from) : undefined),
     to: parseDate(req.query.to ? String(req.query.to) : undefined),
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+    includeOverhead: parseOverhead(req.query.overhead ? String(req.query.overhead) : undefined),
     params: cleaned,
   });
   res.json(result);

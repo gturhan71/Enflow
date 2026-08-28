@@ -139,4 +139,33 @@ describe('profitabilityLedger — buildActualEvents', () => {
     expect(pc[0]).toMatchObject({ direction: 'OUT', basis: 'ACCRUAL', amount: 12_000, currency: 'TRY' });
     expect(pc[0].date).toEqual(new Date('2026-03-15T00:00:00Z'));
   });
+
+  it('books ONLY the elapsed (absorbed) overhead share on the actual side (symmetry with plan)', () => {
+    // Proje 2026-01-01 → 2026-07-01, overhead 60k, 6 eşit pay (10k/ay-ish).
+    // asOf 2026-04-01 → süresinin ~yarısı geçmiş → yaklaşık yarı overhead.
+    const p = proj({ applyOverhead: true, overheadAmount: 60_000 });
+    const midway = buildActualEvents({
+      project: p, invoices: [], payments: [], projectCostItems: [],
+      asOf: new Date('2026-04-01T00:00:00Z'),
+    });
+    const ovhAcc = midway.filter((e) => e.category === 'OVERHEAD' && e.basis === 'ACCRUAL');
+    expect(ovhAcc.length).toBeGreaterThan(0);
+    expect(ovhAcc.length).toBeLessThan(6);            // henüz tüm paylar absorbe edilmedi
+    const absorbed = ovhAcc.reduce((s, e) => s + e.amount, 0);
+    expect(absorbed).toBeGreaterThan(0);
+    expect(absorbed).toBeLessThan(60_000);
+    expect(ovhAcc.every((e) => e.date.getTime() <= new Date('2026-04-01T00:00:00Z').getTime())).toBe(true);
+
+    // asOf projenin sonundan sonra → tüm 6 pay
+    const done = buildActualEvents({
+      project: p, invoices: [], payments: [], projectCostItems: [],
+      asOf: new Date('2026-09-01T00:00:00Z'),
+    });
+    expect(done.filter((e) => e.category === 'OVERHEAD' && e.basis === 'ACCRUAL').reduce((s, e) => s + e.amount, 0)).toBeCloseTo(60_000, 5);
+  });
+
+  it('emits no actual-side overhead when applyOverhead is false', () => {
+    const ev = buildActualEvents(actualInput({}));
+    expect(ev.some((e) => e.category === 'OVERHEAD')).toBe(false);
+  });
 });

@@ -113,6 +113,31 @@ function planRevenueSchedule(
   }));
 }
 
+/**
+ * İşletme maliyeti (overhead) payı olayları — PLAN ve ACTUAL tarafında ORTAK.
+ * Yalnız `Project.applyOverhead === true` ise üretilir; kayıtlı `overheadAmount`
+ * proje süresine 6 eşit parçaya bölünür (ACCRUAL + CASH). ACTUAL tarafında
+ * `untilTs` verilir → yalnız o ana kadar "absorbe edilmiş" paylar döner
+ * (gelecek pay plandan gelir; EAC'de çift sayım olmaz).
+ */
+function overheadEvents(p: LedgerProject, refStart: Date, source: ProfitSource, untilTs?: number): ProfitEvent[] {
+  if (!p.applyOverhead || p.overheadAmount <= 0) return [];
+  const end = p.plannedEndDate ?? new Date(refStart.getTime() + 180 * DAY);
+  const dates = spreadDates(refStart, end, 6);
+  const per = p.overheadAmount / (dates.length || 1);
+  const base = { source, projectId: p.id, opportunityId: p.opportunityId };
+  const out: ProfitEvent[] = [];
+  for (const [idx, d] of dates.entries()) {
+    if (untilTs !== undefined && d.getTime() > untilTs) continue;
+    for (const basis of ['ACCRUAL', 'CASH'] as const) {
+      out.push({ ...base, date: d, amount: per, currency: 'TRY', direction: 'OUT', basis,
+        category: 'OVERHEAD', ref: `ovh-${source.toLowerCase()}-${basis}-${idx}`,
+        confidence: 'ESTIMATED', label: `İşletme maliyeti payı ${idx + 1}` });
+    }
+  }
+  return out;
+}
+
 // ── PLAN olayları ───────────────────────────────────────────────────────────
 
 export interface BuildPlanInput {
@@ -189,18 +214,8 @@ export function buildPlanEvents(input: BuildPlanInput): ProfitEvent[] {
       basis: 'CASH', category: 'PROJECT_COST', ref: `pci-cash-${ref}`, confidence: 'ESTIMATED', label });
   }
 
-  // ── Overhead (işletme maliyeti) — yalnız applyOverhead=true ──────────────
-  if (p.applyOverhead && p.overheadAmount > 0) {
-    const end = p.plannedEndDate ?? new Date(refStart.getTime() + 180 * DAY);
-    const dates = spreadDates(refStart, end, 6);
-    const per = p.overheadAmount / (dates.length || 1);
-    for (const [idx, d] of dates.entries()) {
-      for (const basis of ['ACCRUAL', 'CASH'] as const) {
-        ev.push({ ...base, date: d, amount: per, currency: 'TRY', direction: 'OUT', basis,
-          category: 'OVERHEAD', ref: `ovh-${basis}-${idx}`, confidence: 'ESTIMATED', label: `İşletme maliyeti payı ${idx + 1}` });
-      }
-    }
-  }
+  // ── Overhead (işletme maliyeti) — yalnız applyOverhead=true (PLAN: tüm süre)
+  ev.push(...overheadEvents(p, refStart, 'PLAN'));
 
   return ev;
 }
@@ -212,6 +227,9 @@ export interface BuildActualInput {
   invoices: LedgerInvoice[];
   payments: LedgerPayment[];
   projectCostItems: LedgerProjectCostItem[];
+  /** ACTUAL overhead payının "absorbe edilmiş" kısmını kesmek için (varsayılan: şimdi). */
+  asOf?: Date;
+  opportunityWonAt?: Date | null;
 }
 
 /**
@@ -220,9 +238,12 @@ export interface BuildActualInput {
  *  - CASH gelir/gider: Payment.paidAt (invoiceType ile yön) — Payment yoksa
  *    Invoice.paidAmount+paidAt fallback
  *  - ACCRUAL gider: ProjectCostItem.amountTRY (date/createdAt)
+ *  - OVERHEAD: applyOverhead=true ise, asOf'a kadar absorbe edilmiş işletme
+ *    maliyeti payı (plan ile simetri — gelecek pay plandan gelir)
  */
 export function buildActualEvents(input: BuildActualInput): ProfitEvent[] {
   const { project: p, invoices, payments, projectCostItems } = input;
+  const asOf = input.asOf ?? new Date();
   const ev: ProfitEvent[] = [];
   const base = { source: 'ACTUAL' as const, projectId: p.id, opportunityId: p.opportunityId };
 
@@ -266,6 +287,9 @@ export function buildActualEvents(input: BuildActualInput): ProfitEvent[] {
       category: 'PROJECT_COST', ref: `pci-act-${pc.id ?? idx}`, confidence: 'FIRM',
       label: pc.description || `Proje gideri ${idx + 1}` });
   }
+
+  // ── Overhead — asOf'a kadar absorbe edilmiş pay (plan ile simetri)
+  ev.push(...overheadEvents(p, resolveReferenceStart(p, input.opportunityWonAt), 'ACTUAL', asOf.getTime()));
 
   return ev;
 }
