@@ -8,7 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import {
-  getLedger, getSummary, getCashflow, getTreasury, parseFxParam, parseScopeParam,
+  getLedger, getSummary, getCashflow, getTreasury, getInstruments, parseFxParam, parseScopeParam,
 } from '../services/profitabilityService';
 import { takeSnapshot, listSnapshots, getPlanDrift } from '../services/profitabilitySnapshot';
 import { logActivity } from '../services/activityLog';
@@ -80,6 +80,36 @@ router.get('/treasury', requireRole(VIEW_ROLES), asyncHandler(async (req: Reques
     from: parseDate(req.query.from ? String(req.query.from) : undefined),
     to: parseDate(req.query.to ? String(req.query.to) : undefined),
     fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+  });
+  res.json(result);
+}));
+
+// ── GET /api/profitability/instruments (Faz D) ──────────────────────────────
+// Finansal enstrüman senaryoları (faktoring / mevduat / forward FX) — baz duruma
+// karşı deterministik değer deltaları. Ayarlanabilir: factoringDiscountPct,
+// factoringHorizonDays, depositRatePct, depositTermDays, forwardHorizonDays.
+router.get('/instruments', requireRole(VIEW_ROLES), asyncHandler(async (req: Request, res: Response) => {
+  const scope = parseScopeParam(req.query.scope ? String(req.query.scope) : undefined);
+  const num = (k: string): number | undefined => {
+    const v = req.query[k];
+    if (v === undefined) return undefined;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : undefined;
+  };
+  const params = {
+    factoringAnnualDiscountPct: num('factoringDiscountPct'),
+    factoringHorizonDays: num('factoringHorizonDays'),
+    depositRatePct: num('depositRatePct'),
+    depositTermDays: num('depositTermDays'),
+    forwardHorizonDays: num('forwardHorizonDays'),
+  };
+  const cleaned = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined));
+  const result = await getInstruments(req.tenantId, scope, {
+    asOf: parseDate(req.query.asOf ? String(req.query.asOf) : undefined),
+    from: parseDate(req.query.from ? String(req.query.from) : undefined),
+    to: parseDate(req.query.to ? String(req.query.to) : undefined),
+    fxRates: parseFxParam(req.query.fx ? String(req.query.fx) : undefined),
+    params: cleaned,
   });
   res.json(result);
 }));

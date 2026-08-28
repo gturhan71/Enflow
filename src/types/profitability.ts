@@ -153,3 +153,23 @@ export interface SnapshotTakeResult {
   written: number;
   periodKeys: string[];
 }
+
+// ── Faz D: finansal enstrüman senaryoları ─────────────────────────────────
+
+export interface InstrumentScenario {
+  instrument: 'FACTORING' | 'DEPOSIT' | 'FORWARD_FX';
+  label: string;
+  description: string;
+  delta: number;
+  detail: Record<string, number>;
+  assumptions: Record<string, number>;
+  reversible: boolean;
+}
+
+export interface InstrumentsResult {
+  scope: ProfitScope;
+  asOf: string;
+  baseline: { treasuryNet: number; maxDeficitTRY: number; endingPositionTRY: number };
+  scenarios: InstrumentScenario[];
+  totalOpportunity: number;
+}

@@ -14,6 +14,7 @@ import { fmtCurrency } from '../lib/format';
 import MarginBadge from './project-mgmt/MarginBadge';
 import type {
   ProfitGrain, ProfitPeriodRow, ProfitSummaryResult, CashflowResult, TreasuryResult, PlanDriftSeries,
+  InstrumentsResult,
 } from '../types';
 
 const GRAINS: { key: ProfitGrain; label: string }[] = [
@@ -34,6 +35,7 @@ export default function ProfitabilityModule() {
   const [cashflow, setCashflow] = useState<CashflowResult | null>(null);
   const [treasury, setTreasury] = useState<TreasuryResult | null>(null);
   const [planDrift, setPlanDrift] = useState<PlanDriftSeries[]>([]);
+  const [instruments, setInstruments] = useState<InstrumentsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [snapping, setSnapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,21 +50,24 @@ export default function ProfitabilityModule() {
       ? { from: new Date(Date.UTC(yr, 0, 1)).toISOString(), to: new Date(Date.UTC(yr, 11, 31)).toISOString() }
       : {};
     try {
-      const [sum, cf, tr, drift] = await Promise.all([
+      const [sum, cf, tr, drift, inst] = await Promise.all([
         apiService.getProfitabilitySummary({ grain, asOf: asOfISO, year: yr }),
         apiService.getProfitabilityCashflow({ asOf: asOfISO, ...range }),
         apiService.getProfitabilityTreasury({ asOf: asOfISO, ...range }),
         apiService.getProfitabilityPlanDrift(),
+        apiService.getProfitabilityInstruments({ asOf: asOfISO, ...range }),
       ]);
       setData(sum as ProfitSummaryResult);
       setCashflow(cf as CashflowResult);
       setTreasury(tr as TreasuryResult);
       setPlanDrift((drift?.series ?? []).filter((s) => s.points.length > 1));
+      setInstruments(inst as InstrumentsResult);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kârlılık verisi alınamadı.');
       setData(null);
       setCashflow(null);
       setTreasury(null);
+      setInstruments(null);
     } finally {
       setLoading(false);
     }
@@ -389,10 +394,43 @@ export default function ProfitabilityModule() {
         )}
       </div>
 
+      {/* ── Finansal enstrüman senaryoları — Faz D ──────────────────────── */}
+      {instruments && (
+        <div className="glass-card p-4">
+          <div className="flex items-baseline justify-between mb-1">
+            <h3 className="text-sm font-black text-slate-900">Finansal enstrümanlarla değer</h3>
+            <span className="text-[11px] text-slate-400">
+              Toplam fırsat: <b className={instruments.totalOpportunity > 0 ? 'text-emerald-600' : 'text-slate-500'}>{fmtCurrency(instruments.totalOpportunity)}</b>
+            </span>
+          </div>
+          <p className="text-[11px] text-slate-400 mb-3">
+            Baz hazine katkısı {fmtCurrency(instruments.baseline.treasuryNet)} · gösterge deltalar (kesin fiyatlama değil), varsayımlar kartlarda.
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {instruments.scenarios.map((s) => (
+              <div key={s.instrument} className="border border-slate-200 rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-slate-800">{s.label}</span>
+                  <span className={`text-xs font-black tabular-nums ${s.delta > 0 ? 'text-emerald-600' : s.delta < 0 ? 'text-red-600' : 'text-slate-400'}`}>
+                    {s.delta >= 0 ? '+' : ''}{fmtCurrency(s.delta)}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">{s.description}</p>
+                <div className="text-[10px] text-slate-400 mt-2 space-x-2">
+                  {Object.entries(s.assumptions).map(([k, v]) => (
+                    <span key={k}>{k}: <b>{v}</b></span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <p className="text-[11px] text-slate-400">
-        Faz A–C — canlı plan (tahakkuk + nakit paralel), konsolide nakit pozisyonu + faiz-bazlı hazine
-        katkısı, aylık plan snapshot ile plan-drift. Finansal enstrüman senaryoları (faktoring / forward
-        FX / teminat / mevduat) Faz D.
+        Faz A–D — canlı plan (tahakkuk + nakit paralel), konsolide nakit pozisyonu + faiz-bazlı hazine
+        katkısı, aylık plan snapshot ile plan-drift, finansal enstrüman senaryoları (faktoring / vadeli
+        mevduat / forward FX). Rakamlar gösterge; tenant kur/faiz ayarları Ayarlar → Finans.
       </p>
     </div>
   );

@@ -14,6 +14,9 @@ import { DEFAULT_INTEREST_RATES } from './financingEffect';
 import {
   buildCashflow, buildTreasury, type CashflowResult, type TreasuryResult,
 } from './profitabilityCashflow';
+import {
+  buildInstrumentScenarios, type InstrumentsResult, type InstrumentParams,
+} from './profitabilityInstruments';
 
 export interface ProfitScope { kind: 'ALL' | 'PROJECT'; projectId?: string }
 
@@ -208,6 +211,20 @@ export async function getTreasury(
   const cf = buildCashflow(events, cfOpts);
   const tr = buildTreasury(cf, interestRates, cfOpts);
   return { ...tr, scope };
+}
+
+export interface InstrumentsApiResult extends InstrumentsResult { scope: ProfitScope }
+
+export async function getInstruments(
+  tenantId: string, scope: ProfitScope,
+  opts: { asOf?: Date; from?: Date; to?: Date; fxRates?: Record<string, number>; params?: Partial<InstrumentParams> } = {},
+): Promise<InstrumentsApiResult> {
+  const asOf = opts.asOf ?? new Date();
+  const fxRates = await resolveFxRates(tenantId, opts.fxRates);
+  const interestRates = await resolveInterestRates(tenantId);
+  const events = await gatherAllEvents(tenantId, scope);
+  const result = buildInstrumentScenarios(events, { asOf, from: opts.from, to: opts.to, fxRates }, interestRates, opts.params ?? {});
+  return { ...result, scope };
 }
 
 /** "USD:40,EUR:44" → { USD: 40, EUR: 44 } */
