@@ -1,6 +1,6 @@
 # Enflow — Zamana Duyarlı Kârlılık & Nakit/Hazine Analizi Planı
 
-> Durum: **onaylandı, Faz A geliştirmede** (2026-08-28)
+> Durum: **Faz A tamam** (2026-08-28) — `profitabilityLedger` + `profitabilityRollup` + `profitabilityService` + `routes/profitability.ts` (`/ledger`, `/summary`) + `PROFITABILITY_VIEW` izni + `ProfitabilityModule.tsx`. Birim testleri 18, `tsc` 0 (fe+be), `audit:roles` 0 ERROR/WARN, backend unit 148/148. **Sıradaki: Faz B** (nakit pozisyonu + hazine/faiz paneli).
 > Branch: `feat/profitability-analysis`
 > Tek doğruluk kaynağı bu dosyadır — değişiklik önce burada yapılır, sonra koda/CLAUDE.md'ye yansıtılır.
 

@@ -50,6 +50,7 @@ import financeRouter from './routes/finance';
 import legalRouter from './routes/legal';
 import tendersRouter from './routes/tenders';
 import reportsRouter from './routes/reports';
+import profitabilityRouter from './routes/profitability';
 import pluginsRouter from './routes/plugins';
 import dmoRouter from './routes/dmo';
 
@@ -185,6 +186,7 @@ app.use('/api/finance', financeRouter);
 app.use('/api/legal', legalRouter);
 app.use('/api/tenders', tendersRouter);
 app.use('/api/reports', reportsRouter);
+app.use('/api/profitability', profitabilityRouter);
 app.use('/api/plugins', pluginsRouter);
 app.use('/api/dmo', tenantMiddleware, requireEntitlement('DMO_MODULE'), dmoRouter); // ayrı lisanslı modül
 

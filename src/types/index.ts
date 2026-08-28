@@ -18,3 +18,4 @@ export * from './plugin';
 export * from './backup';
 export * from './dmo';
 export * from './productTaxonomy';
+export * from './profitability';

@@ -133,6 +133,26 @@ class ApiService {
   async getBusinessHealth(): Promise<import('../types').BusinessHealth> { return apiClient.fetchWithAuth('/reports/business-health'); }
   async getDmoAnalytics(): Promise<import('../types').DmoAnalytics> { return apiClient.fetchWithAuth('/reports/dmo-analytics'); }
   async getBrandCategoryAnalytics(): Promise<import('../types').BrandCategoryAnalytics> { return apiClient.fetchWithAuth('/reports/brand-category-analytics'); }
+
+  // Kârlılık analizi (Faz A) — zamana duyarlı, planlanan + gerçekleşen paralel
+  async getProfitabilitySummary(params: { grain: import('../types').ProfitGrain; scope?: string; asOf?: string; year?: number; currency?: string; fx?: string }): Promise<import('../types').ProfitSummaryResult> {
+    const q = new URLSearchParams({ grain: params.grain });
+    if (params.scope) q.set('scope', params.scope);
+    if (params.asOf) q.set('asOf', params.asOf);
+    if (params.year) q.set('year', String(params.year));
+    if (params.currency) q.set('currency', params.currency);
+    if (params.fx) q.set('fx', params.fx);
+    return apiClient.fetchWithAuth(`/profitability/summary?${q.toString()}`);
+  }
+  async getProfitabilityLedger(params: { scope?: string; asOf?: string; from?: string; to?: string; fx?: string }): Promise<import('../types').ProfitLedgerResult> {
+    const q = new URLSearchParams();
+    if (params.scope) q.set('scope', params.scope);
+    if (params.asOf) q.set('asOf', params.asOf);
+    if (params.from) q.set('from', params.from);
+    if (params.to) q.set('to', params.to);
+    if (params.fx) q.set('fx', params.fx);
+    return apiClient.fetchWithAuth(`/profitability/ledger?${q.toString()}`);
+  }
   // İşletme maliyeti (overhead) + birim bütçe
   async getOperatingCostPools(): Promise<import('../types').OperatingCostPool[]> { return apiClient.fetchWithAuth('/finance/operating-cost-pool'); }
   async createOperatingCostPool(d: Partial<import('../types').OperatingCostPool>) { return apiClient.fetchWithAuth('/finance/operating-cost-pool', { method: 'POST', body: JSON.stringify(d) }); }
