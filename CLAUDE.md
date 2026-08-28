@@ -514,7 +514,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 18 minutes ago)
+## changes (last 10 commits — 16 minutes ago)
 ```
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
