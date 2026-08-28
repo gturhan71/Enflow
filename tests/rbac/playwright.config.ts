@@ -11,7 +11,10 @@ export default defineConfig({
   testDir: "./",
   timeout: 30_000,
   fullyParallel: false, // Sıralı — auth setup önce bitmeli
-  retries: 0,
+  // 440-testlik ui-access sweep'inde (2 worker, ~15dk) sidebar'ın "Test Ortamı"
+  // bölümü ara sıra sabit beklemeden sonra render oluyor → tek seferlik flake.
+  // İzole koşuda %100 geçiyor; 1 retry ile rapor "flaky" işaretler (gizlemez).
+  retries: 1,
   globalTeardown: "./global-teardown.ts",
   reporter: [
     ["list"],

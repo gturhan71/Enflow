@@ -584,7 +584,8 @@ export const uiMatrix: UiCase[] = [
   {
     name: "Ziyaret Planı menüsü",
     sidebarText: "Ziyaret Planı",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
+    // VISIT_PLAN_VIEW: GM + SALES_REP + BACKUP_ADMIN (roleDefaultPermissions.ts). sales_rep düzeltildi (bayat 'hidden' idi).
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "visible", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible" },
   },
   {
     name: "Satış Destek menüsü",
@@ -611,7 +612,8 @@ export const uiMatrix: UiCase[] = [
   {
     name: "Garanti & Servis menüsü",
     sidebarText: "Garanti & Servis",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden" },
+    // SERVICE_TICKETS_VIEW: GM + PROJECT_MGR + OPERATIONS_MGR (roleDefaultPermissions.ts). project_mgr/operations_mgr düzeltildi (bayat 'hidden' idi).
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden" },
   },
   {
     name: "Finans menüsü",
@@ -629,11 +631,9 @@ export const uiMatrix: UiCase[] = [
     sidebarText: "Görevler & Takip",
     expect: { general_manager: "visible", presales_eng: "visible", sales_rep: "visible", sales_mgr: "visible", sales_support: "visible", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "visible", procurement_mgr: "visible", isab_mgr: "visible", admin: "hidden", presales_mgr: "visible", technical_spec: "visible", operations_mgr: "visible", hr_mgr: "visible", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
   },
-  {
-    name: "Yönetim Raporları menüsü",
-    sidebarText: "Yönetim Raporları",
-    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "visible", ksu_mgr: "visible", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "visible", backup_admin: "visible" },
-  },
+  // NOT: "Yönetim Raporları" ayrı bir sidebar menüsü DEĞİL — MANAGEMENT_REPORTS_VIEW
+  // izni olanlar için doğrudan Dashboard'a gömülü (bkz. src/constants.ts). Eski
+  // uiMatrix satırı kaldırıldı (kalıcı false-fail üretiyordu).
   {
     name: "Genel Hususlar menüsü",
     sidebarText: "Genel Hususlar",

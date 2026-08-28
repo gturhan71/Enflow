@@ -34,6 +34,22 @@ for (const role of ROLE_NAMES) {
         // Sidebar'ın yüklenmesini bekle (en az bir menü öğesi görünür olmalı)
         await page.waitForTimeout(1500);
 
+        // Alt-öğe (subItem) menüleri yalnız üst grup GENİŞLETİLDİĞİNDE DOM'a gelir
+        // (Sidebar.tsx: `{isExpanded && <AnimatePresence>…}`). Yalnızca ilgili üst
+        // grubu aç — tüm grupları açmak sweep'i kararsızlaştırıyordu. Şu an tek
+        // subItem satırı "Fiziksel Arşiv" (üst grup: "Şirket Evrakları").
+        const SUBITEM_PARENT: Record<string, string> = {
+          "Fiziksel Arşiv": "Şirket Evrakları",
+        };
+        const parentLabel = SUBITEM_PARENT[c.sidebarText];
+        if (parentLabel) {
+          const grp = page.getByTestId("sidebar").getByRole("button").filter({ hasText: parentLabel }).first();
+          if (await grp.count()) {
+            await grp.click({ timeout: 1500 }).catch(() => {});
+            await page.waitForTimeout(400); // AnimatePresence açılış animasyonu
+          }
+        }
+
         // Aramayı sidebar'a (Sidebar.tsx kök `data-testid="sidebar"`) daralt —
         // sayfa genelinde arama, kısa/ortak alt-string'lerin Dashboard
         // içeriğiyle yanlışlıkla eşleşmesine yol açabilir (ör. "Finans" →
