@@ -229,6 +229,7 @@ const TodoModule = ({
           filteredTodos={filteredTodos}
           getRelatedItemName={(todo) => getRelatedItemName(todo, relatedItemCtx)}
           users={users}
+          currentUserId={currentUser?.id}
           onNavigate={onNavigate}
           onToggleStatus={handleStatusChange}
         />

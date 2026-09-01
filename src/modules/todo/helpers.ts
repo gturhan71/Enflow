@@ -76,6 +76,32 @@ export const CHAIN_ENTITY_LABEL: Record<string, string> = {
 export const fmtCompletedAt = (d?: string | null) =>
   d ? new Date(d).toLocaleString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
+// Öncelik sıralaması — küçük sayı = daha kritik (liste/grup sıralaması için).
+export const PRIORITY_RANK: Record<string, number> = { URGENT: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
+
+// dueDate (ISO) → bugüne göre kalan gün; tarih yoksa/geçersizse null.
+export const daysUntil = (iso?: string | null): number | null => {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return null;
+  return Math.ceil((t - Date.now()) / 86400000);
+};
+
+// dueDate (ISO) → kısa TR tarih; geçersizse ham değeri döndür.
+export const fmtDueDate = (iso?: string | null): string => {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime())
+    ? iso
+    : d.toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+// relatedModule kodu → kısa görünen ad (filtre menüsü + grup alt-başlığı).
+export const RELATED_MODULE_LABEL: Record<string, string> = {
+  PROJECT: 'Proje', OPPORTUNITY: 'Fırsat', CONTRACT: 'Sözleşme',
+  LEGAL: 'Hukuk', PROCUREMENT: 'Satın Alma', DELIVERY: 'Teslimat', GENERAL: 'Genel',
+};
+
 export const getPriorityColor = (priority: string) => {
   switch (priority) {
     case 'URGENT': return 'bg-red-100 text-red-700 border-red-200';
@@ -150,6 +176,9 @@ export interface ProposalDetailItem {
   description: string;
   quantity: number;
   purchaseCost?: number;
+  // Kalemin taban-para-birimine (teklif dövizi) çevrilmiş birim maliyeti — `purchaseCost`
+  // kalemin ÖZGÜN teklif para biriminde tutulduğundan marj hesabında bu kullanılır.
+  purchaseCostBase?: number;
   unitSalePrice?: number;
   totalSalePrice?: number;
   marginPercentage?: number;
@@ -180,6 +209,9 @@ export const getProposalDetail = (
   let items: ProposalDetailItem[] = (proposal.items as ProposalDetailItem[]) || [];
   let description = proposal.description || '';
   let terms = proposal.terms || '';
+  // Teklif editörünün kaydettiği taban-para (baseCurrency) toplam girdi maliyeti
+  // (BoM + operasyonel gider) — totalPrice ile aynı birimde; marj için tek doğru kaynak.
+  let totalCostBase: number | undefined;
 
   if (proposal.content) {
     try {
@@ -190,13 +222,22 @@ export const getProposalDetail = (
       if (!items.length && Array.isArray(parsed.items)) items = parsed.items as ProposalDetailItem[];
       if (!description) description = (parsed.description as string) || '';
       if (!terms) terms = (parsed.terms as string) || '';
+      if (typeof parsed.totalCostBase === 'number') {
+        totalCostBase = parsed.totalCostBase;
+      } else if (typeof parsed.totalBoMCostBase === 'number') {
+        totalCostBase = parsed.totalBoMCostBase + (typeof parsed.totalOpsCostBase === 'number' ? parsed.totalOpsCostBase : 0);
+      }
     } catch { /* ignore */ }
   }
 
   if (totalPrice == null) return null;
 
-  const totalCost = items.reduce(
-    (s, i) => s + (i.purchaseCost ?? 0) * (i.quantity ?? 1),
+  // Öncelik: editörün kaydettiği taban-para toplam maliyeti (totalPrice ile birim tutarlı).
+  // Yedek (eski kayıt, totalCostBase yok): kalem başına taban-para maliyeti (purchaseCostBase);
+  // o da yoksa ham purchaseCost — DİKKAT: purchaseCost kalemin özgün teklif para biriminde
+  // tutulur, taban para farklıysa (döviz kurlu teklif) marjı olduğundan yüksek gösterir.
+  const totalCost = totalCostBase ?? items.reduce(
+    (s, i) => s + (i.purchaseCostBase ?? i.purchaseCost ?? 0) * (i.quantity ?? 1),
     0
   );
 

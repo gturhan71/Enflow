@@ -409,7 +409,8 @@ const CRMModule = ({
           const opp = opportunities.find(o => o.id === proposal.opportunityId);
           const cust = customers.find(cu => cu.id === (opp?.customerId ?? proposal.customerId));
           const totalPrice = contentJson.totalPrice as number | undefined;
-          const currency = cust?.currency ?? 'TRY';
+          // Teklif tutarı teklifin kendi (maliyet analizi) para biriminde — müşteri para birimi farklı olabilir.
+          const currency = (contentJson.currency as string | undefined) ?? opp?.costConfig?.baseCurrency ?? cust?.currency ?? 'TRY';
           const priceLabel = totalPrice != null
             ? `${totalPrice.toLocaleString('tr-TR')} ${currency}`
             : '';
@@ -445,9 +446,10 @@ const CRMModule = ({
       if (!gmUnitId) { alert('Onay görevi oluşturulamadı: Genel Müdür birimi tanımlı değil.'); return; }
       const o = opportunities.find(o => o.id === proposal.opportunityId);
       const cust = customers.find(c => c.id === proposal.customerId);
-      const currency = cust?.currency || 'TRY';
       const c = getContentJson(proposal);
       const totalPrice = c.totalPrice as number ?? proposal.totalPrice;
+      // Teklif tutarı teklifin kendi (maliyet analizi) para biriminde — müşteri para birimi farklı olabilir.
+      const currency = (c.currency as string | undefined) ?? o?.costConfig?.baseCurrency ?? cust?.currency ?? 'TRY';
       const priceLabel = totalPrice != null
         ? totalPrice.toLocaleString('tr-TR') + ' ' + currency
         : '';

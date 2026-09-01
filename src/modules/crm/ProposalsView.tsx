@@ -109,7 +109,9 @@ export default function ProposalsView({
             {/* 1. Maliyet analizi tamamlanmış, teklif henüz oluşturulmamış fırsatlar */}
             {readyForProposalOpps.map(opp => {
               const cust = customers.find(c => c.id === opp.customerId);
-              const currency = cust?.currency ?? 'TRY';
+              // BoM satış fiyatları/analiz tutarları maliyet analizi taban para
+              // biriminde üretilir — müşteri para birimi (farklı olabilir) değil onu göster.
+              const currency = opp.costConfig?.baseCurrency ?? opp.currency ?? cust?.currency ?? 'TRY';
               const bomTotal = opp.bomItems && opp.bomItems.length > 0
                 ? opp.bomItems.reduce((sum, item) => {
                     const sp = item.unitSalePrice
@@ -181,17 +183,21 @@ export default function ProposalsView({
             {activeProposals.map(proposal => {
               const opp = opportunities.find(o => o.id === proposal.opportunityId);
               const customer = opp ? customers.find(c => c.id === opp.customerId) : null;
-              const currency = customer?.currency ?? 'TRY';
               const c = getContentJson(proposal);
               const totalPrice = (c.totalPrice as number | undefined) ?? proposal.totalPrice;
+              // Teklif tutarı teklifin kendi (maliyet analizi) para biriminde saklanır;
+              // müşteri para birimi farklı olabilir (bkz. ProposalEditor content.currency).
+              const currency = (c.currency as string | undefined) ?? opp?.costConfig?.baseCurrency ?? customer?.currency ?? 'TRY';
               // Revize edilecek teklif için bir önceki versiyonun tutarı+tarihi — PDF/teklife
               // çevirmeden önce kıyaslama yapılabilsin diye kartta gösterilir.
               const prevProposal = [...proposals]
                 .filter(p => p.opportunityId === proposal.opportunityId && (p.version || 1) < (proposal.version || 1))
                 .sort((a, b) => (b.version || 0) - (a.version || 0))[0];
+              const prevContent = prevProposal ? getContentJson(prevProposal) : null;
               const prevTotalPrice = prevProposal
-                ? ((getContentJson(prevProposal).totalPrice as number | undefined) ?? prevProposal.totalPrice)
+                ? ((prevContent?.totalPrice as number | undefined) ?? prevProposal.totalPrice)
                 : undefined;
+              const prevCurrency = (prevContent?.currency as string | undefined) ?? currency;
               return (
                 <div key={proposal.id} className={cn(
                   "glass-panel p-6 rounded-2xl flex justify-between items-center",
@@ -215,7 +221,7 @@ export default function ProposalsView({
                     {prevProposal && (
                       <p className="text-[11px] text-slate-400 mt-1">
                         Önceki (v{prevProposal.version || 1} · {prevProposal.createdAt ? new Date(prevProposal.createdAt).toLocaleDateString('tr-TR') : '-'}):{' '}
-                        {prevTotalPrice != null ? `${Math.round(prevTotalPrice).toLocaleString('tr-TR')} ${currency}` : '—'}
+                        {prevTotalPrice != null ? `${Math.round(prevTotalPrice).toLocaleString('tr-TR')} ${prevCurrency}` : '—'}
                       </p>
                     )}
                   </div>
@@ -277,7 +283,8 @@ export default function ProposalsView({
                 ? new Date(pdfDateRaw).toLocaleString('tr-TR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
                 : '-';
               const totalPrice = c.totalPrice as number | undefined;
-              const currency = cust?.currency ?? 'TRY';
+              // Teklifin kendi para birimi (maliyet analizi tabanı) — müşteri para birimi farklı olabilir.
+              const currency = (c.currency as string | undefined) ?? opp?.costConfig?.baseCurrency ?? cust?.currency ?? 'TRY';
               const delivered = !!(c.deliveredToCustomer as boolean | undefined);
               return (
                 <div key={proposal.id} className="glass-panel p-5 rounded-2xl border-l-4 border-blue-400">
