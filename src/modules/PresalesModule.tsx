@@ -30,6 +30,7 @@ import SpecComplianceMatrix from './SpecComplianceMatrix';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
 import { useBoM } from '../hooks/useBoM';
+import { fmtCurrency } from '../lib/format';
 import { parseBoMFile } from '../utils/bomParser';
 import { SaveButton } from '../components/SaveButton';
 import { apiService } from '../services/apiService';
@@ -93,11 +94,15 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
     addBoMItem,
     isSubmitting,
     saveAndHandoff,
-    totalCost
+    totalsByCurrency
   } = useBoM(selectedOppId, setOpportunities, opportunities);
 
   // BoM hangi dövizle hazırlanıyorsa o döviz maliyetlendirmeye değişmeden taşınır (kritik)
   const [bomCurrency, setBomCurrency] = useState('TRY');
+  // Kalemler tek dövizdeyse tek tutar, karışık dövizdeyse " + " ile ayrılmış döviz bazlı toplam
+  const totalCostLabel = totalsByCurrency.length > 0
+    ? totalsByCurrency.map(t => fmtCurrency(t.amount, t.currency)).join(' + ')
+    : fmtCurrency(0, bomCurrency);
   const [newItem, setNewItem] = useState({
     pn: '',
     desc: '',
@@ -305,7 +310,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                 <div className="flex items-center gap-4">
                   <div className="text-right">
                     <p className="text-[10px] text-slate-400 font-bold uppercase font-sans">Toplam Maliyet</p>
-                    <p className="text-sm font-mono font-bold text-slate-900">${totalCost.toLocaleString()}</p>
+                    <p className="text-sm font-mono font-bold text-slate-900">{totalCostLabel}</p>
                   </div>
                   <SaveButton onClick={handleRequestApproval} loading={isSubmitting} />
                 </div>
@@ -481,8 +486,8 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                           <td className="px-6 py-4 text-xs font-mono font-bold text-indigo-600">{item.pn}</td>
                           <td className="px-6 py-4 text-xs text-slate-600 font-medium">{item.desc}</td>
                           <td className="px-6 py-4 text-xs text-slate-900 font-bold text-center">{item.qty}</td>
-                          <td className="px-6 py-4 text-xs text-slate-900 font-bold text-right">${item.cost.toLocaleString()}</td>
-                          <td className="px-6 py-4 text-xs text-primary font-black text-right">${(item.cost * item.qty).toLocaleString()}</td>
+                          <td className="px-6 py-4 text-xs text-slate-900 font-bold text-right">{fmtCurrency(item.cost, item.currency || 'TRY')}</td>
+                          <td className="px-6 py-4 text-xs text-primary font-black text-right">{fmtCurrency(item.cost * item.qty, item.currency || 'TRY')}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -490,7 +495,7 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
                       <tr className="bg-slate-900 text-white font-sans">
                         <td colSpan={4} className="px-6 py-4 text-xs font-black uppercase tracking-widest">Genel Toplam</td>
                         <td className="px-6 py-4 text-lg font-black text-right">
-                          ${totalCost.toLocaleString()}
+                          {totalCostLabel}
                         </td>
                       </tr>
                     </tfoot>

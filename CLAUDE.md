@@ -366,14 +366,18 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
+src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
+src/modules/todo/helpers.ts ← ../types
+src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
+src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
-backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
-backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
@@ -408,8 +412,6 @@ src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../ser
 src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
-src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
@@ -432,11 +434,7 @@ src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
-src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
-src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
-src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
@@ -462,6 +460,8 @@ backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
+backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/schedulerLock.ts ← prismaClient
@@ -514,17 +514,17 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 4 days ago)
+## changes (last 10 commits — 19 hours ago)
 ```
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
+src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
+src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
 src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
 backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
 backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
 backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
-backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
-backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
 src/components/MoneyInput.tsx                 +MoneyInput
 src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
 src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
@@ -540,6 +540,8 @@ backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
+backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
+backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
 backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
 backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
@@ -548,13 +550,6 @@ backend/src/utils/entityTypeTab.ts            +entityTypeToTab
 ```
 
 ## backend
-
-### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
-```
-TABLE ProfitabilitySnapshot
-INDEX ProfitabilitySnapshot_tenantId_periodKey_idx ON ProfitabilitySnapshot
-INDEX ProfitabilitySnapshot_tenantId_scope_projectKey_periodKey_asOfKey_key ON ProfitabilitySnapshot
-```
 
 ### backend/src/services/profitabilityDmo.ts
 ```
@@ -662,38 +657,6 @@ export function parseFxParam(raw?) → Record<string, number> | undef  :241-250 
 export function parseScopeParam(raw?) → ProfitScope  :253-256  # "project:<id>" | "all" → ProfitScope
 ```
 
-### backend/src/services/profitabilitySnapshot.ts
-```
-export interface SnapshotResult  :17-22
-  asOf: string  :18-18
-  asOfKey: string  :19-19
-  written: number  :20-20
-  periodKeys: string[]  :21-21
-export interface SnapshotRow  :67-81
-  id: string  :68-68
-  scope: string  :69-69
-  projectKey: string  :70-70
-  asOf: string  :71-71
-  asOfKey: string  :72-72
-  periodKey: string  :73-73
-  currency: string  :74-74
-  plannedRevenue: number  :75-75
-  … +5 more members  :67-67
-export interface PlanDriftPoint  :104-104
-  asOfKey: string  :104-104
-export interface PlanDriftSeries  :105-105
-  periodKey: string  :105-105
-export function asOfKeyOf(d) → string  :13-15
-export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
-export async function listSnapshots(tenantId, filter = {},) → Promise<SnapshotRow[]>  :83-102
-export async function getPlanDrift(tenantId, opts = {}) → Promise<PlanDriftSeries[]>  :111-127  # Her hedef dönem için, o dönemin planlı tahmininin snapshot'l
-```
-
-### backend/src/services/profitabilitySnapshotScheduler.ts
-```
-export function startProfitabilitySnapshotScheduler() → void  :41-44
-```
-
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
@@ -782,6 +745,13 @@ INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
 ```
 TABLE OpportunityRequiredDoc
 INDEX OpportunityRequiredDoc_tenantId_opportunityId_idx ON OpportunityRequiredDoc
+```
+
+### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
+```
+TABLE ProfitabilitySnapshot
+INDEX ProfitabilitySnapshot_tenantId_periodKey_idx ON ProfitabilitySnapshot
+INDEX ProfitabilitySnapshot_tenantId_scope_projectKey_periodKey_asOfKey_key ON ProfitabilitySnapshot
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -1094,6 +1064,38 @@ export function periodKeyOf(date, grain) → string  :52-59
 export function bucketBy(events, opts) → PeriodRow[]  :73-154  # Olayları dönem kovalarına toplar
 ```
 
+### backend/src/services/profitabilitySnapshot.ts
+```
+export interface SnapshotResult  :17-22
+  asOf: string  :18-18
+  asOfKey: string  :19-19
+  written: number  :20-20
+  periodKeys: string[]  :21-21
+export interface SnapshotRow  :67-81
+  id: string  :68-68
+  scope: string  :69-69
+  projectKey: string  :70-70
+  asOf: string  :71-71
+  asOfKey: string  :72-72
+  periodKey: string  :73-73
+  currency: string  :74-74
+  plannedRevenue: number  :75-75
+  … +5 more members  :67-67
+export interface PlanDriftPoint  :104-104
+  asOfKey: string  :104-104
+export interface PlanDriftSeries  :105-105
+  periodKey: string  :105-105
+export function asOfKeyOf(d) → string  :13-15
+export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
+export async function listSnapshots(tenantId, filter = {},) → Promise<SnapshotRow[]>  :83-102
+export async function getPlanDrift(tenantId, opts = {}) → Promise<PlanDriftSeries[]>  :111-127  # Her hedef dönem için, o dönemin planlı tahmininin snapshot'l
+```
+
+### backend/src/services/profitabilitySnapshotScheduler.ts
+```
+export function startProfitabilitySnapshotScheduler() → void  :41-44
+```
+
 ### backend/src/services/restoreService.ts
 ```
 export type LogicalPayloadData  :19-19
@@ -1294,6 +1296,40 @@ export type AgentMode  :14-14
 
 ## src
 
+### src/modules/crm/ProposalsView.tsx
+```
+component ProposalsView
+```
+
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+hook useMemo
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onSave
+handler onSaveAll
+handler onProgressStatus
+handler onMarkLost
+handler onHandOff
+handler onEdit
+handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
+handler onRequestApproval
+handler onOpenReport
+handler onOpenContacts
+handler onEditCustomer
+handler onDeleteCustomer
+handler onCreateProposal
+handler onWonOpportunity
+handler onLostOpportunity
+```
+
 ### src/modules/profitability/DmoChannelTab.tsx
 ```
 component DmoChannelTab
@@ -1317,6 +1353,73 @@ hook useEffect
 hook useMemo
 handler onTab
 handler onChange
+```
+
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :174-185
+  partNumber: string  :175-175
+  description: string  :176-176
+  quantity: number  :177-177
+  purchaseCost?: number  :178-178
+  purchaseCostBase?: number  :181-181
+  unitSalePrice?: number  :182-182
+  totalSalePrice?: number  :183-183
+  marginPercentage?: number  :184-184
+export interface ProposalDetail  :187-196
+  price: string  :188-188
+  totalPrice: number  :189-189
+  totalCost: number  :190-190
+  items: ProposalDetailItem[]  :191-191
+  description: string  :192-192
+  terms: string  :193-193
+  version: number  :194-194
+  opportunityTitle: string  :195-195
+export const taskTargetTab = (t) =>  :56-65
+export const fmtCompletedAt = (d?) =>  :76-77
+export const daysUntil = (iso?) =>  :83-88
+export const fmtDueDate = (iso?) =>  :91-97
+export const getPriorityColor = (priority) =>  :105-112
+export const composedTitle = (newTask, taskAction, ctx) =>  :125-136
+export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :138-172
+```
+
+### src/modules/todo/TaskList.tsx
+```
+component TaskRow
+component Section
+component TaskList
+hook useState
+hook useMemo
+handler onClick
+handler onChange
+```
+
+### src/modules/todo/UnifiedWorkQueue.tsx
+```
+component Section
+component UnifiedWorkQueue
+hook useState
+hook useMemo
+handler onClick
+```
+
+### src/modules/TodoModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export TodoModule
+handler onLoading
+handler onAction
+handler onPreview
+handler onApprove
+handler onReject
+handler onMarkRead
+handler onNavigate
+handler onToggleStatus
+handler onSubmit
 ```
 
 ### src/services/apiService.ts
@@ -1485,7 +1588,7 @@ export interface AbbreviatedBoMItem  :7-20
   margin: number  :14-14
   vendor?: string  :15-15
   … +4 more members  :7-7
-export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-111
+export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
 ```
 
 ### src/hooks/useEnflowQueries.ts
@@ -1756,40 +1859,6 @@ hook useState
 hook useEffect
 handler onChange
 handler onClick
-```
-
-### src/modules/crm/ProposalsView.tsx
-```
-component ProposalsView
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-hook useMemo
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onSave
-handler onSaveAll
-handler onProgressStatus
-handler onMarkLost
-handler onHandOff
-handler onEdit
-handler onCheckIn
-handler onEditProposal
-handler onGoToCostAnalysis
-handler onRequestApproval
-handler onOpenReport
-handler onOpenContacts
-handler onEditCustomer
-handler onDeleteCustomer
-handler onCreateProposal
-handler onWonOpportunity
-handler onLostOpportunity
 ```
 
 ### src/modules/dashboard/KpiDetailDrawer.tsx
@@ -2086,79 +2155,12 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/todo/helpers.ts
-```
-export interface ProposalDetailItem  :174-185
-  partNumber: string  :175-175
-  description: string  :176-176
-  quantity: number  :177-177
-  purchaseCost?: number  :178-178
-  purchaseCostBase?: number  :181-181
-  unitSalePrice?: number  :182-182
-  totalSalePrice?: number  :183-183
-  marginPercentage?: number  :184-184
-export interface ProposalDetail  :187-196
-  price: string  :188-188
-  totalPrice: number  :189-189
-  totalCost: number  :190-190
-  items: ProposalDetailItem[]  :191-191
-  description: string  :192-192
-  terms: string  :193-193
-  version: number  :194-194
-  opportunityTitle: string  :195-195
-export const taskTargetTab = (t) =>  :56-65
-export const fmtCompletedAt = (d?) =>  :76-77
-export const daysUntil = (iso?) =>  :83-88
-export const fmtDueDate = (iso?) =>  :91-97
-export const getPriorityColor = (priority) =>  :105-112
-export const composedTitle = (newTask, taskAction, ctx) =>  :125-136
-export const getRelatedItemName = (todo, { projects, opportunities, proposals, contracts }) =>  :138-172
-```
-
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
 hook useState
 hook useEffect
 handler onChange
-```
-
-### src/modules/todo/TaskList.tsx
-```
-component TaskRow
-component Section
-component TaskList
-hook useState
-hook useMemo
-handler onClick
-handler onChange
-```
-
-### src/modules/todo/UnifiedWorkQueue.tsx
-```
-component Section
-component UnifiedWorkQueue
-hook useState
-hook useMemo
-handler onClick
-```
-
-### src/modules/TodoModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export TodoModule
-handler onLoading
-handler onAction
-handler onPreview
-handler onApprove
-handler onReject
-handler onMarkRead
-handler onNavigate
-handler onToggleStatus
-handler onSubmit
 ```
 
 ### src/modules/VirtualAgentsTestModule.tsx

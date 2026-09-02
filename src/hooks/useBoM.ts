@@ -98,7 +98,16 @@ export const useBoM = (
     }
   };
 
-  const totalCost = bomItems.reduce((acc: number, curr) => acc + (curr.cost * curr.qty), 0);
+  // Kalemler farklı dövizlerde girilebildiği için (bkz. AbbreviatedBoMItem.currency) tek
+  // bir toplam yanıltıcı olur (₺+$ karışık toplanmış gibi görünür) — döviz bazında ayrı
+  // toplamlar döndürülür; ekran hangi dövizde girildiyse o dövizde gösterir.
+  const totalsByCurrency = Object.entries(
+    bomItems.reduce<Record<string, number>>((acc, curr) => {
+      const cur = curr.currency || 'TRY';
+      acc[cur] = (acc[cur] || 0) + curr.cost * curr.qty;
+      return acc;
+    }, {})
+  ).map(([currency, amount]) => ({ currency, amount }));
 
   return {
     bomItems,
@@ -106,6 +115,6 @@ export const useBoM = (
     addBoMItem,
     isSubmitting,
     saveAndHandoff,
-    totalCost
+    totalsByCurrency
   };
 };
