@@ -78,9 +78,18 @@ export default function OpportunitiesView({
 
   const dateReportSummary = useMemo(() => {
     const list = dateFilteredOpportunities;
-    const totalValue = list.reduce((s, o) => s + (o.value || 0), 0);
+    // Fırsatlar farklı dövizlerde (o.currency) girilebilir — tek "₺" toplam yanıltıcı;
+    // döviz bazında ayrı toplanır ve " + " ile gösterilir.
+    const totalsByCurrency: Record<string, number> = {};
+    for (const o of list) {
+      const cur = o.currency || 'TRY';
+      totalsByCurrency[cur] = (totalsByCurrency[cur] || 0) + (o.value || 0);
+    }
+    const totalLabel = Object.entries(totalsByCurrency)
+      .map(([c, v]) => `${v.toLocaleString('tr-TR')} ${c}`)
+      .join(' + ') || '0';
     const avgProbability = list.length ? Math.round(list.reduce((s, o) => s + (o.probability || 0), 0) / list.length) : 0;
-    return { count: list.length, totalValue, avgProbability };
+    return { count: list.length, totalLabel, avgProbability };
   }, [dateFilteredOpportunities]);
 
   const handlePrintDateReport = () => {
@@ -88,7 +97,7 @@ export default function OpportunitiesView({
       const c = customers.find(cc => cc.id === o.customerId);
       return `<tr><td>${esc(o.title)}</td><td>${esc(c?.name || '-')}</td><td>${esc(STATUS_LABEL[o.status] || o.status)}</td>` +
         `<td>${fmtShortDate(o.createdAt) || '-'}</td><td>${fmtShortDate(o.expectedCloseDate) || '-'}</td>` +
-        `<td style="text-align:right">${(o.value || 0).toLocaleString('tr-TR')}</td></tr>`;
+        `<td style="text-align:right">${(o.value || 0).toLocaleString('tr-TR')} ${o.currency || 'TRY'}</td></tr>`;
     }).join('');
     const rangeParts = [
       (openFrom || openTo) ? `Açılış: ${openFrom || '—'} → ${openTo || '—'}` : '',
@@ -96,7 +105,7 @@ export default function OpportunitiesView({
     ].filter(Boolean).join(' · ');
     const body = `<h1>Fırsat Açılış / Kapanış Raporu</h1>` +
       (rangeParts ? `<p class="muted">${esc(rangeParts)}</p>` : '') +
-      `<p class="muted">${dateReportSummary.count} fırsat · Toplam ${dateReportSummary.totalValue.toLocaleString('tr-TR')} ₺ · Ort. olasılık %${dateReportSummary.avgProbability}</p>` +
+      `<p class="muted">${dateReportSummary.count} fırsat · Toplam ${dateReportSummary.totalLabel} · Ort. olasılık %${dateReportSummary.avgProbability}</p>` +
       `<table><thead><tr><th>Fırsat</th><th>Müşteri</th><th>Aşama</th><th>Açılış</th><th>Beklenen Kapanış</th><th>Değer</th></tr></thead><tbody>${rows}</tbody></table>`;
     printReportWindow('Fırsat Açılış-Kapanış Raporu', body);
   };
@@ -109,6 +118,7 @@ export default function OpportunitiesView({
         Müşteri: c?.name || '—',
         Aşama: STATUS_LABEL[o.status] || o.status,
         Değer: o.value || 0,
+        'Para Birimi': o.currency || 'TRY',
         'Olasılık (%)': o.probability || 0,
         Açılış: fmtShortDate(o.createdAt) || '—',
         'Beklenen Kapanış': fmtShortDate(o.expectedCloseDate) || '—',
@@ -236,7 +246,7 @@ export default function OpportunitiesView({
           <div className="flex flex-wrap items-center justify-between gap-3 mt-5 pt-4 border-t border-slate-100">
             <p className="text-xs font-bold text-slate-500">
               <span className="text-slate-900 font-black">{dateReportSummary.count}</span> fırsat ·
-              {' '}Toplam <span className="text-slate-900 font-black">{dateReportSummary.totalValue.toLocaleString('tr-TR')} ₺</span> ·
+              {' '}Toplam <span className="text-slate-900 font-black">{dateReportSummary.totalLabel}</span> ·
               {' '}Ort. olasılık <span className="text-slate-900 font-black">%{dateReportSummary.avgProbability}</span>
             </p>
             <button onClick={handlePrintDateReport}

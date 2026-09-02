@@ -4,7 +4,8 @@ import { Opportunity, Proposal } from '../../types';
 import { Tender } from '../../types/tender';
 import { ContractWorkflow } from './types';
 import { DOC_STATUS_STYLES, WORKFLOW_STATUS_STEPS, TERMINAL_STATUS_LABELS } from './constants';
-import { bestProposalPrice, computeDeadlineAlarm } from './helpers';
+import { bestProposalPrice, computeDeadlineAlarm, resolveWorkflowCurrency } from './helpers';
+import { fmtCurrency } from '../../lib/format';
 
 const ALARM_STYLES: Record<'warning' | 'critical', string> = {
   warning: 'bg-amber-100 text-amber-700 border-amber-200',
@@ -143,7 +144,7 @@ export default function WorkflowListPanel({
                 )}
               </div>
               {readyWorkflows.map(wf => (
-                <WorkflowCard key={wf.id} wf={wf} selected={selectedId === wf.id} onSelect={() => onSelectWorkflow(wf)} />
+                <WorkflowCard key={wf.id} wf={wf} currency={resolveWorkflowCurrency(wf, opportunities)} selected={selectedId === wf.id} onSelect={() => onSelectWorkflow(wf)} />
               ))}
             </div>
           )}
@@ -155,7 +156,7 @@ export default function WorkflowListPanel({
               </div>
               <p className="text-[10px] text-slate-500 -mt-1">Fırsata bağlı olmayan, kazanılmış bir işi temsil etmeyen kayıtlar.</p>
               {infoWorkflows.map(wf => (
-                <WorkflowCard key={wf.id} wf={wf} selected={selectedId === wf.id} onSelect={() => onSelectWorkflow(wf)} />
+                <WorkflowCard key={wf.id} wf={wf} currency="TRY" selected={selectedId === wf.id} onSelect={() => onSelectWorkflow(wf)} />
               ))}
             </div>
           )}
@@ -165,7 +166,7 @@ export default function WorkflowListPanel({
   );
 }
 
-function WorkflowCard({ wf, selected, onSelect }: { wf: ContractWorkflow; selected: boolean; onSelect: () => void }) {
+function WorkflowCard({ wf, currency, selected, onSelect }: { wf: ContractWorkflow; currency: string; selected: boolean; onSelect: () => void }) {
   const alarm = computeDeadlineAlarm(wf);
   return (
     <button
@@ -183,7 +184,7 @@ function WorkflowCard({ wf, selected, onSelect }: { wf: ContractWorkflow; select
       </div>
       {wf.contractValue > 0 && (
         <div className="text-xs text-emerald-600 mt-1">
-          ₺{wf.contractValue.toLocaleString('tr-TR')}
+          {fmtCurrency(wf.contractValue, currency)}
         </div>
       )}
       {alarm.level !== 'none' && (

@@ -1,9 +1,20 @@
 import { apiClient } from '../../services/apiClient';
-import { Proposal } from '../../types';
+import { Opportunity, Proposal } from '../../types';
 import { WORKFLOW_STATUS_STEPS } from './constants';
 import { ContractWorkflow } from './types';
 
 export const BASE = '/contract-workflows';
+
+// ContractWorkflow'da para birimi alanı yok — contractValue kazanılan tekliften
+// gelir ve o teklif fırsatın maliyet-analizi taban para biriminde üretilmiştir.
+// Bu yüzden bağlı fırsatın costConfig.baseCurrency'si (yoksa fırsat dövizi) kullanılır.
+export function resolveWorkflowCurrency(
+  wf: { opportunityId?: string | null },
+  opportunities: Opportunity[],
+): string {
+  const opp = wf.opportunityId ? opportunities.find(o => o.id === wf.opportunityId) : undefined;
+  return opp?.costConfig?.baseCurrency || opp?.currency || 'TRY';
+}
 
 export async function apiFetch(path: string, init?: RequestInit) {
   return apiClient.fetchWithAuth(path, init);

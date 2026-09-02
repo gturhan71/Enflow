@@ -1,14 +1,16 @@
 import { Gavel, Users, ShieldAlert, ArrowRight, RefreshCw, Award } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { fmtCurrency } from '../../lib/format';
 
 interface AuctionWinner { name: string; price: number; isUs: boolean }
 
 export default function AuctionSidePanel({
-  auctionState, numCompetitors, setNumCompetitors, initialDecrement, setInitialDecrement,
+  currency, auctionState, numCompetitors, setNumCompetitors, initialDecrement, setInitialDecrement,
   decrementReductionPct, setDecrementReductionPct, floorCost, onLaunch,
   currentLowestBidVal, auctionRound, currentMinDecrement, ourStatus, ourLastBid, initialValue,
   auctionWinner, onFinalize, onNewAuction,
 }: {
+  currency: string;
   auctionState: 'IDLE' | 'SETUP' | 'BIDDING' | 'FINISHED';
   numCompetitors: number;
   setNumCompetitors: (n: number) => void;
@@ -87,7 +89,7 @@ export default function AuctionSidePanel({
 
             <div className="p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
               <span className="text-[9px] font-black text-red-500/70 uppercase tracking-widest block">En Dip Maliyet Sınırımız</span>
-              <span className="text-lg font-black text-red-600">${floorCost.toLocaleString()}</span>
+              <span className="text-lg font-black text-red-600">{fmtCurrency(floorCost, currency)}</span>
             </div>
 
             <button
@@ -103,7 +105,7 @@ export default function AuctionSidePanel({
             <div className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
               <div>
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Mevcut En Düşük Teklif</span>
-                <span className="text-xl font-black text-slate-900">${currentLowestBidVal.toLocaleString()}</span>
+                <span className="text-xl font-black text-slate-900">{fmtCurrency(currentLowestBidVal, currency)}</span>
               </div>
               <div className="text-right">
                 <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Aktif Tur</span>
@@ -114,7 +116,7 @@ export default function AuctionSidePanel({
             <div className="flex justify-between items-center p-4 bg-amber-500/5 rounded-2xl border border-amber-500/10">
               <div>
                 <span className="text-[9px] font-black text-amber-500/70 uppercase tracking-widest block">Zorunlu Eksiltme Limiti</span>
-                <span className="text-lg font-black text-amber-600">-$${currentMinDecrement.toLocaleString()}</span>
+                <span className="text-lg font-black text-amber-600">-{fmtCurrency(currentMinDecrement, currency)}</span>
               </div>
               <p className="text-[9px] text-amber-500/80 font-bold uppercase tracking-tighter mt-1 max-w-[120px] text-right leading-none">Bu tur için geçerli en az indirim adımı.</p>
             </div>
@@ -122,7 +124,7 @@ export default function AuctionSidePanel({
             <div className="flex justify-between items-center p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
               <div>
                 <span className="text-[9px] font-black text-red-500/70 uppercase tracking-widest block">En Dip Maliyet Sınırımız</span>
-                <span className="text-lg font-black text-red-600">${floorCost.toLocaleString()}</span>
+                <span className="text-lg font-black text-red-600">{fmtCurrency(floorCost, currency)}</span>
               </div>
               <div className="text-right bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
                 <ShieldAlert size={10} /> ZIRHLI LİMİT
@@ -148,7 +150,7 @@ export default function AuctionSidePanel({
                 <div className="flex justify-between items-end">
                   <div>
                     <span className="text-[9px] text-slate-400 block uppercase font-bold">Bizim Son Teklifimiz</span>
-                    <span className="text-xl font-black italic text-emerald-400">${ourLastBid.toLocaleString()}</span>
+                    <span className="text-xl font-black italic text-emerald-400">{fmtCurrency(ourLastBid, currency)}</span>
                   </div>
                 </div>
               </div>
@@ -162,7 +164,7 @@ export default function AuctionSidePanel({
                 <Award className={cn("w-10 h-10 mb-1", auctionWinner.isUs ? "text-emerald-500 animate-bounce" : "text-red-500")} />
                 <h6 className="font-black uppercase tracking-widest text-slate-900 text-sm">{auctionWinner.isUs ? 'İHALEYİ KAZANDIK!' : 'İHALE KAYBEDİLDİ'}</h6>
                 <p className="text-xs text-slate-500 font-bold max-w-[200px] leading-tight">
-                  {auctionWinner.name} firması **$${auctionWinner.price.toLocaleString()}** teklifi ile işi aldı.
+                  {auctionWinner.name} firması <span className="font-black">{fmtCurrency(auctionWinner.price, currency)}</span> teklifi ile işi aldı.
                 </p>
 
                 {auctionWinner.isUs && (

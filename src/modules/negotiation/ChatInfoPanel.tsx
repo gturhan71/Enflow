@@ -1,12 +1,14 @@
 import { Sparkles, Bot, ShieldAlert, Zap, CheckCircle2, RefreshCw } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { fmtCurrency } from '../../lib/format';
 import { Opportunity } from '../../types';
 
 export default function ChatInfoPanel({
-  selectedOpp, chatIsTyping, chatState, chatOffer, floorCost, initialValue, initialMargin,
+  selectedOpp, currency, chatIsTyping, chatState, chatOffer, floorCost, initialValue, initialMargin,
   onStart, onFinalize,
 }: {
   selectedOpp?: Opportunity;
+  currency: string;
   chatIsTyping: boolean;
   chatState: 'IDLE' | 'INTRO' | 'NEGOTIATING' | 'AGREED' | 'FAILED';
   chatOffer: number;
@@ -40,7 +42,7 @@ export default function ChatInfoPanel({
           <div className="flex justify-between items-center p-4 bg-slate-50/50 rounded-2xl border border-slate-100">
             <div>
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">Başlangıç Fiyatı</span>
-              <span className="text-lg font-black text-slate-900">${initialValue.toLocaleString()}</span>
+              <span className="text-lg font-black text-slate-900">{fmtCurrency(initialValue, currency)}</span>
             </div>
             <div className="text-right">
               <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block">İlk Kar Marjı</span>
@@ -51,7 +53,7 @@ export default function ChatInfoPanel({
           <div className="flex justify-between items-center p-4 bg-red-500/5 rounded-2xl border border-red-500/10">
             <div>
               <span className="text-[9px] font-black text-red-500/70 uppercase tracking-widest block">En Dip Maliyet Sınırı</span>
-              <span className="text-lg font-black text-red-600">${floorCost.toLocaleString()}</span>
+              <span className="text-lg font-black text-red-600">{fmtCurrency(floorCost, currency)}</span>
             </div>
             <div className="text-right bg-red-100 text-red-600 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-1">
               <ShieldAlert size={10} /> ZIRHLI LİMİT

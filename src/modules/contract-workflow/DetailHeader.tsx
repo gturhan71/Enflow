@@ -3,6 +3,7 @@ import { Calendar, XCircle, ChevronRight, AlertTriangle } from 'lucide-react';
 import { ContractWorkflow } from './types';
 import { TABS, TabId, WORKFLOW_STATUS_STEPS, CANCEL_TERMINATE_ROLES } from './constants';
 import { stepIndex, computeDeadlineAlarm } from './helpers';
+import { fmtCurrency } from '../../lib/format';
 import ProcessTriggerButton from '../../components/ProcessTriggerButton';
 
 const ALARM_BANNER_STYLES: Record<'warning' | 'critical', string> = {
@@ -11,9 +12,10 @@ const ALARM_BANNER_STYLES: Record<'warning' | 'critical', string> = {
 };
 
 export default function DetailHeader({
-  selected, currentUserRole, onCancelClick, tab, setTab,
+  selected, currency = 'TRY', currentUserRole, onCancelClick, tab, setTab,
 }: {
   selected: ContractWorkflow;
+  currency?: string;
   currentUserRole?: string;
   onCancelClick: () => void;
   tab: TabId;
@@ -33,7 +35,7 @@ export default function DetailHeader({
           <h1 className="text-lg font-semibold text-slate-900">{selected.title}</h1>
           <div className="flex items-center gap-2 mt-1 flex-wrap">
             {selected.contractValue > 0 && (
-              <span className="text-sm text-emerald-600 font-medium">₺{selected.contractValue.toLocaleString('tr-TR')}</span>
+              <span className="text-sm text-emerald-600 font-medium">{fmtCurrency(selected.contractValue, currency)}</span>
             )}
             {selected.deadline && (
               <span className="text-xs text-slate-400 flex items-center gap-1">

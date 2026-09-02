@@ -1,15 +1,17 @@
 import { Users, DollarSign, CheckCircle2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { fmtCurrency } from '../../lib/format';
 import type { Competitor } from './types';
 
 interface Participant { id: string; name: string; lastBid: number; isUs: boolean; avatarColor?: string }
 interface LogEntry { round: number; text: string; type: 'info' | 'bid' | 'alert' | 'success' }
 
 export default function AuctionBoard({
-  ourStatus, ourLastBid, competitors, auctionState, activeParticipants,
+  currency, ourStatus, ourLastBid, competitors, auctionState, activeParticipants,
   withdrawals, setWithdrawals, manualBids, setManualBids, dynamicRequiredMaxes,
   currentMinDecrement, auctionRound, onSubmitRound, auctionLog,
 }: {
+  currency: string;
   ourStatus: 'ACTIVE' | 'WITHDRAWN' | 'ELIMINATED';
   ourLastBid: number;
   competitors: Competitor[];
@@ -56,7 +58,7 @@ export default function AuctionBoard({
             </div>
             <div className="text-right">
               <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Verilen Teklif</span>
-              <span className="text-lg font-black text-slate-900">${ourLastBid.toLocaleString()}</span>
+              <span className="text-lg font-black text-slate-900">{fmtCurrency(ourLastBid, currency)}</span>
             </div>
           </div>
 
@@ -88,7 +90,7 @@ export default function AuctionBoard({
               </div>
               <div className="text-right">
                 <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block">Verilen Teklif</span>
-                <span className="text-lg font-black text-slate-900">${comp.lastBid.toLocaleString()}</span>
+                <span className="text-lg font-black text-slate-900">{fmtCurrency(comp.lastBid, currency)}</span>
               </div>
             </div>
           ))}
@@ -133,7 +135,7 @@ export default function AuctionBoard({
                     <div>
                       <h6 className="font-black text-slate-900 text-xs">{part.name}</h6>
                       <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
-                        Önceki Teklifi: <span className="text-slate-700 font-black">${part.lastBid.toLocaleString()}</span>
+                        Önceki Teklifi: <span className="text-slate-700 font-black">{fmtCurrency(part.lastBid, currency)}</span>
                       </span>
                     </div>
                   </div>
@@ -152,7 +154,7 @@ export default function AuctionBoard({
                           type="text"
                           value={manualBids[part.id] || ''}
                           onChange={(e) => setManualBids(prev => ({ ...prev, [part.id]: e.target.value }))}
-                          placeholder={`En Fazla: $${maxBid.toLocaleString()}`}
+                          placeholder={`En Fazla: ${fmtCurrency(maxBid, currency)}`}
                           className="w-full pl-8 pr-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-black shadow-inner focus:ring-4 focus:ring-slate-900/5 outline-none transition-all text-slate-800"
                         />
                       </div>
@@ -188,7 +190,7 @@ export default function AuctionBoard({
 
           <div className="pt-4 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4">
             <div className="text-[10px] text-slate-400 font-bold max-w-[320px] leading-tight">
-              * Her turlu teklifte, sıradaki firma bir öncekinden en az <span className="text-amber-500 font-black">${currentMinDecrement.toLocaleString()}</span> düşmek zorundadır.
+              * Her turlu teklifte, sıradaki firma bir öncekinden en az <span className="text-amber-500 font-black">{fmtCurrency(currentMinDecrement, currency)}</span> düşmek zorundadır.
             </div>
             <button
               onClick={onSubmitRound}

@@ -366,8 +366,10 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
+src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
 src/modules/todo/helpers.ts ← ../types
@@ -376,7 +378,6 @@ src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
-backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -387,13 +388,12 @@ src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/contexts/AuthContext.tsx ← types, services/apiService
-src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
 src/modules/contract-workflow/AnalysisTab.tsx ← types
-src/modules/contract-workflow/ContextTab.tsx ← ../types, types
-src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
+src/modules/contract-workflow/ContextTab.tsx ← ../types, ../lib/format, helpers, types
+src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../lib/format, ../components/ProcessTriggerButton
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
 src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
@@ -420,8 +420,12 @@ src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, typ
 src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
+src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, ../lib/format, types
+src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils, ../lib/format
+src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../lib/format, ../types
+src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, ../lib/format, types
+src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, lib/format, negotiation/types
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
-src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
@@ -459,6 +463,7 @@ backend/src/services/opportunityProgressReminders.ts ← prismaClient, dashboard
 backend/src/services/opportunityProgressService.ts ← prismaClient, activityLog
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
+backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
@@ -514,7 +519,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:945  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 19 hours ago)
+## changes (last 10 commits — 13 minutes ago)
 ```
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
@@ -522,7 +527,6 @@ src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
 src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
 src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
-backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
 backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
 backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
 src/components/MoneyInput.tsx                 +MoneyInput
@@ -539,6 +543,7 @@ backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextD
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
+backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
 backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
 backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
@@ -573,30 +578,6 @@ export interface DmoProfitResult  :38-46
   currency: string  :45-45
 export type DmoGrain  :16-16
 export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
-```
-
-### backend/src/services/profitabilityInstruments.ts
-```
-export interface InstrumentParams  :20-26
-  factoringAnnualDiscountPct: number  :21-21
-  factoringHorizonDays: number  :22-22
-  depositRatePct: number  :23-23
-  depositTermDays: number  :24-24
-  forwardHorizonDays: number  :25-25
-export interface InstrumentScenario  :36-44
-  instrument: 'FACTORING' | 'DEPOSIT' | 'FORWARD_  :37-37
-  label: string  :38-38
-  description: string  :39-39
-  delta: number  :40-40
-  detail: Record<string, number>  :41-41
-  assumptions: Record<string, number>  :42-42
-  reversible: boolean  :43-43
-export interface InstrumentsResult  :46-51
-  asOf: string  :47-47
-  baseline: { treasuryNet: number  :48-48
-  scenarios: InstrumentScenario[]  :49-49
-  totalOpportunity: number  :50-50
-export function buildInstrumentScenarios(events, opts, interestRates, params = {},) → InstrumentsResult  :191-216
 ```
 
 ### backend/src/services/profitabilityLedger.ts
@@ -660,6 +641,12 @@ export function parseScopeParam(raw?) → ProfitScope  :253-256  # "project:<id>
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
+```
+
+### backend/prisma/migrations/20260808195334_add_purchase_quote_item/migration.sql
+```
+TABLE PurchaseQuoteItem
+INDEX PurchaseQuoteItem_purchaseQuoteId_purchaseItemId_key ON PurchaseQuoteItem
 ```
 
 ### backend/prisma/migrations/20260808205531_vendor_brands_purchaseitem_brand/migration.sql
@@ -1038,6 +1025,30 @@ export interface CashflowResult  :43-50
   deficitWindows: DeficitWindow[]  :48-48
 ```
 
+### backend/src/services/profitabilityInstruments.ts
+```
+export interface InstrumentParams  :20-26
+  factoringAnnualDiscountPct: number  :21-21
+  factoringHorizonDays: number  :22-22
+  depositRatePct: number  :23-23
+  depositTermDays: number  :24-24
+  forwardHorizonDays: number  :25-25
+export interface InstrumentScenario  :36-44
+  instrument: 'FACTORING' | 'DEPOSIT' | 'FORWARD_  :37-37
+  label: string  :38-38
+  description: string  :39-39
+  delta: number  :40-40
+  detail: Record<string, number>  :41-41
+  assumptions: Record<string, number>  :42-42
+  reversible: boolean  :43-43
+export interface InstrumentsResult  :46-51
+  asOf: string  :47-47
+  baseline: { treasuryNet: number  :48-48
+  scenarios: InstrumentScenario[]  :49-49
+  totalOpportunity: number  :50-50
+export function buildInstrumentScenarios(events, opts, interestRates, params = {},) → InstrumentsResult  :191-216
+```
+
 ### backend/src/services/profitabilityRollup.ts
 ```
 export interface RollupOpts  :16-23
@@ -1296,6 +1307,21 @@ export type AgentMode  :14-14
 
 ## src
 
+### src/hooks/useBoM.ts
+```
+export interface AbbreviatedBoMItem  :7-20
+  id?: string  :8-8
+  lineKey?: string  :9-9
+  pn: string  :10-10
+  desc: string  :11-11
+  qty: number  :12-12
+  cost: number  :13-13
+  margin: number  :14-14
+  vendor?: string  :15-15
+  … +4 more members  :7-7
+export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
+```
+
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
@@ -1328,6 +1354,22 @@ handler onDeleteCustomer
 handler onCreateProposal
 handler onWonOpportunity
 handler onLostOpportunity
+```
+
+### src/modules/PresalesModule.tsx
+```
+props PresalesModuleProps
+hook useAuth
+hook useRef
+hook useState
+hook useEffect
+hook useBoM
+hook useCallback
+export PresalesModule
+handler onChange
+handler onClick
+handler onTransferToBoM
+handler onSelected
 ```
 
 ### src/modules/profitability/DmoChannelTab.tsx
@@ -1576,21 +1618,6 @@ hook useContext
 export AuthProvider
 ```
 
-### src/hooks/useBoM.ts
-```
-export interface AbbreviatedBoMItem  :7-20
-  id?: string  :8-8
-  lineKey?: string  :9-9
-  pn: string  :10-10
-  desc: string  :11-11
-  qty: number  :12-12
-  cost: number  :13-13
-  margin: number  :14-14
-  vendor?: string  :15-15
-  … +4 more members  :7-7
-export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
-```
-
 ### src/hooks/useEnflowQueries.ts
 ```
 export const useOpportunities = (tenantId, options = {}) =>  :6-14
@@ -1690,17 +1717,18 @@ handler onBlur
 
 ### src/modules/contract-workflow/helpers.ts
 ```
-export interface DeadlineAlarm  :46-52
-  level: 'none' | 'warning' | 'critical'  :47-47
-  daysLeft: number | null  :48-48
-  missingRequired: number  :49-49
-  totalRequired: number  :50-50
-  label: string  :51-51
-export async function apiFetch(path, init?)  :8-10
-export function bestProposalPrice(opportunityId, proposals) → number | null  :14-36
-export function computeDeadlineAlarm(wf) → DeadlineAlarm  :54-68
-export const stepIndex = (status) =>  :38-52
-export const isDocsComplete = (wf) =>  :70-70
+export interface DeadlineAlarm  :57-63
+  level: 'none' | 'warning' | 'critical'  :58-58
+  daysLeft: number | null  :59-59
+  missingRequired: number  :60-60
+  totalRequired: number  :61-61
+  label: string  :62-62
+export function resolveWorkflowCurrency(wf, opportunities,) → string  :11-17
+export async function apiFetch(path, init?)  :19-21
+export function bestProposalPrice(opportunityId, proposals) → number | null  :25-47
+export function computeDeadlineAlarm(wf) → DeadlineAlarm  :65-79
+export const stepIndex = (status) =>  :49-63
+export const isDocsComplete = (wf) =>  :81-81
 ```
 
 ### src/modules/contract-workflow/LegalCaseForm.tsx
@@ -1993,6 +2021,62 @@ handler onDelete
 handler onReviewed
 ```
 
+### src/modules/negotiation/AuctionBoard.tsx
+```
+component AuctionBoard
+handler onChange
+handler onClick
+```
+
+### src/modules/negotiation/AuctionSidePanel.tsx
+```
+component AuctionSidePanel
+handler onChange
+handler onClick
+```
+
+### src/modules/negotiation/ChatInfoPanel.tsx
+```
+component ChatInfoPanel
+handler onClick
+```
+
+### src/modules/negotiation/ChatWindow.tsx
+```
+component ChatWindow
+handler onSubmit
+handler onChange
+handler onClick
+```
+
+### src/modules/NegotiationModule.tsx
+```
+hook useAuth
+hook useState
+hook useMemo
+hook useEffect
+hook useRef
+export NegotiationModule
+handler onCurrency
+handler onBackToDashboard
+handler onDeal
+handler onSelect
+handler onStart
+handler onFinalize
+handler onCustomCounterSubmit
+handler onQuickCounter
+handler onRestart
+handler onMarkLost
+handler onState
+handler onPct
+handler onLaunch
+handler onRound
+handler onWinner
+handler onNewAuction
+handler onSubmitRound
+handler onLog
+```
+
 ### src/modules/PlatformTicketsModule.tsx
 ```
 component PlatformTicketsModule
@@ -2003,22 +2087,6 @@ export PlatformTicketsModule
 handler onClick
 handler onChange
 handler onSubmit
-```
-
-### src/modules/PresalesModule.tsx
-```
-props PresalesModuleProps
-hook useAuth
-hook useRef
-hook useState
-hook useEffect
-hook useBoM
-hook useCallback
-export PresalesModule
-handler onChange
-handler onClick
-handler onTransferToBoM
-handler onSelected
 ```
 
 ### src/modules/procurement/PRDetailDrawer.tsx
@@ -2274,35 +2342,6 @@ export interface DashboardPayload  :1-35
   … +19 more members  :1-1
 ```
 
-### src/types/dmo.ts
-```
-export interface DmoCatalogItem  :2-8
-  id: string  :3-3
-  unit: string  :4-4
-  unitCost: number  :5-5
-  validFrom?: string | null  :6-6
-  frameworkAgreementId?: string | null  :7-7
-export interface DmoFrameworkAgreement  :9-12
-  id: string  :10-10
-  quotaTotal?: number | null  :11-11
-export interface DmoExchangeRate  :13-16
-  id: string  :14-14
-  source?: string | null  :15-15
-export interface DmoOrderItem  :17-20
-  id?: string  :18-18
-  unitCost: number  :19-19
-export interface DmoOrder  :21-31
-  id: string  :22-22
-  frameworkAgreementId?: string | null  :23-23
-  ownerId?: string | null  :24-24
-  revenueTotal: number  :25-25
-  rateValidFrom?: string | null  :26-26
-  risturnRateApplied: number  :27-27
-  commissionType: string  :28-28
-  grossProfit: number  :29-29
-  … +1 more members  :21-21
-```
-
 ### src/types/presales.ts
 ```
 export interface CostRequirement  :1-10
@@ -2359,33 +2398,6 @@ export interface PurchaseQuoteItem  :51-58
   purchaseQuoteId: string  :53-53
   purchaseItemId: string  :54-54
   quantity: number  :55-55
-```
-
-### src/types/productTaxonomy.ts
-```
-export interface Brand  :5-12
-id: string  :6-6
-tenantId: string  :7-7
-name: string  :8-8
-isActive: boolean  :9-9
-createdAt: string  :10-10
-updatedAt: string  :11-11
-export interface ProductCategory  :14-21
-id: string  :15-15
-tenantId: string  :16-16
-name: string  :17-17
-isActive: boolean  :18-18
-createdAt: string  :19-19
-updatedAt: string  :20-20
-export interface BrandSource  :23-32
-id: string  :24-24
-tenantId: string  :25-25
-brandId: string  :26-26
-name: string  :27-27
-notes?: string | null  :28-28
-isActive: boolean  :29-29
-createdAt: string  :30-30
-updatedAt: string  :31-31
 ```
 
 ### src/types/project.ts

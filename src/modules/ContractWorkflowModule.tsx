@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Tender } from '../types/tender';
 import { ContractWorkflow, ContractWorkflowDoc, AiAnalysis, Props } from './contract-workflow/types';
 import { TabId } from './contract-workflow/constants';
-import { BASE, apiFetch } from './contract-workflow/helpers';
+import { BASE, apiFetch, resolveWorkflowCurrency } from './contract-workflow/helpers';
 import WorkflowListPanel, { WorkflowFormState } from './contract-workflow/WorkflowListPanel';
 import DetailHeader from './contract-workflow/DetailHeader';
 import ContextTab from './contract-workflow/ContextTab';
@@ -559,6 +559,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
           <div className="glass-card flex-1 flex flex-col overflow-hidden">
             <DetailHeader
               selected={selected}
+              currency={resolveWorkflowCurrency(selected, opportunities)}
               currentUserRole={currentUser?.role}
               onCancelClick={() => setCancelModalTarget(selected.status === 'SIGNED' ? 'TERMINATED' : 'CANCELLED')}
               tab={tab}

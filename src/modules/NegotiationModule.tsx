@@ -3,6 +3,7 @@ import { Gavel } from 'lucide-react';
 import { Opportunity, Proposal } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
+import { fmtCurrency } from '../lib/format';
 import type { Competitor, Message } from './negotiation/types';
 import AccessDeniedPanel from './negotiation/AccessDeniedPanel';
 import ProposalSelectorHeader from './negotiation/ProposalSelectorHeader';
@@ -112,6 +113,20 @@ const NegotiationModule = ({
     return ((initialValue - floorCost) / initialValue) * 100;
   }, [initialValue, floorCost]);
 
+  // Pazarlık tutarları teklifin/fırsatın kendi para biriminde gösterilir (sabit "$" değil).
+  const negotiationCurrency = useMemo(() => {
+    try {
+      if (selectedProposal?.content) {
+        const c = typeof selectedProposal.content === 'string'
+          ? JSON.parse(selectedProposal.content)
+          : selectedProposal.content;
+        if (typeof c?.currency === 'string' && c.currency) return c.currency as string;
+      }
+    } catch { /* ignore */ }
+    return selectedOpp?.costConfig?.baseCurrency || selectedOpp?.currency || 'TRY';
+  }, [selectedProposal, selectedOpp]);
+  const money = (n: number) => fmtCurrency(n, negotiationCurrency);
+
   // --- STATE FOR 1v1 LIVE CHAT NEGOTIATION ---
   const [chatState, setChatState] = useState<'IDLE' | 'INTRO' | 'NEGOTIATING' | 'AGREED' | 'FAILED'>('IDLE');
   const [chatMessages, setChatMessages] = useState<Message[]>([]);
@@ -176,12 +191,12 @@ const NegotiationModule = ({
 
     setTimeout(() => {
       setChatIsTyping(false);
-      addChatMessage('system', `Pazarlık simülasyonu başlatıldı. Fırsat: ${selectedOpp.title} | En Dip Maliyet Sınırı: $${floorCost.toLocaleString()}`);
+      addChatMessage('system', `Pazarlık simülasyonu başlatıldı. Fırsat: ${selectedOpp.title} | En Dip Maliyet Sınırı: ${money(floorCost)}`);
 
       setChatIsTyping(true);
       setTimeout(() => {
         setChatIsTyping(false);
-        addChatMessage('customer', `Merhaba Sayın Yetkili. ${selectedOpp.title} projeniz için hazırladığınız teklifi aldık. Teknik detaylar gayet iyi ancak fiyat bütçemizi epey zorluyor. Bizim bütçemiz en fazla $${startingCustomerOffer.toLocaleString()} seviyesinde. Bu rakama anlaşabilir miyiz?`);
+        addChatMessage('customer', `Merhaba Sayın Yetkili. ${selectedOpp.title} projeniz için hazırladığınız teklifi aldık. Teknik detaylar gayet iyi ancak fiyat bütçemizi epey zorluyor. Bizim bütçemiz en fazla ${money(startingCustomerOffer)} seviyesinde. Bu rakama anlaşabilir miyiz?`);
         setChatState('NEGOTIATING');
       }, 2000);
     }, 1000);
@@ -190,7 +205,7 @@ const NegotiationModule = ({
   const handleChatCounter = (offerPrice: number) => {
     if (offerPrice <= 0 || isNaN(offerPrice)) return;
 
-    addChatMessage('manager', `Bizim teklifimiz: $${offerPrice.toLocaleString()}`, offerPrice);
+    addChatMessage('manager', `Bizim teklifimiz: ${money(offerPrice)}`, offerPrice);
     setChatOffer(offerPrice);
     setChatIsTyping(true);
 
@@ -200,7 +215,7 @@ const NegotiationModule = ({
       setChatIsTyping(false);
 
       if (offerPrice < floorCost) {
-        addChatMessage('system', `KRİTİK UYARI: Girilen teklif ($${offerPrice.toLocaleString()}) en dip maliyetin ($${floorCost.toLocaleString()}) altındadır! Şirket bu fiyata zarar edeceği için onay vermemektedir.`);
+        addChatMessage('system', `KRİTİK UYARI: Girilen teklif (${money(offerPrice)}) en dip maliyetin (${money(floorCost)}) altındadır! Şirket bu fiyata zarar edeceği için onay vermemektedir.`);
         addChatMessage('customer', `Teklifiniz bütçemize çok uygun ancak şirketinizin bu fiyatla zarar edeceğini düşünüyoruz. İş birliğimizin sağlıklı yürümesi için adil bir fiyatta mutabık kalmalıyız.`);
         return;
       }
@@ -211,8 +226,8 @@ const NegotiationModule = ({
       const priceDiffPct = ((offerPrice - chatCustomerTarget) / chatCustomerTarget) * 100;
 
       if (priceDiffPct <= 3 || (offerPrice === floorCost && Math.random() > 0.4)) {
-        addChatMessage('customer', `Harika! $${offerPrice.toLocaleString()} fiyatı bizim için kabul edilebilir bir seviyedir. Bu şartlar altında anlaşmayı sağlamaktan memnuniyet duyuyoruz. Evrak işlerini başlatabiliriz!`);
-        addChatMessage('system', `MUTABAKAT SAĞLANDI! Anlaşma Fiyatı: $${offerPrice.toLocaleString()} | Brüt Kar: $${(offerPrice - floorCost).toLocaleString()} (%${marginPercentage.toFixed(1)} marj).`);
+        addChatMessage('customer', `Harika! ${money(offerPrice)} fiyatı bizim için kabul edilebilir bir seviyedir. Bu şartlar altında anlaşmayı sağlamaktan memnuniyet duyuyoruz. Evrak işlerini başlatabiliriz!`);
+        addChatMessage('system', `MUTABAKAT SAĞLANDI! Anlaşma Fiyatı: ${money(offerPrice)} | Brüt Kar: ${money((offerPrice - floorCost))} (%${marginPercentage.toFixed(1)} marj).`);
         setChatState('AGREED');
       } else if (newConcession >= 5) {
         addChatMessage('customer', `Üzgünüm, müzakerede ortak bir noktada buluşamadık. Bizim bütçe sınırımız çok net. Masadan kalkmak durumundayız. İyi çalışmalar dileriz.`);
@@ -231,9 +246,9 @@ const NegotiationModule = ({
         setChatCustomerTarget(nextCustomerOffer);
 
         const responseTexts = [
-          `Fiyatı biraz daha esnettik fakat $${offerPrice.toLocaleString()} hala yüksek. Biz teklifimizi $${nextCustomerOffer.toLocaleString()} seviyesine çıkartabiliriz. Ne dersiniz?`,
-          `Adım attığınız için teşekkürler ancak bütçemiz tam olarak buna elvermiyor. $${nextCustomerOffer.toLocaleString()} seviyesine inebilirseniz yönetimden hızlıca onay alabilirim.`,
-          `Bize biraz daha destek olmanız gerekiyor. $${nextCustomerOffer.toLocaleString()} olarak güncellersek el sıkışmaya hazırız.`
+          `Fiyatı biraz daha esnettik fakat ${money(offerPrice)} hala yüksek. Biz teklifimizi ${money(nextCustomerOffer)} seviyesine çıkartabiliriz. Ne dersiniz?`,
+          `Adım attığınız için teşekkürler ancak bütçemiz tam olarak buna elvermiyor. ${money(nextCustomerOffer)} seviyesine inebilirseniz yönetimden hızlıca onay alabilirim.`,
+          `Bize biraz daha destek olmanız gerekiyor. ${money(nextCustomerOffer)} olarak güncellersek el sıkışmaya hazırız.`
         ];
 
         const randomText = responseTexts[Math.floor(Math.random() * responseTexts.length)];
@@ -258,7 +273,7 @@ const NegotiationModule = ({
         value: chatOffer
       });
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: chatOffer } : o));
-      alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${chatOffer.toLocaleString()} olarak sisteme işlendi.`);
+      alert(`Pazarlık başarıyla tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel ${money(chatOffer)} olarak sisteme işlendi.`);
       if (setActiveTab) setActiveTab('contract-workflow');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Hata oluştu.');
@@ -317,7 +332,7 @@ const NegotiationModule = ({
     setWithdrawals({});
     setAuctionLog([
       { round: 0, text: `Açık Eksiltme İhalesi Başlatıldı! Toplam ${numCompetitors} Rakip Firma İştirak Ediyor.`, type: 'info' },
-      { round: 0, text: `Başlangıç Teklifi: $${initialValue.toLocaleString()} | İlk Tur Minimum Düşüş Şartı: $${initialDecrement.toLocaleString()}`, type: 'info' }
+      { round: 0, text: `Başlangıç Teklifi: ${money(initialValue)} | İlk Tur Minimum Düşüş Şartı: ${money(initialDecrement)}`, type: 'info' }
     ]);
   };
 
@@ -384,7 +399,7 @@ const NegotiationModule = ({
         newlyWithdrawn[part.id] = true;
         logs.push({
           round: auctionRound,
-          text: `🚨 ${part.name} ihaleden çekildi! (Son geçerli teklifi: $${part.lastBid.toLocaleString()})`,
+          text: `🚨 ${part.name} ihaleden çekildi! (Son geçerli teklifi: ${money(part.lastBid)})`,
           type: 'alert'
         });
       } else {
@@ -398,12 +413,12 @@ const NegotiationModule = ({
 
         const requiredMax = precedingBid - currentMinDecrement;
         if (bidVal > requiredMax) {
-          alert(`Hata: ${part.name} için girilen teklif ($${bidVal.toLocaleString()}) kurallara aykırı!\nBir önceki tekliften ($${precedingBid.toLocaleString()}) en az minimum eksiltme miktarı ($${currentMinDecrement.toLocaleString()}) kadar düşmelidir.\nGirebileceğiniz maksimum teklif: $${requiredMax.toLocaleString()}`);
+          alert(`Hata: ${part.name} için girilen teklif (${money(bidVal)}) kurallara aykırı!\nBir önceki tekliften (${money(precedingBid)}) en az minimum eksiltme miktarı (${money(currentMinDecrement)}) kadar düşmelidir.\nGirebileceğiniz maksimum teklif: ${money(requiredMax)}`);
           return;
         }
 
         if (part.isUs && bidVal < floorCost) {
-          const confirmGoBelow = window.confirm(`KRİTİK UYARI: Bizim (Enflow) için girdiğiniz teklif ($${bidVal.toLocaleString()}) en dip maliyetimizin ($${floorCost.toLocaleString()}) altındadır! Zarar etmeyi kabul ediyor musunuz?`);
+          const confirmGoBelow = window.confirm(`KRİTİK UYARI: Bizim (Enflow) için girdiğiniz teklif (${money(bidVal)}) en dip maliyetimizin (${money(floorCost)}) altındadır! Zarar etmeyi kabul ediyor musunuz?`);
           if (!confirmGoBelow) return;
         }
 
@@ -411,7 +426,7 @@ const NegotiationModule = ({
         precedingBid = bidVal; // Set the new tracker for sequential order
         logs.push({
           round: auctionRound,
-          text: `💸 ${part.name} teklifini bir önceki en düşük tekliften ($${(precedingBid + (precedingBid === bidVal ? 0 : currentMinDecrement)).toLocaleString()}) düşerek $${bidVal.toLocaleString()} yaptı.`,
+          text: `💸 ${part.name} teklifini bir önceki en düşük tekliften (${money((precedingBid + (precedingBid === bidVal ? 0 : currentMinDecrement)))}) düşerek ${money(bidVal)} yaptı.`,
           type: 'bid'
         });
       }
@@ -468,7 +483,7 @@ const NegotiationModule = ({
         ...prev,
         {
           round: auctionRound,
-          text: `🏆 AÇIK EKSİLTME TAMAMLANDI! Kazanan: ${winnerName} | Kazanan Fiyat: $${winnerPrice.toLocaleString()}`,
+          text: `🏆 AÇIK EKSİLTME TAMAMLANDI! Kazanan: ${winnerName} | Kazanan Fiyat: ${money(winnerPrice)}`,
           type: isUsWinner ? 'success' : 'alert'
         }
       ]);
@@ -485,7 +500,7 @@ const NegotiationModule = ({
       setCurrentMinDecrement(nextDecrement);
       setAuctionLog(prev => [
         ...prev,
-        { round: nextRound, text: `--- Tur ${nextRound} Başladı! Bu tur için gereken Minimum Düşüş: $${nextDecrement.toLocaleString()} ---`, type: 'info' }
+        { round: nextRound, text: `--- Tur ${nextRound} Başladı! Bu tur için gereken Minimum Düşüş: ${money(nextDecrement)} ---`, type: 'info' }
       ]);
     }
   };
@@ -498,7 +513,7 @@ const NegotiationModule = ({
         value: auctionWinner.price
       });
       setOpportunities(prev => prev.map(o => o.id === selectedOpp.id ? { ...o, status: 'WON', value: auctionWinner.price } : o));
-      alert(`Açık eksiltme zaferi tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel $${auctionWinner.price.toLocaleString()} olarak sisteme işlendi.`);
+      alert(`Açık eksiltme zaferi tescillendi! Fırsat KAZANILDI durumuna getirildi ve revize edilmiş bedel ${money(auctionWinner.price)} olarak sisteme işlendi.`);
       if (setActiveTab) setActiveTab('contract-workflow');
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Hata oluştu.');
@@ -549,6 +564,7 @@ const NegotiationModule = ({
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <ChatInfoPanel
             selectedOpp={selectedOpp}
+            currency={negotiationCurrency}
             chatIsTyping={chatIsTyping}
             chatState={chatState}
             chatOffer={chatOffer}
@@ -559,6 +575,7 @@ const NegotiationModule = ({
             onFinalize={handleFinalizeChatDeal}
           />
           <ChatWindow
+            currency={negotiationCurrency}
             chatConcessions={chatConcessions}
             chatMessages={chatMessages}
             chatIsTyping={chatIsTyping}
@@ -579,6 +596,7 @@ const NegotiationModule = ({
         // ==================== MODE 2: MULTI-COMPETITOR REVERSE AUCTION ====================
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fadeIn">
           <AuctionSidePanel
+            currency={negotiationCurrency}
             auctionState={auctionState}
             numCompetitors={numCompetitors}
             setNumCompetitors={setNumCompetitors}
@@ -599,6 +617,7 @@ const NegotiationModule = ({
             onNewAuction={startAuctionSetup}
           />
           <AuctionBoard
+            currency={negotiationCurrency}
             ourStatus={ourStatus}
             ourLastBid={ourLastBid}
             competitors={competitors}

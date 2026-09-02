@@ -2,13 +2,15 @@ import type { RefObject, FormEvent } from 'react';
 import { MessageSquare, User as UserIcon, Bot, Zap, Percent, ShieldAlert, DollarSign, ArrowRight, XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
+import { fmtCurrency } from '../../lib/format';
 import type { Message } from './types';
 
 export default function ChatWindow({
-  chatConcessions, chatMessages, chatIsTyping, chatEndRef, chatState, chatOffer, floorCost,
+  currency, chatConcessions, chatMessages, chatIsTyping, chatEndRef, chatState, chatOffer, floorCost,
   chatCustomCounter, setChatCustomCounter, onCustomCounterSubmit, onQuickCounter,
   onFinalize, onRestart, onMarkLost,
 }: {
+  currency: string;
   chatConcessions: number;
   chatMessages: Message[];
   chatIsTyping: boolean;
@@ -134,7 +136,7 @@ export default function ChatWindow({
               className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center gap-1.5 transition-all active:scale-95 ml-auto"
               title="Maksimum indirim sınırı"
             >
-              <ShieldAlert size={12} /> EN DİP FİYATI VER (${floorCost.toLocaleString()})
+              <ShieldAlert size={12} /> EN DİP FİYATI VER ({fmtCurrency(floorCost, currency)})
             </button>
           </div>
 

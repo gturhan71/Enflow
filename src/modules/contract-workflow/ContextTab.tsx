@@ -1,5 +1,7 @@
 import { CheckCircle2, Layers, Cpu, ChevronRight } from 'lucide-react';
 import { Opportunity } from '../../types';
+import { fmtCurrency } from '../../lib/format';
+import { resolveWorkflowCurrency } from './helpers';
 import { ContractWorkflow } from './types';
 
 export default function ContextTab({
@@ -14,6 +16,7 @@ export default function ContextTab({
   onNotesBlur: (value: string) => void;
   onGoToAnalysis: () => void;
 }) {
+  const currency = resolveWorkflowCurrency(selected, opportunities);
   return (
     <div className="space-y-5">
 
@@ -66,7 +69,7 @@ export default function ContextTab({
       {/* Sözleşme bedeli ve tarih */}
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-xs text-slate-400 mb-1 block">Sözleşme Bedeli (₺)</label>
+          <label className="text-xs text-slate-400 mb-1 block">Sözleşme Bedeli ({currency})</label>
           <input
             key={`val-${selected.id}`}
             className="input-glass w-full"
@@ -76,7 +79,7 @@ export default function ContextTab({
           />
           {selected.contractValue > 0 && (
             <p className="text-xs text-emerald-600 mt-1">
-              ₺{selected.contractValue.toLocaleString('tr-TR')} — kazanılan tekliften
+              {fmtCurrency(selected.contractValue, currency)} — kazanılan tekliften
             </p>
           )}
         </div>
