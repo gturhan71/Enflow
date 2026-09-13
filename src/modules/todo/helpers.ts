@@ -111,6 +111,9 @@ export const getPriorityColor = (priority: string) => {
   }
 };
 
+const PRIORITY_LABEL_TR: Record<string, string> = { URGENT: 'Acil', HIGH: 'Yüksek', MEDIUM: 'Orta', LOW: 'Düşük' };
+export const getPriorityLabel = (priority: string) => PRIORITY_LABEL_TR[priority] || priority;
+
 // İlgili modülün seçilebilir kayıtları (fırsat/proje).
 export const itemsForModule = (
   mod: string | undefined,

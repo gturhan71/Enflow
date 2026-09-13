@@ -14,7 +14,7 @@ router.post('/', (req: Request, res: Response) => {
   fs.appendFile(logPath, logMessage, (err) => {
     if (err) {
       logger.error('Logging failed:', err);
-      return res.status(500).json({ error: 'Logging failed' });
+      return res.status(500).json({ error: 'Kayıt yazılamadı.' });
     }
     res.json({ success: true });
   });
@@ -28,7 +28,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (_req: Request, res: Respon
   }
 
   fs.readFile(logPath, 'utf8', (err, data) => {
-    if (err) return res.status(500).json({ error: 'Read failed' });
+    if (err) return res.status(500).json({ error: 'Kayıtlar okunamadı.' });
     const logs = data.split('\n').filter(Boolean).map(line => {
       const match = line.match(/\[(.*?)\] User (.*?) (.*)/);
       return match ? { timestamp: match[1], userId: match[2], action: match[3] } : null;

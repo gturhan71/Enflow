@@ -23,9 +23,16 @@ const verifyBadge = (s: string) => {
   if (s === 'FAILED') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-500/10 text-red-600">✗ Başarısız</span>;
   return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600">⏳ Bekliyor</span>;
 };
+const STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Bekliyor', RUNNING: 'Çalışıyor', COMPLETED: 'Tamamlandı', FAILED: 'Başarısız',
+  ANALYZING: 'Analiz Ediliyor', AWAITING_CONFIRM: 'Onay Bekliyor', RESTORING: 'Geri Yükleniyor',
+};
+const SCOPE_LABELS: Record<string, string> = { PLATFORM: 'Platform', TENANT: 'Kiracı' };
+const KIND_LABELS: Record<string, string> = { FULL: 'Tam', STATE: 'Durum', DATA: 'Veri' };
+const TARGET_LABELS: Record<string, string> = { LOCAL: 'Yerel', NEXTCLOUD: 'Nextcloud', S3: 'S3' };
 const statusBadge = (s: string) => {
   const tone = s === 'COMPLETED' ? 'bg-emerald-500/10 text-emerald-600' : s === 'FAILED' ? 'bg-red-500/10 text-red-600' : 'bg-sky-500/10 text-sky-600';
-  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tone}`}>{s}</span>;
+  return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tone}`}>{STATUS_LABELS[s] || s}</span>;
 };
 const targetIcon = (t: string) => t === 'NEXTCLOUD' ? <Cloud className="w-3.5 h-3.5" /> : t === 'S3' ? <Server className="w-3.5 h-3.5" /> : <HardDrive className="w-3.5 h-3.5" />;
 
@@ -145,7 +152,7 @@ const JobsTab = ({ jobs, form, setForm, busy, onRun, onVerify, onRestore }: {
       <h3 className="font-bold text-slate-900 mb-4 flex items-center gap-2"><Play className="w-4 h-4 text-indigo-500" /> Şimdi Yedekle</h3>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <Select label="Kapsam" value={form.scope} onChange={v => setForm(f => ({ ...f, scope: v }))} options={[['PLATFORM', 'Platform (tüm DB)'], ['TENANT', 'Yalnız kiracı verisi']]} />
-        <Select label="Tür" value={form.kind} onChange={v => setForm(f => ({ ...f, kind: v }))} options={[['FULL', 'Tam (state + veri)'], ['STATE', 'State (dosya)'], ['DATA', 'Veri (mantıksal)']]} />
+        <Select label="Tür" value={form.kind} onChange={v => setForm(f => ({ ...f, kind: v }))} options={[['FULL', 'Tam (durum + veri)'], ['STATE', 'Durum (dosya)'], ['DATA', 'Veri (mantıksal)']]} />
         <Select label="Hedef" value={form.targetType} onChange={v => setForm(f => ({ ...f, targetType: v }))} options={[['LOCAL', 'Yerel dizin'], ['NEXTCLOUD', 'Nextcloud'], ['S3', 'S3 / uyumlu']]} />
         <div>
           <label className="block text-xs font-semibold text-slate-600 mb-1">Lokasyon (ops.)</label>
@@ -172,8 +179,8 @@ const JobsTab = ({ jobs, form, setForm, busy, onRun, onVerify, onRestore }: {
           {jobs.map(j => (
             <tr key={j.id} className="border-t border-slate-100">
               <td className="px-4 py-3 text-slate-700">{fmtDate(j.startedAt)}<div className="text-[11px] text-slate-400">{j.trigger === 'SCHEDULED' ? 'Zamanlı' : 'Manuel'}{j.startedByName ? ` · ${j.startedByName}` : ''}</div></td>
-              <td className="px-4 py-3"><span className="font-medium text-slate-800">{j.scope}</span> · {j.kind}<div className="text-[11px] text-slate-400">{j.dbProvider}</div></td>
-              <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-slate-600">{targetIcon(j.targetType)} {j.targetType}</span></td>
+              <td className="px-4 py-3"><span className="font-medium text-slate-800">{SCOPE_LABELS[j.scope] || j.scope}</span> · {KIND_LABELS[j.kind] || j.kind}<div className="text-[11px] text-slate-400">{j.dbProvider}</div></td>
+              <td className="px-4 py-3"><span className="inline-flex items-center gap-1 text-slate-600">{targetIcon(j.targetType)} {TARGET_LABELS[j.targetType] || j.targetType}</span></td>
               <td className="px-4 py-3 text-slate-600">{fmtBytes(j.sizeBytes)}</td>
               <td className="px-4 py-3">{statusBadge(j.status)}{j.error && <div className="text-[11px] text-red-500 max-w-[180px] truncate" title={j.error}>{j.error}</div>}</td>
               <td className="px-4 py-3">{verifyBadge(j.verifyStatus)}</td>
@@ -186,7 +193,7 @@ const JobsTab = ({ jobs, form, setForm, busy, onRun, onVerify, onRestore }: {
                     <button onClick={() => downloadArtifact(j.id, 'data')} title="Veri indir (JSON)" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><Download className="w-4 h-4" /></button>
                   )}
                   {j.targetType === 'LOCAL' && j.stateRef && (
-                    <button onClick={() => downloadArtifact(j.id, 'state')} title="State indir (.db)" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><HardDrive className="w-4 h-4" /></button>
+                    <button onClick={() => downloadArtifact(j.id, 'state')} title="Durum dosyasını indir (.db)" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500"><HardDrive className="w-4 h-4" /></button>
                   )}
                   <button onClick={() => onRestore(j.id)} disabled={busy === 'analyze-' + j.id || j.status !== 'COMPLETED' || !j.dataRef} title="Geri yükle (analiz)" className="p-1.5 rounded-lg hover:bg-slate-100 text-indigo-500 disabled:opacity-40">
                     {busy === 'analyze-' + j.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
@@ -210,7 +217,7 @@ const RestoreTab = ({ restores, busy, setBusy, flash, reload }: {
 
   const confirm = async (id: string, mode: 'LOGICAL' | 'STATE') => {
     setBusy('restore-' + id); setConfirmId(null);
-    try { await apiService.confirmRestore(id, mode); flash('ok', mode === 'STATE' ? 'State dosyası hazırlandı (kontrollü restart gerekir).' : 'Geri yükleme tamamlandı.'); await reload(); }
+    try { await apiService.confirmRestore(id, mode); flash('ok', mode === 'STATE' ? 'Durum dosyası hazırlandı (kontrollü restart gerekir).' : 'Geri yükleme tamamlandı.'); await reload(); }
     catch (e) { flash('err', 'Geri yükleme hatası: ' + (e instanceof Error ? e.message : '')); }
     finally { setBusy(null); }
   };
@@ -268,7 +275,7 @@ const RestoreTab = ({ restores, busy, setBusy, flash, reload }: {
                 <div className="text-sm text-amber-800 flex items-center gap-2 mb-3"><AlertCircle className="w-4 h-4" /> Bu işlem mevcut veriyi yedekteki haliyle değiştirir. Önce otomatik güvenlik snapshot alınır. Devam?</div>
                 <div className="flex gap-2">
                   <button onClick={() => confirm(r.id, 'LOGICAL')} className="btn-primary text-sm">Mantıksal Geri Yükle</button>
-                  <button onClick={() => confirm(r.id, 'STATE')} className="btn-secondary text-sm">State Dosyası Hazırla</button>
+                  <button onClick={() => confirm(r.id, 'STATE')} className="btn-secondary text-sm">Durum Dosyası Hazırla</button>
                   <button onClick={() => setConfirmId(null)} className="btn-secondary text-sm">Vazgeç</button>
                 </div>
               </div>
@@ -319,7 +326,7 @@ const ScheduleTab = ({ settings, setSettings, flash }: {
           <input type="number" min={1} value={s.intervalHours} onChange={e => upd({ intervalHours: Number(e.target.value) })} className="input-glass w-full text-sm" />
         </div>
         <Select label="Kapsam" value={s.scope} onChange={v => upd({ scope: v as BackupSettings['scope'] })} options={[['PLATFORM', 'Platform (tüm DB)'], ['TENANT', 'Yalnız kiracı']]} />
-        <Select label="Tür" value={s.kind} onChange={v => upd({ kind: v as BackupSettings['kind'] })} options={[['FULL', 'Tam'], ['STATE', 'State'], ['DATA', 'Veri']]} />
+        <Select label="Tür" value={s.kind} onChange={v => upd({ kind: v as BackupSettings['kind'] })} options={[['FULL', 'Tam'], ['STATE', 'Durum'], ['DATA', 'Veri']]} />
         <Select label="Hedef" value={s.targetType} onChange={v => upd({ targetType: v as BackupSettings['targetType'] })} options={[['LOCAL', 'Yerel'], ['NEXTCLOUD', 'Nextcloud'], ['S3', 'S3']]} />
         <div className="sm:col-span-2">
           <label className="block text-xs font-semibold text-slate-600 mb-1">Lokasyon (dizin / prefix)</label>

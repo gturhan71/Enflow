@@ -3,7 +3,7 @@ import { Plus, CheckCircle2, ArrowRightCircle, Trash2, AlertTriangle } from 'luc
 import { AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/apiService';
 import { LegalCase, LegalRequest } from '../../types';
-import { LEGAL_TYPE_LABELS, LEGAL_STATUS_STYLES, PRIORITY_STYLES } from './constants';
+import { LEGAL_TYPE_LABELS, LEGAL_STATUS_STYLES, LEGAL_STATUS_LABELS, REQUEST_STATUS_LABELS, PRIORITY_STYLES, PRIORITY_LABELS } from './constants';
 import { BASE, apiFetch, computeDeadlineAlarm } from './helpers';
 import { ContractWorkflow } from './types';
 import LegalCaseForm from './LegalCaseForm';
@@ -87,7 +87,7 @@ export default function LegalView() {
                   <div>
                     <h4 className="font-semibold text-slate-900">{r.title}</h4>
                     {r.description && <p className="text-xs text-slate-600 mt-1">{r.description}</p>}
-                    <p className="text-xs text-slate-500 mt-1">Öncelik: <span className={PRIORITY_STYLES[r.priority] || 'text-slate-400'}>{r.priority}</span> · {r.status}</p>
+                    <p className="text-xs text-slate-500 mt-1">Öncelik: <span className={PRIORITY_STYLES[r.priority] || 'text-slate-400'}>{PRIORITY_LABELS[r.priority] || r.priority}</span> · {REQUEST_STATUS_LABELS[r.status] || r.status}</p>
                   </div>
                   <button onClick={() => convertToCase(r)} className="btn-secondary text-xs flex items-center gap-1 whitespace-nowrap">
                     <ArrowRightCircle className="w-3.5 h-3.5" /> Vakaya Dönüştür
@@ -111,8 +111,8 @@ export default function LegalView() {
                       <div className="flex items-center gap-2 flex-wrap">
                         <h4 className="font-semibold text-slate-900">{c.title}</h4>
                         <span className="text-xs text-slate-500">{LEGAL_TYPE_LABELS[c.type] || c.type}</span>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${LEGAL_STATUS_STYLES[c.status] || ''}`}>{c.status}</span>
-                        <span className={`text-[10px] font-bold uppercase ${PRIORITY_STYLES[c.priority]}`}>{c.priority}</span>
+                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${LEGAL_STATUS_STYLES[c.status] || ''}`}>{LEGAL_STATUS_LABELS[c.status] || c.status}</span>
+                        <span className={`text-[10px] font-bold uppercase ${PRIORITY_STYLES[c.priority]}`}>{PRIORITY_LABELS[c.priority] || c.priority}</span>
                         {c.docNumber && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg">{c.docNumber}</span>}
                       </div>
                       {c.summary && <p className="text-xs text-slate-600">{c.summary}</p>}

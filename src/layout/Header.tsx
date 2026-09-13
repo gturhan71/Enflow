@@ -20,6 +20,9 @@ import { Notification } from '../types';
 import { apiService } from '../services/apiService';
 import { logger } from '../utils/logger';
 import { useOpportunities, useCustomers, useProjects, useTasks } from '../hooks/useEnflowQueries';
+import { STATUS_LABEL as OPP_STATUS_LABEL } from '../modules/crm/constants';
+import { STATUS_CONFIG as PROJECT_STATUS_CONFIG } from '../modules/project-mgmt/constants';
+import { REQUEST_STATUS_LABELS as TASK_STATUS_LABELS } from '../modules/contract-workflow/constants';
 
 interface SearchResult {
   id: string;
@@ -69,16 +72,16 @@ const Header = ({
     if (q.length < 2) return [];
     const results: SearchResult[] = [];
     for (const o of (searchOpportunities || []) as { id: string; title: string; status?: string }[]) {
-      if (o.title?.toLowerCase().includes(q)) results.push({ id: o.id, category: 'Fırsat', label: o.title, sub: o.status, targetTab: 'crm-opportunities' });
+      if (o.title?.toLowerCase().includes(q)) results.push({ id: o.id, category: 'Fırsat', label: o.title, sub: o.status ? (OPP_STATUS_LABEL[o.status] || o.status) : undefined, targetTab: 'crm-opportunities' });
     }
     for (const c of (searchCustomers || []) as { id: string; name: string }[]) {
       if (c.name?.toLowerCase().includes(q)) results.push({ id: c.id, category: 'Müşteri', label: c.name, targetTab: 'crm-customers' });
     }
     for (const p of (searchProjects || []) as { id: string; name: string; status?: string }[]) {
-      if (p.name?.toLowerCase().includes(q)) results.push({ id: p.id, category: 'Proje', label: p.name, sub: p.status, targetTab: 'project-mgmt' });
+      if (p.name?.toLowerCase().includes(q)) results.push({ id: p.id, category: 'Proje', label: p.name, sub: p.status ? (PROJECT_STATUS_CONFIG[p.status as keyof typeof PROJECT_STATUS_CONFIG]?.label || p.status) : undefined, targetTab: 'project-mgmt' });
     }
     for (const t of (searchTasks || []) as { id: string; title: string; status?: string }[]) {
-      if (t.title?.toLowerCase().includes(q)) results.push({ id: t.id, category: 'Görev', label: t.title, sub: t.status, targetTab: 'todo' });
+      if (t.title?.toLowerCase().includes(q)) results.push({ id: t.id, category: 'Görev', label: t.title, sub: t.status ? (TASK_STATUS_LABELS[t.status] || t.status) : undefined, targetTab: 'todo' });
     }
     return results.slice(0, 12);
   }, [searchQuery, searchOpportunities, searchCustomers, searchProjects, searchTasks]);

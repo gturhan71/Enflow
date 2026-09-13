@@ -61,8 +61,8 @@ export const printProjectReport = (project: Project, forCustomer = false) => {
     <div class="card"><p class="label">Planlanan Bitiş</p><p class="val" style="font-size:14px">${fmtDate(project.plannedEndDate)}</p></div>
     <div class="card"><p class="label">Aktif Faz</p><p class="val" style="font-size:14px">${project.phase}</p></div>
   </div>
-  <h2>Milestone Takibi</h2>
-  <table><tr><th>Milestone</th><th>Durum</th><th>İlerleme</th><th>Plan Başlangıç</th><th>Plan Bitiş</th><th>Gerçek Bitiş</th></tr>${msRows}</table>
+  <h2>Kilometre Taşı Takibi</h2>
+  <table><tr><th>Kilometre Taşı</th><th>Durum</th><th>İlerleme</th><th>Plan Başlangıç</th><th>Plan Bitiş</th><th>Gerçek Bitiş</th></tr>${msRows}</table>
   ${!forCustomer ? `
   <h2>Finansal Özet</h2>
   <div class="grid">

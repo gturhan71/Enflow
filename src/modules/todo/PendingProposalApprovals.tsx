@@ -2,7 +2,7 @@ import { AlertCircle, DollarSign, Eye, CheckCircle2, X, Target } from 'lucide-re
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { TodoTask } from '../../types';
-import { getPriorityColor, ProposalDetail } from './helpers';
+import { getPriorityColor, getPriorityLabel, ProposalDetail } from './helpers';
 
 export default function PendingProposalApprovals({
   approvals,
@@ -43,7 +43,7 @@ export default function PendingProposalApprovals({
               <div className="flex-1 space-y-3">
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className={cn("text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest", getPriorityColor(todo.priority))}>
-                    {todo.priority}
+                    {getPriorityLabel(todo.priority)}
                   </span>
                   <h4 className="font-black text-slate-900 text-lg tracking-tight">{todo.title}</h4>
                   {detail && (

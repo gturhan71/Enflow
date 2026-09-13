@@ -43,7 +43,7 @@ const BackupScheduleSettings: React.FC = () => {
         <div>
           <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tür</label>
           <select value={s.kind} onChange={e => upd({ kind: e.target.value as BackupSettings['kind'] })} className="w-full mt-1 px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-primary text-sm">
-            <option value="FULL">Tam</option><option value="STATE">State</option><option value="DATA">Veri</option>
+            <option value="FULL">Tam</option><option value="STATE">Durum</option><option value="DATA">Veri</option>
           </select>
         </div>
         <div>

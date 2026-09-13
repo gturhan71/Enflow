@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { XCircle } from 'lucide-react';
 import { motion } from 'motion/react';
 import { apiService } from '../../services/apiService';
-import { LEGAL_TYPE_LABELS } from './constants';
+import { LEGAL_TYPE_LABELS, PRIORITY_LABELS } from './constants';
 import { ContractWorkflow } from './types';
 
 export default function LegalCaseForm({ workflows, onClose, onSaved }: { workflows: ContractWorkflow[]; onClose: () => void; onSaved: () => void }) {
@@ -38,7 +38,7 @@ export default function LegalCaseForm({ workflows, onClose, onSaved }: { workflo
             {Object.entries(LEGAL_TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
           </select>
           <select className="input-glass w-full text-sm" value={f.priority} onChange={e => set('priority', e.target.value)}>
-            {['LOW', 'MEDIUM', 'HIGH'].map(o => <option key={o} value={o}>{o}</option>)}
+            {['LOW', 'MEDIUM', 'HIGH'].map(o => <option key={o} value={o}>{PRIORITY_LABELS[o] || o}</option>)}
           </select>
         </div>
         {f.type === 'CONTRACT_REVIEW' && (

@@ -11,6 +11,15 @@ const ENTITY_TYPES = [
   'LESSON', 'RISK', 'METRIC', 'EXTERNAL_DOC', 'VISIT_PLAN', 'WORKFLOW',
 ];
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  OPPORTUNITY: 'Fırsat', PROPOSAL: 'Teklif', PROJECT: 'Proje', CONTRACT_WORKFLOW: 'Sözleşme Yönetimi',
+  CONTRACT: 'Sözleşme', TENDER: 'İhale', PURCHASE_REQUEST: 'Satınalma Talebi', VENDOR: 'Tedarikçi',
+  INVOICE: 'Fatura', PROJECT_COST: 'Proje Maliyeti', GUARANTEE: 'Teminat Mektubu', LEGAL_CASE: 'Hukuki Vaka',
+  TASK: 'Görev', CUSTOMER: 'Müşteri', USER: 'Kullanıcı', UNIT: 'Birim', APPROVAL_STAGE: 'Onay Aşaması',
+  DOCUMENT: 'Belge', ARCHIVE: 'Arşiv', LESSON: 'Ders', RISK: 'Risk/Fırsat', METRIC: 'Metrik',
+  EXTERNAL_DOC: 'Dış Doküman', VISIT_PLAN: 'Ziyaret Planı', WORKFLOW: 'İş Akışı',
+};
+
 function actionTone(action: string): string {
   if (action.startsWith('CREATE')) return 'bg-emerald-100 text-emerald-700';
   if (action.startsWith('DELETE') || action.includes('REJECT')) return 'bg-red-100 text-red-700';
@@ -191,7 +200,7 @@ export function ActivityLogModule() {
               <label className="text-[10px] font-bold uppercase text-slate-400">Varlık Tipi</label>
               <select value={entityType} onChange={e => setEntityType(e.target.value)} className="input-glass text-sm px-3 py-2 rounded-xl block">
                 <option value="">Tümü</option>
-                {ENTITY_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {ENTITY_TYPES.map(t => <option key={t} value={t}>{ENTITY_TYPE_LABELS[t] || t}</option>)}
               </select>
             </div>
             <div className="space-y-1">

@@ -27,6 +27,14 @@ interface ExternalDoc {
   version?: string | null; status: string; notes?: string | null; docNumber?: string | null;
 }
 
+const RISK_STATUS_TR: Record<string, string> = { OPEN: 'Açık', MITIGATING: 'Azaltılıyor', CLOSED: 'Kapandı' };
+const EXTERNAL_DOC_STATUS_TR: Record<string, string> = { ACTIVE: 'Aktif', SUPERSEDED: 'Yerini Aldı', WITHDRAWN: 'Geri Çekildi' };
+const IMPACT_TR: Record<string, string> = { LOW: 'Düşük', MEDIUM: 'Orta', HIGH: 'Yüksek' };
+const LESSON_CATEGORY_TR: Record<string, string> = {
+  TECHNICAL: 'Teknik', COMMERCIAL: 'Ticari', PROCESS: 'Süreç', CUSTOMER: 'Müşteri', SUPPLIER: 'Tedarikçi', OTHER: 'Diğer',
+};
+const RISK_TYPE_TR: Record<string, string> = { RISK: 'Risk', OPPORTUNITY: 'Fırsat' };
+
 type TabKey = 'lessons' | 'risks' | 'metrics' | 'external';
 
 const TABS: { key: TabKey; label: string; icon: React.ReactNode }[] = [
@@ -135,8 +143,8 @@ const LessonsTab = ({ items, onDelete }: { items: Lesson[]; onDelete: (id: strin
             <div className="space-y-1">
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="font-black text-slate-900">{l.title}</h4>
-                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${IMPACT_BADGE[l.impact] || 'bg-slate-100 text-slate-600'}`}>{l.impact}</span>
-                <span className="text-[10px] font-bold uppercase text-slate-400">{l.category}</span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${IMPACT_BADGE[l.impact] || 'bg-slate-100 text-slate-600'}`}>{IMPACT_TR[l.impact] || l.impact}</span>
+                <span className="text-[10px] font-bold uppercase text-slate-400">{LESSON_CATEGORY_TR[l.category] || l.category}</span>
                 <DocBadge n={l.docNumber} />
               </div>
               <p className="text-sm text-slate-600">{l.situation}</p>
@@ -172,7 +180,7 @@ const RisksTab = ({ items, onDelete }: { items: Risk[]; onDelete: (id: string) =
                   <DocBadge n={r.docNumber} />
                 </div>
                 {r.description && <p className="text-sm text-slate-600">{r.description}</p>}
-                <p className="text-xs text-slate-500">Olasılık: <b>{r.probability}</b> · Etki: <b>{r.impact}</b>{r.owner ? ` · Sorumlu: ${r.owner}` : ''} · {r.status}</p>
+                <p className="text-xs text-slate-500">Olasılık: <b>{r.probability}</b> · Etki: <b>{r.impact}</b>{r.owner ? ` · Sorumlu: ${r.owner}` : ''} · {RISK_STATUS_TR[r.status] || r.status}</p>
                 {r.response && <p className="text-xs text-slate-500"><span className="font-bold">Aksiyon:</span> {r.response}</p>}
               </div>
             </div>
@@ -228,7 +236,7 @@ const ExternalTab = ({ items, onDelete }: { items: ExternalDoc[]; onDelete: (id:
             <div className="flex items-center gap-2 flex-wrap">
               <h4 className="font-black text-slate-900">{d.name}</h4>
               {d.version && <span className="text-[10px] font-bold text-slate-400">v{d.version}</span>}
-              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${d.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{d.status}</span>
+              <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${d.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{EXTERNAL_DOC_STATUS_TR[d.status] || d.status}</span>
               <DocBadge n={d.docNumber} />
             </div>
             <p className="text-xs text-slate-500">{d.source || '—'}{d.externalRef ? ` · Ref: ${d.externalRef}` : ''}</p>
@@ -287,15 +295,15 @@ const RecordForm = ({ tab, userName, onClose, onSaved }: {
 
         {tab === 'lessons' && (<>
           <Input label="Başlık" v={f.title} on={(v) => set('title', v)} />
-          <Select label="Etki" v={f.impact || 'MEDIUM'} on={(v) => set('impact', v)} opts={['LOW', 'MEDIUM', 'HIGH']} />
-          <Select label="Kategori" v={f.category || 'OTHER'} on={(v) => set('category', v)} opts={['TECHNICAL', 'COMMERCIAL', 'PROCESS', 'CUSTOMER', 'SUPPLIER', 'OTHER']} />
+          <Select label="Etki" v={f.impact || 'MEDIUM'} on={(v) => set('impact', v)} opts={['LOW', 'MEDIUM', 'HIGH']} labelFor={o => IMPACT_TR[o] || o} />
+          <Select label="Kategori" v={f.category || 'OTHER'} on={(v) => set('category', v)} opts={['TECHNICAL', 'COMMERCIAL', 'PROCESS', 'CUSTOMER', 'SUPPLIER', 'OTHER']} labelFor={o => LESSON_CATEGORY_TR[o] || o} />
           <Textarea label="Durum" v={f.situation} on={(v) => set('situation', v)} />
           <Textarea label="Kök Neden" v={f.rootCause} on={(v) => set('rootCause', v)} />
           <Textarea label="Aksiyon" v={f.action} on={(v) => set('action', v)} />
         </>)}
 
         {tab === 'risks' && (<>
-          <Select label="Tip" v={f.type || 'RISK'} on={(v) => set('type', v)} opts={['RISK', 'OPPORTUNITY']} />
+          <Select label="Tip" v={f.type || 'RISK'} on={(v) => set('type', v)} opts={['RISK', 'OPPORTUNITY']} labelFor={o => RISK_TYPE_TR[o] || o} />
           <Input label="Başlık" v={f.title} on={(v) => set('title', v)} />
           <div className="grid grid-cols-2 gap-3">
             <Select label="Olasılık (1-5)" v={f.probability || '3'} on={(v) => set('probability', v)} opts={['1', '2', '3', '4', '5']} />
@@ -353,11 +361,11 @@ const Textarea = ({ label, v, on }: { label: string; v?: string; on: (v: string)
     <textarea value={v || ''} onChange={(e) => on(e.target.value)} rows={2} className="input-glass w-full mt-1 resize-none" />
   </div>
 );
-const Select = ({ label, v, on, opts }: { label: string; v: string; on: (v: string) => void; opts: string[] }) => (
+const Select = ({ label, v, on, opts, labelFor }: { label: string; v: string; on: (v: string) => void; opts: string[]; labelFor?: (o: string) => string }) => (
   <div>
     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
     <select value={v} onChange={(e) => on(e.target.value)} className="input-glass w-full mt-1">
-      {opts.map(o => <option key={o} value={o}>{o}</option>)}
+      {opts.map(o => <option key={o} value={o}>{labelFor ? labelFor(o) : o}</option>)}
     </select>
   </div>
 );

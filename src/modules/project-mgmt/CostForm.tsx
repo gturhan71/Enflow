@@ -36,7 +36,7 @@ const CostForm: FC<CostFormProps> = ({ milestones, onSave, onClose }) => {
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 font-semibold">Milestone</label>
+              <label className="text-xs text-slate-400 font-semibold">Kilometre Taşı</label>
               <select value={form.milestoneId} onChange={f('milestoneId')} className="input-glass w-full px-3 py-2 text-sm rounded-xl mt-1">
                 <option value="">Genel</option>
                 {milestones.map(m => <option key={m.id} value={m.id}>{m.title}</option>)}

@@ -36,6 +36,8 @@ const ORDER_STATUS: Record<string, { label: string; badge: string }> = {
 const NEXT_STATUS: Record<string, string> = {
   EVALUATION: 'CONFIRMED', CONFIRMED: 'IN_DELIVERY', IN_DELIVERY: 'DELIVERED', DELIVERED: 'INVOICED', INVOICED: 'CLOSED',
 };
+const CATALOG_STATUS_TR: Record<string, string> = { ACTIVE: 'Aktif', PASSIVE: 'Pasif', EXPIRED: 'Süresi Doldu' };
+const AGREEMENT_STATUS_TR: Record<string, string> = { ACTIVE: 'Aktif', EXPIRED: 'Süresi Doldu', SUSPENDED: 'Askıda', CANCELLED: 'İptal Edildi' };
 
 export function DmoModule() {
   const { currentUser } = useAuth();
@@ -243,7 +245,7 @@ function CatalogTab({ items, canEdit, onNew, onEdit, onDelete }: { items: DmoCat
                 </td>
                 <td className="p-3 text-right">{fmt(it.listPrice, it.currency)}</td>
                 <td className="p-3 text-right text-slate-500">{fmt(it.unitCost, it.costCurrency)}</td>
-                <td className="p-3 text-center"><span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{it.status}</span></td>
+                <td className="p-3 text-center"><span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{CATALOG_STATUS_TR[it.status] || it.status}</span></td>
                 {canEdit && <td className="p-3 text-right whitespace-nowrap"><button onClick={() => onEdit(it)} className="p-1 text-slate-400 hover:text-primary"><Pencil size={14} /></button><button onClick={() => onDelete(it.id)} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></td>}
               </tr>
             ))}
@@ -275,7 +277,7 @@ function AgreementsTab({ items, canEdit, onNew, onEdit, onDelete }: { items: Dmo
                   <div className="bg-slate-100 rounded h-2 mt-1 overflow-hidden"><div className={`h-full ${usedPct > 0.9 ? 'bg-red-500' : 'bg-primary/70'}`} style={{ width: `${usedPct * 100}%` }} /></div>
                 </div>
               )}
-              <span className="inline-block mt-2 text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{a.status}</span>
+              <span className="inline-block mt-2 text-[9px] font-black uppercase px-2 py-0.5 rounded bg-slate-100 text-slate-600">{AGREEMENT_STATUS_TR[a.status] || a.status}</span>
             </div>
           );
         })}
@@ -401,7 +403,7 @@ function AgreementForm({ initial, onClose, onSaved }: { initial?: DmoFrameworkAg
       <Field label="Anlaşma No"><input className={inp} value={f.agreementNo} onChange={e => setF({ ...f, agreementNo: e.target.value })} /></Field>
       <Field label="Başlık"><input className={inp} value={f.title} onChange={e => setF({ ...f, title: e.target.value })} /></Field>
       <Field label="Kota (TRY)"><input type="number" className={inp} value={f.quotaTotal} onChange={e => setF({ ...f, quotaTotal: Number(e.target.value) })} /></Field>
-      <Field label="Durum"><select className={inp} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}>{['ACTIVE', 'EXPIRED', 'SUSPENDED', 'CANCELLED'].map(s => <option key={s}>{s}</option>)}</select></Field>
+      <Field label="Durum"><select className={inp} value={f.status} onChange={e => setF({ ...f, status: e.target.value })}>{['ACTIVE', 'EXPIRED', 'SUSPENDED', 'CANCELLED'].map(s => <option key={s} value={s}>{AGREEMENT_STATUS_TR[s] || s}</option>)}</select></Field>
       <button onClick={save} className="btn-primary w-full py-2 rounded-xl text-sm">Kaydet</button>
     </Modal>
   );

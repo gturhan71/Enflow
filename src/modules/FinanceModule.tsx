@@ -43,6 +43,14 @@ const INVOICE_STATUS: Record<string, string> = {
   PAID: 'bg-emerald-100 text-emerald-700', OVERDUE: 'bg-red-100 text-red-700',
   CANCELLED: 'bg-slate-200 text-slate-400',
 };
+const INVOICE_STATUS_TR: Record<string, string> = {
+  DRAFT: 'Taslak', ISSUED: 'Kesildi', SENT: 'Gönderildi', PARTIAL: 'Kısmi Ödendi',
+  PAID: 'Ödendi', OVERDUE: 'Vadesi Geçti', CANCELLED: 'İptal Edildi',
+};
+const INVOICE_TYPE_TR: Record<string, string> = { SALES: 'Satış', PURCHASE: 'Satınalma' };
+const PAYMENT_METHOD_TR: Record<string, string> = {
+  BANK_TRANSFER: 'Banka Havalesi', CHEQUE: 'Çek', CASH: 'Nakit', OTHER: 'Diğer',
+};
 const GUARANTEE_STATUS: Record<string, string> = {
   ACTIVE: 'bg-emerald-100 text-emerald-700', RELEASED: 'bg-slate-100 text-slate-500',
   EXPIRED: 'bg-red-100 text-red-700', CALLED: 'bg-amber-100 text-amber-700',
@@ -181,7 +189,7 @@ const InvoicesTab = ({ items, onPay, onDelete }: {
                     {inv.type === 'SALES' ? 'Satış' : 'Alış'}
                   </span>
                   <h4 className="font-black text-slate-900">{inv.invoiceNo || '(no yok)'}</h4>
-                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${INVOICE_STATUS[inv.status] || 'bg-slate-100 text-slate-600'}`}>{inv.status}</span>
+                  <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg ${INVOICE_STATUS[inv.status] || 'bg-slate-100 text-slate-600'}`}>{INVOICE_STATUS_TR[inv.status] || inv.status}</span>
                   <DocBadge n={inv.docNumber} />
                 </div>
                 <p className="text-sm text-slate-600">{inv.customerName || inv.vendorName || '—'}</p>
@@ -370,6 +378,7 @@ const FulfillGuaranteeForm = ({ g, onClose, onSaved }: { g: GuaranteeLetter; onC
 
 // ── İşletme Maliyeti Havuzu (overhead) ───────────────────────────────────────
 const OVH_METHOD_TR: Record<string, string> = { PCT_OF_VALUE: 'Sözleşme değerinin %’si', PCT_OF_DIRECT_COST: 'Direkt maliyetin %’si', POOL_RATE: 'Havuz oranı' };
+const OVH_STATUS_TR: Record<string, string> = { ACTIVE: 'Aktif', CLOSED: 'Kapalı' };
 function OverheadPoolTab({ canEdit }: { canEdit: boolean }) {
   const [pools, setPools] = useState<import('../types').OperatingCostPool[]>([]);
   const [form, setForm] = useState<{ id?: string; periodStart: string; periodEnd: string; personnelCost: number; otherOpex: number; method: string; rate: number } | null>(null);
@@ -402,7 +411,7 @@ function OverheadPoolTab({ canEdit }: { canEdit: boolean }) {
                 <td className="p-3 text-right font-bold">{fmt(p.totalPool)}</td>
                 <td className="p-3 text-center text-xs">{OVH_METHOD_TR[p.method] || p.method}</td>
                 <td className="p-3 text-right">{p.method === 'POOL_RATE' ? p.rate : `%${p.rate}`}</td>
-                <td className="p-3 text-center"><span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${p.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{p.status}</span></td>
+                <td className="p-3 text-center"><span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${p.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}`}>{OVH_STATUS_TR[p.status] || p.status}</span></td>
                 {canEdit && <td className="p-3 text-right whitespace-nowrap"><button onClick={() => setForm({ id: p.id, periodStart: p.periodStart.slice(0, 10), periodEnd: p.periodEnd.slice(0, 10), personnelCost: p.personnelCost, otherOpex: p.otherOpex, method: p.method, rate: p.rate })} className="p-1 text-slate-400 hover:text-primary"><Pencil size={14} /></button><button onClick={async () => { await apiService.deleteOperatingCostPool(p.id); load(); }} className="p-1 text-slate-400 hover:text-red-500"><Trash2 size={14} /></button></td>}
               </tr>
             ))}
@@ -706,8 +715,8 @@ const InvoiceForm = ({ userId, onClose, onSaved }: { userId?: string; onClose: (
   return (
     <Modal title="Yeni Fatura" onClose={onClose}>
       <div className="grid grid-cols-2 gap-3">
-        <Select label="Tip" v={f.type} on={(v) => set('type', v)} opts={['SALES', 'PURCHASE']} />
-        <Select label="Durum" v={f.status} on={(v) => set('status', v)} opts={['DRAFT', 'ISSUED', 'SENT', 'CANCELLED']} />
+        <Select label="Tip" v={f.type} on={(v) => set('type', v)} opts={['SALES', 'PURCHASE']} labelFor={o => INVOICE_TYPE_TR[o] || o} />
+        <Select label="Durum" v={f.status} on={(v) => set('status', v)} opts={['DRAFT', 'ISSUED', 'SENT', 'CANCELLED']} labelFor={o => INVOICE_STATUS_TR[o] || o} />
       </div>
       <Input label="Fatura No" v={f.invoiceNo} on={(v) => set('invoiceNo', v)} />
       <div className="grid grid-cols-2 gap-3">
@@ -766,8 +775,8 @@ const GuaranteeForm = ({ onClose, onSaved }: { onClose: () => void; onSaved: () 
   return (
     <Modal title="Yeni Teminat Mektubu" onClose={onClose}>
       <div className="grid grid-cols-2 gap-3">
-        <Select label="Tip" v={f.type} on={(v) => set('type', v)} opts={['BID_BOND', 'PERFORMANCE', 'ADVANCE', 'WARRANTY']} />
-        <Select label="Durum" v={f.status} on={(v) => set('status', v)} opts={['ACTIVE', 'RELEASED', 'EXPIRED', 'CALLED']} />
+        <Select label="Tip" v={f.type} on={(v) => set('type', v)} opts={['BID_BOND', 'PERFORMANCE', 'ADVANCE', 'WARRANTY']} labelFor={o => GTYPE_TR[o] || o} />
+        <Select label="Durum" v={f.status} on={(v) => set('status', v)} opts={['ACTIVE', 'RELEASED', 'EXPIRED', 'CALLED']} labelFor={o => GUARANTEE_STATUS_TR[o] || o} />
       </div>
       <Input label="Banka" v={f.bankName} on={(v) => set('bankName', v)} />
       <div className="grid grid-cols-2 gap-3">
@@ -816,7 +825,7 @@ const PaymentForm = ({ invoice, onClose, onSaved }: { invoice: Invoice; onClose:
       {invoice.currency !== 'TRY' && invoice.issueRateToTRY != null && (
         <Input label={`Tahsilat Kuru (1 ${invoice.currency} = ? TRY — kesim kuru: ${invoice.issueRateToTRY})`} v={f.fxRate} on={(v) => set('fxRate', v)} type="number" placeholder="B-18 — kur farkı hesabı için" />
       )}
-      <Select label="Yöntem" v={f.method} on={(v) => set('method', v)} opts={['BANK_TRANSFER', 'CHEQUE', 'CASH', 'OTHER']} />
+      <Select label="Yöntem" v={f.method} on={(v) => set('method', v)} opts={['BANK_TRANSFER', 'CHEQUE', 'CASH', 'OTHER']} labelFor={o => PAYMENT_METHOD_TR[o] || o} />
       <Input label="Tarih (boşsa bugün)" v={f.paidAt} on={(v) => set('paidAt', v)} type="date" />
       <Input label="Referans" v={f.reference} on={(v) => set('reference', v)} />
       {err && <p className="text-xs text-red-500 font-bold">{err}</p>}
@@ -832,11 +841,11 @@ const Input = ({ label, v, on, type = 'text', placeholder }: { label: string; v?
     <input type={type} value={v || ''} placeholder={placeholder} onChange={(e) => on(e.target.value)} className="input-glass w-full mt-1" />
   </div>
 );
-const Select = ({ label, v, on, opts }: { label: string; v: string; on: (v: string) => void; opts: string[] }) => (
+const Select = ({ label, v, on, opts, labelFor }: { label: string; v: string; on: (v: string) => void; opts: string[]; labelFor?: (o: string) => string }) => (
   <div>
     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{label}</label>
     <select value={v} onChange={(e) => on(e.target.value)} className="input-glass w-full mt-1">
-      {opts.map(o => <option key={o} value={o}>{o}</option>)}
+      {opts.map(o => <option key={o} value={o}>{labelFor ? labelFor(o) : o}</option>)}
     </select>
   </div>
 );

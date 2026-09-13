@@ -7,7 +7,7 @@ import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { TodoTask, Unit, User } from '../../types';
 import {
-  getPriorityColor, taskTargetTab, fmtCompletedAt, fmtDueDate,
+  getPriorityColor, getPriorityLabel, taskTargetTab, fmtCompletedAt, fmtDueDate,
   PRIORITY_RANK, daysUntil, RELATED_MODULE_LABEL,
 } from './helpers';
 import { dleftBadge, severityRank } from '../dashboard/helpers';
@@ -57,7 +57,7 @@ function TaskRow({
       <div className="flex items-center gap-3 px-4 py-3">
         <button onClick={onToggleExpand} className="flex-1 min-w-0 flex items-center gap-3 text-left">
           <span className={cn('w-2.5 h-2.5 rounded-full shrink-0', PRIORITY_DOT[todo.priority] || 'bg-slate-300')}
-            title={todo.priority} />
+            title={getPriorityLabel(todo.priority)} />
           <span className="font-bold text-slate-800 text-sm truncate">{todo.title}</span>
           {relName && (
             <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg shrink-0 max-w-[220px] truncate">
@@ -99,7 +99,7 @@ function TaskRow({
           )}
           <div className="flex flex-wrap items-center gap-3">
             <span className={cn('text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest', getPriorityColor(todo.priority))}>
-              {todo.priority}
+              {getPriorityLabel(todo.priority)}
             </span>
             <span className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-slate-100">
               <Briefcase size={13} /> {units?.find(u => u.id === todo.unitId)?.name}
@@ -471,7 +471,7 @@ export default function TaskList({
                         )}
                         <div className="flex flex-wrap items-center gap-4">
                           <span className={cn('text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest', getPriorityColor(todo.priority))}>
-                            {todo.priority}
+                            {getPriorityLabel(todo.priority)}
                           </span>
                           <div className="flex items-center gap-2 text-[10px] text-slate-400 font-black uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-slate-100">
                             <Briefcase size={13} />

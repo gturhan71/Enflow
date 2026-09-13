@@ -2,6 +2,8 @@ import React from 'react';
 import { Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { fmtCurrency as cfmt } from '../../lib/format';
+import { STATUS_LABEL } from '../crm/constants';
+import { STATUS_CONFIG } from '../project-mgmt/constants';
 import DrawerShell from './DrawerShell';
 
 export type KpiKey = 'pipeline' | 'won' | 'lost' | 'projects' | 'winProbability';
@@ -51,10 +53,10 @@ const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onCl
 
   const handleExport = () => {
     const rows = kpiKey === 'projects'
-      ? (projectItems || []).map(p => ({ Proje: p.name, Durum: p.status, 'İlerleme (%)': p.progress, Değer: p.value ?? 0 }))
+      ? (projectItems || []).map(p => ({ Proje: p.name, Durum: STATUS_CONFIG[p.status as keyof typeof STATUS_CONFIG]?.label || p.status, 'İlerleme (%)': p.progress, Değer: p.value ?? 0 }))
       : (oppItems || []).map(o => ({
           Fırsat: o.title,
-          Durum: o.status,
+          Durum: STATUS_LABEL[o.status] || o.status,
           Değer: o.value,
           ...(kpiKey === 'winProbability' ? { 'Olasılık (%)': o.probability ?? 0 } : {}),
         }));
@@ -87,7 +89,7 @@ const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onCl
               <div key={p.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800 truncate">{p.name}</p>
-                  <p className="text-[10px] text-slate-400">{p.status} · %{p.progress} ilerleme</p>
+                  <p className="text-[10px] text-slate-400">{STATUS_CONFIG[p.status as keyof typeof STATUS_CONFIG]?.label || p.status} · %{p.progress} ilerleme</p>
                 </div>
                 {p.value != null && p.value > 0 && (
                   <span className="text-xs font-black text-slate-700 shrink-0">{cfmt(p.value)}</span>
@@ -105,7 +107,7 @@ const KpiDetailDrawer: React.FC<Props> = ({ kpiKey, oppItems, projectItems, onCl
               <div key={o.id} className="flex items-center justify-between gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
                 <div className="min-w-0">
                   <p className="text-xs font-bold text-slate-800 truncate">{o.title}</p>
-                  <p className="text-[10px] text-slate-400">{o.status}</p>
+                  <p className="text-[10px] text-slate-400">{STATUS_LABEL[o.status] || o.status}</p>
                 </div>
                 <div className="text-right shrink-0">
                   <span className="text-xs font-black text-slate-700 block">{cfmt(o.value)}</span>

@@ -3,6 +3,8 @@ import type { DashboardPayload } from '../../types';
 import { fmtCurrency as cfmt } from '../../lib/format';
 import { WK, WIDGET_META, WIDGET_TARGET_TAB, HORIZON_LABEL, HORIZON_COLOR } from './widgetCatalog';
 import { dleftBadge } from './helpers';
+import { STATUS_LABEL } from '../crm/constants';
+import { PRIORITY_LABELS } from '../contract-workflow/constants';
 import DrawerShell from './DrawerShell';
 
 interface Props {
@@ -55,7 +57,7 @@ const DETAIL_BODY: Partial<Record<WK, (d: DashboardPayload) => React.ReactNode>>
   ),
   myOpportunities: (d) => (
     <Rows empty="Atanmış aktif fırsat yok." items={d.personal.myOpportunities} row={(o) => (
-      <Row key={o.id} left={o.title} sub={o.technicalStatus === 'PENDING_APPROVAL' ? 'Onayda' : o.status} right={cfmt(o.value)} />
+      <Row key={o.id} left={o.title} sub={o.technicalStatus === 'PENDING_APPROVAL' ? 'Onayda' : (STATUS_LABEL[o.status] || o.status)} right={cfmt(o.value)} />
     )} />
   ),
   contractDeadlines: (d) => (
@@ -67,7 +69,7 @@ const DETAIL_BODY: Partial<Record<WK, (d: DashboardPayload) => React.ReactNode>>
   legalDeadlines: (d) => (
     <Rows empty="Açık hukuk dosyası vadesi yok." items={d.timeSensitive.legalDeadlines} row={(l) => {
       const b = dleftBadge(l.daysLeft);
-      return <Row key={l.id} left={l.title} sub={l.priority} right={b.t} rightClass={b.c} />;
+      return <Row key={l.id} left={l.title} sub={PRIORITY_LABELS[l.priority] || l.priority} right={b.t} rightClass={b.c} />;
     }} />
   ),
   approvalBottlenecks: (d) => (

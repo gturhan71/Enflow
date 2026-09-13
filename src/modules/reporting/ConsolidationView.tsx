@@ -1,5 +1,7 @@
 import { MK_LABEL_PR, LT_LABEL_PR, type ConsolidationResult } from './helpers';
 
+const VISIT_STATUS_TR: Record<string, string> = { PLANNED: 'Planlandı', COMPLETED: 'Tamamlandı', CANCELLED: 'İptal' };
+
 export default function ConsolidationView({ c }: { c: ConsolidationResult }) {
   const vr = c.visitReconciliation;
   return (
@@ -74,7 +76,7 @@ export default function ConsolidationView({ c }: { c: ConsolidationResult }) {
                   <span className="font-bold text-slate-700">{v.customerName || '—'}</span>
                   {v.note && <span className="text-slate-500"> — {v.note}</span>}
                 </div>
-                <span className="text-[10px] text-slate-400 font-bold shrink-0">{v.date.slice(0, 10)} · {v.status}</span>
+                <span className="text-[10px] text-slate-400 font-bold shrink-0">{v.date.slice(0, 10)} · {VISIT_STATUS_TR[v.status] || v.status}</span>
               </div>
             ))}
           </div>

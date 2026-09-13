@@ -182,7 +182,7 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     where: { id: pid(req), tenantId: req.tenantId },
     include: { documents: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
   });
-  if (!wf) return res.status(404).json({ error: 'Not found' });
+  if (!wf) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   res.json(withPenaltyExposure(wf));
 }));
 
@@ -194,7 +194,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   } = req.body;
 
   const current = await prisma.contractWorkflow.findFirst({ where: { id: pid(req), tenantId: req.tenantId } });
-  if (!current) return res.status(404).json({ error: 'Not found' });
+  if (!current) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
 
   // Teslim süresi yeniden hesabı — deliveryPeriodDays veya signedDate değiştiğinde
   // deliveryDueDate + alt-kırılımlı DeliveryTimelineStep'ler yeniden üretilir.
@@ -279,7 +279,7 @@ router.post('/:id/analyze', asyncHandler(async (req: Request, res: Response) => 
   const wf = await prisma.contractWorkflow.findFirst({
     where: { id, tenantId: req.tenantId },
   });
-  if (!wf) return res.status(404).json({ error: 'Not found' });
+  if (!wf) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
 
   const inputText = [
     wf.contractText ? `## SÖZLEŞME METNİ\n${wf.contractText}` : '',
@@ -529,7 +529,7 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     where: { id, tenantId: req.tenantId },
     include: { documents: true },
   });
-  if (!wf) return res.status(404).json({ error: 'Not found' });
+  if (!wf) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   // Faz A düzeltmesi: eskiden bu uçta hiçbir durum ön-koşulu yoktu (yalnız
   // `!wf.projectId` idempotency koruması vardı) — SIGNED olmayan bir sözleşme
   // de aktarılabiliyordu. TRANSFERRED zaten aktarılmış olanın tekrar
@@ -613,7 +613,7 @@ router.post('/:id/handoff-procurement', asyncHandler(async (req: Request, res: R
   const id = pid(req);
   const tenantId = req.tenantId;
   const wf = await prisma.contractWorkflow.findFirst({ where: { id, tenantId } });
-  if (!wf) return res.status(404).json({ error: 'Not found' });
+  if (!wf) return res.status(404).json({ error: 'Kayıt bulunamadı.' });
   if (!['SIGNED', 'TRANSFERRED'].includes(wf.status)) {
     return res.status(409).json({ error: 'Yalnız imzalanmış sözleşme Satınalmaya aktarılabilir.' });
   }

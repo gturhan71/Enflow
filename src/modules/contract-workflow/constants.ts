@@ -63,6 +63,15 @@ export const LEGAL_STATUS_STYLES: Record<string, string> = {
   ESCALATED: 'bg-red-100 text-red-700 border-red-200',
   CLOSED: 'bg-emerald-100 text-emerald-700 border-emerald-200',
 };
+export const LEGAL_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Açık', IN_REVIEW: 'İncelemede', RESPONDED: 'Yanıtlandı', ESCALATED: 'Yükseltildi', CLOSED: 'Kapandı',
+};
+export const REQUEST_STATUS_LABELS: Record<string, string> = {
+  PENDING: 'Bekliyor', IN_PROGRESS: 'Devam Ediyor', COMPLETED: 'Tamamlandı',
+};
 export const PRIORITY_STYLES: Record<string, string> = {
   LOW: 'text-slate-500', MEDIUM: 'text-amber-600', HIGH: 'text-red-600',
+};
+export const PRIORITY_LABELS: Record<string, string> = {
+  LOW: 'Düşük', MEDIUM: 'Orta', HIGH: 'Yüksek',
 };
