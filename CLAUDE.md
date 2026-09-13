@@ -10,7 +10,7 @@ Enflow, B2B satış ve iş süreçlerini yöneten çok kiracılı (multi-tenant)
 
 ## Versiyonlama Kuralı
 
-**Güncel sürüm: Enflow v2.4.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
+**Güncel sürüm: Enflow v2.5.0** — tek kaynak `src/constants.ts` `APP_VERSION`; kök `package.json` ve `backend/package.json` `version` alanları bununla senkron tutulur (üçü aynı anda güncellenir).
 
 Format `vMAJOR.MINOR.PATCH`:
 - **Feature eklemesi** → PATCH artar (`v2.1.0` → `v2.1.1` → `v2.1.2` → ...). Bir değişikliği PATCH'e yansıtmadan **önce**, eklenenin gerçekten bir feature olduğu (bugfix/refactor/dokümantasyon/chore/bakım değil) kullanıcıya sorularak doğrulanır — onay verilmeden versiyon numarası **değiştirilmez**.
@@ -86,7 +86,7 @@ cd backend && pnpm dev
 **Upload:** `multer` memoryStorage → lokal `backend/uploads/contracts/{folder}/` + opsiyonel Nextcloud WebDAV  
 **Static dosyalar:** `GET /uploads/...` → `backend/uploads/` dizini
 
-## Veritabanı Modelleri (Prisma) — 78 model, katmanlı
+## Veritabanı Modelleri (Prisma) — 79 model, katmanlı
 
 Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prisma/schema.prisma`.)
 
@@ -95,7 +95,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 **Akış motoru:** `Workflow` / `WorkflowStep` (default şablon + skip-logic) · `WorkflowLog` · `TodoTask` (birim görevi, relatedModule + relatedItemId, SLA) · `ApprovalChain` / `ApprovalStage` (Finans→İGPD→GM→KSU) · `Notification` · `ActivityLog` (provenance: actorType, agentRunId)
 **Domain — CRM/Satış:** `Customer` · `Opportunity` (costConfig, lostReason, updatedBy) · `Proposal` (versiyonlu)
 **Domain — Presales:** `BoMItem` · `CostItem` · `CostAnalysisVersion` (maliyet analizi versiyon geçmişi/snapshot — Faz 10)
-**Domain — Sözleşme:** `Contract` (eski) · `ContractWorkflow` (projectId — Faz 9 T4) · `ContractWorkflowDoc`
+**Domain — Sözleşme:** `Contract` (eski) · `ContractWorkflow` (projectId — Faz 9 T4; deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct — teslim süresi takibi) · `ContractWorkflowDoc` · `DeliveryTimelineStep` (tenderId/contractWorkflowId — alt kırılımlı tahmini teslim takvimi)
 **Domain — Proje:** `Project` · `ProjectMilestone` · `ProjectCostItem` (purchaseRequestId — Faz 9 T5) · `ProjectHandoverDoc` (11 zorunlu evrak)
 **Domain — Satınalma:** `Vendor` · `PurchaseRequest` (9 statü) · `PurchaseItem` · `PurchaseQuote` · `DeliveryRecord`
 **Domain — Finans:** `Invoice` (SALES/PURCHASE, purchaseRequestId — Faz 9 T6) · `Payment` · `GuaranteeLetter`
@@ -324,8 +324,9 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 11 | Yönetim Dashboard'una **Ziyaret Performansı** widget'ı (`computeVisitPerformance`, `unitReportingService.ts`) — bu ayki planlanan/gerçekleşen ziyaret oranı + son 6 ay, penceresi (60 gün) dolmuş "olgun" ziyaretlerden heuristik ziyaret→fırsat dönüşüm oranı (aynı müşteri bir kez sayılır, en erken ziyarete atıf). GENERAL_MANAGER + SALES_MGR varsayılan kokpitine eklendi (`widgetCatalog.ts` `visitPerformance`), migration yok | — |
 | 12 | **Tenant verisi alan-bazlı şifreleme** — envelope encryption, tenant-başına DEK (`Tenant.dekWrapped`, `AUTH_JWT_SECRET` deseniyle aynı `DATA_ENCRYPTION_MASTER_KEY` env var). Kapsam: Tenant YZ `apiKey`, `Vendor.iban`/`bankName`, `Customer.taxNumber`/`taxOffice` (AES-256-GCM, `enc:v1:` önekli, arama/filtrede kullanılmadığı doğrulandı). Yeni `backend/src/services/tenantEncryption.ts` (`encryptForTenant`/`decryptForTenant`) + backfill script (`backfill-tenant-encryption.ts`, idempotent) + `install/wizard.mjs` otomatik key üretimi. Route-bazlı çağrı (genel Prisma `$extends` hot path'ine eklenmedi — bkz. gerekçe `docs/TENANT_DATA_ENCRYPTION_PLAN.md`). Yan-etki: `GET/POST/PUT /api/tenants` artık `dekWrapped`'i `omit` ediyor (önceden hiçbir alan şifrelenmediği için bu risk yoktu). Key rotation + `backend/uploads/` dosya şifrelemesi + gerçek KMS entegrasyonu bilinçli olarak kapsam dışı bırakıldı. | add_tenant_dek |
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
+| 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
 
-Her faz sonunda RBAC süiti **69/69** geçti. Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
+Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
 
 > Tamamlanan tüm işler için bkz. yukarıdaki **Faz Geçmişi (özet)** tablosu (Faz 0–9 + bakım). Birimler-arası geçiş zinciri (T1, T3–T6) ve 8 birim agent'ı tamamlandı.
@@ -367,17 +368,21 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
+src/modules/contract-workflow/ContextTab.tsx ← ../types, types, DeliveryTimelinePanel
+src/modules/contract-workflow/SigningTab.tsx ← types
+src/modules/contract-workflow/types.ts ← ../types
+src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
-src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
-src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
+src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
+src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
-backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
+backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
+backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
@@ -390,17 +395,13 @@ src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
 src/modules/contract-workflow/AnalysisTab.tsx ← types
-src/modules/contract-workflow/ContextTab.tsx ← ../types, types, DeliveryTimelinePanel
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
 src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
 src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
-src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/TransferTab.tsx ← types
-src/modules/contract-workflow/types.ts ← ../types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
-src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
@@ -429,15 +430,15 @@ src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/fo
 src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
 src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
+src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
+src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
-src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
@@ -446,6 +447,7 @@ src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag,
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
@@ -457,14 +459,13 @@ backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupV
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
-backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
-backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
+backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
@@ -522,25 +523,29 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 63 seconds ago)
+## changes (last 10 commits — 5 minutes ago)
 ```
-src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
-src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
+src/modules/contract-workflow/ContextTab.tsx  ~ContextTab
+src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
+src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~ChecklistTab  ~GuaranteesTab
 src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
 src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
-src/services/apiService.ts                    +profQuery  ~ApiService
-backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
+backend/src/services/deliveryDeadlineReminders.ts +resolveDue  +notifyAll  +sweepDeliveryDeadlineReminders  +safeParse
+backend/src/services/deliveryPenalty.ts       +computePenaltyExposure
+backend/src/services/deliveryTimeline.ts      +buildDeliveryTimeline  +addDays  +computeDeliveryDueDate
+backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 src/components/MoneyInput.tsx                 +MoneyInput
-src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
 src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
-src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~GuaranteesTab
+src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
+src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
+src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
 backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
-backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
+backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
 backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
 backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
@@ -556,28 +561,85 @@ backend/src/utils/entityTypeTab.ts            +entityTypeToTab
 
 ## backend
 
-### backend/src/services/profitabilityDmo.ts
+### backend/prisma/migrations/20260913092634_add_delivery_deadline_tracking/migration.sql
 ```
-export interface DmoPeriodRow  :24-36
-  periodKey: string  :25-25
-  label: string  :26-26
-  orderCount: number  :27-27
-  revenue: number  :28-28
-  cost: number  :29-29
-  grossProfit: number  :30-30
-  risturn: number  :31-31
-  commission: number  :32-32
-  … +3 more members  :24-24
-export interface DmoProfitResult  :38-46
-  grain: DmoGrain  :39-39
-  year: number | null  :40-40
-  asOf: string  :41-41
-  rows: DmoPeriodRow[]  :42-42
-  totals: Omit<DmoPeriodRow, 'periodKey' | 'l  :43-43
-  pipeline: { evaluationCount: number  :44-44
-  currency: string  :45-45
-export type DmoGrain  :16-16
-export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
+TABLE DeliveryTimelineStep
+TABLE new_Customer
+TABLE new_Opportunity
+TABLE new_Tender
+TABLE new_WorkflowStep
+INDEX Customer_tenantId_parentId_idx ON Customer
+INDEX Opportunity_tenantId_status_idx ON Opportunity
+INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
+INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
+INDEX Tender_tenantId_status_idx ON Tender
+INDEX DeliveryTimelineStep_tenantId_tenderId_idx ON DeliveryTimelineStep
+INDEX DeliveryTimelineStep_tenantId_contractWorkflowId_idx ON DeliveryTimelineStep
+INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
+```
+
+### backend/src/services/deliveryDeadlineReminders.ts
+```
+export async function sweepDeliveryDeadlineReminders(tenantId) → Promise<void>  :49-109
+```
+
+### backend/src/services/deliveryPenalty.ts
+```
+export interface PenaltyExposureInput  :6-12
+  contractValue: number  :7-7
+  dailyRatePct: number | null | undefined  :8-8
+  capPct: number | null | undefined  :9-9
+  dueDate: Date  :10-10
+  asOf: Date  :11-11
+export interface PenaltyExposureResult  :14-19
+  overdueDays: number  :15-15
+  rawPenalty: number  :16-16
+  cappedPenalty: number  :17-17
+  isCapped: boolean  :18-18
+export function computePenaltyExposure(opts) → PenaltyExposureResult | null  :24-36  # Gecikme yoksa veya günlük oran tanımlı değilse `null` döner 
+```
+
+### backend/src/services/deliveryTimeline.ts
+```
+export interface DeliveryPhaseTemplate  :7-10
+  title: string  :8-8
+  pctOfPeriod: number  :9-9
+export interface DeliveryTimelineStepInput  :19-23
+  title: string  :20-20
+  sortOrder: number  :21-21
+  plannedDate: Date  :22-22
+export function buildDeliveryTimeline(referenceStart, totalDays, phases = DEFAULT_DELIVERY_PHASES,) → DeliveryTimelineStepInput[]  :30-41  # `referenceStart`'tan itibaren `totalDays` süreye yayılan faz
+export function addDays(date, days) → Date  :43-45
+export function computeDeliveryDueDate(referenceStart, totalDays) → Date  :47-49
+```
+
+### backend/src/services/processEngine.ts
+```
+export interface StepRecipientQuery  :35-40
+  unitId: string  :36-36
+  role: string | null  :37-37
+  delegateUserId?: string | null  :38-38
+  recipientField?: string | null  :39-39
+export interface StageActionCtx  :119-129
+  tenantId: string  :120-120
+  entityType: string  :121-121
+  entityId: string  :122-122
+  step: WorkflowStep  :123-123
+  actorUserId?: string  :124-124
+  input?: Record<string, unknown>  :128-128
+export interface FieldSpec  :135-135
+  key: string  :135-135
+export interface AdvanceProcessOpts  :730-738
+  actorUserId?: string  :731-731
+  stageId?: string  :732-732
+  decision?: 'APPROVE' | 'REJECT'  :733-733
+  note?: string  :734-734
+  input?: Record<string, unknown>  :737-737
+export interface AdvanceProcessResult  :740-744
+  chain: ApprovalChain & { stages: ApprovalS  :741-741
+  advancedToOrder: number | null  :742-742
+  actionsInvoked: string[]  :743-743
+export class ProcessNotConfiguredError  :28-33
 ```
 
 ### backend/pnpm-lock.yaml
@@ -648,23 +710,6 @@ INDEX OpportunityRequiredDoc_tenantId_opportunityId_idx ON OpportunityRequiredDo
 TABLE ProfitabilitySnapshot
 INDEX ProfitabilitySnapshot_tenantId_periodKey_idx ON ProfitabilitySnapshot
 INDEX ProfitabilitySnapshot_tenantId_scope_projectKey_periodKey_asOfKey_key ON ProfitabilitySnapshot
-```
-
-### backend/prisma/migrations/20260913092634_add_delivery_deadline_tracking/migration.sql
-```
-TABLE DeliveryTimelineStep
-TABLE new_Customer
-TABLE new_Opportunity
-TABLE new_Tender
-TABLE new_WorkflowStep
-INDEX Customer_tenantId_parentId_idx ON Customer
-INDEX Opportunity_tenantId_status_idx ON Opportunity
-INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
-INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
-INDEX Tender_tenantId_status_idx ON Tender
-INDEX DeliveryTimelineStep_tenantId_tenderId_idx ON DeliveryTimelineStep
-INDEX DeliveryTimelineStep_tenantId_contractWorkflowId_idx ON DeliveryTimelineStep
-INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -774,41 +819,6 @@ export function pingDashboard(tenantId) → void  :15-17
 export async function getDashboardPingAt(tenantId) → Promise<number | null>  :20-23  # Son sinyal zamanını epoch-ms olarak döner; hiç ping atılmamı
 ```
 
-### backend/src/services/deliveryDeadlineReminders.ts
-```
-export async function sweepDeliveryDeadlineReminders(tenantId) → Promise<void>  :49-109
-```
-
-### backend/src/services/deliveryPenalty.ts
-```
-export interface PenaltyExposureInput  :6-12
-  contractValue: number  :7-7
-  dailyRatePct: number | null | undefined  :8-8
-  capPct: number | null | undefined  :9-9
-  dueDate: Date  :10-10
-  asOf: Date  :11-11
-export interface PenaltyExposureResult  :14-19
-  overdueDays: number  :15-15
-  rawPenalty: number  :16-16
-  cappedPenalty: number  :17-17
-  isCapped: boolean  :18-18
-export function computePenaltyExposure(opts) → PenaltyExposureResult | null  :24-36  # Gecikme yoksa veya günlük oran tanımlı değilse `null` döner 
-```
-
-### backend/src/services/deliveryTimeline.ts
-```
-export interface DeliveryPhaseTemplate  :7-10
-  title: string  :8-8
-  pctOfPeriod: number  :9-9
-export interface DeliveryTimelineStepInput  :19-23
-  title: string  :20-20
-  sortOrder: number  :21-21
-  plannedDate: Date  :22-22
-export function buildDeliveryTimeline(referenceStart, totalDays, phases = DEFAULT_DELIVERY_PHASES,) → DeliveryTimelineStepInput[]  :30-41  # `referenceStart`'tan itibaren `totalDays` süreye yayılan faz
-export function addDays(date, days) → Date  :43-45
-export function computeDeliveryDueDate(referenceStart, totalDays) → Date  :47-49
-```
-
 ### backend/src/services/deploymentGuard.ts
 ```
 export function checkDeploymentTopology() → void  :15-30
@@ -883,35 +893,6 @@ export function opportunityRemotePath(trackingCode, subfolder) → string  :24-2
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
 ```
 
-### backend/src/services/processEngine.ts
-```
-export interface StepRecipientQuery  :35-40
-  unitId: string  :36-36
-  role: string | null  :37-37
-  delegateUserId?: string | null  :38-38
-  recipientField?: string | null  :39-39
-export interface StageActionCtx  :119-129
-  tenantId: string  :120-120
-  entityType: string  :121-121
-  entityId: string  :122-122
-  step: WorkflowStep  :123-123
-  actorUserId?: string  :124-124
-  input?: Record<string, unknown>  :128-128
-export interface FieldSpec  :135-135
-  key: string  :135-135
-export interface AdvanceProcessOpts  :730-738
-  actorUserId?: string  :731-731
-  stageId?: string  :732-732
-  decision?: 'APPROVE' | 'REJECT'  :733-733
-  note?: string  :734-734
-  input?: Record<string, unknown>  :737-737
-export interface AdvanceProcessResult  :740-744
-  chain: ApprovalChain & { stages: ApprovalS  :741-741
-  advancedToOrder: number | null  :742-742
-  actionsInvoked: string[]  :743-743
-export class ProcessNotConfiguredError  :28-33
-```
-
 ### backend/src/services/profitabilityCashflow.ts
 ```
 export interface CashPoint  :18-25
@@ -939,6 +920,30 @@ export interface CashflowResult  :43-50
   byCurrency: CashSeries[]  :46-46
   consolidatedTRY: CashSeries  :47-47
   deficitWindows: DeficitWindow[]  :48-48
+```
+
+### backend/src/services/profitabilityDmo.ts
+```
+export interface DmoPeriodRow  :24-36
+  periodKey: string  :25-25
+  label: string  :26-26
+  orderCount: number  :27-27
+  revenue: number  :28-28
+  cost: number  :29-29
+  grossProfit: number  :30-30
+  risturn: number  :31-31
+  commission: number  :32-32
+  … +3 more members  :24-24
+export interface DmoProfitResult  :38-46
+  grain: DmoGrain  :39-39
+  year: number | null  :40-40
+  asOf: string  :41-41
+  rows: DmoPeriodRow[]  :42-42
+  totals: Omit<DmoPeriodRow, 'periodKey' | 'l  :43-43
+  pipeline: { evaluationCount: number  :44-44
+  currency: string  :45-45
+export type DmoGrain  :16-16
+export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
 ```
 
 ### backend/src/services/profitabilityInstruments.ts
@@ -1319,6 +1324,78 @@ export interface AbbreviatedBoMItem  :7-20
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
 ```
 
+### src/modules/contract-workflow/ContextTab.tsx
+```
+component ContextTab
+handler onBlur
+handler onClick
+```
+
+### src/modules/contract-workflow/SigningTab.tsx
+```
+component SigningTab
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/types.ts
+```
+export interface ContractWorkflowDoc  :3-16
+  id: string  :4-4
+  workflowId: string  :5-5
+  name: string  :6-6
+  docType: string  :7-7
+  description?: string  :8-8
+  deadline?: string | null  :9-9
+  status: string  :10-10
+  fileUrl?: string | null  :11-11
+  … +4 more members  :3-3
+export interface DeliveryTimelineStep  :18-23
+  id: string  :19-19
+  title: string  :20-20
+  sortOrder: number  :21-21
+  plannedDate?: string | null  :22-22
+export interface PenaltyExposure  :25-30
+  overdueDays: number  :26-26
+  rawPenalty: number  :27-27
+  cappedPenalty: number  :28-28
+  isCapped: boolean  :29-29
+export interface ContractWorkflow  :32-61
+  id: string  :33-33
+  title: string  :34-34
+  opportunityId?: string | null  :35-35
+  contractValue: number  :36-36
+```
+
+### src/modules/ContractWorkflowModule.tsx
+```
+component ContractWorkflowModule
+hook useAuth
+hook useState
+hook useAIGate
+hook useCallback
+hook useEffect
+export ContractWorkflowModule
+handler onCreate
+handler onSelectWorkflow
+handler onTenderNameBlur
+handler onTenderNoBlur
+handler onContractValueBlur
+handler onDeadlineBlur
+handler onNotesBlur
+handler onDeliveryFieldsBlur
+handler onSaveTexts
+handler onAnalyse
+handler onFileSelect
+handler onAddDoc
+handler onDeleteDoc
+handler onDocStatusChange
+handler onDocFieldUpdate
+handler onFetchFromArchive
+handler onMarkReadyToSign
+handler onSendForApproval
+```
+
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
@@ -1353,6 +1430,13 @@ handler onWonOpportunity
 handler onLostOpportunity
 ```
 
+### src/modules/DeliveryTimelinePanel.tsx
+```
+props DeliveryTimelinePanelProps
+export DeliveryTimelineStepLike
+export DeliveryTimelinePanel
+```
+
 ### src/modules/PresalesModule.tsx
 ```
 props PresalesModuleProps
@@ -1369,29 +1453,45 @@ handler onTransferToBoM
 handler onSelected
 ```
 
-### src/modules/profitability/DmoChannelTab.tsx
+### src/modules/project-mgmt/ProjectDetail.tsx
 ```
-component DmoChannelTab
-component Card
+props ProjectDetailProps
 hook useState
-hook useCallback
 hook useEffect
 hook useMemo
+export ProjectDetail
+handler onClick
 handler onChange
+handler onApplied
+handler onSave
 ```
 
-### src/modules/ProfitabilityModule.tsx
+### src/modules/SalesSupport.tsx
 ```
-component ProfitabilityModule
-component MainTabs
-component TreasuryRow
-component SummaryCard
+component TenderList
+component TenderCalendar
+component ChecklistTab
+component GuaranteesTab
+component SubmittedTenders
+component TenderSelectorEmpty
+component Modal
+component TenderForm
+props SalesSupportProps
+hook useAuth
 hook useState
 hook useCallback
 hook useEffect
 hook useMemo
-handler onTab
+hook useAIGate
+export SalesSupport
+handler onSelect
+handler onChanged
+handler onWithdraw
+handler onSelectTender
 handler onChange
+handler onClick
+handler onKeyDown
+handler onClose
 ```
 
 ### src/modules/todo/helpers.ts
@@ -1461,47 +1561,62 @@ handler onToggleStatus
 handler onSubmit
 ```
 
-### src/services/apiService.ts
+### src/types/project.ts
 ```
-class ApiService  :24-78
-  setAuth(tenantId, token)  :25-27
-  async login(email, password)  :29-31
-  async forgotPassword(email)  :33-35
-  async getSetupStatus() → Promise<  :38-38
-  async runSetup(payload) → Promise<  :43-43
-  async getCustomers()  :51-51
-  async createCustomer(data)  :52-52
-  async updateCustomer(id, data)  :53-53
-  … +23 more methods  :24-24
+export interface ProjectMilestone  :9-34
+  id: string  :10-10
+  projectId: string  :11-11
+  title: string  :12-12
+  description?: string | null  :13-13
+  milestoneType: MilestoneType  :14-14
+  status: MilestoneStatus  :15-15
+  progress: number  :16-16
+  assignedToId?: string | null  :17-17
+  … +16 more members  :9-9
+export interface ProjectCostItem  :35-52
+  id: string  :36-36
+  projectId: string  :37-37
+  category: CostCategory  :38-38
+  description: string  :39-39
+  plannedAmount: number  :40-40
+  actualAmount: number  :41-41
+  currency: string  :42-42
+  amountTRY: number  :43-43
+  … +8 more members  :35-35
+export interface Project  :53-83
+  id: string  :54-54
+  code?: string | null  :55-55
+  name: string  :56-56
+  type: ProjectType  :57-57
 ```
 
-### src/types/profitability.ts
+### src/types/tender.ts
 ```
-export interface ProfitEvent  :6-19
-  date: string  :7-7
-  amount: number  :8-8
-  currency: string  :9-9
-  direction: 'IN' | 'OUT'  :10-10
-  basis: 'ACCRUAL' | 'CASH'  :11-11
-  source: 'PLAN' | 'ACTUAL'  :12-12
-  category: string  :13-13
-  projectId: string | null  :14-14
-  … +4 more members  :6-6
-export interface ProfitCurrencyBreak  :21-24
-  plannedRevenue: number  :22-22
-  actualRevenue: number  :23-23
-export interface ProfitPeriodRow  :26-40
-  periodKey: string  :27-27
-  label: string  :28-28
-  currency: string  :29-29
-  plannedRevenue: number  :30-30
-  actualRevenue: number  :31-31
-  plannedCashIn: number  :32-32
-  actualCashIn: number  :33-33
-  eacCost: number  :34-34
-  … +5 more members  :26-26
-export interface ProfitScope  :42-42
-  kind: 'ALL' | 'PROJECT'  :42-42
+export interface DeliveryTimelineStep  :2-7
+  id: string  :3-3
+  title: string  :4-4
+  sortOrder: number  :5-5
+  plannedDate?: string | null  :6-6
+export interface TenderChecklistItem  :8-22
+  id: string  :9-9
+  tenderId: string  :10-10
+  name: string  :11-11
+  isRequired: boolean  :12-12
+  status: 'PENDING' | 'DONE' | 'WAIVED'  :13-13
+  fileUrl?: string | null  :14-14
+  sortOrder: number  :15-15
+  notes?: string | null  :16-16
+  … +5 more members  :8-8
+export interface Tender  :23-51
+  id: string  :24-24
+  tenantId: string  :25-25
+  name: string  :26-26
+  ikn?: string | null  :27-27
+  authority?: string | null  :28-28
+  method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED  :29-29
+  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED'  :30-30
+  submissionDeadline?: string | null  :31-31
+  … +19 more members  :23-23
 ```
 
 ### src/App.tsx
@@ -1677,13 +1792,6 @@ handler onChange
 export type TabId  :15-15
 ```
 
-### src/modules/contract-workflow/ContextTab.tsx
-```
-component ContextTab
-handler onBlur
-handler onClick
-```
-
 ### src/modules/contract-workflow/DetailHeader.tsx
 ```
 component DetailHeader
@@ -1734,46 +1842,10 @@ hook useEffect
 handler onClick
 ```
 
-### src/modules/contract-workflow/SigningTab.tsx
-```
-component SigningTab
-handler onClick
-handler onChange
-```
-
 ### src/modules/contract-workflow/TransferTab.tsx
 ```
 component TransferTab
 handler onClick
-```
-
-### src/modules/contract-workflow/types.ts
-```
-export interface ContractWorkflowDoc  :3-16
-  id: string  :4-4
-  workflowId: string  :5-5
-  name: string  :6-6
-  docType: string  :7-7
-  description?: string  :8-8
-  deadline?: string | null  :9-9
-  status: string  :10-10
-  fileUrl?: string | null  :11-11
-  … +4 more members  :3-3
-export interface DeliveryTimelineStep  :18-23
-  id: string  :19-19
-  title: string  :20-20
-  sortOrder: number  :21-21
-  plannedDate?: string | null  :22-22
-export interface PenaltyExposure  :25-30
-  overdueDays: number  :26-26
-  rawPenalty: number  :27-27
-  cappedPenalty: number  :28-28
-  isCapped: boolean  :29-29
-export interface ContractWorkflow  :32-61
-  id: string  :33-33
-  title: string  :34-34
-  opportunityId?: string | null  :35-35
-  contractValue: number  :36-36
 ```
 
 ### src/modules/contract-workflow/WorkflowListPanel.tsx
@@ -1783,35 +1855,6 @@ component WorkflowCard
 export WorkflowFormState
 handler onChange
 handler onClick
-```
-
-### src/modules/ContractWorkflowModule.tsx
-```
-component ContractWorkflowModule
-hook useAuth
-hook useState
-hook useAIGate
-hook useCallback
-hook useEffect
-export ContractWorkflowModule
-handler onCreate
-handler onSelectWorkflow
-handler onTenderNameBlur
-handler onTenderNoBlur
-handler onContractValueBlur
-handler onDeadlineBlur
-handler onNotesBlur
-handler onDeliveryFieldsBlur
-handler onSaveTexts
-handler onAnalyse
-handler onFileSelect
-handler onAddDoc
-handler onDeleteDoc
-handler onDocStatusChange
-handler onDocFieldUpdate
-handler onFetchFromArchive
-handler onMarkReadyToSign
-handler onSendForApproval
 ```
 
 ### src/modules/CorporateGovernanceModule.tsx
@@ -1958,13 +2001,6 @@ handler onOpps
 handler onValue
 handler onCount
 handler onSave
-```
-
-### src/modules/DeliveryTimelinePanel.tsx
-```
-props DeliveryTimelinePanelProps
-export DeliveryTimelineStepLike
-export DeliveryTimelinePanel
 ```
 
 ### src/modules/DmoModule.tsx
@@ -2155,22 +2191,34 @@ handler onRefresh
 handler onSave
 ```
 
+### src/modules/profitability/DmoChannelTab.tsx
+```
+component DmoChannelTab
+component Card
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+handler onChange
+```
+
+### src/modules/ProfitabilityModule.tsx
+```
+component ProfitabilityModule
+component MainTabs
+component TreasuryRow
+component SummaryCard
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+handler onTab
+handler onChange
+```
+
 ### src/modules/project-mgmt/KanbanView.tsx
 ```
 component KanbanView
-```
-
-### src/modules/project-mgmt/ProjectDetail.tsx
-```
-props ProjectDetailProps
-hook useState
-hook useEffect
-hook useMemo
-export ProjectDetail
-handler onClick
-handler onChange
-handler onApplied
-handler onSave
 ```
 
 ### src/modules/ProjectManagementModule.tsx
@@ -2227,34 +2275,6 @@ component BrandCategoryCard
 ### src/modules/reporting/OverviewTab.tsx
 ```
 component OverviewTab
-```
-
-### src/modules/SalesSupport.tsx
-```
-component TenderList
-component TenderCalendar
-component ChecklistTab
-component GuaranteesTab
-component SubmittedTenders
-component TenderSelectorEmpty
-component Modal
-component TenderForm
-props SalesSupportProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-hook useAIGate
-export SalesSupport
-handler onSelect
-handler onChanged
-handler onWithdraw
-handler onSelectTender
-handler onChange
-handler onClick
-handler onKeyDown
-handler onClose
 ```
 
 ### src/modules/ServiceTicketsModule.tsx
@@ -2353,6 +2373,20 @@ handler onClick
 handler onChange
 ```
 
+### src/services/apiService.ts
+```
+class ApiService  :24-78
+  setAuth(tenantId, token)  :25-27
+  async login(email, password)  :29-31
+  async forgotPassword(email)  :33-35
+  async getSetupStatus() → Promise<  :38-38
+  async runSetup(payload) → Promise<  :43-43
+  async getCustomers()  :51-51
+  async createCustomer(data)  :52-52
+  async updateCustomer(id, data)  :53-53
+  … +23 more methods  :24-24
+```
+
 ### src/types/crm.ts
 ```
 export interface Opportunity  :4-41
@@ -2425,33 +2459,33 @@ export interface BomHandoff  :35-48
   handedOffById?: string | null  :40-40
 ```
 
-### src/types/project.ts
+### src/types/profitability.ts
 ```
-export interface ProjectMilestone  :9-34
-  id: string  :10-10
-  projectId: string  :11-11
-  title: string  :12-12
-  description?: string | null  :13-13
-  milestoneType: MilestoneType  :14-14
-  status: MilestoneStatus  :15-15
-  progress: number  :16-16
-  assignedToId?: string | null  :17-17
-  … +16 more members  :9-9
-export interface ProjectCostItem  :35-52
-  id: string  :36-36
-  projectId: string  :37-37
-  category: CostCategory  :38-38
-  description: string  :39-39
-  plannedAmount: number  :40-40
-  actualAmount: number  :41-41
-  currency: string  :42-42
-  amountTRY: number  :43-43
-  … +8 more members  :35-35
-export interface Project  :53-83
-  id: string  :54-54
-  code?: string | null  :55-55
-  name: string  :56-56
-  type: ProjectType  :57-57
+export interface ProfitEvent  :6-19
+  date: string  :7-7
+  amount: number  :8-8
+  currency: string  :9-9
+  direction: 'IN' | 'OUT'  :10-10
+  basis: 'ACCRUAL' | 'CASH'  :11-11
+  source: 'PLAN' | 'ACTUAL'  :12-12
+  category: string  :13-13
+  projectId: string | null  :14-14
+  … +4 more members  :6-6
+export interface ProfitCurrencyBreak  :21-24
+  plannedRevenue: number  :22-22
+  actualRevenue: number  :23-23
+export interface ProfitPeriodRow  :26-40
+  periodKey: string  :27-27
+  label: string  :28-28
+  currency: string  :29-29
+  plannedRevenue: number  :30-30
+  actualRevenue: number  :31-31
+  plannedCashIn: number  :32-32
+  actualCashIn: number  :33-33
+  eacCost: number  :34-34
+  … +5 more members  :26-26
+export interface ProfitScope  :42-42
+  kind: 'ALL' | 'PROJECT'  :42-42
 ```
 
 ### src/types/reports.ts
@@ -2481,35 +2515,6 @@ export interface OverviewUnit  :27-33
   unitKey: string  :28-28
   label: string  :29-29
   role: string  :30-30
-```
-
-### src/types/tender.ts
-```
-export interface DeliveryTimelineStep  :2-7
-  id: string  :3-3
-  title: string  :4-4
-  sortOrder: number  :5-5
-  plannedDate?: string | null  :6-6
-export interface TenderChecklistItem  :8-22
-  id: string  :9-9
-  tenderId: string  :10-10
-  name: string  :11-11
-  isRequired: boolean  :12-12
-  status: 'PENDING' | 'DONE' | 'WAIVED'  :13-13
-  fileUrl?: string | null  :14-14
-  sortOrder: number  :15-15
-  notes?: string | null  :16-16
-  … +5 more members  :8-8
-export interface Tender  :23-51
-  id: string  :24-24
-  tenantId: string  :25-25
-  name: string  :26-26
-  ikn?: string | null  :27-27
-  authority?: string | null  :28-28
-  method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED  :29-29
-  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED'  :30-30
-  submissionDeadline?: string | null  :31-31
-  … +19 more members  :23-23
 ```
 
 ### src/types/workflow.ts

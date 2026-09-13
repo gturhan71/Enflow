@@ -34,7 +34,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-export const APP_VERSION = 'v2.4.0';
+export const APP_VERSION = 'v2.5.0';
 
 export const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Sistem Yöneticisi',
