@@ -437,7 +437,6 @@ src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
 src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
-src/modules/reporting/BrandCategoryCard.tsx ← ../types, ../lib/format, ../components/InfoTooltip
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
@@ -457,6 +456,7 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
+backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
@@ -523,7 +523,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 5 minutes ago)
+## changes (last 10 commits — 30 minutes ago)
 ```
 src/modules/contract-workflow/ContextTab.tsx  ~ContextTab
 src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
@@ -534,16 +534,12 @@ backend/src/services/deliveryDeadlineReminders.ts +resolveDue  +notifyAll  +swee
 backend/src/services/deliveryPenalty.ts       +computePenaltyExposure
 backend/src/services/deliveryTimeline.ts      +buildDeliveryTimeline  +addDays  +computeDeliveryDueDate
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
-src/components/MoneyInput.tsx                 +MoneyInput
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
-src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
-src/modules/crm/OpportunityRequiredDocsPanel.tsx +OpportunityRequiredDocsPanel
+src/modules/crm/OpportunityRequiredDocsPanel.tsx ~OpportunityRequiredDocsPanel
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
 src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
-backend/src/services/documentNumberService.ts +incrementDocumentSequence  +nextDocumentNumber  +nextOpportunityTrackingCode  ~nextDocumentNumber
-backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +opportunityLocalUrl  +opportunityRemotePath  +resolveOpportunityForEntity
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
 backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
 backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
@@ -806,6 +802,11 @@ export interface ContractWorkflowFallback  :70-70
 export type TransitionCheckResult  :33-33
 export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
 export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
+```
+
+### backend/src/services/corporateDocumentReminders.ts
+```
+export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -2265,11 +2266,6 @@ handler onSaved
 ### src/modules/reporting/BottleneckPanel.tsx
 ```
 component BottleneckPanel
-```
-
-### src/modules/reporting/BrandCategoryCard.tsx
-```
-component BrandCategoryCard
 ```
 
 ### src/modules/reporting/OverviewTab.tsx

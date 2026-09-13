@@ -794,17 +794,18 @@ model Notification {
 }
 
 model CorporateDocument {
-  id         String    @id @default(cuid())
-  name       String
-  category   String
-  expiryDate DateTime?
-  fileUrl    String?
-  tags       String?
-  docNumber  String? // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
-  tenantId   String
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  tenant     Tenant    @relation(fields: [tenantId], references: [id])
+  id            String    @id @default(cuid())
+  name          String
+  category      String
+  expiryDate    DateTime?
+  fileUrl       String?
+  tags          String?
+  docNumber     String? // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
+  remindersSent String? // JSON dizi — gönderilen geçerlilik hatırlatmaları (guaranteeReminders.ts ile aynı desen)
+  tenantId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
 }
 
 model Workflow {

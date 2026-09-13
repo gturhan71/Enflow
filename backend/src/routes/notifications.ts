@@ -3,12 +3,14 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { sweepTenderReminders } from '../services/tenderReminders';
 import { sweepDeliveryDeadlineReminders } from '../services/deliveryDeadlineReminders';
+import { sweepCorporateDocumentReminders } from '../services/corporateDocumentReminders';
 
 const router: Router = Router();
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   await sweepTenderReminders(req.tenantId); // poll'de zaman-eşiği hatırlatmaları üret
   await sweepDeliveryDeadlineReminders(req.tenantId); // teslim tarihi hatırlatma/gecikme uyarısı
+  await sweepCorporateDocumentReminders(req.tenantId); // şirket evrakı geçerlilik hatırlatması
   const userId = req.query.userId ? String(req.query.userId) : undefined;
   const notifications = await prisma.notification.findMany({
     where: { tenantId: req.tenantId, ...(userId ? { userId } : {}) },

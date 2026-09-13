@@ -6,12 +6,14 @@ import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
+import { sweepCorporateDocumentReminders } from '../services/corporateDocumentReminders';
 
 const router: Router = Router();
 const DOCUMENT_UPLOADS_ROOT = path.join(__dirname, '../../uploads/documents');
 const corporateDocUpload = documentUpload(50);
 
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  await sweepCorporateDocumentReminders(req.tenantId); // poll'de geçerlilik hatırlatmaları üret
   const docs = await prisma.corporateDocument.findMany({ where: { tenantId: req.tenantId } });
   res.json(docs);
 }));
