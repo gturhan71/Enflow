@@ -4,7 +4,7 @@ export type MilestoneStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'BLO
 export type MilestoneType  =
   | 'PLANNING' | 'PROCUREMENT' | 'SHIPMENT' | 'INSTALLATION'
   | 'DEVELOPMENT' | 'TESTING' | 'ACCEPTANCE' | 'INVOICING'
-  | 'COLLECTION' | 'WARRANTY' | 'CUSTOM';
+  | 'COLLECTION' | 'WARRANTY' | 'DELIVERY' | 'CUSTOM';
 export type CostCategory   = 'PROCUREMENT' | 'TRAVEL' | 'EXTERNAL_SERVICE' | 'OTHER';
 export interface ProjectMilestone {
   id: string;

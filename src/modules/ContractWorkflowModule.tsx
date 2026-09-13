@@ -176,6 +176,15 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
     selectWorkflow(wf);
   };
 
+  const handleDeliveryFieldsBlur = async (patch: Record<string, unknown>) => {
+    if (!selected) return;
+    const wf = await apiFetch(`${BASE}/${selected.id}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    });
+    selectWorkflow(wf);
+  };
+
   const handleNotesBlur = async (value: string) => {
     if (!selected) return;
     await apiFetch(`${BASE}/${selected.id}`, {
@@ -584,6 +593,7 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
                       onContractValueBlur={handleContractValueBlur}
                       onDeadlineBlur={handleDeadlineBlur}
                       onNotesBlur={handleNotesBlur}
+                      onDeliveryFieldsBlur={handleDeliveryFieldsBlur}
                       onGoToAnalysis={() => setTab('analysis')}
                     />
                   )}

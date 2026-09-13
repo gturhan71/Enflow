@@ -242,7 +242,12 @@ const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, curren
                         <span className="text-sm font-semibold truncate">{ms.title}</span>
                         {ms.isParallel && <span className="text-[10px] bg-blue-900/30 text-blue-300 px-1.5 py-0.5 rounded font-medium">Paralel</span>}
                         {ms.requiresApproval && <span className="text-[10px] bg-amber-900/30 text-amber-300 px-1.5 py-0.5 rounded font-medium">Onay</span>}
-                        {overdue && <span className="text-[10px] bg-red-900/30 text-red-300 px-1.5 py-0.5 rounded font-medium">Gecikmiş</span>}
+                        {ms.milestoneType === 'DELIVERY' && <span className="text-[10px] bg-indigo-900/30 text-indigo-300 px-1.5 py-0.5 rounded font-medium">Teslim</span>}
+                        {overdue && (
+                          <span className="text-[10px] bg-red-900/30 text-red-300 px-1.5 py-0.5 rounded font-medium">
+                            {ms.milestoneType === 'DELIVERY' ? 'Gecikmiş — Cezai Şart Riski' : 'Gecikmiş'}
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-400">{sc.label} · {fmtShort(ms.plannedEnd)}</p>
                     </div>

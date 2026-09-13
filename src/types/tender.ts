@@ -1,4 +1,10 @@
 // Faz 6c — İhale / İYB
+export interface DeliveryTimelineStep {
+  id: string;
+  title: string;
+  sortOrder: number;
+  plannedDate?: string | null;
+}
 export interface TenderChecklistItem {
   id: string;
   tenderId: string;
@@ -38,4 +44,8 @@ export interface Tender {
   createdAt: string;
   updatedAt: string;
   checklist?: TenderChecklistItem[];
+  expectedDeliveryDays?: number | null;
+  vendorDeliveryConfirmed?: boolean;
+  vendorDeliveryConfirmedNote?: string | null;
+  deliveryTimeline?: DeliveryTimelineStep[];
 }

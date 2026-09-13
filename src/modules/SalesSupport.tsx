@@ -10,6 +10,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useAIGate } from '../contexts/AIGateContext';
 import { fmtCurrency as fmt } from '../lib/format';
 import { sampleGuaranteeText, uploadGuaranteeSampleFile } from '../lib/guaranteeText';
+import DeliveryTimelinePanel from './DeliveryTimelinePanel';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
 
 interface SalesSupportProps {
@@ -345,6 +346,9 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
   // "Teklif İletildi" — dosyayı Girilen İhaleler'e taşı (eksik dökümanda onay ister)
   const submitBid = async () => {
     if (!tender) return;
+    if (tender.expectedDeliveryDays != null && !tender.vendorDeliveryConfirmed) {
+      if (!window.confirm('Teslim süresi tedarikçi tarafından teyit edilmedi — bu şekilde ihaleye girmek risklidir. Yine de devam edilsin mi?')) return;
+    }
     const reqMissing = items.filter(i => i.isRequired && !['DONE', 'WAIVED'].includes(i.status));
     if (reqMissing.length > 0 && !window.confirm(`${reqMissing.length} zorunlu döküman eksik:\n• ${reqMissing.map(m => m.name).join('\n• ')}\n\nYine de teklifi iletildi olarak işaretleyip Girilen İhaleler'e taşımak istiyor musunuz?`)) return;
     if (!window.confirm('Teklif iletildi olarak işaretlenecek ve dosya "Girilen İhaleler" arşivine taşınacak. Onaylıyor musunuz?')) return;
@@ -400,6 +404,8 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
           </button>
         )}
       </div>
+
+      <DeliveryTimelinePanel steps={tender.deliveryTimeline} />
 
       {/* İhale Dosyası Analizi — 3 mod: AI-metin / AI-dosya / manuel */}
       <div className="glass-card p-5 space-y-3">
@@ -681,7 +687,8 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 function TenderForm({ opportunities, onClose, onSaved }: {
   opportunities: Opportunity[]; onClose: () => void; onSaved: () => void;
 }) {
-  const [f, setF] = useState<Record<string, string>>({ name: '', ikn: '', authority: '', method: 'OPEN', estimatedValue: '', submissionDeadline: '', opportunityId: '', categoryCode: 'IHL' });
+  const [f, setF] = useState<Record<string, string>>({ name: '', ikn: '', authority: '', method: 'OPEN', estimatedValue: '', submissionDeadline: '', opportunityId: '', categoryCode: 'IHL', expectedDeliveryDays: '' });
+  const [vendorConfirmed, setVendorConfirmed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const set = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
@@ -696,6 +703,8 @@ function TenderForm({ opportunities, onClose, onSaved }: {
         submissionDeadline: f.submissionDeadline || null,
         opportunityId: f.opportunityId || null,
         categoryCode: f.categoryCode || 'IHL',
+        expectedDeliveryDays: f.expectedDeliveryDays ? Number(f.expectedDeliveryDays) : null,
+        vendorDeliveryConfirmed: vendorConfirmed,
       });
       onSaved();
     } catch (e) { setErr(e instanceof Error ? e.message : 'Kaydetme hatası.'); setSaving(false); }
@@ -716,6 +725,16 @@ function TenderForm({ opportunities, onClose, onSaved }: {
       </div>
       <label className="text-xs text-slate-500">Son teklif tarihi</label>
       <input className="input-glass w-full text-sm" type="date" value={f.submissionDeadline} onChange={e => set('submissionDeadline', e.target.value)} />
+      <div className="grid grid-cols-2 gap-3 items-end">
+        <div>
+          <label className="text-xs text-slate-500 mb-1 block">Tahmini Teslim Süresi (gün)</label>
+          <input className="input-glass w-full text-sm" type="number" min={0} placeholder="Örn: 90" value={f.expectedDeliveryDays} onChange={e => set('expectedDeliveryDays', e.target.value)} />
+        </div>
+        <label className="flex items-center gap-2 text-xs text-slate-500 mb-2">
+          <input type="checkbox" checked={vendorConfirmed} onChange={e => setVendorConfirmed(e.target.checked)} />
+          Tedarikçi teslim süresini teyit etti
+        </label>
+      </div>
       {opportunities.length > 0 && (
         <select className="input-glass w-full text-sm" value={f.opportunityId} onChange={e => set('opportunityId', e.target.value)}>
           <option value="">İlgili fırsat (opsiyonel)</option>

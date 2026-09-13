@@ -378,7 +378,6 @@ src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
-backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
@@ -468,6 +467,7 @@ backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSla
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
+backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
 backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
@@ -522,7 +522,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 11 days ago)
+## changes (last 10 commits — 63 seconds ago)
 ```
 src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
 src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
@@ -530,12 +530,7 @@ src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
 src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
 src/services/apiService.ts                    +profQuery  ~ApiService
 backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
-backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
-backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
 src/components/MoneyInput.tsx                 +MoneyInput
-src/lib/guaranteeText.ts                      +uploadGuaranteeSampleFile  ~sampleGuaranteeText
-src/modules/contract-workflow/DocumentsTab.tsx ~GuaranteeRequestSection
-src/modules/contract-workflow/WorkflowListPanel.tsx ~WorkflowListPanel
 src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
 src/modules/crm/OpportunitiesView.tsx         ~OpportunitiesView
 src/modules/crm/OpportunityDocumentsPanel.tsx +OpportunityDocumentsPanel
@@ -547,7 +542,9 @@ backend/src/services/opportunityFolderService.ts +resolveOpportunityUploadDir  +
 backend/src/services/processEngine.ts         +resolveStepRecipients  +notifyUnitManager  ~resolveStepRecipients  ~readEntityFields
 backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
 backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
+backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
 backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
+backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
 backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
 backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
 backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
@@ -581,64 +578,6 @@ export interface DmoProfitResult  :38-46
   currency: string  :45-45
 export type DmoGrain  :16-16
 export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
-```
-
-### backend/src/services/profitabilityLedger.ts
-```
-export interface ProfitEvent  :17-30
-  date: Date  :18-18
-  amount: number  :19-19
-  currency: string  :20-20
-  direction: ProfitDirection  :21-21
-  basis: ProfitBasis  :22-22
-  source: ProfitSource  :23-23
-  category: string  :24-24
-  projectId: string | null  :25-25
-  … +4 more members  :17-17
-export interface LedgerProject  :34-46
-  id: string  :35-35
-  name: string  :36-36
-  totalValue: number  :37-37
-  contractCurrency: string  :38-38
-  progress: number  :39-39
-  startDate: Date | null  :40-40
-  plannedEndDate: Date | null  :41-41
-  createdAt: Date  :42-42
-  … +3 more members  :34-34
-export interface LedgerInstallment  :48-48
-  dueDate: Date  :48-48
-export interface LedgerMilestone  :49-49
-  plannedEnd: Date | null  :49-49
-export interface LedgerBoM  :50-50
-```
-
-### backend/src/services/profitabilityService.ts
-```
-export interface ProfitScope  :21-21
-  kind: 'ALL' | 'PROJECT'  :21-21
-export interface LedgerResult  :131-137
-  scope: ProfitScope  :132-132
-  asOf: string  :133-133
-  fxRates: Record<string, number>  :134-134
-  plan: ProfitEvent[]  :135-135
-  actual: ProfitEvent[]  :136-136
-export interface SummaryResult  :159-166
-  scope: ProfitScope  :160-160
-  grain: Grain  :161-161
-  asOf: string  :162-162
-  reportCurrency: string  :163-163
-  fxRates: Record<string, number>  :164-164
-  rows: PeriodRow[]  :165-165
-export interface CashflowApiResult  :198-198
-export interface TreasuryApiResult  :199-199
-export interface InstrumentsApiResult  :226-226
-export async function getLedger(tenantId, scope, opts = {},) → Promise<LedgerResult>  :139-157
-export async function getSummary(tenantId, scope, grain, opts = {},) → Promise<SummaryResult>  :168-188
-export async function getCashflow(tenantId, scope, opts = {},) → Promise<CashflowApiResult>  :201-210
-export async function getTreasury(tenantId, scope, opts = {},) → Promise<TreasuryApiResult>  :212-224
-export async function getInstruments(tenantId, scope, opts = {},) → Promise<InstrumentsApiResult>  :228-238
-export function parseFxParam(raw?) → Record<string, number> | undef  :241-250  # "USD:40,EUR:44" → { USD: 40, EUR: 44 }
-export function parseScopeParam(raw?) → ProfitScope  :253-256  # "project:<id>" | "all" → ProfitScope
 ```
 
 ### backend/pnpm-lock.yaml
@@ -1026,6 +965,35 @@ export interface InstrumentsResult  :46-51
 export function buildInstrumentScenarios(events, opts, interestRates, params = {},) → InstrumentsResult  :191-216
 ```
 
+### backend/src/services/profitabilityLedger.ts
+```
+export interface ProfitEvent  :17-30
+  date: Date  :18-18
+  amount: number  :19-19
+  currency: string  :20-20
+  direction: ProfitDirection  :21-21
+  basis: ProfitBasis  :22-22
+  source: ProfitSource  :23-23
+  category: string  :24-24
+  projectId: string | null  :25-25
+  … +4 more members  :17-17
+export interface LedgerProject  :34-46
+  id: string  :35-35
+  name: string  :36-36
+  totalValue: number  :37-37
+  contractCurrency: string  :38-38
+  progress: number  :39-39
+  startDate: Date | null  :40-40
+  plannedEndDate: Date | null  :41-41
+  createdAt: Date  :42-42
+  … +3 more members  :34-34
+export interface LedgerInstallment  :48-48
+  dueDate: Date  :48-48
+export interface LedgerMilestone  :49-49
+  plannedEnd: Date | null  :49-49
+export interface LedgerBoM  :50-50
+```
+
 ### backend/src/services/profitabilityRollup.ts
 ```
 export interface RollupOpts  :16-23
@@ -1050,6 +1018,35 @@ export interface PeriodRow  :30-48
 export type Grain  :14-14
 export function periodKeyOf(date, grain) → string  :52-59
 export function bucketBy(events, opts) → PeriodRow[]  :73-154  # Olayları dönem kovalarına toplar
+```
+
+### backend/src/services/profitabilityService.ts
+```
+export interface ProfitScope  :21-21
+  kind: 'ALL' | 'PROJECT'  :21-21
+export interface LedgerResult  :131-137
+  scope: ProfitScope  :132-132
+  asOf: string  :133-133
+  fxRates: Record<string, number>  :134-134
+  plan: ProfitEvent[]  :135-135
+  actual: ProfitEvent[]  :136-136
+export interface SummaryResult  :159-166
+  scope: ProfitScope  :160-160
+  grain: Grain  :161-161
+  asOf: string  :162-162
+  reportCurrency: string  :163-163
+  fxRates: Record<string, number>  :164-164
+  rows: PeriodRow[]  :165-165
+export interface CashflowApiResult  :198-198
+export interface TreasuryApiResult  :199-199
+export interface InstrumentsApiResult  :226-226
+export async function getLedger(tenantId, scope, opts = {},) → Promise<LedgerResult>  :139-157
+export async function getSummary(tenantId, scope, grain, opts = {},) → Promise<SummaryResult>  :168-188
+export async function getCashflow(tenantId, scope, opts = {},) → Promise<CashflowApiResult>  :201-210
+export async function getTreasury(tenantId, scope, opts = {},) → Promise<TreasuryApiResult>  :212-224
+export async function getInstruments(tenantId, scope, opts = {},) → Promise<InstrumentsApiResult>  :228-238
+export function parseFxParam(raw?) → Record<string, number> | undef  :241-250  # "USD:40,EUR:44" → { USD: 40, EUR: 44 }
+export function parseScopeParam(raw?) → ProfitScope  :253-256  # "project:<id>" | "all" → ProfitScope
 ```
 
 ### backend/src/services/profitabilitySnapshot.ts

@@ -11,6 +11,7 @@ import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath
 import { analyzeSpec } from '../services/specAnalysis';
 import { sweepTenderReminders } from '../services/tenderReminders';
 import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
+import { buildDeliveryTimeline } from '../services/deliveryTimeline';
 
 const router: Router = Router();
 
@@ -52,7 +53,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
   const items = await prisma.tender.findMany({
     where,
     orderBy: { createdAt: 'desc' },
-    include: { checklist: { orderBy: { sortOrder: 'asc' } } },
+    include: { checklist: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
   });
   res.json(items);
 }));
@@ -61,7 +62,7 @@ router.get('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const id = String(req.params.id);
   const item = await prisma.tender.findFirst({
     where: { id, tenantId: req.tenantId },
-    include: { checklist: { orderBy: { sortOrder: 'asc' } } },
+    include: { checklist: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!item) return res.status(404).json({ error: 'İhale bulunamadı.' });
   res.json(item);
@@ -71,6 +72,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
   const {
     name, ikn, authority, method, status, submissionDeadline, estimatedValue, currency,
     opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes, categoryCode,
+    expectedDeliveryDays, vendorDeliveryConfirmed, vendorDeliveryConfirmedNote,
   } = req.body;
   if (!name) return res.status(400).json({ error: 'İhale adı zorunlu.' });
   const docNumber = await maybeDocNumber(req.tenantId, categoryCode);
@@ -92,8 +94,17 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
       ownerName: ownerName || null,
       notes: notes || null,
       docNumber,
+      expectedDeliveryDays: expectedDeliveryDays != null ? Number(expectedDeliveryDays) : null,
+      vendorDeliveryConfirmed: Boolean(vendorDeliveryConfirmed),
+      vendorDeliveryConfirmedNote: vendorDeliveryConfirmedNote || null,
     },
   });
+  if (item.expectedDeliveryDays != null) {
+    const steps = buildDeliveryTimeline(new Date(), item.expectedDeliveryDays);
+    await prisma.deliveryTimelineStep.createMany({
+      data: steps.map((s) => ({ tenantId: req.tenantId, tenderId: item.id, title: s.title, sortOrder: s.sortOrder, plannedDate: s.plannedDate })),
+    });
+  }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'TENDER', entityId: item.id, details: { name: item.name, ikn: item.ikn } });
   res.json(item);
 }));
@@ -105,6 +116,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const {
     name, ikn, authority, method, status, submissionDeadline, estimatedValue, currency,
     opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes,
+    expectedDeliveryDays, vendorDeliveryConfirmed, vendorDeliveryConfirmedNote,
   } = req.body;
 
   // Süreç Motoru (Faz B) — WON geçişi hem rol-kısıtlı hem de (artık) tenant'ın
@@ -131,8 +143,22 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
       submissionDeadline: submissionDeadline ? new Date(submissionDeadline) : record.submissionDeadline,
       estimatedValue: typeof estimatedValue === 'number' ? estimatedValue : record.estimatedValue,
       currency, opportunityId, contractWorkflowId, ekapRef, ownerId, ownerName, notes,
+      expectedDeliveryDays: expectedDeliveryDays !== undefined ? (expectedDeliveryDays != null ? Number(expectedDeliveryDays) : null) : undefined,
+      vendorDeliveryConfirmed, vendorDeliveryConfirmedNote,
     },
   });
+
+  // Teslim süresi girildi/değişti → alt-kırılımlı tahmini takvim yeniden üretilir
+  // (salt-okunur, ihale hazırlığı sırasında görünür tahmin — WON'da Sözleşme'ye taşınır).
+  if (expectedDeliveryDays !== undefined) {
+    await prisma.deliveryTimelineStep.deleteMany({ where: { tenantId: req.tenantId, tenderId: id } });
+    if (expectedDeliveryDays != null) {
+      const steps = buildDeliveryTimeline(new Date(), Number(expectedDeliveryDays));
+      await prisma.deliveryTimelineStep.createMany({
+        data: steps.map((s) => ({ tenantId: req.tenantId, tenderId: id, title: s.title, sortOrder: s.sortOrder, plannedDate: s.plannedDate })),
+      });
+    }
+  }
 
   // İhale WON → Süreç Motoru: TENDER_TO_CONTRACT'ı ilerletir (yapılandırılmış
   // AUTO+CREATE_CONTRACT_FROM_TENDER adımı ContractWorkflow'u oluşturur ve bağlar).
@@ -149,7 +175,8 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   }
 
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status && status !== record.status ? `STATUS_${status}` : 'UPDATE', entityType: 'TENDER', entityId: id, details: { name: item.name, status: item.status } });
-  res.json(item);
+  const full = await prisma.tender.findFirst({ where: { id }, include: { deliveryTimeline: { orderBy: { sortOrder: 'asc' } } } });
+  res.json(full ?? item);
 }));
 
 router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {

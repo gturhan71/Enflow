@@ -12,6 +12,10 @@ import { computeProjectProgress } from '../services/projectProgress';
 import { summarizeProject } from '../services/projectSummary';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
+import { entityTypeToTab } from '../utils/entityTypeTab';
+import { computePenaltyExposure } from '../services/deliveryPenalty';
+
+const DELIVERY_NOTIFY_ROLES = ['PROJECT_MGR', 'PROCUREMENT_MGR', 'SALES_MGR', 'LEGAL_MGR'];
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -227,6 +231,8 @@ router.post('/:id/milestones', asyncHandler(async (req: Request, res: Response) 
 
 router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Response) => {
   if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
+  const before = await prisma.projectMilestone.findFirst({ where: { id: String(req.params.msId), projectId: String(req.params.id) } });
+  if (!before) return res.status(404).json({ error: 'Milestone bulunamadı.' });
   const data: Record<string, unknown> = {};
   const dateFields = ['plannedStart','plannedEnd','actualStart','actualEnd'];
   const numFields  = ['progress','budgetAmount','actualCost','order'];
@@ -258,7 +264,42 @@ router.put('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Respo
     },
   });
 
-  res.json(ms);
+  // Teslimat teyidi — DELIVERY tipi milestone YENİ COMPLETED'a geçtiyse (PM'in
+  // Kanban'dan "teslim alındı" işaretlemesi) risk kapandı bilgisi çapraz birimlere düşer.
+  // Bundan sonra bu milestone hatırlatma sweep'inin COMPLETED filtresine takılacağı için
+  // uyarılar kendiliğinden durur — ayrı bir "durdurma" mantığı gerekmez.
+  let penaltyExposure = null;
+  if (ms) {
+    if (ms.milestoneType === 'DELIVERY') {
+      if (ms.plannedEnd) {
+        const wf = await prisma.contractWorkflow.findFirst({ where: { tenantId: req.tenantId, projectId: String(req.params.id) } });
+        penaltyExposure = computePenaltyExposure({
+          contractValue: wf?.contractValue ?? 0, dailyRatePct: wf?.penaltyDailyRatePct ?? null, capPct: wf?.penaltyCapPct ?? null,
+          dueDate: ms.plannedEnd, asOf: new Date(),
+        });
+      }
+      if (ms.status === 'COMPLETED' && before.status !== 'COMPLETED') {
+        const project = await prisma.project.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId } });
+        if (project) {
+          const roleUsers = await prisma.user.findMany({ where: { tenantId: req.tenantId, status: 'ACTIVE', role: { in: DELIVERY_NOTIFY_ROLES } } });
+          const targets = new Set<string>(roleUsers.map((u) => u.id));
+          if (project.pmId) targets.add(project.pmId);
+          for (const userId of targets) {
+            await prisma.notification.create({
+              data: {
+                tenantId: req.tenantId, userId, type: 'INFO', title: 'Teslimat teyit edildi',
+                message: `${project.name} — ${ms.title}: teslimat teyit edildi.`,
+                relatedModule: entityTypeToTab('PROJECT'), relatedItemId: project.id,
+              },
+            }).catch(() => {});
+          }
+          await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELIVERY_CONFIRMED', entityType: 'PROJECT', entityId: project.id, details: { milestoneId: ms.id, milestoneTitle: ms.title } });
+        }
+      }
+    }
+  }
+
+  res.json({ ...ms, penaltyExposure });
 }));
 
 router.delete('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Response) => {

@@ -1,5 +1,5 @@
 import {
-  CheckCircle2, XCircle, Shield, PenTool, Loader2, UserCheck, Clock, UserX,
+  CheckCircle2, XCircle, Shield, PenTool, Loader2, UserCheck, Clock, UserX, AlertTriangle,
 } from 'lucide-react';
 import { ContractWorkflow } from './types';
 
@@ -19,6 +19,20 @@ export default function SigningTab({
 }) {
   return (
     <div className="space-y-6 max-w-lg">
+      {/* Teslim süresi aşıldıysa cezai şart riski — bkz. ContextTab'daki teslim süresi/ceza ayarları */}
+      {selected.penaltyExposure && (
+        <div className="p-4 rounded-xl border border-red-300 bg-red-100 flex items-start gap-3">
+          <AlertTriangle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-red-700">
+            <p className="font-semibold">Cezai Şart Riski — Teslim süresi {selected.penaltyExposure.overdueDays} gün aşıldı</p>
+            <p className="mt-0.5">
+              Tahmini gecikme cezası: ₺{selected.penaltyExposure.cappedPenalty.toLocaleString('tr-TR')}
+              {selected.penaltyExposure.isCapped ? ' (sözleşme tavanına takıldı)' : ''}
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Pre-signing checklist */}
       <div className="space-y-2">
         <h3 className="text-sm font-semibold text-slate-500">İmzalama Öncesi Kontrol</h3>

@@ -22,6 +22,7 @@ import { resolveGroupAfterDecision, autoSkipOrphanStages, resolveEffectiveApprov
 import { createProjectWithMilestones } from './projectFactory';
 import { createInvoiceRecord } from './invoiceService';
 import { entityTypeToTab } from '../utils/entityTypeTab';
+import { buildDeliveryTimeline, computeDeliveryDueDate } from './deliveryTimeline';
 import type { ApprovalChain, ApprovalStage, User, WorkflowStep } from '@prisma/client';
 
 export class ProcessNotConfiguredError extends Error {
@@ -329,6 +330,26 @@ async function createProjectFromEntity(ctx: StageActionCtx): Promise<void> {
       },
       ctx.actorUserId,
     );
+
+    // Teslim süresi kullanılmışsa (wf.deliveryDueDate set), sözleşme aşamasındaki
+    // tahmini alt-kırılım (DeliveryTimelineStep) gerçek, izlenebilir ProjectMilestone
+    // satırlarına dönüşür — proje türü şablonlarına dokunulmaz, sona eklenir.
+    if (project && wf.deliveryDueDate) {
+      const timelineSteps = await prisma.deliveryTimelineStep.findMany({
+        where: { tenantId: ctx.tenantId, contractWorkflowId: wf.id },
+        orderBy: { sortOrder: 'asc' },
+      });
+      const baseOrder = project.milestones.length;
+      for (const [idx, step] of timelineSteps.entries()) {
+        await prisma.projectMilestone.create({
+          data: {
+            projectId: project.id, title: step.title, milestoneType: 'DELIVERY',
+            plannedEnd: step.plannedDate, order: baseOrder + idx, status: 'NOT_STARTED',
+          },
+        });
+      }
+    }
+
     await prisma.contractWorkflow.update({
       where: { id: wf.id },
       data: { status: 'TRANSFERRED', projectId: project?.id ?? null, updatedAt: new Date() },
@@ -361,6 +382,10 @@ async function createContractFromTender(ctx: StageActionCtx): Promise<void> {
   if (!tender) throw new Error('İhale kaydı bulunamadı.');
   if (tender.contractWorkflowId) return; // idempotent — zaten bağlı
 
+  // Teslim süresi Tender'dan taşınır (henüz signedDate yok — referans "şimdi").
+  const now = new Date();
+  const deliveryDueDate = tender.expectedDeliveryDays != null ? computeDeliveryDueDate(now, tender.expectedDeliveryDays) : null;
+
   const wf = await prisma.contractWorkflow.create({
     data: {
       title: tender.ikn ? `${tender.name} — İKN: ${tender.ikn}` : tender.name,
@@ -370,8 +395,16 @@ async function createContractFromTender(ctx: StageActionCtx): Promise<void> {
       opportunityId: tender.opportunityId || null,
       status: 'DRAFT',
       tenantId: ctx.tenantId,
+      deliveryPeriodDays: tender.expectedDeliveryDays,
+      deliveryDueDate,
     },
   });
+  if (tender.expectedDeliveryDays != null) {
+    const steps = buildDeliveryTimeline(now, tender.expectedDeliveryDays);
+    await prisma.deliveryTimelineStep.createMany({
+      data: steps.map((s) => ({ tenantId: ctx.tenantId, contractWorkflowId: wf.id, title: s.title, sortOrder: s.sortOrder, plannedDate: s.plannedDate })),
+    });
+  }
   await prisma.tender.update({ where: { id: tender.id }, data: { contractWorkflowId: wf.id } });
   await logActivity({ tenantId: ctx.tenantId, userId: ctx.actorUserId, action: 'CONTRACT_WORKFLOW_CREATED', entityType: 'TENDER', entityId: tender.id, details: { contractWorkflowId: wf.id } });
 }

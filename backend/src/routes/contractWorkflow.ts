@@ -14,6 +14,8 @@ import { logActivity } from '../services/activityLog';
 import { checkStatusTransition, buildAutoTitle } from '../services/contractWorkflowState';
 import { similarityRatio } from '../utils/textSimilarity';
 import { resolveOpportunityUploadDir, opportunityLocalUrl, opportunityRemotePath } from '../services/opportunityFolderService';
+import { buildDeliveryTimeline, computeDeliveryDueDate } from '../services/deliveryTimeline';
+import { computePenaltyExposure } from '../services/deliveryPenalty';
 
 const router: Router = Router();
 router.use(tenantMiddleware);
@@ -133,10 +135,10 @@ const archiveSourceNote = (match: { name: string; docNumber: string | null }) =>
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const workflows = await prisma.contractWorkflow.findMany({
     where: { tenantId: req.tenantId },
-    include: { documents: { orderBy: { sortOrder: 'asc' } } },
+    include: { documents: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
     orderBy: { createdAt: 'desc' },
   });
-  res.json(workflows);
+  res.json(workflows.map(withPenaltyExposure));
 }));
 
 // ── CREATE ────────────────────────────────────────────────────────────────────
@@ -165,23 +167,43 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(wf);
 }));
 
+// Teslim tarihi aşıldığında tahmini gecikme cezasını hesaplar — tek kaynak backend,
+// frontend formülü tekrar etmez (bilgilendirici; Finans/Invoice'a otomatik yansımaz).
+function withPenaltyExposure<T extends { contractValue: number; deliveryDueDate: Date | null; penaltyDailyRatePct: number | null; penaltyCapPct: number | null }>(wf: T) {
+  const penaltyExposure = wf.deliveryDueDate
+    ? computePenaltyExposure({ contractValue: wf.contractValue, dailyRatePct: wf.penaltyDailyRatePct, capPct: wf.penaltyCapPct, dueDate: wf.deliveryDueDate, asOf: new Date() })
+    : null;
+  return { ...wf, penaltyExposure };
+}
+
 // ── GET ONE ───────────────────────────────────────────────────────────────────
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const wf = await prisma.contractWorkflow.findFirst({
     where: { id: pid(req), tenantId: req.tenantId },
-    include: { documents: { orderBy: { sortOrder: 'asc' } } },
+    include: { documents: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
   });
   if (!wf) return res.status(404).json({ error: 'Not found' });
-  res.json(wf);
+  res.json(withPenaltyExposure(wf));
 }));
 
 // ── UPDATE ────────────────────────────────────────────────────────────────────
 router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
-  const { contractText, specText, status, signedDate, deadline, contractValue, notes, title, tenderName, tenderNo, projectName, cancelReason } = req.body;
+  const {
+    contractText, specText, status, signedDate, deadline, contractValue, notes, title, tenderName, tenderNo, projectName, cancelReason,
+    deliveryPeriodDays, penaltyClauseText, penaltyDailyRatePct, penaltyCapPct,
+  } = req.body;
+
+  const current = await prisma.contractWorkflow.findFirst({ where: { id: pid(req), tenantId: req.tenantId } });
+  if (!current) return res.status(404).json({ error: 'Not found' });
+
+  // Teslim süresi yeniden hesabı — deliveryPeriodDays veya signedDate değiştiğinde
+  // deliveryDueDate + alt-kırılımlı DeliveryTimelineStep'ler yeniden üretilir.
+  const deliveryInputsChanged = deliveryPeriodDays !== undefined || signedDate !== undefined;
+  const nextDeliveryPeriodDays: number | null = deliveryPeriodDays !== undefined ? deliveryPeriodDays : current.deliveryPeriodDays;
+  const nextSignedDate: Date | null = signedDate !== undefined ? (signedDate ? new Date(signedDate) : null) : current.signedDate;
+  const nextDeliveryDueDate = nextDeliveryPeriodDays != null ? computeDeliveryDueDate(nextSignedDate ?? new Date(), nextDeliveryPeriodDays) : null;
 
   if (status !== undefined) {
-    const current = await prisma.contractWorkflow.findFirst({ where: { id: pid(req), tenantId: req.tenantId } });
-    if (!current) return res.status(404).json({ error: 'Not found' });
     if (status !== current.status) {
       const check = checkStatusTransition(current.status, status, req.userRole || '', cancelReason);
       if (!check.ok) return res.status(check.code).json({ error: check.error });
@@ -217,11 +239,29 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
       ...(tenderName !== undefined && { tenderName }),
       ...(tenderNo !== undefined && { tenderNo }),
       ...(projectName !== undefined && { projectName }),
+      ...(deliveryPeriodDays !== undefined && { deliveryPeriodDays }),
+      ...(deliveryInputsChanged && { deliveryDueDate: nextDeliveryDueDate }),
+      ...(penaltyClauseText !== undefined && { penaltyClauseText }),
+      ...(penaltyDailyRatePct !== undefined && { penaltyDailyRatePct }),
+      ...(penaltyCapPct !== undefined && { penaltyCapPct }),
       ...(isTerminalExit && { cancelReason, cancelledAt: new Date(), cancelledById: req.userId }),
       updatedAt: new Date(),
     },
-    include: { documents: { orderBy: { sortOrder: 'asc' } } },
+    include: { documents: { orderBy: { sortOrder: 'asc' } }, deliveryTimeline: { orderBy: { sortOrder: 'asc' } } },
   });
+
+  if (deliveryInputsChanged) {
+    await prisma.deliveryTimelineStep.deleteMany({ where: { tenantId: req.tenantId, contractWorkflowId: wf.id } });
+    if (nextDeliveryPeriodDays != null) {
+      const steps = buildDeliveryTimeline(nextSignedDate ?? new Date(), nextDeliveryPeriodDays);
+      await prisma.deliveryTimelineStep.createMany({
+        data: steps.map((s) => ({ tenantId: req.tenantId, contractWorkflowId: wf.id, title: s.title, sortOrder: s.sortOrder, plannedDate: s.plannedDate })),
+      });
+      wf.deliveryTimeline = await prisma.deliveryTimelineStep.findMany({ where: { tenantId: req.tenantId, contractWorkflowId: wf.id }, orderBy: { sortOrder: 'asc' } });
+    } else {
+      wf.deliveryTimeline = [];
+    }
+  }
 
   // NOT: `SIGNED` durumuna geçiş için ayrı bir eylem YOK — imza onayı zincirin
   // aşamaları (ör. KSU→GM) `/approval-chains/:id/stages/:sid/approve` üzerinden
@@ -230,7 +270,7 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
   // TRANSITION_ROLES — ayrı bir yetki katmanı) yansıtır.
 
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: status ? `STATUS_${status}` : 'UPDATE', entityType: 'CONTRACT_WORKFLOW', entityId: wf.id, details: { title: wf.title, status: wf.status, ...(isTerminalExit && { cancelReason }) } });
-  res.json(wf);
+  res.json(withPenaltyExposure(wf));
 }));
 
 // ── AI ANALYSIS ───────────────────────────────────────────────────────────────

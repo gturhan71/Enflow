@@ -15,6 +15,20 @@ export interface ContractWorkflowDoc {
   notes?: string;
 }
 
+export interface DeliveryTimelineStep {
+  id: string;
+  title: string;
+  sortOrder: number;
+  plannedDate?: string | null;
+}
+
+export interface PenaltyExposure {
+  overdueDays: number;
+  rawPenalty: number;
+  cappedPenalty: number;
+  isCapped: boolean;
+}
+
 export interface ContractWorkflow {
   id: string;
   title: string;
@@ -36,6 +50,14 @@ export interface ContractWorkflow {
   procurementRequestId?: string | null;
   documents: ContractWorkflowDoc[];
   createdAt: string;
+  // Teslim süresi — sözleşmenin kendi geçerlilik/hazırlık süresinden (deadline) BAĞIMSIZ
+  deliveryPeriodDays?: number | null;
+  deliveryDueDate?: string | null;
+  penaltyClauseText?: string | null;
+  penaltyDailyRatePct?: number | null;
+  penaltyCapPct?: number | null;
+  deliveryTimeline?: DeliveryTimelineStep[];
+  penaltyExposure?: PenaltyExposure | null;
 }
 
 export interface AiAnalysis {
