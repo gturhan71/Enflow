@@ -13,12 +13,13 @@
 // `role` alanına göre çalışır ve autoSkipOrphanStages (approvalChainService.ts)
 // zaten "role'de aktif kimse yok" durumunu self-healing çözer.
 
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction, ManagedTx } from '../prismaClient';
 
-// `prisma` .$extends() ile genişletilmiş bir client — Prisma.TransactionClient
-// (temel client'ın tipi) yapısal olarak uyuşmuyor. Gerçek tx tipini doğrudan
-// bu client'ın kendi $transaction imzasından türetiyoruz.
-type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
+// `runManagedTransaction`'ın verdiği `tx`, `prismaClient.ts`'teki `basePrisma`'dan
+// türer (RLS katmanını taşımaz) — bu yüzden yerel tip de aynı kaynaktan (`ManagedTx`)
+// alınır; `prisma`'nın kendi $transaction imzasından türetilen bir tip yapısal
+// olarak UYUŞMAZ (iki farklı uzantı katmanı).
+type Tx = ManagedTx;
 
 export interface OwnedCategory {
   key: string;
@@ -197,11 +198,11 @@ export async function transferOwnership(params: {
   const toUser = await prisma.user.findFirst({ where: { id: toUserId, tenantId, status: 'ACTIVE' } });
   if (!toUser) throw new Error('Hedef kullanıcı bulunamadı veya aktif değil.');
 
-  return prisma.$transaction((tx) => transferOwnershipTx(tx, { ...params, toUserName: toUser.name }));
+  return runManagedTransaction((tx) => transferOwnershipTx(tx, { ...params, toUserName: toUser.name }));
 }
 
 export async function deactivateUser(tenantId: string, userId: string): Promise<void> {
-  await prisma.$transaction(async (tx) => {
+  await runManagedTransaction(async (tx) => {
     await tx.user.update({ where: { id: userId }, data: { status: 'INACTIVE' } });
     // Kendi verdiği vekaleti de geçersiz kıl; ona vekalet verenlerin devri
     // transferOwnership içinde zaten temizlendi ama transfer edilecek aktif

@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { prisma } from '../prismaClient';
 import { LocalTarget, NextcloudTarget, S3Target, BackupTarget } from './backupTargets';
 import { getBackupSettings } from './backupService';
+import { runWithTenant, runWithRlsBypass } from './tenantContext';
 
 function sha256File(p: string): string {
   return crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
@@ -123,14 +124,17 @@ export async function verifyBackup(jobId: string): Promise<{ status: 'PASSED' | 
 
 /** verifyStatus=PENDING + COMPLETED yedekleri sırayla doğrular (scheduler kullanır). */
 export async function drainVerifyQueue(limit = 5): Promise<number> {
-  const pending = await prisma.backupJob.findMany({
+  // Tüm tenant'ların bekleyen doğrulama işleri — kasıtlı cross-tenant okuma
+  // (Postgres RLS, Faz 3); her iş kendi tenant-context'iyle işlenir.
+  const pending = await runWithRlsBypass(() => prisma.backupJob.findMany({
     where: { status: 'COMPLETED', verifyStatus: 'PENDING' },
     orderBy: { startedAt: 'asc' },
     take: limit,
-  });
+    select: { id: true, tenantId: true },
+  }));
   let n = 0;
   for (const job of pending) {
-    try { await verifyBackup(job.id); n++; } catch { /* tek iş hatası kuyruğu durdurmaz */ }
+    try { await runWithTenant(job.tenantId, () => verifyBackup(job.id)); n++; } catch { /* tek iş hatası kuyruğu durdurmaz */ }
   }
   return n;
 }

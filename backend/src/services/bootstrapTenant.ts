@@ -1,10 +1,11 @@
 // Enflow — Tenant bootstrap (ilk-çalıştırma kurulumu + dev seed ortak servisi).
 // Boş bir kurulumu canlıya hazırlar: tenant + varsayılan birimler + ilk GM
 // kullanıcısı + abonelik (gerçek lisans ya da 30 günlük deneme).
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { verifyLicenseToken } from './licenseVerify';
 import { hashPassword, signAuthToken } from './auth';
 import { PLAN_MAP, TRIAL_USER_LIMIT, TRIAL_STORAGE_LIMIT_MB } from '../planCatalog';
+import { runWithRlsBypass } from './tenantContext';
 
 // Varsayılan birim seti (kurumsal süreç swimlane'leri — seed.ts ile aynı).
 // Kurulumda otomatik oluşturulur; sonradan "şablon yükle" ile de eklenir (units.ts).
@@ -75,7 +76,9 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
     licensePayload = r.payload;
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  // Yeni tenant kurulumu — henüz hiçbir tenant context'i yok (tam da bunu
+  // yaratıyoruz), Postgres RLS (Faz 3) için kasıtlı bypass gerekir.
+  const result = await runWithRlsBypass(() => runManagedTransaction(async (tx) => {
     const tenant = await tx.tenant.create({
       data: { ...(input.tenantId ? { id: input.tenantId } : {}), name: companyName },
     });
@@ -114,7 +117,7 @@ export async function bootstrapTenant(input: BootstrapInput): Promise<BootstrapR
     await tx.subscription.create({ data: { tenantId: tenant.id, ...subData } });
 
     return { tenant, admin, sub: subData };
-  });
+  }));
 
   // Lisans verildiyse tenant binding'i şimdi doğrula (yanlış tenant'a üretilmiş lisans engellenir).
   if (input.license && licensePayload && licensePayload.tenantId && licensePayload.tenantId !== result.tenant.id) {

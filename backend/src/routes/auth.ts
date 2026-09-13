@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler } from '../middleware';
 import { verifyPassword, signAuthToken } from '../services/auth';
+import { runWithRlsBypass } from '../services/tenantContext';
 
 const router: Router = Router();
 
@@ -12,7 +13,9 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'E-posta ve şifre zorunludur.' });
   }
 
-  const user = await prisma.user.findUnique({ where: { email }, include: { tenant: true } });
+  // Girişte tenant henüz bilinmiyor (e-posta ile aranıyor) — Postgres RLS'in (Faz 3)
+  // bu sorguyu 0 satıra düşürmemesi için kasıtlı bypass gerekir.
+  const user = await runWithRlsBypass(() => prisma.user.findUnique({ where: { email }, include: { tenant: true } }));
   // Kullanıcı sayımı sızıntısını önle: yok/yanlış-şifre/pasif hepsi AYNI genel yanıtı döner.
   const ok = user && user.status === 'ACTIVE' && (await verifyPassword(password, user.password));
   if (!ok || !user) {

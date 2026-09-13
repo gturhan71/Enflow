@@ -8,6 +8,7 @@
 import { prisma } from '../prismaClient';
 import { takeSnapshot, asOfKeyOf } from './profitabilitySnapshot';
 import { acquireLock, releaseLock } from './schedulerLock';
+import { runWithTenant } from './tenantContext';
 
 const LOCK_NAME = 'profitability-snapshot-scheduler';
 const LOCK_TTL_MS = 2 * 3_600_000;
@@ -23,14 +24,18 @@ async function tick(): Promise<void> {
     const asOfKey = asOfKeyOf(now);
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
-      const existing = await prisma.profitabilitySnapshot.findFirst({
-        where: { tenantId: t.id, asOfKey },
-        select: { id: true },
+      // Postgres RLS (Faz 3) — bu döngü hiçbir HTTP isteğinin İÇİNDE değil,
+      // her iterasyon kendi tenant-context'ini kurmalı.
+      await runWithTenant(t.id, async () => {
+        const existing = await prisma.profitabilitySnapshot.findFirst({
+          where: { tenantId: t.id, asOfKey },
+          select: { id: true },
+        });
+        if (existing) return; // bu ay zaten alındı
+        try {
+          await takeSnapshot(t.id, { asOf: now });
+        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
       });
-      if (existing) continue; // bu ay zaten alındı
-      try {
-        await takeSnapshot(t.id, { asOf: now });
-      } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
     }
   } catch { /* sweep ana akışı bozmaz */ } finally {
     await releaseLock(LOCK_NAME);

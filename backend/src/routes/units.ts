@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { DEFAULT_UNITS } from '../services/bootstrapTenant';
@@ -90,7 +90,7 @@ router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, re
     return res.status(400).json({ error: 'Bu birim bir iş akışında kullanılıyor. Önce iş akışından çıkarın.' });
   }
 
-  await prisma.$transaction(async (tx) => {
+  await runManagedTransaction(async (tx) => {
     if (transferToUnitId && unit._count.users > 0) {
       await tx.user.updateMany({
         where: { unitId: id, tenantId },

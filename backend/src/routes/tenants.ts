@@ -1,11 +1,12 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { isAIConfigured, assertSafeAiUrl } from '../services/aiClient';
 import { verifyLicenseToken } from '../services/licenseVerify';
 import { encryptForTenant } from '../services/tenantEncryption';
 import { PLAN_MAP, PLAN_RANK } from '../planCatalog';
+import { runWithRlsBypass } from '../services/tenantContext';
 
 const router: Router = Router();
 
@@ -22,12 +23,15 @@ router.post('/', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandle
   const { name } = req.body;
   if (!name || typeof name !== 'string') return res.status(400).json({ error: 'Şirket adı zorunludur.' });
 
-  const tenant = await prisma.$transaction(async (tx) => {
+  // Yeni tenant oluşturmak, çağıranın kendi tenant-context'inden (Faz 3 RLS)
+  // KASITLI olarak bağımsız bir işlemdir — yeni tenant'ın Subscription satırı
+  // çağıranın tenant_id'siyle eşleşmez, bypass gerekir.
+  const tenant = await runWithRlsBypass(() => runManagedTransaction(async (tx) => {
     // dekWrapped ASLA client'a çıkmaz — şifreleme anahtarı sarmalı, sunucu-içi sır.
     const newTenant = await tx.tenant.create({ data: { name }, omit: { dekWrapped: true } });
     await tx.subscription.create({ data: { tenantId: newTenant.id, plan: 'STARTER' } });
     return newTenant;
-  });
+  }));
 
   res.json(tenant);
 }));

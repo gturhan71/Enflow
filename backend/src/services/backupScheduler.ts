@@ -11,6 +11,7 @@ import { runBackup, getBackupSettings, BackupScope, BackupKind, TargetType } fro
 import { drainVerifyQueue } from './backupVerifyService';
 import { logActivity } from './activityLog';
 import { acquireLock, releaseLock } from './schedulerLock';
+import { runWithTenant } from './tenantContext';
 
 const LOCK_NAME = 'backup-scheduler';
 const LOCK_TTL_MS = 10 * 60_000; // 10dk — runBackup uzun sürebilir (VACUUM INTO)
@@ -24,30 +25,34 @@ async function tick(): Promise<void> {
     if (!(await acquireLock(LOCK_NAME, LOCK_TTL_MS))) return;
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
-      const s = await getBackupSettings(t.id);
-      if (!s?.enabled || !s.intervalHours || s.intervalHours <= 0) continue;
+      // Postgres RLS (Faz 3) — bu döngü hiçbir HTTP isteğinin İÇİNDE değil,
+      // her iterasyon kendi tenant-context'ini kurmalı.
+      await runWithTenant(t.id, async () => {
+        const s = await getBackupSettings(t.id);
+        if (!s?.enabled || !s.intervalHours || s.intervalHours <= 0) return;
 
-      const last = await prisma.backupJob.findFirst({
-        where: { tenantId: t.id, trigger: 'SCHEDULED' },
-        orderBy: { startedAt: 'desc' },
-        select: { startedAt: true },
-      });
-      const dueMs = s.intervalHours * 3600 * 1000;
-      if (last && Date.now() - new Date(last.startedAt).getTime() < dueMs) continue;
-
-      try {
-        const job = await runBackup({
-          tenantId: t.id,
-          scope: (s.scope as BackupScope) || 'PLATFORM',
-          kind: (s.kind as BackupKind) || 'FULL',
-          targetType: (s.targetType as TargetType) || 'LOCAL',
-          location: s.location || null,
-          trigger: 'SCHEDULED',
-          startedByName: 'scheduler',
-          settings: s,
+        const last = await prisma.backupJob.findFirst({
+          where: { tenantId: t.id, trigger: 'SCHEDULED' },
+          orderBy: { startedAt: 'desc' },
+          select: { startedAt: true },
         });
-        await logActivity({ tenantId: t.id, action: 'BACKUP_SCHEDULED_RUN', entityType: 'BACKUP_JOB', entityId: job.id, details: { intervalHours: s.intervalHours } });
-      } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+        const dueMs = s.intervalHours * 3600 * 1000;
+        if (last && Date.now() - new Date(last.startedAt).getTime() < dueMs) return;
+
+        try {
+          const job = await runBackup({
+            tenantId: t.id,
+            scope: (s.scope as BackupScope) || 'PLATFORM',
+            kind: (s.kind as BackupKind) || 'FULL',
+            targetType: (s.targetType as TargetType) || 'LOCAL',
+            location: s.location || null,
+            trigger: 'SCHEDULED',
+            startedByName: 'scheduler',
+            settings: s,
+          });
+          await logActivity({ tenantId: t.id, action: 'BACKUP_SCHEDULED_RUN', entityType: 'BACKUP_JOB', entityId: job.id, details: { intervalHours: s.intervalHours } });
+        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+      });
     }
 
     // Doğrulama kuyruğu (manuel + zamanlı tüm bekleyenler)

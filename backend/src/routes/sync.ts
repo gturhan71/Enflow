@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, withRetry } from '../middleware';
 
 const router: Router = Router();
@@ -9,7 +9,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
   const { tasks, opportunities } = req.body;
 
   const result = await withRetry(async () => {
-    return await prisma.$transaction(async (tx) => {
+    return await runManagedTransaction(async (tx) => {
       for (const task of (tasks || [])) {
         if (task.id) {
           await tx.todoTask.upsert({

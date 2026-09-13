@@ -57,6 +57,27 @@ geçmişini taşıyamaz. İki yol var:
    bir adımda hata olursa `schema.prisma` otomatik sqlite'a geri alınır — repo her zaman
    çalışır SQLite durumuna döner.
 
+## En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+
+`install/wizard.mjs` artık Postgres'te **tek** rol değil **iki** rol oluşturur:
+
+- **`<appUser>_migrator`** — DB owner (DDL). Yalnız `db push` / ileride `migrate deploy`
+  sırasında kullanılır; `backend/.env`'e **yazılmaz**, kurulum özetinde bir kez gösterilir.
+- **`<appUser>` (runtime)** — `backend/.env` → `DATABASE_URL` bunu kullanır. DDL/CREATEROLE/
+  SUPERUSER **yok**; `db push` sonrası yalnız `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL
+  TABLES` + `ALTER DEFAULT PRIVILEGES` (gelecekteki tablolar için otomatik) uygulanır.
+
+**Etki:** Bu dokümandaki "Uygulama" adımları (Yaklaşım A/B, `migrate deploy`) ve
+`backend/src/scripts/migrateToPostgres.ts` gibi Postgres'e şema yazan her araç, **migrator**
+kimlik bilgileriyle çalıştırılmalıdır — mevcut `DATABASE_URL` (runtime) ile çalıştırılırsa
+DDL izni olmadığından başarısız olur. `migrateToPostgres.ts` bugün operatörün verdiği hedef
+`DATABASE_URL`'i doğrudan kullanıyor (kendi rol provizyonu yok) — bu scripti migrator/runtime
+ayrımına uyarlamak (veya en azından dokümante etmek: "hedef Postgres'e migrator kimlik
+bilgileriyle bağlanın, script bitince runtime rolüne GRANT'leri elle/otomatik uygulayın")
+**ayrı bir takip işi**, bu turda yapılmadı. Aynı şekilde `upgrade-tool/core.mjs`'in Postgres
+şema güncellemesi akışı da bugün yok (yalnız SQLite hedefliyor) — ileride eklenirse migrator
+kimlik bilgilerini kullanmalı.
+
 ## Kapasite teyidi (kurulum sihirbazı)
 
 `install/wizard.mjs` artık PostgreSQL sorusundan önce beklenen kullanıcı sayısı + yıllık veri

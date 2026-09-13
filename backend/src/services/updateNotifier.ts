@@ -8,6 +8,7 @@ import { readFileSync } from 'fs';
 import path from 'path';
 import { prisma } from '../prismaClient';
 import { acquireLock, releaseLock } from './schedulerLock';
+import { runWithTenant } from './tenantContext';
 
 // Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
 // (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
@@ -87,27 +88,31 @@ async function tick(): Promise<void> {
 
     const tenants = await prisma.tenant.findMany({ select: { id: true } });
     for (const t of tenants) {
-      try {
-        const marker = await readMarker(t.id);
+      // Postgres RLS (Faz 3) — bu döngü hiçbir HTTP isteğinin İÇİNDE değil,
+      // her iterasyon kendi tenant-context'ini kurmalı.
+      await runWithTenant(t.id, async () => {
+        try {
+          const marker = await readMarker(t.id);
 
-        // Başarıyla uygulandı → bilgi bildirimi (uygulanan hedef bazında dedup)
-        if (u.applied && u.to && marker.lastAppliedTo !== u.to) {
-          await notifyGMs(t.id, 'SUCCESS', 'Sistem güncellendi', `Enflow ${u.to} sürümüne yükseltildi.`);
-          await writeMarker(t.id, { lastAppliedTo: u.to });
-          continue;
-        }
+          // Başarıyla uygulandı → bilgi bildirimi (uygulanan hedef bazında dedup)
+          if (u.applied && u.to && marker.lastAppliedTo !== u.to) {
+            await notifyGMs(t.id, 'SUCCESS', 'Sistem güncellendi', `Enflow ${u.to} sürümüne yükseltildi.`);
+            await writeMarker(t.id, { lastAppliedTo: u.to });
+            return;
+          }
 
-        // Güncelleme mevcut → hatırlatma (hedef ref bazında dedup, spam yok)
-        if (u.available && u.target && marker.lastNotifiedRef !== (u.ref || u.target)) {
-          const when = u.publishedAt ? new Date(u.publishedAt).toLocaleDateString('tr-TR') : '';
-          const note = u.notes ? ` — ${u.notes}` : '';
-          await notifyGMs(
-            t.id, 'WARNING', 'Yeni sürüm mevcut',
-            `Yeni Enflow sürümü yayında: ${u.target}${when ? ` (${when})` : ''}${note}. Yükseltme aracını çalıştırın.`
-          );
-          await writeMarker(t.id, { lastNotifiedRef: u.ref || u.target });
-        }
-      } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+          // Güncelleme mevcut → hatırlatma (hedef ref bazında dedup, spam yok)
+          if (u.available && u.target && marker.lastNotifiedRef !== (u.ref || u.target)) {
+            const when = u.publishedAt ? new Date(u.publishedAt).toLocaleDateString('tr-TR') : '';
+            const note = u.notes ? ` — ${u.notes}` : '';
+            await notifyGMs(
+              t.id, 'WARNING', 'Yeni sürüm mevcut',
+              `Yeni Enflow sürümü yayında: ${u.target}${when ? ` (${when})` : ''}${note}. Yükseltme aracını çalıştırın.`
+            );
+            await writeMarker(t.id, { lastNotifiedRef: u.ref || u.target });
+          }
+        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+      });
     }
   } catch { /* sweep ana akışı bozmaz */ } finally {
     await releaseLock(LOCK_NAME);

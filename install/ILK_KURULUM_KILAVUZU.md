@@ -124,6 +124,11 @@ Hangi işletim sisteminde olursanız olun, kurulum betiği aynı soruları sıra
    olmadan sistem yeni bir Enflow sürümü çıktığında bunu **hiç fark etmez** — bildirim zili
    tetiklenmez (bkz. `upgrade-tool/README.md`). Linux/macOS'ta bunun karşılığı bir `cron`
    girdisidir, kurulum betiği kendisi eklemez (elle: `upgrade-tool/README.md`).
+6. **Ağ sertleştirmesi (opsiyonel)** — kurulumun sonunda betik, bu sunucuda yalnız SSH(22)
+   ve backend portuna gelen trafiğe izin verecek şekilde güvenlik duvarını (ufw/Windows
+   Firewall) kısıtlamayı **açıkça onayınızı isteyerek** önerir (varsayılan HAYIR — siz
+   onaylamadan hiçbir şey değişmez). Bu, veritabanı portunun ve Prisma Studio'nun yanlışlıkla
+   internete açık kalmasını engeller — bkz. § "Kurulumdan Sonra — Ağ Güvenliği" aşağıda.
 
 Betik ayrıca `AUTH_JWT_SECRET` ve `DATA_ENCRYPTION_MASTER_KEY` gibi güvenlik anahtarlarını
 **sizin için otomatik ve güvenli rastgele üretir** — bunlarla ilgili hiçbir şey girmeniz
@@ -149,6 +154,22 @@ pnpm dev --port 3000            # frontend → :3000 (ayrı terminal)
 ```
 
 Üretimde tarayıcıda yalnız `http://localhost:3002` adresine gitmeniz yeterlidir.
+
+### 2.5b Kurulumdan Sonra — Ağ Güvenliği
+
+Sunucuya internetten erişim varsa (özellikle bir VPS/bulut sunucusundaysanız) kurulumdan
+sonra şunları doğrulayın (tek-kaynak plan: `docs/VERITABANI_GUVENLIGI_PLAN.md`):
+
+- **`npx prisma studio`'yu bu sunucuda ASLA çalıştırmayın.** Veriye bakmanız gerekiyorsa
+  kendi bilgisayarınızdan SSH tüneli açın (`ssh -L 5555:localhost:5555 kullanici@sunucu`)
+  ve Studio'yu tünelin arka ucunda (`localhost`'ta) çalıştırın — port hiçbir zaman dışarı
+  açılmaz.
+- **PostgreSQL kullanıyorsanız** DB portu (varsayılan 5432) internetten ulaşılamaz olmalı.
+  Kurulum sihirbazı bunu ufw/Windows Firewall ile sizin onayınızla kısıtlayabilir; onaylamadıysanız
+  ekrana yazdığı komutları elle çalıştırın veya sunucu sağlayıcınızın güvenlik grubu/firewall
+  panelinden yalnız 22 (SSH) ve backend portunu (varsayılan 3002, ya da önündeki reverse proxy
+  portu 80/443) açık bırakın.
+- Doğrulama (kendi bilgisayarınızdan): `nmap -p 5432 <sunucu-ip>` → "closed"/"filtered" beklenir.
 
 ### 2.6 Sık Karşılaşılan Sorunlar
 

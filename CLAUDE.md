@@ -325,8 +325,9 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 12 | **Tenant verisi alan-bazlı şifreleme** — envelope encryption, tenant-başına DEK (`Tenant.dekWrapped`, `AUTH_JWT_SECRET` deseniyle aynı `DATA_ENCRYPTION_MASTER_KEY` env var). Kapsam: Tenant YZ `apiKey`, `Vendor.iban`/`bankName`, `Customer.taxNumber`/`taxOffice` (AES-256-GCM, `enc:v1:` önekli, arama/filtrede kullanılmadığı doğrulandı). Yeni `backend/src/services/tenantEncryption.ts` (`encryptForTenant`/`decryptForTenant`) + backfill script (`backfill-tenant-encryption.ts`, idempotent) + `install/wizard.mjs` otomatik key üretimi. Route-bazlı çağrı (genel Prisma `$extends` hot path'ine eklenmedi — bkz. gerekçe `docs/TENANT_DATA_ENCRYPTION_PLAN.md`). Yan-etki: `GET/POST/PUT /api/tenants` artık `dekWrapped`'i `omit` ediyor (önceden hiçbir alan şifrelenmediği için bu risk yoktu). Key rotation + `backend/uploads/` dosya şifrelemesi + gerçek KMS entegrasyonu bilinçli olarak kapsam dışı bırakıldı. | add_tenant_dek |
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 | 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
+| 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı hiç çalıştırılmadı**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
 
-Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
+Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli; Faz 15: RBAC süiti artık 1027 test — SQLite'a karşı koşuldu, 1000 geçti/26 kaldı, `git stash` ile değişiklikler geri alınıp AYNI 26 test birebir aynı hatalarla yine başarısız olduğu doğrulandı → önceden var, Faz 15'ten bağımsız, sıfır regresyon; Postgres-özel Faz 2/3 değişikliği yerel bir Postgres örneğiyle henüz manuel doğrulanmadı). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
 
 > Tamamlanan tüm işler için bkz. yukarıdaki **Faz Geçmişi (özet)** tablosu (Faz 0–9 + bakım). Birimler-arası geçiş zinciri (T1, T3–T6) ve 8 birim agent'ı tamamlandı.
@@ -415,7 +416,6 @@ src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
-src/modules/contract-workflow/TransferTab.tsx ← types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
@@ -427,7 +427,6 @@ src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
-src/modules/IntegrationWizard.tsx ← constants, types, services/nextcloudService, services/exchangeService, services/whatsappService
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
@@ -437,15 +436,11 @@ src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
 src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
-src/modules/procurement/VendorForm.tsx ← ../types, ../services/apiService
-src/modules/procurement/VendorsTab.tsx ← ../types
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
-src/modules/ProposalEditor.tsx ← lib/utils, types, lib/procurementCosts
-src/modules/reporting/AnalyticsTab.tsx ← ../services/apiService, dashboard/useDashboardStream, ../components/HealthCards, ../types, BusinessHealthCard
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
@@ -458,14 +453,16 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/middleware.ts ← prismaClient, services/auth, utils/logger
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock
+backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
+backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
+backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
@@ -473,19 +470,21 @@ backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
+backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
 backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
-backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext
+backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
-backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock
+backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext
 backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
@@ -529,7 +528,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 6 hours ago)
+## changes (last 10 commits — 2 hours ago)
 ```
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/ContextTab.tsx  ~ContextTab
@@ -538,7 +537,7 @@ src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
 src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
 src/modules/FinanceModule.tsx                 ~OverheadPoolTab
 src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
-src/modules/SalesSupport.tsx                  ~ChecklistTab  ~Modal  ~TenderForm
+src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
 src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
 src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
 src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
@@ -547,17 +546,6 @@ backend/src/services/deliveryDeadlineReminders.ts +resolveDue  +notifyAll  +swee
 backend/src/services/deliveryPenalty.ts       +computePenaltyExposure
 backend/src/services/deliveryTimeline.ts      +buildDeliveryTimeline  +addDays  +computeDeliveryDueDate
 backend/src/services/processEngine.ts         ~createProjectFromEntity  ~createContractFromTender  ~ProcessNotConfiguredError
-src/modules/profitability/DmoChannelTab.tsx   +DmoChannelTab  +Card
-src/modules/ProfitabilityModule.tsx           +ProfitabilityModule  +MainTabs  +TreasuryRow  +SummaryCard
-src/services/apiService.ts                    +profQuery  ~ApiService
-backend/src/services/profitabilityCashflow.ts +flattenCashEvents  +buildSeries  +deficitWindowsOf  +buildCashflow
-backend/src/services/profitabilityDmo.ts      +bucketKey  +getDmoProfitability
-backend/src/services/profitabilityInstruments.ts +toTRY  +horizonMs  +mergedCashEvents  +scenarioFactoring
-backend/src/services/profitabilityLedger.ts   +resolveReferenceStart  +spreadDates  +planRevenueSchedule  +overheadEvents
-backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketBy
-backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
-backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
-backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
 ```
 
 ## backend
@@ -731,9 +719,9 @@ async function main()  :29-57
 
 ### backend/src/middleware.ts
 ```
-export const asyncHandler = (fn) =>  :8-10
-export const requireRole = (allowed) =>  :77-85
-export const requireEntitlement = (pluginKey) =>  :109-116
+export const asyncHandler = (fn) =>  :9-11
+export const requireRole = (allowed) =>  :82-90
+export const requireEntitlement = (pluginKey) =>  :116-123
 ```
 
 ### backend/src/planCatalog.ts
@@ -741,9 +729,15 @@ export const requireEntitlement = (pluginKey) =>  :109-116
 export type PlanId  :5-5
 ```
 
+### backend/src/prismaClient.ts
+```
+export type ManagedTx  :112-112
+export async function runManagedTransaction(callback, options?,) → Promise<T>  :121-135
+```
+
 ### backend/src/services/activityLogArchiveScheduler.ts
 ```
-export function startActivityLogArchiveScheduler() → void  :48-53
+export function startActivityLogArchiveScheduler() → void  :53-58
 ```
 
 ### backend/src/services/agentProvenance.ts
@@ -785,33 +779,28 @@ export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :
 
 ### backend/src/services/backupScheduler.ts
 ```
-export function startBackupScheduler() → void  :61-65
+export function startBackupScheduler() → void  :66-70
+```
+
+### backend/src/services/backupVerifyService.ts
+```
+export async function verifyBackup(jobId) → Promise<  :47-47
+export async function drainVerifyQueue(limit = 5) → Promise<number>  :126-140  # verifyStatus=PENDING + COMPLETED yedekleri sırayla doğrular 
 ```
 
 ### backend/src/services/bootstrapTenant.ts
 ```
-export interface BootstrapInput  :39-46
-  companyName: string  :40-40
-  admin: { name: string  :41-41
-  license?: string  :43-43
-  tenantId?: string  :45-45
-export interface BootstrapResult  :47-52
-  tenantId: string  :48-48
-  token: string  :49-49
-  user: { id: string  :50-50
-  subscription: { plan: string  :51-51
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :54-122
-```
-
-### backend/src/services/contractWorkflowState.ts
-```
-export interface ContractAnalysisExtract  :69-69
-  projectName: string | null  :69-69
-export interface ContractWorkflowFallback  :70-70
-  tenderName: string | null  :70-70
-export type TransitionCheckResult  :33-33
-export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
-export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
+export interface BootstrapInput  :40-47
+  companyName: string  :41-41
+  admin: { name: string  :42-42
+  license?: string  :44-44
+  tenantId?: string  :46-46
+export interface BootstrapResult  :48-53
+  tenantId: string  :49-49
+  token: string  :50-50
+  user: { id: string  :51-51
+  subscription: { plan: string  :52-52
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :55-124
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -897,6 +886,32 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/personnelTransferService.ts
+```
+export interface OwnedCategory  :24-29
+  key: string  :25-25
+  label: string  :26-26
+  count: number  :27-27
+  sample: { id: string  :28-28
+export interface OwnedItemsResult  :31-41
+  userId: string  :32-32
+  userName: string  :33-33
+  role: string  :34-34
+  status: string  :35-35
+  categories: OwnedCategory[]  :36-36
+  totalActive: number  :37-37
+  inboundDelegationCount: number  :38-38
+  createdOpportunityCount: number  :39-39
+  … +1 more members  :31-31
+export interface TransferResult  :43-46
+  transferred: Record<string, number>  :44-44
+  clearedInboundDelegations: number  :45-45
+export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResult>  :154-173
+export async function transferOwnership(params) → Promise<TransferResult>  :193-202
+export async function deactivateUser(tenantId, userId) → Promise<void>  :204-213
+export async function hardDeleteUser(tenantId, userId) → Promise<  :215-215
 ```
 
 ### backend/src/services/profitabilityCashflow.ts
@@ -1089,7 +1104,16 @@ export async function getPlanDrift(tenantId, opts = {}) → Promise<PlanDriftSer
 
 ### backend/src/services/profitabilitySnapshotScheduler.ts
 ```
-export function startProfitabilitySnapshotScheduler() → void  :41-44
+export function startProfitabilitySnapshotScheduler() → void  :46-49
+```
+
+### backend/src/services/restoreService.ts
+```
+export type LogicalPayloadData  :20-20
+export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :59-111  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
+export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :153-157  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
+export async function applyLogicalRestore(restoreId, actor?) → Promise<  :246-246  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
+export async function stageStateRestore(restoreId) → Promise<  :286-286  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
 ```
 
 ### backend/src/services/roleDefaultPermissions.ts
@@ -1136,6 +1160,13 @@ export function mockDocuments() → AnalyzedDoc[]  :64-75
 export async function analyzeSpec(inputText, opts,) → Promise<  :105-108  # Şartname/sözleşme metnini analiz eder; tenant YZ'si yapıland
 ```
 
+### backend/src/services/tenantContext.ts
+```
+export function getTenantContext() → TenantContext | undefined  :15-17
+export function runWithTenant(tenantId, fn) → T  :21-23
+export function runWithRlsBypass(fn) → T  :29-31
+```
+
 ### backend/src/services/unitReportingService.ts
 ```
 export interface UnitDefinition  :6-10
@@ -1167,19 +1198,19 @@ export interface WorkflowBottleneck  :457-461
 
 ### backend/src/services/updateNotifier.ts
 ```
-export interface UpdateStatus  :17-32
-  checkedAt?: string  :18-18
-  current?: { shortSha?: string | null  :19-19
-  update?: { available?: boolean  :20-21
-  applied?: boolean  :22-22
-  failed?: boolean  :23-23
-  kind?: 'tag' | 'commit'  :24-24
-  target?: string | null  :25-25
-  ref?: string | null  :26-26
-  … +4 more members  :17-17
-export function enflowHome() → string  :35-37  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
-export function readUpdateStatus() → UpdateStatus | null  :39-45
-export function startUpdateNotifier() → void  :118-122
+export interface UpdateStatus  :18-33
+  checkedAt?: string  :19-19
+  current?: { shortSha?: string | null  :20-20
+  update?: { available?: boolean  :21-22
+  applied?: boolean  :23-23
+  failed?: boolean  :24-24
+  kind?: 'tag' | 'commit'  :25-25
+  target?: string | null  :26-26
+  ref?: string | null  :27-27
+  … +4 more members  :18-18
+export function enflowHome() → string  :36-38  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
+export function readUpdateStatus() → UpdateStatus | null  :40-46
+export function startUpdateNotifier() → void  :123-127
 ```
 
 ### backend/src/services/virtualAgentService.ts
@@ -1927,13 +1958,6 @@ handler onChange
 handler onClick
 ```
 
-### src/modules/contract-workflow/CancelModal.tsx
-```
-component CancelModal
-handler onClick
-handler onChange
-```
-
 ### src/modules/contract-workflow/DetailHeader.tsx
 ```
 component DetailHeader
@@ -1965,12 +1989,6 @@ export function bestProposalPrice(opportunityId, proposals) → number | null  :
 export function computeDeadlineAlarm(wf) → DeadlineAlarm  :54-68
 export const stepIndex = (status) =>  :38-52
 export const isDocsComplete = (wf) =>  :70-70
-```
-
-### src/modules/contract-workflow/TransferTab.tsx
-```
-component TransferTab
-handler onClick
 ```
 
 ### src/modules/contract-workflow/WorkflowListPanel.tsx
@@ -2096,14 +2114,6 @@ handler onCount
 handler onSave
 ```
 
-### src/modules/IntegrationWizard.tsx
-```
-hook useState
-export IntegrationWizard
-handler onClick
-handler onChange
-```
-
 ### src/modules/LicenseTypesModule.tsx
 ```
 hook useAuth
@@ -2205,23 +2215,6 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/procurement/VendorForm.tsx
-```
-props VendorFormProps
-hook useState
-hook useEffect
-export VendorForm
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### src/modules/procurement/VendorsTab.tsx
-```
-props VendorsTabProps
-export VendorsTab
-```
-
 ### src/modules/ProcurementModule.tsx
 ```
 props ProcurementModuleProps
@@ -2285,27 +2278,6 @@ handler onDelete
 handler onRefresh
 handler onPrintReport
 handler onSave
-```
-
-### src/modules/ProposalEditor.tsx
-```
-props ProposalEditorProps
-hook useState
-hook useMemo
-hook useEffect
-export ProposalEditor
-handler onClick
-handler onChange
-```
-
-### src/modules/reporting/AnalyticsTab.tsx
-```
-component AnalyticsTab
-hook useState
-hook useCallback
-hook useEffect
-hook useDashboardStream
-handler onSaved
 ```
 
 ### src/modules/reporting/BottleneckPanel.tsx
@@ -2598,24 +2570,24 @@ export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) 
 
 ### upgrade-tool/core.mjs
 ```
-export function resolveHome()  :22-27  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
-export function currentVersion(home)  :40-47
-export async function latestVersion(home, channel = 'auto')  :68-94  # En son yayınlanan sürüm
-export function compare(home, current, latest)  :97-111  # Yerel ile uzak karşılaştır → güncelleme var mı
-export function statusPath(home)  :114-114
-export function writeStatus(home, status)  :116-122
-export function readStatus(home)  :123-125
-export async function checkAndWrite(home, channel = 'auto')  :128-146  # Kontrol et + durum dosyası yaz
-export async function runUpgrade(home, opts = {})  :198-259  # Güvenli yükseltme
-function git(home, args)  :14-16
-function gitSafe(home, args)  :17-19
-function parseSemver(tag)  :30-33  # semver "vX
-function cmpSemver(a, b)  :34-37
-function githubJson(path)  :50-62  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
-function dbProvider(home)  :149-159
-function backupDb(home, log)  :161-175
-function restoreDb(snap, log)  :176-181
-function run(home, cmd, args, log, opts = {})  :183-192
+export function resolveHome  :22-27
+export function currentVersion  :40-47
+export async function latestVersion  :68-94
+export function compare  :97-111
+export function statusPath  :114-114
+export function writeStatus  :116-122
+export function readStatus  :123-125
+export async function checkAndWrite  :128-146
+export async function runUpgrade  :198-259
+function git  :14-16
+function gitSafe  :17-19
+function parseSemver  :30-33
+function cmpSemver  :34-37
+function githubJson  :50-62
+function dbProvider  :149-159
+function backupDb  :161-175
+function restoreDb  :176-181
+function run  :183-192
 ```
 
 ### upgrade-tool/README.md
@@ -2635,4 +2607,4 @@ code-fence powershell
 ```
 
 
-> **Not everything is here.** 189 file(s) omitted to stay under the 18372-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 194 file(s) omitted, 1 collapsed to anchors to stay under the 18431-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

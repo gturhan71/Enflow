@@ -96,17 +96,82 @@ async function ensurePostgresServer(admin) {
   return false;
 }
 
-// enflow rolü (dbadmin) + veritabanını superuser ile oluştur (idempotent).
-function provisionPostgresDb(admin, { db, appUser, appPass }) {
+// İKİ-ROL AYRIMI (en az yetki, Adım 0 madde 5): `migratorUser` DB'nin OWNER'ı
+// (DDL yetkili — yalnız kurulum/upgrade sırasında `db push`/`migrate deploy` için
+// kullanılır, backend/.env'e YAZILMAZ); `appUser` çalışma zamanı rolü — LOGIN var
+// ama DDL/CREATEROLE/SUPERUSER YOK, yalnız aşağıda grantRuntimePrivileges() ile
+// DML (SELECT/INSERT/UPDATE/DELETE) yetkisi verilir. İkisi de superuser ile
+// idempotent oluşturulur.
+function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass }) {
   const esc = (v) => String(v).replace(/'/g, "''");
-  // rol
-  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(appUser)}') THEN CREATE ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}'; END IF; END $$;` });
-  psql(admin, null, { command: `ALTER ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}';` });
-  // veritabanı (CREATE DATABASE transaction-dışı; var mı diye bak)
+  // migrator rolü (owner — DDL)
+  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(migratorUser)}') THEN CREATE ROLE "${migratorUser}" WITH LOGIN PASSWORD '${esc(migratorPass)}'; END IF; END $$;` });
+  psql(admin, null, { command: `ALTER ROLE "${migratorUser}" WITH LOGIN PASSWORD '${esc(migratorPass)}';` });
+  // runtime rolü (DML-only — NOSUPERUSER/NOCREATEDB/NOCREATEROLE açıkça verilir)
+  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(appUser)}') THEN CREATE ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}' NOSUPERUSER NOCREATEDB NOCREATEROLE; END IF; END $$;` });
+  psql(admin, null, { command: `ALTER ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}' NOSUPERUSER NOCREATEDB NOCREATEROLE;` });
+  // veritabanı — migrator sahipliğinde (CREATE DATABASE transaction-dışı; var mı diye bak)
   const exists = (psql(admin, null, { command: `SELECT 1 FROM pg_database WHERE datname='${esc(db)}';` }).stdout || '').includes('1');
-  if (!exists) psql(admin, null, { command: `CREATE DATABASE "${db}" OWNER "${appUser}";` });
-  const g = psql(admin, null, { command: `GRANT ALL PRIVILEGES ON DATABASE "${db}" TO "${appUser}";` });
+  if (!exists) psql(admin, null, { command: `CREATE DATABASE "${db}" OWNER "${migratorUser}";` });
+  else psql(admin, null, { command: `ALTER DATABASE "${db}" OWNER TO "${migratorUser}";` }); // eski tek-rol kurulumundan yükseltme
+  const g = psql(admin, null, { command: `GRANT CONNECT ON DATABASE "${db}" TO "${appUser}";` });
   return g.status === 0;
+}
+
+// db push/migrate SONRASI çağrılır — runtime rolüne yalnız DML yetkisi verir +
+// ALTER DEFAULT PRIVILEGES ile gelecekteki (bir sonraki db push'ta eklenen)
+// tablolar için de otomatik yetki devreder (elle tekrar grant gerekmez).
+// `conn` yeterli yetkiye sahip herhangi bir bağlantı olabilir (burada: superuser admin).
+function grantRuntimePrivileges(conn, { db, appUser, migratorUser }) {
+  const commands = [
+    `GRANT USAGE ON SCHEMA public TO "${appUser}";`,
+    `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${appUser}";`,
+    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "${appUser}";`,
+    `ALTER DEFAULT PRIVILEGES FOR ROLE "${migratorUser}" IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "${appUser}";`,
+    `ALTER DEFAULT PRIVILEGES FOR ROLE "${migratorUser}" IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "${appUser}";`,
+  ];
+  for (const command of commands) {
+    const r = psql({ host: conn.host, port: conn.port, user: conn.user, pass: conn.pass }, null, { db, command });
+    if (r.status !== 0) return false;
+  }
+  return true;
+}
+
+// Uygulama sunucusunun gelen trafiğini SSH + backend portuna kısıtlar — yalnız
+// operatör AÇIKÇA onaylarsa çalışır (varsayılan HAYIR), mevcut kuralları SİLMEZ,
+// yalnız ekler. Adım 0 madde 3: DB/Studio portu ASLA internete açık olmamalı.
+async function offerFirewallHardening(backendPort) {
+  head('Ağ sertleştirmesi (opsiyonel)');
+  if (!isWin && commandExists('ufw')) {
+    const yes = await askYN(
+      `ufw ile bu sunucuda gelen trafiği yalnız SSH(22) + backend portuna (${backendPort}) izin verecek şekilde kısıtlayalım mı? (Postgres/Prisma Studio portu dahil diğer HER ŞEY reddedilir — mevcut kurallar silinmez, yalnız eklenir)`,
+      false,
+    );
+    if (yes) {
+      run('sudo', ['ufw', 'allow', '22/tcp'], REPO);
+      run('sudo', ['ufw', 'allow', `${backendPort}/tcp`], REPO);
+      run('sudo', ['ufw', 'default', 'deny', 'incoming'], REPO);
+      run('sudo', ['ufw', '--force', 'enable'], REPO);
+      ok(`ufw etkin: yalnız 22 + ${backendPort} gelen trafiğe açık.`);
+    } else {
+      warn(`ufw atlandı. Elle: sudo ufw allow 22/tcp && sudo ufw allow ${backendPort}/tcp && sudo ufw default deny incoming && sudo ufw enable`);
+    }
+  } else if (isWin) {
+    const yes = await askYN(
+      `Windows Firewall ile gelen trafiği yalnız RDP/SSH(varsayılan) + backend portuna (${backendPort}) izin verecek şekilde kısıtlayalım mı? (mevcut kurallar silinmez, yalnız eklenir)`,
+      false,
+    );
+    if (yes) {
+      run('powershell', ['-NoProfile', '-Command', `New-NetFirewallRule -DisplayName 'Enflow-Backend' -Direction Inbound -Protocol TCP -LocalPort ${backendPort} -Action Allow`], REPO);
+      ok(`Windows Firewall kuralı eklendi: yalnız ${backendPort}/TCP (+ mevcut RDP/SSH kuralları) gelen trafiğe açık.`);
+      warn('Postgres portu (varsayılan 5432) için AYRI bir Inbound kural YOK — yalnız izin verilenler dışında her şey varsayılan Windows Firewall politikasına göre engellenir; "Genel" profilde varsayılanın "Bloke" olduğunu doğrulayın (Windows Defender Firewall → Özellikler).');
+    } else {
+      warn(`Atlandı. Elle: New-NetFirewallRule -DisplayName 'Enflow-Backend' -Direction Inbound -Protocol TCP -LocalPort ${backendPort} -Action Allow`);
+    }
+  } else {
+    warn('ufw bulunamadı (macOS/diğer) — güvenlik duvarını elle yapılandırın: yalnız SSH(22) ve backend portu ('
+      + backendPort + ') gelen trafiğe açık olmalı, Postgres (5432) ve Prisma Studio (5555) ASLA internete açılmamalı.');
+  }
 }
 
 // ── 0) Başlık ────────────────────────────────────────────────────────────────
@@ -121,7 +186,7 @@ log(`${C.b}${C.c}
 
 async function main() {
   // ── 1) Önkoşul denetimi ────────────────────────────────────────────────────
-  head('1/6 · Önkoşul denetimi');
+  head('1/7 · Önkoşul denetimi');
   const nodeV = process.versions.node;
   const major = Number(nodeV.split('.')[0]);
   if (major < 20) { err(`Node ${nodeV} — en az 20 gerekli (öneri: 22 LTS+).`); exit(1); }
@@ -148,7 +213,7 @@ async function main() {
   ok('Proje kökü doğrulandı');
 
   // ── 2) Yapılandırma ─────────────────────────────────────────────────────────
-  head('2/6 · Yapılandırma (boş bırakırsanız varsayılan)');
+  head('2/7 · Yapılandırma (boş bırakırsanız varsayılan)');
   const backendPort = await ask('Backend portu', '3002');
   const frontendPort = await ask('Frontend portu', '3000');
 
@@ -158,7 +223,7 @@ async function main() {
   // yalnız gerekçeli öneri (kullanıcı yine de "hayır" diyebilir).
   const SQLITE_MAX_USERS = 20;      // ~20 üzeri kullanıcıda eşzamanlı yazma çakışması belirginleşir
   const SQLITE_MAX_STORAGE_GB = 5;  // ikincil sinyal
-  head('2b/6 · Kapasite teyidi');
+  head('2b/7 · Kapasite teyidi');
   const expectedUsers = Number(await ask('Beklenen toplam kullanıcı sayısı?', '10')) || 10;
   const expectedStorageGB = Number(await ask('Yaklaşık 1 yıl içinde birikmesi beklenen veri (GB)?', '1')) || 1;
   const overCapacity = expectedUsers > SQLITE_MAX_USERS || expectedStorageGB > SQLITE_MAX_STORAGE_GB;
@@ -167,6 +232,7 @@ async function main() {
   }
 
   let dbUrl = 'file:./dev.db';
+  let migratorUrl = null; // yalnız usePg true ise dolar — db push/migrate deploy İÇİN, .env'e YAZILMAZ
   const usePg = await askYN('PostgreSQL kullanılsın mı? (Hayır = SQLite)', overCapacity);
   if (!usePg && overCapacity) {
     warn('SQLite ile devam ediliyor. Büyüdüğünüzde sorunsuz geçiş için: `pnpm migrate:to-postgres` (backend/ içinde).');
@@ -175,9 +241,19 @@ async function main() {
     const host = await ask('Postgres host', 'localhost');
     const port = await ask('Postgres port', '5432');
     const db = await ask('Veritabanı adı', 'enflow');
-    const appUser = await ask('Uygulama DB kullanıcısı (dbadmin)', 'enflow');
+    const appUser = await ask('Uygulama DB kullanıcısı (runtime, en az yetkili — yalnız SELECT/INSERT/UPDATE/DELETE)', 'enflow');
     let appPass = await ask('Uygulama DB şifresi (boş = otomatik üret)', '');
     if (!appPass) { appPass = secret(18); ok('Uygulama DB şifresi otomatik üretildi (özet sonunda gösterilecek).'); }
+    // Migrator rolü otomatik türetilir (elle sorulmaz) — yalnız kurulum/upgrade sırasında
+    // DDL için kullanılır, backend/.env'e asla yazılmaz (Adım 0 madde 5, en az yetki).
+    const migratorUser = `${appUser}_migrator`;
+    const migratorPass = secret(18);
+
+    if (host !== 'localhost' && host !== '127.0.0.1') {
+      warn(`UZAK Postgres sunucusu tespit edildi (${host}). Bu DB portu (${port}) ASLA genel internete açık olmamalı —`
+        + ' yalnız uygulama sunucusunun bulunduğu private network/VPC içinden erişilebilir olmalı. Doğrulama:');
+      log(`${C.dim}  nmap -p ${port} ${host}   ${C.y}# Beklenen: port kapalı/filtered (internetten)${C.r}`);
+    }
 
     // Superuser (postgres) — sunucu kurulumu + rol/DB oluşturmak için. Zaten kuruluysa
     // mevcut superuser bilgileri kullanılır; değilse winget ile kurulur.
@@ -188,16 +264,18 @@ async function main() {
     };
     const serverOk = await ensurePostgresServer(admin);
     if (serverOk) {
-      const provisioned = DRY ? true : provisionPostgresDb(admin, { db, appUser, appPass });
-      if (provisioned) ok(`PostgreSQL hazır: rol "${appUser}" + veritabanı "${db}" (mevcutsa korunur).`);
+      const provisioned = DRY ? true : provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass });
+      if (provisioned) ok(`PostgreSQL hazır: migrator rolü "${migratorUser}" (DDL) + runtime rolü "${appUser}" (DML-only) + veritabanı "${db}" (mevcutsa korunur).`);
       else warn('DB/rol otomatik oluşturulamadı — superuser bilgilerini/erişimi kontrol edip elle oluşturun.');
     } else {
-      warn('PostgreSQL sağlanamadı — .env yine de yazılır; sunucuyu hazırlayıp `pnpm prisma db push` çalıştırın.');
+      warn('PostgreSQL sağlanamadı — .env yine de yazılır; sunucuyu hazırlayıp `pnpm prisma db push` (migrator kimlik bilgileriyle) çalıştırın.');
     }
     dbUrl = `postgresql://${appUser}:${appPass}@${host}:${port}/${db}?schema=public`;
+    migratorUrl = `postgresql://${migratorUser}:${migratorPass}@${host}:${port}/${db}?schema=public`;
     setSchemaProvider('postgresql'); // Prisma provider'ını Postgres'e çevir
     // Özette gösterilecek not
-    globalThis.__pgSummary = { host, port, db, appUser, appPass, superuser: admin.user };
+    globalThis.__pgSummary = { host, port, db, appUser, appPass, migratorUser, migratorPass, superuser: admin.user };
+    globalThis.__pgGrant = { admin, db, appUser, migratorUser }; // 5/7'de db push sonrası grantRuntimePrivileges için
   } else {
     setSchemaProvider('sqlite'); // SQLite yolunda provider'ı geri al (önceki PG denemesi kalmışsa)
   }
@@ -215,7 +293,7 @@ async function main() {
   const aiModel = aiBase ? await ask('YZ Model (ops.)', '') : '';
 
   // ── 3) .env yaz ─────────────────────────────────────────────────────────────
-  head('3/6 · Ortam dosyaları');
+  head('3/7 · Ortam dosyaları');
   const envLines = [
     `PORT=${backendPort}`,
     `DATABASE_URL="${dbUrl}"`,
@@ -242,14 +320,17 @@ async function main() {
   }
 
   // ── 4) Bağımlılıklar ─────────────────────────────────────────────────────────
-  head('4/6 · Bağımlılık kurulumu (pnpm)');
+  head('4/7 · Bağımlılık kurulumu (pnpm)');
   run('pnpm', ['install'], REPO);
   run('pnpm', ['install'], join(REPO, 'backend'));
   ok('Bağımlılıklar kuruldu (frontend + backend)');
 
   // ── 5) Veritabanı ─────────────────────────────────────────────────────────────
-  head('5/6 · Veritabanı (Prisma)');
-  const env = { ...process.env, DATABASE_URL: dbUrl };
+  head('5/7 · Veritabanı (Prisma)');
+  // Postgres'te şema DDL'i (db push) migrator kimlik bilgileriyle çalışır — runtime
+  // (appUser) rolünün DDL yetkisi yok (en az yetki, Adım 0 madde 5). SQLite'ta tek
+  // rol kavramı olmadığı için dbUrl zaten doğrudan kullanılır.
+  const env = { ...process.env, DATABASE_URL: usePg ? migratorUrl : dbUrl };
   const prismaRun = (a) => {
     log(`${C.dim}  $ pnpm prisma ${a.join(' ')}${C.r}`);
     if (DRY) { log(`${C.y}  [dry-run] atlandı${C.r}`); return; }
@@ -275,8 +356,37 @@ async function main() {
   if (usePg) {
     // PostgreSQL: mevcut migration'lar SQLite lehçesinde → şema modellerden `db push`
     // ile kurulur (migration geçmişi yok). Postgres migration seti sonra üretilecek
-    // (bkz. install/POSTGRES_MIGRATION_PLAN.md).
+    // (bkz. install/POSTGRES_MIGRATION_PLAN.md). Migrator kimlik bilgileriyle (DDL).
     prismaRun(['db', 'push', '--accept-data-loss']);
+    // db push tabloları migrator sahipliğinde oluşturur — runtime rolüne (appUser)
+    // yalnız DML yetkisi verilir (+ gelecekteki tablolar için ALTER DEFAULT PRIVILEGES).
+    const grantInfo = globalThis.__pgGrant;
+    if (grantInfo && !DRY) {
+      const grantOk = grantRuntimePrivileges(grantInfo.admin, grantInfo);
+      if (grantOk) ok(`Runtime rolü "${grantInfo.appUser}" yalnız DML yetkisiyle yapılandırıldı (DDL/DROP/ALTER YOK).`);
+      else warn('Runtime yetkilendirmesi otomatik uygulanamadı — GRANT komutlarını elle çalıştırın (bkz. install/POSTGRES_MIGRATION_PLAN.md).');
+    }
+
+    // Row-Level Security (Faz 3, docs/VERITABANI_GUVENLIGI_PLAN.md) — DB-seviyesi
+    // tenant izolasyonu. HENÜZ gerçek bir Postgres'e karşı ucu-uca doğrulanmadı
+    // (yalnız kod incelemesi + tip kontrolü) — bilerek OPT-IN, varsayılan HAYIR.
+    if (!DRY) {
+      const applyRls = await askYN(
+        'PostgreSQL Row-Level Security (RLS) uygulansın mı? (DB seviyesinde tenant izolasyonu — YENİ, henüz gerçek bir Postgres\'e karşı ucu-uca doğrulanmadı; kabul ederseniz kurulum sonunda `pnpm verify:postgres-rls` çalıştırıp sonucu kontrol edin)',
+        false,
+      );
+      if (applyRls) {
+        log(`${C.dim}  $ pnpm apply:postgres-rls${C.r}`);
+        const r = spawnSync('pnpm', ['apply:postgres-rls'], {
+          cwd: join(REPO, 'backend'), stdio: 'inherit', shell: isWin,
+          env: { ...process.env, DATABASE_URL: migratorUrl },
+        });
+        if (r.status === 0) ok('RLS politikaları uygulandı. ÖNERİ: `cd backend && pnpm verify:postgres-rls` ile canlı doğrulayın.');
+        else warn('RLS uygulanamadı — elle: `cd backend && DATABASE_URL=<migrator-url> pnpm apply:postgres-rls`.');
+      } else {
+        warn('RLS atlandı. Tenant izolasyonu yalnız uygulama katmanında (mevcut davranış). Sonradan: `cd backend && DATABASE_URL=<migrator-url> pnpm apply:postgres-rls`.');
+      }
+    }
   } else {
     prismaRun(['migrate', 'deploy']);
   }
@@ -286,8 +396,17 @@ async function main() {
   // tarayıcıdaki Kurulum Sihirbazı şirket + ilk yönetici + lisansı tanımlasın.
   // (Yedek Yöneticisi gibi ek kullanıcılar sonradan Ayarlar → Kullanıcılar'dan eklenir.)
 
-  // ── 6) Derleme (opsiyonel — üretim) ────────────────────────────────────────────
-  head('6/6 · Frontend derleme');
+  // ── 6) Ağ sertleştirmesi (opsiyonel — Adım 0 madde 3) ──────────────────────────
+  head('6/7 · Ağ sertleştirmesi');
+  await offerFirewallHardening(backendPort);
+  if (usePg) {
+    log(`${C.dim}  Postgres portu (${globalThis.__pgSummary?.port}) yalnız uygulama sunucusunun private`
+      + ` network'ünden erişilebilir olmalı — genel internete ASLA açılmamalı.${C.r}`);
+  }
+  warn('`npx prisma studio` bu sunucuda ASLA çalıştırılmamalı — yalnız yerel geliştirmede kullanın (uzaktan bakmak gerekiyorsa SSH tüneli kullanın).');
+
+  // ── 7) Derleme (opsiyonel — üretim) ────────────────────────────────────────────
+  head('7/7 · Frontend derleme');
   const build = await askYN('Frontend üretim derlemesi (pnpm build → dist) yapılsın mı?', true);
   if (build) { run('pnpm', ['build'], REPO); ok('Frontend derlendi → dist/'); }
   else warn('Derleme atlandı (geliştirme modunda `pnpm dev` kullanın).');
@@ -319,10 +438,15 @@ ${C.dim}(Kabuk: ${py})${C.r}`);
 ${C.b}${C.y}PostgreSQL — DB erişim bilgileri (GÜVENLE SAKLAYIN):${C.r}
   Sunucu    : ${pg.host}:${pg.port}
   Veritabanı: ${pg.db}
-  DB kullanıcı (dbadmin): ${pg.appUser}
-  DB şifre  : ${C.b}${pg.appPass}${C.r}
-  ${C.dim}Bu bilgiler backend/.env → DATABASE_URL içinde de var. Şema "db push" ile kuruldu
-  (Postgres migration seti sonra: install/POSTGRES_MIGRATION_PLAN.md).${C.r}`);
+  ${C.b}Runtime rolü${C.r} (backend/.env → DATABASE_URL bunu kullanır; yalnız DML — SELECT/INSERT/UPDATE/DELETE):
+    Kullanıcı: ${pg.appUser}
+    Şifre    : ${C.b}${pg.appPass}${C.r}
+  ${C.b}Migrator rolü${C.r} (DDL — yalnız gelecekteki şema güncellemelerinde/upgrade'de kullanılır, .env'de YOK):
+    Kullanıcı: ${pg.migratorUser}
+    Şifre    : ${C.b}${pg.migratorPass}${C.r}
+  ${C.dim}Migrator şifresini de güvenle saklayın — bir sonraki \`prisma db push\`/şema güncellemesi
+  için gerekecek (bkz. install/POSTGRES_MIGRATION_PLAN.md). Postgres portu (${pg.port}) ASLA
+  genel internete açılmamalı.${C.r}`);
   }
 }
 

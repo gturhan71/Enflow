@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { advanceProcess, ProcessNotConfiguredError, entityExists, ENTITY_TYPES } from '../services/processEngine';
@@ -128,7 +128,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
     return res.status(400).json({ error: `Geçersiz hedef kaydı türü: ${entityType}` });
   }
 
-  const updatedWorkflow = await prisma.$transaction(async (tx) => {
+  const updatedWorkflow = await runManagedTransaction(async (tx) => {
     await tx.workflowStep.deleteMany({ where: { workflowId: id } });
 
     return tx.workflow.update({
@@ -202,10 +202,10 @@ router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: R
     }
   }
 
-  await prisma.$transaction([
-    prisma.workflowStep.deleteMany({ where: { workflowId: id } }),
-    prisma.workflow.delete({ where: { id } }),
-  ]);
+  await runManagedTransaction(async (tx) => {
+    await tx.workflowStep.deleteMany({ where: { workflowId: id } });
+    await tx.workflow.delete({ where: { id } });
+  });
   await logActivity({ tenantId, userId: req.userId, action: 'DELETE', entityType: 'WORKFLOW', entityId: id, details: { name: record.name, processKey: record.processKey } });
   res.json({ success: true });
 }));

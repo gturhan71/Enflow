@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { scoreQuotes } from '../services/virtualAgentService';
@@ -412,7 +412,7 @@ router.put('/:id/quotes/:qid', asyncHandler(async (req: Request, res: Response) 
   const lines = Array.isArray(items) ? items.filter(i => i.purchaseItemId && i.quantity > 0 && i.unitPrice >= 0) : null;
   const resolvedTotal = lines && lines.length > 0 ? sumQuoteLines(lines) : Number(totalAmount);
 
-  await prisma.$transaction(async (tx) => {
+  await runManagedTransaction(async (tx) => {
     if (lines) {
       await tx.purchaseQuoteItem.deleteMany({ where: { purchaseQuoteId: qid } });
       if (lines.length > 0) {

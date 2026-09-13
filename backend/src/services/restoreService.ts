@@ -10,7 +10,8 @@ import os from 'os';
 import path from 'path';
 import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
+import { runWithRlsBypass } from './tenantContext';
 import { LocalTarget, NextcloudTarget, S3Target, BackupTarget, BACKUPS_ROOT, ensureDir } from './backupTargets';
 import { runBackup, getBackupSettings, listModels, detectProvider, ModelMeta, DbProvider } from './backupService';
 
@@ -266,10 +267,13 @@ export async function applyLogicalRestore(restoreId: string, actor?: { id?: stri
   // Tek transaction (tek bağlantı) — SQLite'ta defer_foreign_keys, Postgres'te
   // döngüsel-alan-null+geri-yazma stratejisiyle sil/yeniden-yükle sırasından
   // bağımsız çalışır (bkz. loadModelsIntoTarget, provider-farkında).
-  const restored = await prisma.$transaction(
+  // Geri yükleme, potansiyel olarak birden çok tenant'ın verisini yeniden
+  // yazan idari bir işlemdir (`scope`/`scopeTenant` — tam veya tenant-bazlı
+  // olabilir) — Postgres RLS (Faz 3) için kasıtlı bypass gerekir.
+  const restored = await runWithRlsBypass(() => runManagedTransaction(
     (tx) => loadModelsIntoTarget(tx as unknown as TxLike, payload.data, detectProvider(), scope, scopeTenant),
     { timeout: 120_000, maxWait: 15_000 },
-  );
+  ));
 
   await prisma.restoreJob.update({
     where: { id: restoreId },

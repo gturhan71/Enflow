@@ -62,13 +62,17 @@ PowerShell ile elle:
 
 1. **Önkoşul denetimi** — Node ≥ 20, git, pnpm (yoksa corepack ile kurar).
 2. **Yapılandırma** — backend/frontend portu, kapasite teyidi (beklenen kullanıcı sayısı
-   + yıllık veri hacmi → eşik aşılırsa PostgreSQL önerilir), veritabanı (SQLite/PostgreSQL),
-   `AUTH_JWT_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
-3. **Ortam dosyaları** — `backend/.env` yazılır.
+   + yıllık veri hacmi → eşik aşılırsa PostgreSQL önerilir), veritabanı (SQLite/PostgreSQL —
+   Postgres seçilirse **iki rol** oluşturulur: DDL yetkili `migrator` + DML-only `runtime`,
+   bkz. Güvenlik bölümü), `AUTH_JWT_SECRET` (güvenli rastgele üretilir), opsiyonel YZ.
+3. **Ortam dosyaları** — `backend/.env` yazılır (runtime DB rolüyle — migrator kimlik
+   bilgileri `.env`'e yazılmaz, yalnız kurulum özetinde bir kez gösterilir).
 4. **Bağımlılıklar** — `pnpm install` (frontend + backend).
-5. **Veritabanı** — `prisma generate` + `prisma migrate deploy`; opsiyonel
-   `backup_admin` (Yedek Yöneticisi) kullanıcısı.
-6. **Derleme** — opsiyonel `pnpm build` (üretim için `dist/`).
+5. **Veritabanı** — `prisma generate` + `prisma migrate deploy` (SQLite) /
+   `prisma db push` (Postgres, migrator kimlik bilgileriyle) + runtime rolüne DML-only GRANT.
+6. **Ağ sertleştirmesi** — DB/Studio port maruziyeti uyarısı + opsiyonel (onaylı) ufw/Windows
+   Firewall kısıtlaması.
+7. **Derleme** — opsiyonel `pnpm build` (üretim için `dist/`).
 
 Bittiğinde başlatma komutlarını ekrana yazar.
 
@@ -110,7 +114,12 @@ içinde `install.sh`, `install.ps1`, `wizard.mjs`, `README.md`, `.env.example`.
 Varsayılan SQLite'tır. PostgreSQL için sihirbazda "PostgreSQL kullanılsın mı?" → Evet
 seçin (kapasite eşiği aşıldığında sihirbaz bunu zaten varsayılan öneri yapar) —
 `schema.prisma` provider'ı ve rol/DB provizyonu **otomatik** yapılır, elle düzenleme
-gerekmez. Mevcut bir SQLite kurulumunu sonradan taşımak için: `cd backend && pnpm
+gerekmez. Sihirbaz **iki rol** oluşturur: `<kullanıcı>_migrator` (DB owner, DDL —
+yalnız kurulum/şema güncellemesinde kullanılır) ve asıl `DATABASE_URL`'in kullandığı
+**runtime rolü** (yalnız DML — SELECT/INSERT/UPDATE/DELETE, DROP/ALTER/CREATE ROLE
+yok). Migrator şifresi yalnız kurulum özetinde bir kez gösterilir, güvenle saklayın —
+gelecekteki bir şema güncellemesinde (bkz. aşağıdaki not) yeniden gerekecek. Mevcut
+bir SQLite kurulumunu sonradan taşımak için: `cd backend && pnpm
 migrate:to-postgres` (bkz. [`POSTGRES_MIGRATION_PLAN.md`](POSTGRES_MIGRATION_PLAN.md)).
 
 ---
@@ -136,3 +145,27 @@ migrate:to-postgres` (bkz. [`POSTGRES_MIGRATION_PLAN.md`](POSTGRES_MIGRATION_PLA
 - API anahtarları (YZ, S3, Nextcloud) yalnız sunucuda/`.env`'de tutulur; uygulama
   içi YZ entegrasyonu tenant-bazlı ve maskelidir.
 - Yedek dosyaları web kökü dışındadır; indirme yalnız yetkili (Backup Admin/GM).
+
+### Veritabanı ve Prisma Studio Erişimi
+
+Tek-kaynak plan/gerekçe: [`docs/VERITABANI_GUVENLIGI_PLAN.md`](../docs/VERITABANI_GUVENLIGI_PLAN.md).
+
+- **`npx prisma studio`'yu prod sunucusunda ASLA çalıştırmayın.** Yalnız yerel
+  geliştirmede kullanın. Uzak sunucudaki veriye bakmanız gerekiyorsa SSH tüneli açın
+  (`ssh -L 5555:localhost:5555 kullanici@sunucu`) ve Studio'yu sunucuda `--hostname
+  0.0.0.0` gibi bir seçenekle **asla dışa açmayın** — tünel yalnız sizin makinenizden
+  bağlanır, port dışarıya hiç açılmaz.
+- **Postgres kullanan kurulumlarda DB portu (varsayılan 5432) internete KAPALI
+  olmalı** — yalnız uygulama sunucusunun bulunduğu private network/VPC'den erişilebilir.
+  Sihirbaz (`wizard.mjs`) kurulum sonunda bunu ufw (Linux) veya Windows Firewall ile
+  **onayınızla** (varsayılan hayır) uygulayabilir; onaylamazsanız ekrana yazdığı komutları
+  elle çalıştırın.
+- `prisma` CLI backend `devDependencies`'te (prod bağımlılığı değil) — ama backend
+  prod'da da derlenmemiş `ts-node` ile çalıştığı için `devDependencies` prod host'tan
+  kaldırılamıyor (bilinçli, dokümante edilmiş sınır — bkz. plan). Gerçek koruma CLI'yi
+  silmek değil, **ağ izolasyonu** + aşağıdaki en-az-yetkili DB kullanıcısı.
+- Postgres kurulumunda sihirbaz **iki ayrı rol** oluşturur: `<kullanıcı>_migrator`
+  (DDL — yalnız kurulum/şema güncellemesinde kullanılır, `.env`'e yazılmaz) ve asıl
+  `DATABASE_URL` içindeki **runtime rolü** (yalnız SELECT/INSERT/UPDATE/DELETE —
+  DROP/ALTER/CREATE ROLE yetkisi yok). Uygulama bu ayrım sayesinde bir güvenlik açığında
+  bile şemayı değiştiremez.

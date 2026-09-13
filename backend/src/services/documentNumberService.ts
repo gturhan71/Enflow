@@ -1,4 +1,4 @@
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 
 /**
  * Özgün, tenant-yapılandırılabilir doküman numarası üretir (Faz 3).
@@ -26,7 +26,7 @@ export async function incrementDocumentSequence(
   categoryCode: string,
   year: number
 ): Promise<number> {
-  return prisma.$transaction(async (tx) => {
+  return runManagedTransaction(async (tx) => {
     const existing = await tx.documentSequence.findUnique({
       where: { tenantId_categoryCode_year: { tenantId, categoryCode, year } },
     });

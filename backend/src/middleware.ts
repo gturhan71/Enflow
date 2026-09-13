@@ -3,6 +3,7 @@ import { timingSafeEqual } from 'crypto';
 import { prisma } from './prismaClient';
 import { verifyAuthToken } from './services/auth';
 import { logger } from './utils/logger';
+import { runWithTenant, runWithRlsBypass } from './services/tenantContext';
 
 // eslint-disable-next-line @typescript-eslint/ban-types
 export const asyncHandler = (fn: Function) => (req: Request, res: Response, next: NextFunction) => {
@@ -28,10 +29,12 @@ export const tenantMiddleware = asyncHandler(async (req: Request, res: Response,
   if (!payload) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum.' });
 
   // Kullanıcı hâlâ mevcut ve aktif mi? (token iptali/rol değişimi için canlı kontrol)
-  const user = await prisma.user.findUnique({
+  // Tenant henüz context'te DEĞİL (bunu bulmak için sorguyu çalıştırıyoruz) — Postgres
+  // RLS'in (Faz 3) bu tek sorguyu 0 satıra düşürmemesi için kasıtlı bypass gerekir.
+  const user = await runWithRlsBypass(() => prisma.user.findUnique({
     where: { id: payload.sub },
     select: { id: true, tenantId: true, role: true, status: true },
-  });
+  }));
   if (!user || user.status !== 'ACTIVE' || user.tenantId !== payload.tid) {
     return res.status(401).json({ error: 'Oturum geçersiz.' });
   }
@@ -45,7 +48,9 @@ export const tenantMiddleware = asyncHandler(async (req: Request, res: Response,
   req.userId = user.id;
   req.userRole = user.role;
   req.tenantId = user.tenantId; // yetkili kaynak: imzalı token → DB doğrulaması
-  next();
+  // Bu noktadan sonra istek zincirindeki (route handler'lar dahil) TÜM Prisma
+  // sorguları Postgres RLS ile bu tenant'a kısıtlanır (Faz 3, prismaClient.ts).
+  runWithTenant(user.tenantId, next);
 });
 
 // Salt-okunur roller: hiçbir modülde/veride mutasyon yapamaz.
@@ -101,7 +106,9 @@ export const platformApiKeyMiddleware = asyncHandler(async (req: Request, res: R
   if (a.length !== b.length || !timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Geçersiz API anahtarı.' });
   }
-  next();
+  // Bu uç tasarım gereği cross-tenant (dış triage aracı tüm tenant'ları okur/yazar) —
+  // Postgres RLS (Faz 3) bu istek zincirinde kasıtlı olarak bypass edilir.
+  runWithRlsBypass(next);
 });
 
 // Eklenti/lisans koruması: modül ayrı lisanslıysa (PLUGIN_CATALOG) entitlement zorunlu.

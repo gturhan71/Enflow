@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../prismaClient';
+import { prisma, runManagedTransaction } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole, withRetry } from '../middleware';
 import { resetApprovalChain, resolveEffectiveApprover } from '../services/approvalChainService';
 import { advanceProcess, ProcessNotConfiguredError } from '../services/processEngine';
@@ -332,7 +332,7 @@ router.post('/:id/bom', tenantMiddleware, asyncHandler(async (req: Request, res:
     }
   }
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await runManagedTransaction(async (tx) => {
     await tx.boMItem.deleteMany({ where: { opportunityId } });
 
     const created = [];
@@ -440,7 +440,7 @@ router.post('/:id/costs', tenantMiddleware, asyncHandler(async (req: Request, re
   const tenantId = req.tenantId;
   const { items } = req.body;
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await runManagedTransaction(async (tx) => {
     await tx.costItem.deleteMany({ where: { opportunityId, tenantId } });
     const created = [];
     for (const item of items) {
@@ -495,7 +495,7 @@ router.post('/:id/cost-analysis', tenantMiddleware, asyncHandler(async (req: Req
   const marginFloorPct = await getSalesMarginFloor(tenantId);
   const result = computeSalesCosting({ bomItems, manualCostItems, costConfig, marginFloorPct });
 
-  const bomResult = await prisma.$transaction(async (tx) => {
+  const bomResult = await runManagedTransaction(async (tx) => {
     await tx.boMItem.deleteMany({ where: { opportunityId } });
     const created = [];
     for (const item of result.pricedBomItems) {

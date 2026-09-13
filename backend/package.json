@@ -11,6 +11,8 @@
     "test:unit": "vitest run",
     "sync:roles": "ts-node --transpile-only src/scripts/syncRolePermissions.ts",
     "migrate:to-postgres": "ts-node --transpile-only src/scripts/migrateToPostgres.ts",
+    "apply:postgres-rls": "ts-node --transpile-only src/scripts/apply-postgres-rls.ts",
+    "verify:postgres-rls": "ts-node --transpile-only src/scripts/verify-postgres-rls.ts",
     "test:load": "node scripts/loadtest/mixed-read.mjs",
     "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts"
   },
