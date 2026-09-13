@@ -27,7 +27,7 @@ export interface Tender {
   ikn?: string | null;
   authority?: string | null;
   method: 'OPEN' | 'RESTRICTED' | 'NEGOTIATED' | 'DIRECT' | 'PRIVATE';
-  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED' | 'WITHDRAWN';
+  status: 'DRAFT' | 'PREPARING' | 'SUBMITTED' | 'EVALUATING' | 'WON' | 'LOST' | 'CANCELLED' | 'WITHDRAWN' | 'HOLD';
   submissionDeadline?: string | null;
   submittedAt?: string | null;
   withdrawnAt?: string | null;

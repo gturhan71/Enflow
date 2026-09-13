@@ -134,6 +134,17 @@ const TodoModule = ({
     }
   };
 
+  // Birim yöneticisinin, henüz kimseye atanmamış bir birim görevini kendi
+  // personelinden birine ataması ("Personel Ata") — bkz. TaskList.tsx.
+  const handleAssignTask = async (taskId: string, userId: string) => {
+    try {
+      const updated = await apiService.updateTask(taskId, { assignedToUserId: userId });
+      setTasks(tasks.map(t => t.id === taskId ? updated : t));
+    } catch (err) {
+      alert('Personel atanamadı.');
+    }
+  };
+
   const approveProposalTask = async (task: TodoTask) => {
     await handleStatusChange(task.id, 'COMPLETED');
     await apiService.updateProposal(task.relatedItemId!, { status: 'APPROVED' });
@@ -232,6 +243,7 @@ const TodoModule = ({
           currentUserId={currentUser?.id}
           onNavigate={onNavigate}
           onToggleStatus={handleStatusChange}
+          onAssign={handleAssignTask}
         />
       </div>
 

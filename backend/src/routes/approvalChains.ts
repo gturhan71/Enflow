@@ -350,6 +350,26 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
         },
       }).catch(() => undefined);
       await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TECH_EVAL_REJECTED', entityType: 'OPPORTUNITY', entityId: opp.id, details: { note } });
+
+      // Presales'in teknik değerlendirmeyi reddetmesi, fırsata bağlı bir ihale
+      // dosyası da varsa (bkz. opportunities.ts otomatik ihale tetikleyicisi)
+      // o dosyanın hazırlığını durdurmalı — henüz sonuçlanmamış (DRAFT/PREPARING)
+      // bir dosya varsa HOLD'a alınır; Satış Destek birimi gerekçeyle bilgilendirilir.
+      // Sonuçlanmış (SUBMITTED/WON/LOST/CANCELLED/WITHDRAWN) bir dosyaya dokunulmaz.
+      const linkedTender = await prisma.tender.findFirst({ where: { tenantId: req.tenantId, opportunityId: opp.id } });
+      if (linkedTender && ['DRAFT', 'PREPARING'].includes(linkedTender.status)) {
+        const holdNote = `[BEKLEMEDE — ${new Date().toLocaleDateString('tr-TR')}] Presales teknik değerlendirmeyi reddetti: ${note}`;
+        await prisma.tender.update({
+          where: { id: linkedTender.id },
+          data: { status: 'HOLD', notes: linkedTender.notes ? `${linkedTender.notes}\n\n${holdNote}` : holdNote },
+        });
+        const supportUsers = await prisma.user.findMany({ where: { tenantId: req.tenantId, role: 'SALES_SUPPORT', status: 'ACTIVE' } });
+        const holdMsg = `"${opp.title}" ihale dosyası beklemeye alındı — Presales teknik değerlendirmeyi reddetti. Gerekçe: ${note}`;
+        await Promise.all(supportUsers.map((u) =>
+          prisma.notification.create({ data: { tenantId: req.tenantId, userId: u.id, type: 'WARNING', title: 'İhale dosyası beklemede', message: holdMsg, relatedModule: ENTITY_TYPE_TAB.TENDER, relatedItemId: linkedTender.id } }).catch(() => undefined)
+        ));
+        await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'TENDER_HOLD', entityType: 'TENDER', entityId: linkedTender.id, details: { reason: note, opportunityId: opp.id } });
+      }
     }
   }
 

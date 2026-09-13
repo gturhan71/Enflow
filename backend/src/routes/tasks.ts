@@ -97,6 +97,16 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const record = await prisma.todoTask.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
 
+  // "Personel Ata" (bkz. TaskList.tsx) — yalnız GM, görevin birim yöneticisi ya
+  // da görevi oluşturan kişi, atanmamış bir görevi birimden birine atayabilir.
+  if (rest.assignedToUserId !== undefined && rest.assignedToUserId !== record.assignedToUserId) {
+    const actor = req.userId ? await prisma.user.findUnique({ where: { id: req.userId }, select: { role: true, unitId: true } }) : null;
+    const unit = await prisma.unit.findFirst({ where: { id: record.unitId, tenantId }, select: { managerId: true } });
+    const isManager = !!actor?.unitId && actor.unitId === record.unitId && unit?.managerId === req.userId;
+    const isAllowed = actor?.role === 'GENERAL_MANAGER' || isManager || record.assignedBy === req.userId;
+    if (!isAllowed) return res.status(403).json({ error: 'Bu görevi başka birine atama yetkiniz yok.' });
+  }
+
   const data: Record<string, unknown> = { ...rest };
   if (dueDate) data.dueDate = new Date(dueDate as string);
   if (progressNotes !== undefined) {
@@ -109,6 +119,21 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   else if (rest.status && rest.status !== 'COMPLETED' && record.status === 'COMPLETED') data.completedAt = null;
   const task = await prisma.todoTask.update({ where: { id }, data });
   await logActivity({ tenantId, userId: req.userId, action: rest.status && rest.status !== record.status ? `STATUS_${rest.status}` : 'UPDATE', entityType: 'TASK', entityId: id, details: { title: task.title, status: task.status } });
+
+  // "Personel Ata" ile atanan kişiye bildirim (POST'taki atama bildirimiyle simetrik).
+  if (task.assignedToUserId && task.assignedToUserId !== record.assignedToUserId && task.assignedToUserId !== req.userId) {
+    await prisma.notification.create({
+      data: {
+        tenantId,
+        userId: task.assignedToUserId,
+        type: 'TASK',
+        title: 'Size bir görev atandı',
+        message: task.title,
+        relatedModule: targetTab(task.actionKey, task.relatedModule),
+        relatedItemId: task.relatedItemId,
+      },
+    }).catch(() => {});
+  }
   res.json(task);
 }));
 

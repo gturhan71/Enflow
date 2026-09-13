@@ -129,19 +129,40 @@ router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (r
     }).catch(() => null);
     autoTenderCreated = !!tender;
 
-    const salesSupport = await prisma.user.findFirst({ where: { tenantId, role: 'SALES_SUPPORT' } });
+    // Tek bir kullanıcı yerine BİRİMİN TAMAMI bilgilendirilir (findFirst→findMany) —
+    // eskiden bildirim rastgele/ilk bulunan tek Satış Destek kullanıcısına gidiyordu,
+    // birimde birden fazla personel varsa diğerleri hiç haberdar olmuyordu.
+    const supportUsers = await prisma.user.findMany({ where: { tenantId, role: 'SALES_SUPPORT', status: 'ACTIVE' } });
     const label = METHOD_LABELS[procurementMethod] || procurementMethod;
     const dateStr = bidDate ? bidDate.toLocaleDateString('tr-TR') : 'belirtilmedi';
-    await notify(tenantId, salesSupport?.id, 'Yeni fırsat takibi', `"${title}" — usul: ${label}, son teklif: ${dateStr}. İhale/dosya hazırlığını başlatın.`, 'INFO');
+    const supportMsg = `"${title}" — usul: ${label}, son teklif: ${dateStr}. İhale/dosya hazırlığını başlatın.`;
+    await Promise.all(supportUsers.map((u) => notify(tenantId, u.id, 'Yeni fırsat takibi', supportMsg, 'INFO')));
+
     // Faz D düzeltmesi — eskiden SALES_SUPPORT rolünde aktif kimse yoksa görev
     // yine de sahte bir unitId ('unit_sales_support') ile oluşuyordu, hiçbir
     // gerçek birime karşılık gelmediği için kimseye görünmüyordu (T4 öncesi
     // hatasıyla aynı sınıf). Artık yalnız gerçek bir birim çözülebiliyorsa oluşur.
-    if (salesSupport?.unitId) {
+    // SALES_SUPPORT personeli birden fazla birime dağılmışsa (ör. bir kısmı genel
+    // "Satış & Pazarlama" biriminde) varsayılan şablon adı "Satış Destek" olan
+    // birim tercih edilir — aksi halde görev, dosyayla ilgisiz bir birime
+    // (ör. fırsatı açan satış temsilcisinin de üyesi olduğu birime) düşebilirdi.
+    const candidateUnitIds = [...new Set(supportUsers.map((u) => u.unitId).filter((id): id is string => !!id))];
+    let supportUnit: { id: string; managerId: string | null } | null = null;
+    if (candidateUnitIds.length > 0) {
+      const candidateUnits = await prisma.unit.findMany({ where: { id: { in: candidateUnitIds }, tenantId }, select: { id: true, name: true, managerId: true } });
+      supportUnit = candidateUnits.find((u) => u.name === 'Satış Destek') || candidateUnits[0] || null;
+    }
+    if (supportUnit) {
+      // Birimin bir yöneticisi (Unit.managerId) varsa görev KİŞİ ATANMADAN
+      // (assignedToUserId=null) oluşur — bu durumda tüm birim üyeleri görevi
+      // görür, yönetici "Personel Ata" ile ilgilenecek kişiyi seçer. Yönetici
+      // yoksa görev, SEÇİLEN BİRİMDEKİ ilk aktif Satış Destek personeline atanır.
+      const unitSupportUsers = supportUsers.filter((u) => u.unitId === supportUnit!.id);
+      const fallbackAssignee = supportUnit.managerId ? null : (unitSupportUsers[0]?.id ?? null);
       await prisma.todoTask.create({ data: {
         title: `İhale dosyası: ${title}`,
         description: `Fırsat ${label} usulüyle teklife dönüşecek (son teklif: ${dateStr}). Dosya hazırlığını teklifle paralel yürütün.`,
-        unitId: salesSupport.unitId, assignedBy: finalCreatedById, tenantId,
+        unitId: supportUnit.id, assignedBy: finalCreatedById, assignedToUserId: fallbackAssignee, tenantId,
         // actionKey=TENDER_FILE_PREP → "Git" butonu sales-support'a (İhale/İSAB
         // ekranı) gider, relatedModule=OPPORTUNITY fallback'inin götürdüğü
         // crm-opportunities'e değil (iş fiilen orada yapılıyor).

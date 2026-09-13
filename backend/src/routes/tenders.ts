@@ -19,6 +19,9 @@ const router: Router = Router();
 // deseniyle aynı: yalnız bu belirli statü geçişi için sabit bir rol kısıtlaması;
 // dosyanın geri kalanı — checklist, evrak, diğer alan güncellemeleri — serbest kalır).
 const WON_TRANSITION_ROLES = ['GENERAL_MANAGER', 'ISAB_MGR', 'SALES_MGR'];
+// HOLD (Presales teknik değerlendirmeyi reddettiğinde otomatik) yalnız bu roller
+// tarafından kaldırılabilir — yeniden başlatma kararı insan onayına bırakılır.
+const HOLD_RELEASE_ROLES = ['GENERAL_MANAGER', 'SALES_MGR'];
 
 const TENDER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/tenders');
 const tenderUpload = documentUpload(50);
@@ -122,6 +125,11 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   // Süreç Motoru (Faz B) — WON geçişi hem rol-kısıtlı hem de (artık) tenant'ın
   // İş Akışı Tasarımcısı'nda kurguladığı TENDER_TO_CONTRACT sürecine bağlı.
   // İkisi de durum kalıcı yazılmadan ÖNCE kontrol edilir (yarım-yazma riski yok).
+  const leavingHold = record.status === 'HOLD' && status !== undefined && status !== 'HOLD';
+  if (leavingHold && !HOLD_RELEASE_ROLES.includes(req.userRole || '')) {
+    return res.status(403).json({ error: 'Beklemedeki bir ihale dosyasını yalnız Genel Müdür veya Satış Müdürü aktif hale getirebilir.' });
+  }
+
   const becomingWon = record.status !== 'WON' && status === 'WON' && !record.contractWorkflowId;
   if (becomingWon) {
     if (!WON_TRANSITION_ROLES.includes(req.userRole || '')) {

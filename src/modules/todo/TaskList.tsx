@@ -36,7 +36,7 @@ const bySeverityThenPriority = (a: TodoTask, b: TodoTask) =>
 
 // ── Tek satırlık görev — tıklayınca satır içi detay açılır ────────────────────
 function TaskRow({
-  todo, units, users, getRelatedItemName, onNavigate, onToggleStatus, expanded, onToggleExpand,
+  todo, units, users, getRelatedItemName, onNavigate, onToggleStatus, expanded, onToggleExpand, currentUserId, onAssign,
 }: {
   todo: TodoTask;
   units?: Unit[];
@@ -46,11 +46,19 @@ function TaskRow({
   onToggleStatus: (taskId: string, newStatus: TodoTask['status']) => void;
   expanded: boolean;
   onToggleExpand: () => void;
+  currentUserId?: string;
+  onAssign?: (taskId: string, userId: string) => void;
 }) {
   const dl = daysUntil(todo.dueDate);
   const badge = dleftBadge(dl);
   const relName = todo.relatedModule && todo.relatedModule !== 'GENERAL' ? getRelatedItemName(todo) : '';
   const target = taskTargetTab(todo);
+  // Görev henüz kimseye atanmamışsa (bkz. backend: assignedToUserId=null →
+  // birim geneline görünür) ve oturum sahibi bu birimin yöneticisiyse
+  // ("Personel Ata") ilgilenecek personeli seçebilir.
+  const taskUnit = units?.find(u => u.id === todo.unitId);
+  const isUnitManager = !!currentUserId && !!taskUnit?.managerId && taskUnit.managerId === currentUserId;
+  const unitStaff = users?.filter(u => u.unitId === todo.unitId) || [];
 
   return (
     <motion.div layout className="rounded-2xl border border-slate-100 bg-white overflow-hidden">
@@ -109,6 +117,20 @@ function TaskRow({
                 <UserCircle size={13} /> {users?.find(u => u.id === todo.assignedToUserId)?.name || 'Atanan kişi'}
               </span>
             )}
+            {!todo.assignedToUserId && isUnitManager && onAssign && (
+              <label className="flex items-center gap-2 text-[10px] text-amber-700 font-black uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-amber-200">
+                <UserCircle size={13} /> Personel Ata
+                <select
+                  defaultValue=""
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => { if (e.target.value) onAssign(todo.id, e.target.value); }}
+                  className="ml-1 text-[10px] font-bold uppercase bg-transparent outline-none"
+                >
+                  <option value="" disabled>Seç…</option>
+                  {unitStaff.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </label>
+            )}
             {relName && (
               <span className="flex items-center gap-2 text-[10px] text-indigo-600 font-black uppercase tracking-widest bg-white px-3 py-1 rounded-lg border border-indigo-100">
                 <Target size={13} /> {(RELATED_MODULE_LABEL[todo.relatedModule!] || todo.relatedModule)}: {relName}
@@ -159,6 +181,7 @@ export default function TaskList({
   currentUserId,
   onNavigate,
   onToggleStatus,
+  onAssign,
 }: {
   units?: Unit[];
   filterUnit: string;
@@ -169,6 +192,7 @@ export default function TaskList({
   currentUserId?: string;
   onNavigate?: (tab: string, itemId?: string | null) => void;
   onToggleStatus: (taskId: string, newStatus: TodoTask['status']) => void;
+  onAssign?: (taskId: string, userId: string) => void;
 }) {
   const [showCompleted, setShowCompleted] = useState(false);
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
@@ -259,7 +283,7 @@ export default function TaskList({
   }, [activeSorted]);
 
   const rowProps = (todo: TodoTask) => ({
-    todo, units, users, getRelatedItemName, onNavigate, onToggleStatus,
+    todo, units, users, getRelatedItemName, onNavigate, onToggleStatus, currentUserId, onAssign,
     expanded: expandedTaskId === todo.id,
     onToggleExpand: () => setExpandedTaskId(expandedTaskId === todo.id ? null : todo.id),
   });

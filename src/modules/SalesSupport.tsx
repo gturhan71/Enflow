@@ -49,6 +49,7 @@ const METHOD_LABELS: Record<string, string> = {
 const STATUS_LABELS: Record<string, string> = {
   DRAFT: 'Taslak', PREPARING: 'Hazırlık', SUBMITTED: 'Teklif Verildi', EVALUATING: 'Değerlendirme',
   WON: 'Kazanıldı', LOST: 'Kaybedildi', CANCELLED: 'İptal', WITHDRAWN: 'İştirak Edilmedi',
+  HOLD: 'Beklemede',
 };
 const STATUS_STYLES: Record<string, string> = {
   DRAFT: 'bg-slate-100 text-slate-600 border-slate-200',
@@ -59,6 +60,14 @@ const STATUS_STYLES: Record<string, string> = {
   LOST: 'bg-red-100 text-red-700 border-red-200',
   CANCELLED: 'bg-slate-100 text-slate-400 border-slate-200',
   WITHDRAWN: 'bg-slate-100 text-slate-500 border-slate-300',
+  HOLD: 'bg-red-100 text-red-700 border-red-300',
+};
+// Bir dosyanın en son "[BEKLEMEDE — ...]" gerekçe notunu (notes alanına eklenen
+// serbest metin içinden) okunur hale getirir; bulunamazsa null döner.
+const holdReasonOf = (notes?: string | null): string | null => {
+  if (!notes) return null;
+  const idx = notes.lastIndexOf('[BEKLEMEDE');
+  return idx === -1 ? null : notes.slice(idx);
 };
 // Aktif sekmelerden çıkarılan terminal/arşiv durumları
 const ARCHIVED_STATUSES = ['SUBMITTED', 'EVALUATING', 'WON', 'LOST', 'WITHDRAWN'];
@@ -93,9 +102,19 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
   // Backend WON_TRANSITION_ROLES (tenders.ts) ile birebir — sonuç (Kazanıldı/
   // Kaybedildi) kararı yalnız bu rollere ait.
   const canDecideResult = ['GENERAL_MANAGER', 'ISAB_MGR', 'SALES_MGR'].includes(currentUser?.role || '');
+  // Backend HOLD_RELEASE_ROLES (tenders.ts) ile birebir.
+  const canReleaseHold = ['GENERAL_MANAGER', 'SALES_MGR'].includes(currentUser?.role || '');
   const [withdrawTarget, setWithdrawTarget] = useState<Tender | null>(null);
   const [withdrawReason, setWithdrawReason] = useState('');
   const [withdrawing, setWithdrawing] = useState(false);
+
+  const releaseHold = async (tender: Tender) => {
+    if (!window.confirm(`"${tender.name}" ihale dosyasının beklemesi kaldırılıp hazırlığa devam edilsin mi?`)) return;
+    try {
+      await apiService.updateTender(tender.id, { status: 'PREPARING' });
+      await load();
+    } catch (e) { alert('İşlem hatası: ' + (e instanceof Error ? e.message : '')); }
+  };
 
   const confirmWithdraw = async () => {
     if (!withdrawTarget || !withdrawReason.trim()) return;
@@ -135,9 +154,9 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 
       {loading && <p className="text-sm text-slate-400 italic px-1">Yükleniyor...</p>}
 
-      {tab === 'list' && <TenderList tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
+      {tab === 'list' && <TenderList tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} selectedId={selectedId} onSelect={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} canReleaseHold={canReleaseHold} onReleaseHold={releaseHold} />}
       {tab === 'calendar' && <TenderCalendar tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} />}
-      {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} />}
+      {tab === 'checklist' && <ChecklistTab tender={selected && !ARCHIVED_STATUSES.includes(selected.status) ? selected : null} tenders={tenders.filter(t => !ARCHIVED_STATUSES.includes(t.status))} onSelectTender={setSelectedId} onChanged={load} isGM={isGM} onWithdraw={setWithdrawTarget} canReleaseHold={canReleaseHold} onReleaseHold={releaseHold} />}
       {tab === 'guarantees' && <GuaranteesTab tender={selected} tenders={tenders} onSelectTender={setSelectedId} userName={currentUser?.name} />}
       {tab === 'submitted' && <SubmittedTenders tenders={tenders.filter(t => ARCHIVED_STATUSES.includes(t.status))} onChanged={load} canDecideResult={canDecideResult} />}
 
@@ -176,9 +195,10 @@ const SalesSupport: React.FC<SalesSupportProps> = ({ opportunities = [] }) => {
 };
 
 // ── İhale Listesi ────────────────────────────────────────────────────────────────
-function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw }: {
+function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw, canReleaseHold, onReleaseHold }: {
   tenders: Tender[]; selectedId: string | null; onSelect: (id: string) => void; onChanged: () => void;
   isGM?: boolean; onWithdraw?: (t: Tender) => void;
+  canReleaseHold?: boolean; onReleaseHold?: (t: Tender) => void;
 }) {
   if (tenders.length === 0)
     return <div className="glass-card p-16 text-center text-slate-400 italic">Henüz ihale yok. "Yeni İhale" ile başlayın.</div>;
@@ -186,6 +206,9 @@ function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw
     <div className="space-y-3">
       {tenders.map(t => {
         const dleft = daysUntil(t.submissionDeadline);
+        // Fırsat oluşturulunca otomatik açılan, henüz elle dokunulmamış (hâlâ
+        // Taslak) dosyalar — Satış Destek'in dikkatini çekmesi için ayrı rozet.
+        const isNewAuto = t.status === 'DRAFT' && !!t.opportunityId;
         return (
           <div key={t.id} onClick={() => onSelect(t.id)}
             className={`glass-card p-5 cursor-pointer transition-all ${selectedId === t.id ? 'ring-2 ring-primary/40' : 'hover:shadow-lg'}`}>
@@ -193,6 +216,7 @@ function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw
               <div className="space-y-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h4 className="font-black text-slate-900 truncate">{t.name}</h4>
+                  {isNewAuto && <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg bg-emerald-500 text-white">🆕 Yeni İhale</span>}
                   <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES[t.status] || ''}`}>{STATUS_LABELS[t.status] || t.status}</span>
                   {(() => { const b = deadlineBadge(t.submissionDeadline); return b ? <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${b.tone}`}>{b.label}</span> : null; })()}
                   {t.docNumber && <span className="text-[10px] font-mono text-indigo-600 bg-indigo-100 px-2 py-0.5 rounded-lg">{t.docNumber}</span>}
@@ -201,6 +225,11 @@ function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw
                   {t.ikn ? `İKN: ${t.ikn} · ` : ''}{t.authority ? `${t.authority} · ` : ''}{METHOD_LABELS[t.method] || t.method}
                 </p>
                 <p className="text-sm font-bold text-slate-700">{fmt(t.estimatedValue, t.currency)}</p>
+                {t.status === 'HOLD' && (
+                  <p className="text-[11px] text-red-600 font-semibold bg-red-50 border border-red-200 rounded-lg px-2 py-1 mt-1">
+                    ⏸ {holdReasonOf(t.notes) || 'Presales teknik değerlendirmeyi reddetti — dosya beklemede.'}
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-3 flex-shrink-0">
                 <div className="text-right">
@@ -212,6 +241,10 @@ function TenderList({ tenders, selectedId, onSelect, onChanged, isGM, onWithdraw
                     </span>
                   )}
                 </div>
+                {t.status === 'HOLD' && canReleaseHold && onReleaseHold && (
+                  <button onClick={(e) => { e.stopPropagation(); onReleaseHold(t); }} title="Beklemeyi kaldır, hazırlığa devam et"
+                    className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 border border-emerald-300 bg-emerald-50 rounded-lg px-2 py-1 transition-colors">Beklemeyi Kaldır</button>
+                )}
                 {isGM && onWithdraw && (
                   <button onClick={(e) => { e.stopPropagation(); onWithdraw(t); }} title="Yönetim: İhaleye iştirak etme (KPI-nötr)"
                     className="text-[10px] font-bold text-slate-500 hover:text-slate-800 border border-slate-200 rounded-lg px-2 py-1 transition-colors">İştirak Etme</button>
@@ -260,9 +293,10 @@ function TenderCalendar({ tenders }: { tenders: Tender[] }) {
 }
 
 // ── Uygunluk Denetimi (Checklist) ────────────────────────────────────────────────
-function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWithdraw }: {
+function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWithdraw, canReleaseHold, onReleaseHold }: {
   tender: Tender | null; tenders: Tender[]; onSelectTender: (id: string) => void; onChanged?: () => void;
   isGM?: boolean; onWithdraw?: (t: Tender) => void;
+  canReleaseHold?: boolean; onReleaseHold?: (t: Tender) => void;
 }) {
   const { requireAI } = useAIGate();
   const [items, setItems] = useState<TenderChecklistItem[]>([]);
@@ -376,6 +410,30 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
 
   if (!tender)
     return <TenderSelectorEmpty tenders={tenders} onSelectTender={onSelectTender} text="Uygunluk denetimi için bir ihale seçin." />;
+
+  // Presales teknik değerlendirmeyi reddettiğinde otomatik HOLD'a alınan dosya —
+  // dosya/evrak/analiz işlemleri kilitlenir (salt-okunur); yalnız GM/Satış
+  // Müdürü "Beklemeyi Kaldır" ile hazırlığa devam ettirebilir (tenders.ts
+  // HOLD_RELEASE_ROLES).
+  if (tender.status === 'HOLD') {
+    return (
+      <div className="glass-card p-8 space-y-4">
+        <div className="flex items-center gap-2">
+          <h4 className="font-black text-slate-900">{tender.name}</h4>
+          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-lg border ${STATUS_STYLES.HOLD}`}>{STATUS_LABELS.HOLD}</span>
+        </div>
+        <div className="p-4 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+          ⏸ {holdReasonOf(tender.notes) || 'Presales teknik değerlendirmeyi reddetti — dosya hazırlığı durduruldu.'}
+        </div>
+        <p className="text-xs text-slate-400">Evrak/analiz işlemleri bu dosya beklemedeyken kilitlidir.</p>
+        {canReleaseHold && onReleaseHold ? (
+          <button onClick={() => onReleaseHold(tender)} className="btn-primary text-xs">Beklemeyi Kaldır — Hazırlığa Devam Et</button>
+        ) : (
+          <p className="text-xs text-slate-400 italic">Beklemeyi yalnız Genel Müdür veya Satış Müdürü kaldırabilir.</p>
+        )}
+      </div>
+    );
+  }
 
   const required = items.filter(i => i.isRequired);
   const done = required.filter(i => ['DONE', 'WAIVED'].includes(i.status));
