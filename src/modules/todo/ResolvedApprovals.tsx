@@ -1,4 +1,5 @@
-import { CheckCircle2, X, DollarSign, Target } from 'lucide-react';
+import { useState } from 'react';
+import { CheckCircle2, X, DollarSign, Target, ChevronDown, ChevronUp } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { TodoTask } from '../../types';
@@ -13,10 +14,21 @@ export default function ResolvedApprovals({
   getDetail: (todo: TodoTask) => ProposalDetail | null;
   getRelatedItemName: (todo: TodoTask) => string;
 }) {
+  const [expanded, setExpanded] = useState(false);
   if (approvals.length === 0) return null;
   return (
     <div className="space-y-4">
-      <h4 className="text-base font-black text-slate-800 uppercase tracking-widest">Onaylanan / Reddedilen Teklifler</h4>
+      <button
+        onClick={() => setExpanded(v => !v)}
+        className="w-full flex items-center justify-between gap-3 p-5 rounded-[28px] bg-emerald-50/60 border border-emerald-100 hover:bg-emerald-50 transition-all"
+      >
+        <span className="flex items-center gap-2 text-xs font-black text-emerald-700 uppercase tracking-widest">
+          <CheckCircle2 size={16} />
+          Onaylanan / Reddedilen Teklifler ({approvals.length})
+        </span>
+        {expanded ? <ChevronUp size={18} className="text-emerald-600" /> : <ChevronDown size={18} className="text-emerald-600" />}
+      </button>
+      {expanded && (
       <div className="grid grid-cols-1 gap-4">
         {approvals.map((todo) => {
           const approved = todo.status === 'COMPLETED';
@@ -59,6 +71,7 @@ export default function ResolvedApprovals({
           );
         })}
       </div>
+      )}
     </div>
   );
 }

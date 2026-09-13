@@ -381,6 +381,7 @@ src/modules/todo/helpers.ts ← ../types
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
@@ -411,6 +412,7 @@ src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobo
 src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/OpportunityHistoryPanel.tsx ← ../lib/utils, ../types, ../services/apiService, constants, helpers
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, DrawerShell
@@ -443,6 +445,7 @@ src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, co
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
+src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
@@ -456,7 +459,6 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog
-backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deploymentGuard.ts ← utils/logger
@@ -471,7 +473,6 @@ backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock
-backend/src/services/restoreService.ts ← prismaClient, backupTargets, backupService
 backend/src/services/salesCosting.ts ← prismaClient
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
@@ -523,13 +524,14 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 30 minutes ago)
+## changes (last 10 commits — 16 minutes ago)
 ```
 src/modules/contract-workflow/ContextTab.tsx  ~ContextTab
 src/modules/ContractWorkflowModule.tsx        +birim  ~ContractWorkflowModule
 src/modules/SalesSupport.tsx                  +SubmittedTenders  ~SubmittedTenders  ~ChecklistTab  ~GuaranteesTab
 src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
 src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
+backend/src/services/corporateDocumentReminders.ts +sweepCorporateDocumentReminders  +safeParse
 backend/src/services/deliveryDeadlineReminders.ts +resolveDue  +notifyAll  +sweepDeliveryDeadlineReminders  +safeParse
 backend/src/services/deliveryPenalty.ts       +computePenaltyExposure
 backend/src/services/deliveryTimeline.ts      +buildDeliveryTimeline  +addDays  +computeDeliveryDueDate
@@ -548,7 +550,6 @@ backend/src/services/profitabilityRollup.ts   +periodKeyOf  +marginPct  +bucketB
 backend/src/services/profitabilityService.ts  +resolveFxRates  +resolveInterestRates  +stripOverhead  +assembleProject
 backend/src/services/profitabilitySnapshot.ts +asOfKeyOf  +takeSnapshot  +listSnapshots  +d
 backend/src/services/profitabilitySnapshotScheduler.ts +tick  +startProfitabilitySnapshotScheduler
-backend/src/services/roleDefaultPermissions.ts +defaultPermissionsForRole
 backend/src/services/serviceTicketReminders.ts ~sweepServiceTicketSla
 backend/src/services/slaEscalation.ts         ~sweepSlaEscalations
 backend/src/services/workflowTemplate.ts      ~applyDefaultWorkflowTemplate
@@ -572,6 +573,11 @@ INDEX Tender_tenantId_status_idx ON Tender
 INDEX DeliveryTimelineStep_tenantId_tenderId_idx ON DeliveryTimelineStep
 INDEX DeliveryTimelineStep_tenantId_contractWorkflowId_idx ON DeliveryTimelineStep
 INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
+```
+
+### backend/src/services/corporateDocumentReminders.ts
+```
+export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
 ```
 
 ### backend/src/services/deliveryDeadlineReminders.ts
@@ -802,11 +808,6 @@ export interface ContractWorkflowFallback  :70-70
 export type TransitionCheckResult  :33-33
 export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
 export function buildAutoTitle(extracted, fallback) → string  :77-83  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
-```
-
-### backend/src/services/corporateDocumentReminders.ts
-```
-export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
 ```
 
 ### backend/src/services/dashboardService.ts
@@ -1085,15 +1086,6 @@ export async function getPlanDrift(tenantId, opts = {}) → Promise<PlanDriftSer
 ### backend/src/services/profitabilitySnapshotScheduler.ts
 ```
 export function startProfitabilitySnapshotScheduler() → void  :41-44
-```
-
-### backend/src/services/restoreService.ts
-```
-export type LogicalPayloadData  :19-19
-export async function loadModelsIntoTarget  :58-110
-export async function analyzeRestore  :152-156
-export async function applyLogicalRestore  :245-245
-export async function stageStateRestore  :282-282
 ```
 
 ### backend/src/services/roleDefaultPermissions.ts
@@ -1942,6 +1934,13 @@ hook useCallback
 handler onClick
 ```
 
+### src/modules/crm/OpportunityHistoryPanel.tsx
+```
+component OpportunityHistoryPanel
+hook useState
+handler onClick
+```
+
 ### src/modules/crm/OpportunityRequiredDocsPanel.tsx
 ```
 component OpportunityRequiredDocsPanel
@@ -2328,6 +2327,12 @@ component PendingChainApprovals
 hook useState
 hook useEffect
 handler onChange
+```
+
+### src/modules/todo/ResolvedApprovals.tsx
+```
+component ResolvedApprovals
+hook useState
 ```
 
 ### src/modules/VirtualAgentsTestModule.tsx
