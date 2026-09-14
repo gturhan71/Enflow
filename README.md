@@ -6,7 +6,7 @@
 
 **Ziyaretten tahsilata kadar tüm B2B iş akışını tek platformda otomatikleştiren, çok kiracılı (multi-tenant) kurumsal SaaS.**
 
-[![Version](https://img.shields.io/badge/sürüm-v2.3-6366f1)](#-sürüm-geçmişi)
+[![Version](https://img.shields.io/badge/sürüm-v2.5.0-6366f1)](#-sürüm-geçmişi)
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-8_(Rolldown)-646cff?logo=vite&logoColor=white)](https://vitejs.dev)
@@ -30,9 +30,11 @@ Farkı: süreçler birbirine **kopuk modüller** değil, **otomatik devir halkal
      └──────────────▶ [ İhale / İYB ] ◀──────────────────────┘
                               │
         Sözleşme (imza) ─▶ Proje ─▶ Satınalma ─▶ Finans (Fatura & Tahsilat)
+                                                        │
+                                              Kârlılık & Nakit/Hazine Analizi
 ```
 
-> Zincirin tamamı kapalı: birimler-arası geçişler otomatik, her adım denetim izine (audit log) ve onay swimlane'lerine bağlı.
+> Zincirin tamamı kapalı: birimler-arası geçişler otomatik, her adım denetim izine (audit log) ve onay swimlane'lerine bağlı. Sözleşmeye bağlı **teslim süresi takibi** (cezai şart hesabı) imza gününden proje teslimine kadar zincir boyunca taşınır.
 
 ---
 
@@ -53,14 +55,17 @@ Kısaca: **birden fazla birimin ortak bir süreçte koordine olması gereken** h
 
 ## ✨ Öne Çıkan Yetenekler
 
-- 🔄 **Uçtan uca otomasyon** — birimler-arası devir zinciri (İhale→Sözleşme→Proje→Satınalma→Finans) tam otomatik.
+- 🔄 **Uçtan uca otomasyon** — birimler-arası devir zinciri (İhale→Sözleşme→Proje→Satınalma→Finans) tam otomatik; sözleşmeye bağlı teslim süresi + cezai şart takibi zincir boyunca taşınır.
 - 🧭 **Akış motoru** — Workflow + skip-logic, birim görevleri (SLA'lı TodoTask), çok-aşamalı onay swimlane'leri (Finans→İGB→GM→KSU).
-- 🤖 **8 sanal agent** — Tender · Project · Presales · Procurement · Finance · Legal · CRM · İGB. Para & hukuk **yalnız danışman**.
-- 📈 **Yönetim & büyüme analitiği** — birim metrikleri, huni analizi, tahmin, karlılık, müşteri/proje sağlık skorları.
-- 💰 **Gelişmiş finans** — çok para birimli, KDV, işletme maliyeti dağıtımı (overhead), DMO katalog & kârlılık motoru.
-- 🔐 **Kurumsal güvenlik** — parola (bcrypt) + imzalı JWT, tenant izolasyonu, RBAC (RBAC süiti **486/486**), denetim izi, imzalı lisans (Ed25519).
+- 🤖 **8 sanal agent** — Tender · Project · Presales · Procurement · Finance · Legal · CRM · İGB. Para & hukuk **yalnız danışman**; otonom modda geri-alınabilir eylemler uygulanır (recommend→act).
+- 📈 **Yönetim & büyüme analitiği** — birim metrikleri, huni analizi, tahmin, ziyaret performansı, müşteri/proje sağlık skorları.
+- 💰 **Zamana duyarlı kârlılık & hazine** — plan/gerçek karşılaştırmalı proje-aylık-çeyreklik-yıllık kârlılık, konsolide nakit pozisyonu, faiz-bazlı hazine katkısı, finansal enstrüman senaryoları (faktoring/vadeli mevduat/forward FX), aylık plan-drift snapshot'ı.
+- 🧾 **Gelişmiş finans** — çok para birimli, KDV, işletme maliyeti dağıtımı (overhead), DMO katalog & kârlılık kanalı.
+- 🔍 **Presales YZ karşılaştırma** — şartname maddeleri ↔ ürün specsheet uygunluk matrisi (YZ, grup/aday bazlı), xlsx çıktı.
+- 🔐 **Kurumsal güvenlik** — parola (bcrypt) + imzalı JWT, tenant izolasyonu + tenant-başına alan-bazlı şifreleme (AES-256-GCM envelope), en-az-yetki DB rolleri + ağ sertleştirmesi, RBAC (Playwright E2E süiti **1027 test**), denetim izi, imzalı lisans (Ed25519).
 - 🧩 **Sağlayıcıdan bağımsız YZ** — sözleşme/şartname analizi için OpenAI-uyumlu herhangi bir modeli (OpenAI, Gemini, Anthropic, yerel Ollama…) tenant kendi anahtarıyla bağlar.
-- 🏢 **Çok kiracılı SaaS** — 64 veri modeli, 36 API alanı, 29 ekran modülü, tümü `tenantId` ile izole.
+- 🏢 **Çok kiracılı SaaS** — 79 veri modeli, 42 API alanı, 36 ekran modülü, tümü `tenantId` ile izole.
+- 📚 **Kendi kendini belgeleyen** — canlı Enflow-Wiki (`/wiki`) + uygulama-içi rol-duyarlı Yardım modülü.
 
 ---
 
@@ -123,7 +128,10 @@ pnpm dev --port 3000            # frontend (3000) — ayrı terminal
 
 | Sürüm | Tarih | Öne çıkanlar |
 |---|---|---|
-| **v2.3** | 14.07.2026 | 🔐 **Güvenlik sertleştirmesi** — parola (bcrypt) + imzalı JWT kimlik doğrulama, tenant-izolasyonu IDOR düzeltmeleri, dosya-yükleme MIME beyaz listesi, SSRF guard, helmet + rate-limit. RBAC 486/486. |
+| **v2.5.0** | 13.09.2026 | 🚚 **Sözleşmeye bağlı teslim süresi takibi** — İhale→Sözleşme→Proje zinciri boyunca alt-kırılımlı teslim takvimi + otomatik cezai şart hesabı + 30/15/7/1 gün hatırlatmaları. Ayrıca: **veritabanı güvenliği sertleştirmesi** (ağ + en-az-yetki DB rolleri; PostgreSQL RLS kod tamam, prod-doğrulama bekliyor). |
+| **v2.4.0** | 16.08.2026 | 📮 **Talep & Geri Bildirim** (Platform Ticket) modülü — tenant'lardan ürün talebi/hata/iyileştirme toplama, dış triage aracıyla entegre. |
+| — | 09.08.2026 | 💰 **Zamana duyarlı Kârlılık & Nakit/Hazine analizi** (Faz A–E) — plan/gerçek karşılaştırmalı kârlılık, nakit pozisyonu, hazine + finansal enstrüman senaryoları, aylık plan-drift snapshot'ı. 🔒 **Tenant verisi alan-bazlı şifreleme** (Faz 12). Fırsat kartına Teklif/Maliyet Analizi geçmiş paneli + Yönetim Dashboard'una Ziyaret Performansı widget'ı. |
+| **v2.3** | 14.07.2026 | 🔐 **Güvenlik sertleştirmesi** — parola (bcrypt) + imzalı JWT kimlik doğrulama, tenant-izolasyonu IDOR düzeltmeleri, dosya-yükleme MIME beyaz listesi, SSRF guard, helmet + rate-limit. |
 | **v2.2** | 03.07.2026 | 📊 **DMO Katalog & Kârlılık** modülü, **İşletme Maliyeti dağıtımı** (2 katmanlı overhead + birim bütçe absorpsiyonu), **Büyüme Analitiği** (13 rapor + 3 seviyeli sağlık skoru). |
 | **v2.1** | 02.07.2026 | 🐘 Temiz kurulumda **PostgreSQL** desteği (dual-adapter + winget provizyon), Kurulum Sihirbazı soğuk-başlangıç düzeltmesi. |
 | **v2.0** | 18.06.2026 | 🏗️ Kurumsal süreç genişlemesi (Faz 0–9): kalıcı ApprovalChain, Ziyaret Planı, Proje Devir Paketi, doküman kodlama, Finans/Hukuk/İhale modülleri, Yönetim Raporları, **8 sanal agent** + birimler-arası otomatik devir zinciri. |
@@ -135,8 +143,9 @@ pnpm dev --port 3000            # frontend (3000) — ayrı terminal
 
 - Kimlik doğrulama **parola (bcrypt hash) + imzalı JWT** ile yapılır; oturumlar süreli, tenant kimliği imzalı token'dan türetilir.
 - Üretimde **`AUTH_JWT_SECRET`** (≥16 karakter, güçlü rastgele) **zorunludur**; sihirbaz sırları üretir, `.env` sürüm kontrolüne konmaz.
-- API anahtarları (YZ, S3, Nextcloud) yalnız sunucuda/`.env`'de; YZ entegrasyonu tenant-bazlı ve maskelidir.
-- Tüm veriler `tenantId` ile izole; her mutasyon **denetim izine** (audit log) yazılır; RBAC 19 rol + izin ağacı.
+- Hassas alanlar (YZ API anahtarı, tedarikçi IBAN/banka, müşteri vergi no) **tenant-başına DEK ile şifrelenir** (envelope encryption, AES-256-GCM); API anahtarları yalnız sunucuda/`.env`'de, YZ entegrasyonu maskelidir.
+- **Veritabanı sertleştirmesi** — kurulum sihirbazında opt-in ağ kısıtlaması (ufw/Windows Firewall) + iki-rol PostgreSQL provizyonu (migrator: DDL, runtime: yalnız DML, `NOSUPERUSER`); Row-Level Security kod tabanında hazır (prod'a alınmadan önce PostgreSQL'e karşı doğrulama bekliyor).
+- Tüm veriler `tenantId` ile izole; her mutasyon **denetim izine** (audit log) yazılır; RBAC 20+ rol + izin ağacı, Playwright E2E süiti 1027 test.
 - Yedek dosyaları web kökü dışında; indirme yalnız yetkili (Backup Admin / GM).
 
 ---

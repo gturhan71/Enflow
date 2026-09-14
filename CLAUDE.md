@@ -380,8 +380,6 @@ src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
 src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
-src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, crm/constants
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
@@ -396,7 +394,6 @@ src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
-src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
@@ -437,6 +434,8 @@ src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procu
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
+src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
@@ -459,6 +458,7 @@ src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, co
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
+src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
@@ -539,8 +539,7 @@ src/modules/FinanceModule.tsx                 ~OverheadPoolTab
 src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
 src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
 src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
-src/modules/todo/TaskList.tsx                 +TaskRow  +Section  ~TaskList
-src/modules/todo/UnifiedWorkQueue.tsx         +Section  ~UnifiedWorkQueue
+src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/services/activityLogArchiveScheduler.ts ~tick
 backend/src/services/backupScheduler.ts       ~tick
@@ -1507,40 +1506,6 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/crm/ProposalsView.tsx
-```
-component ProposalsView
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-hook useMemo
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onSave
-handler onSaveAll
-handler onProgressStatus
-handler onMarkLost
-handler onHandOff
-handler onEdit
-handler onCheckIn
-handler onEditProposal
-handler onGoToCostAnalysis
-handler onRequestApproval
-handler onOpenReport
-handler onOpenContacts
-handler onEditCustomer
-handler onDeleteCustomer
-handler onCreateProposal
-handler onWonOpportunity
-handler onLostOpportunity
-```
-
 ### src/modules/dashboard/KpiDetailDrawer.tsx
 ```
 props Props
@@ -1745,15 +1710,6 @@ hook useState
 hook useMemo
 handler onClick
 handler onChange
-```
-
-### src/modules/todo/UnifiedWorkQueue.tsx
-```
-component Section
-component UnifiedWorkQueue
-hook useState
-hook useMemo
-handler onClick
 ```
 
 ### src/modules/TodoModule.tsx
@@ -2117,6 +2073,40 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/crm/ProposalsView.tsx
+```
+component ProposalsView
+```
+
+### src/modules/CRMModule.tsx
+```
+hook useAuth
+hook useState
+hook useEffect
+hook useSearch
+hook useMemo
+export CRMModule
+handler onProposal
+handler onOpportunity
+handler onSave
+handler onSaveAll
+handler onProgressStatus
+handler onMarkLost
+handler onHandOff
+handler onEdit
+handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
+handler onRequestApproval
+handler onOpenReport
+handler onOpenContacts
+handler onEditCustomer
+handler onDeleteCustomer
+handler onCreateProposal
+handler onWonOpportunity
+handler onLostOpportunity
+```
+
 ### src/modules/dashboard/widgetCatalog.ts
 ```
 export interface WidgetMeta  :15-19
@@ -2381,6 +2371,15 @@ component PendingChainApprovals
 hook useState
 hook useEffect
 handler onChange
+```
+
+### src/modules/todo/UnifiedWorkQueue.tsx
+```
+component Section
+component UnifiedWorkQueue
+hook useState
+hook useMemo
+handler onClick
 ```
 
 ### src/modules/VirtualAgentsTestModule.tsx

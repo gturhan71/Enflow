@@ -1346,7 +1346,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 > 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
 >
-> Ölçek (2026-08-03): **67 veri modeli · 33 ekran modülü · 38 API alanı · 35 servis · 8 sanal agent · 20 rol · 8 katman (0–7).** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi + DMO Kataloğu + Garanti & Servis + işletme maliyeti dağıtımı + satış fiyatlandırma motoru + uygulama-içi Yardım modülü.)
+> Ölçek (2026-09-14): **79 veri modeli · 36 ekran modülü · 42 API alanı · 70+ servis · 8 sanal agent · 20+ rol · 8 katman (0–7).** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi + DMO Kataloğu + Garanti & Servis + işletme maliyeti dağıtımı + satış fiyatlandırma motoru + uygulama-içi Yardım modülü + zamana duyarlı Kârlılık & Nakit/Hazine analizi + tenant verisi alan-bazlı şifreleme + sözleşmeye bağlı teslim süresi/cezai şart takibi + Talep & Geri Bildirim.)
 
 ### 27.1 Enflow nedir? (tek paragraf)
 
@@ -1374,7 +1374,8 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
      │            (Birim yöneticisi onayı; AI ile sözleşme/şartname analizi)
      ▼
 [Proje Yönetimi]  Kazanılan iş projeye döner: milestone'lar, maliyet, karlılık,
-     │            11 zorunlu evrakla "Devir Paketi"
+     │            11 zorunlu evrakla "Devir Paketi"; sözleşmedeki teslim süresi
+     │            alt-kırılımlı takvime (Sipariş Onayı/Üretim/Sevkiyat/Teslim) döner
      ▼
 [Satınalma]       Talep → tedarikçi teklifi → PO → teslimat → fatura (9 statü)
      │
@@ -1386,7 +1387,7 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
                   kur farkı (FX) mahsubu
 ```
 
-Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGB→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller). Ayrıca ana hatla **paralel/opsiyonel bir kanal**: **DMO Kataloğu** — devlet malzeme ofisi tipi sipariş/kârlılık akışı, kendi kur+risturn+komisyon maliyetlendirme motoruyla ana CRM→Sözleşme hattından bağımsız çalışır.
+Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Finans→İGB→GM→KSU), **Hukuk** (vaka takibi), **Genel Hususlar** (risk/ders/KPI), **Yönetim Raporları** (birim metrikleri), **Sanal Agentlar** (boş birim koltuğunu dolduran vekiller), **Kârlılık** (proje/tenant genelinde plan↔gerçek zamana-duyarlı kârlılık + nakit/hazine analizi — hattı izler, mutasyon yapmaz). Ayrıca ana hatla **paralel/opsiyonel bir kanal**: **DMO Kataloğu** — devlet malzeme ofisi tipi sipariş/kârlılık akışı, kendi kur+risturn+komisyon maliyetlendirme motoruyla ana CRM→Sözleşme hattından bağımsız çalışır (Kârlılık modülünde ayrı bir sekme olarak görünür, proje kümülatifine karışmaz).
 
 > ⚙️ **Not (akış olgunluğu):** Birimler-arası geçiş halkaları **otomatik**tir (Faz 9): İhale WON→Sözleşme (T3) · Sözleşme SIGNED→Proje (T4) · Proje→Satınalma maliyet kalemi (T5) · Satınalma faturası→Finans (T6) · WON Fırsat→Proje (T1). Para tutarları kuruş hassasiyetinde yuvarlanır (`financeEngine`); döviz toplamları daima ayrı (sessiz tek-toplam yok).
 
@@ -1401,7 +1402,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
 | **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis / SpecComplianceMatrix (Şartname↔Ürün specsheet uygunluk matrisi + xlsx, yalnız YZ anahtarı varsa) / ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/presales/spec-compliance`, `/tenants/ai-settings` |
 | **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri → `/sync`, `/admin/security-test` |
-| **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt + kur farkı) → `/tenants/governance-settings`, `/finance/calc`. **İşletme maliyeti:** OperatingCostPool/UnitBudget/ProjectUnitParticipation → `overheadService` (şirket% + birim katsayı 2-katmanlı dağıtım, tam-yüklü net marj) → proje detayında Overhead paneli. **DMO Kataloğu (paralel kanal):** DmoCatalogItem/DmoFrameworkAgreement/DmoExchangeRate/DmoOrder/DmoOrderItem → `dmoCosting` (kur açığı+risturn+komisyon) → DmoModule → `/dmo`. **Uygulama-içi Yardım:** statik makale seti (`src/content/helpArticles.ts`) → HelpModule (Header'daki Yardım ikonu) → rol-duyarlı, bağlamsal kullanım kılavuzu; harici genel-tanıtım için bu wiki'ye link verir. |
+| **7 · Yedekleme & Yönetişim** | BackupJob, RestoreJob → BackupModule + **Backup Admin** (salt-okunur rol) → `backupService`/`backupVerifyService`/`restoreService`/`backupScheduler` (LOCAL/Nextcloud/S3, doğrulama, fark-analizli restore, zamanlı) → `/backup`. **Yönetişim:** `governance` (Görev Ayrılığı SoD + tutar-bazlı onay matrisi/DoA), `financeEngine` (kuruş tabanlı net/KDV/brüt + kur farkı) → `/tenants/governance-settings`, `/finance/calc`. **İşletme maliyeti:** OperatingCostPool/UnitBudget/ProjectUnitParticipation → `overheadService` (şirket% + birim katsayı 2-katmanlı dağıtım, tam-yüklü net marj) → proje detayında Overhead paneli. **DMO Kataloğu (paralel kanal):** DmoCatalogItem/DmoFrameworkAgreement/DmoExchangeRate/DmoOrder/DmoOrderItem → `dmoCosting` (kur açığı+risturn+komisyon) → DmoModule → `/dmo`. **Kârlılık & Hazine:** `profitabilityLedger`/`profitabilityRollup`/`profitabilityCashflow`/`profitabilityInstruments`/`profitabilitySnapshot` (salt-okunur, plan↔gerçek + nakit pozisyonu + faiz-bazlı hazine + faktoring/mevduat/forward-FX senaryoları + aylık plan-drift) → ProfitabilityModule → `/profitability`. **Teslim Süresi Takibi:** DeliveryTimelineStep → `deliveryTimeline`/`deliveryPenalty` (alt-kırılımlı takvim + otomatik cezai şart hesabı, 30/15/7/1 gün hatırlatması) → ContractWorkflow/Tender/Proje ekranlarında. **Uygulama-içi Yardım:** statik makale seti (`src/content/helpArticles.ts`) → HelpModule (Header'daki Yardım ikonu) → rol-duyarlı, bağlamsal kullanım kılavuzu; harici genel-tanıtım için bu wiki'ye link verir. |
 
 ### 27.4 Akış motoru — birimler birbiriyle nasıl "konuşur"
 
@@ -1430,12 +1431,13 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | CRM | Müşteri & fırsat, teklif, pazarlık; Maliyet Analizi (forward-kur + marj, müdür onayı) | Satış |
 | Presales & Dizayn | BoM + vendor teklif değerlendirme (fiyat + teknik uygunluk + dosya kanıtı) + Şartname↔Ürün specsheet uygunluk matrisi/xlsx (yalnız YZ anahtarı varsa) → Satışa devir | Presales / Teknik |
 | Satış Destek (İhale) | Şartname YZ analizi → evrak listesi (otomatik eşleme) → teminat → zaman-duyarlı hatırlatma | Satış Destek / İYB |
-| Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir | KSU + Yönetim |
-| Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı | Proje |
+| Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir; teslim süresi + cezai şart takibi (alt-kırılımlı takvim) | KSU + Yönetim |
+| Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı; teslim milestone'u tamamlanınca ilgili birimlere teyit bildirimi | Proje |
 | Satın Alma | BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura) | Satın Alma |
 | Garanti & Servis | Teslim-sonrası servis/arıza talebi kaydı → çözüm → kapanış; projeyle ilişkili | Proje / Teknik Servis |
 | Finans | Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi; kur farkı mahsubu | Finans |
 | DMO Kataloğu | Devlet malzeme ofisi tipi sipariş + kur/risturn/komisyon kârlılık motoru (paralel kanal) | Satış / Finans (lisanslı) |
+| Kârlılık | Zamana duyarlı plan↔gerçek kârlılık (proje/aylık/çeyreklik/yıllık) + konsolide nakit pozisyonu + hazine katkısı + finansal enstrüman senaryoları (faktoring/vadeli mevduat/forward FX) + aylık plan-drift snapshot'ı; salt-okunur, mutasyon yapmaz | GM / Finans / Proje / Satış Müdürü |
 | Görevler & Takip | Birimler-arası görev havuzu + "Bekleyen Onaylarım"; iş-günü SLA | Tüm birimler |
 | Yönetim Raporları | Birim metrik + darboğaz + dönem raporu (escalation) + yazdırma | GM + Müdürler |
 | Genel Hususlar | Dersler/risk/KPI/dış doküman + doküman kodlama | Kalite / Yönetim |
@@ -1477,4 +1479,4 @@ Statik **enflow-wiki** (`wiki/index.html`) bu bölümden **otomatik üretilir** 
 
 ---
 
-*Bu belge Enflow v2026-06-27 sürümüne aittir. Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = enflow-wiki kaynağı; statik wiki `wiki/index.html` bu bölümden üretilir.*
+*Bu belge Enflow v2.5.0 sürümüne aittir (güncellendi: 2026-09-14). Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = enflow-wiki kaynağı; statik wiki `wiki/index.html` bu bölümden üretilir.*
