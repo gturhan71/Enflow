@@ -14,7 +14,7 @@ const norm = (s: string) => s.trim().toLocaleLowerCase('tr-TR');
 router.get('/', tenantMiddleware, GM_OR_PRESALES, asyncHandler(async (req: Request, res: Response) => {
   const units = await prisma.unit.findMany({
     where: { tenantId: req.tenantId },
-    include: { users: true }
+    include: { users: { omit: { password: true } } }
   });
   res.json(units);
 }));

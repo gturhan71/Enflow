@@ -90,6 +90,17 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
     tenantId: process.env.GM_TENANT_ID  ?? "tenant-1",
   },
   presales_eng: {
+    // Not (2026-09-13): dev.db'de bu kullanıcının rolü PRESALES_MGR'a kaymıştı
+    // (muhtemelen elle değiştirilmiş) — units.ts GM_OR_PRESALES kapısı
+    // (GENERAL_MANAGER/PRESALES_ENG/BACKUP_ADMIN, bkz. governance/role-matrix.ts
+    // endpointDomains:['units']) PRESALES_MGR'ı İÇERMEZ, dolayısıyla "Birim
+    // listesi" testi (api-permissions.spec.ts) beklenen "allow" yerine 403
+    // alıyordu. Persona'yı başka bir hesaba (aliveli@enflow.com) taşımak yeni
+    // bir sızıntıya yol açtı (o hesapta ekstra PROCUREMENT_VIEW izni var,
+    // "Satın Alma" menüsü beklenmedik şekilde görünür oldu) — doğru kök-neden
+    // düzeltmesi dev.db'deki bu kullanıcının ROLÜNü PRESALES_ENG'e geri almak
+    // (permissions dizisine dokunmadan — bu bir kod değişikliği değil, yerel
+    // dev.db veri düzeltmesi; bkz. 2026-09-13 RBAC oturum notu).
     email:    process.env.PRESALES_EMAIL     ?? "goktugturhan74@gmail.com",
     tenantId: process.env.PRESALES_TENANT_ID ?? "tenant-1",
   },
@@ -120,9 +131,16 @@ export const roles: Record<RoleName, { email: string; tenantId: string }> = {
 export const testPassword = process.env.RBAC_PASSWORD ?? "123456";
 
 // Başka tenant'tan kullanıcı — izolasyon testleri için
+// Not (2026-09-13): eski varsayılan (ali.mal@enflow.com / cmq484c3f...) artık
+// dev.db'de mevcut değil — o kullanıcı/tenant kimliği geçmişte elle oluşturulmuş
+// ve tenant-2 daha sonra farklı bir seed script'iyle "tenant2" id'siyle yeniden
+// kurulmuş. Login başarısız olunca auth.setup.ts sessizce mock-token'a düşüyor
+// ve tenant-isolation.spec.ts'teki TÜM vakalar 403/404 yerine 401 alıyordu
+// (gerçek tenant kontrolüne hiç ulaşılmadan auth aşamasında reddediliyordu).
+// Gerçek seed'deki tenant2 GM kullanıcısına güncellendi.
 export const crossTenantUser = {
-  email:    process.env.CROSS_EMAIL     ?? "ali.mal@enflow.com",
-  tenantId: process.env.CROSS_TENANT_ID ?? "cmq484c3f0000jbw3z10ae4ex",
+  email:    process.env.CROSS_EMAIL     ?? "gm@tenant2.local",
+  tenantId: process.env.CROSS_TENANT_ID ?? "tenant2",
 };
 
 // --- Gerçek kaynak ID'leri (tenant-1) ----------------------------------------

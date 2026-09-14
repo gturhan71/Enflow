@@ -40,6 +40,11 @@ for (const role of ROLE_NAMES) {
         // subItem satırı "Fiziksel Arşiv" (üst grup: "Şirket Evrakları").
         const SUBITEM_PARENT: Record<string, string> = {
           "Fiziksel Arşiv": "Şirket Evrakları",
+          // "Test Ortamı" ayrı bir sidebar bloğuydu, 2026-08-19'da kaldırılıp
+          // "Güvenlik Testi"/"Denetim İzi"/"Sanal Agentlar" normal "Ayarlar"
+          // alt-öğelerine taşındı (bkz. src/constants.ts NAV_ITEMS yorumu) —
+          // dolayısıyla artık "Ayarlar" genişletilmeden DOM'a gelmiyor.
+          "Güvenlik Testi": "Ayarlar",
         };
         const parentLabel = SUBITEM_PARENT[c.sidebarText];
         if (parentLabel) {

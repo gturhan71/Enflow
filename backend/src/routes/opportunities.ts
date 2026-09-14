@@ -35,7 +35,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 
   const opps = await prisma.opportunity.findMany({
     where,
-    include: { customer: true, assignedTo: true, createdBy: true, bomItems: { include: { brand: true, category: true } }, costItems: true }
+    include: { customer: true, assignedTo: { omit: { password: true } }, createdBy: { omit: { password: true } }, bomItems: { include: { brand: true, category: true } }, costItems: true }
   });
 
   // Zorunlu teknik değerlendirme (CRM_HANDOFF) durumu — Satış Müdürü'nün fırsat
@@ -110,7 +110,7 @@ router.post('/', tenantMiddleware, CAN_CREATE_OPPORTUNITY, asyncHandler(async (r
       tenantId,
       status: status || 'NEW'
     },
-    include: { customer: true, assignedTo: true, createdBy: true }
+    include: { customer: true, assignedTo: { omit: { password: true } }, createdBy: { omit: { password: true } } }
   });
 
   // Satınalma usulü seçildiyse: Satış Destek için otomatik İhale/dosya takibi + uyarı (her usulde)
@@ -231,7 +231,7 @@ router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
   const updated = await prisma.opportunity.update({
     where: { id: opportunityId },
     data: updateData,
-    include: { customer: true, assignedTo: true, createdBy: true }
+    include: { customer: true, assignedTo: { omit: { password: true } }, createdBy: { omit: { password: true } } }
   });
 
   // Usul/son-teklif tarihi değiştiyse bağlı Tender'ı senkronla (varsa)
@@ -878,7 +878,7 @@ router.post('/:id/progress-checkin', tenantMiddleware, asyncHandler(async (req: 
     throw e;
   }
 
-  const updated = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId }, include: { customer: true, assignedTo: true, createdBy: true } });
+  const updated = await prisma.opportunity.findFirst({ where: { id: opportunityId, tenantId }, include: { customer: true, assignedTo: { omit: { password: true } }, createdBy: { omit: { password: true } } } });
   res.json(updated);
 }));
 
