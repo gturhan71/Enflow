@@ -54,7 +54,8 @@ graphify-out/
 /dev.db-shm
 /dev.db-wal
 
-# Playwright uçtan uca senaryo çalışma-zamanı çıktısı (trace/screenshot — MB'larca)
+# Uçtan uca oracle test ortamı (docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md) çalışma-zamanı çıktısı
 tests/e2e-scenario/test-results/
 tests/e2e-scenario/dev.db
 tests/e2e-scenario/node_modules/
+tests/e2e-scenario/.tmp-db/

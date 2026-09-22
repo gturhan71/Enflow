@@ -593,7 +593,15 @@ router.post('/:id/transfer', asyncHandler(async (req: Request, res: Response) =>
     ? await prisma.project.findFirst({ where: { id: updatedWf.projectId, tenantId: req.tenantId } })
     : null;
 
-  if (updatedWf && updatedWf.status !== 'TRANSFERRED') {
+  // B-xx düzeltmesi — eskiden bu satır KOŞULSUZDU: onay zinciri hâlâ PENDING
+  // (ör. PROJECT_MGR dolu ama henüz onaylamamış) ve proje HİÇ oluşmamışken bile
+  // status 'TRANSFERRED' yazılıyordu (bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md
+  // §6.1). Artık yalnız zincir GERÇEKTEN COMPLETED olduğunda yazılır — bu hem
+  // AUTO adımın projeyi oluşturduğu normal akışı (o zaten kendi status'unu
+  // TRANSFERRED yapıyor, processEngine.ts createProjectFromEntity) hem de
+  // tenant'ın proje-otomasyonu hiç kurgulamadığı "yalnız görev aktarımı" akışını
+  // (tüm insan onay aşamaları COMPLETED ama AUTO adım yok) doğru kapsar.
+  if (updatedWf && updatedWf.status !== 'TRANSFERRED' && result.chain.status === 'COMPLETED') {
     await prisma.contractWorkflow.update({ where: { id }, data: { status: 'TRANSFERRED', updatedAt: new Date() } });
   }
 

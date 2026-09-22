@@ -1,0 +1,14 @@
+{
+  "name": "enflow-e2e-scenario",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Uctan uca is-mantigi/oracle test ortami (Faz 0 dokumani: docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md). tests/rbac erisim izinlerini test eder; bu paket surec motoru + sanal agent/bos koltuk davranisinin SONUCUNU test eder.",
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "vitest": "^4.1.10",
+    "typescript": "^5.6.0"
+  }
+}

@@ -130,7 +130,16 @@ export async function autoSkipOrphanStages(tenantId: string, chainId: string) {
         !!ent &&
         (ent.status === 'ACTIVE' || ent.status === 'TRIAL') &&
         (!ent.expiresAt || ent.expiresAt.getTime() >= Date.now());
-      autonomousAgent = active && ent!.mode === 'AUTONOMOUS';
+      // Güvenlik düzeltmesi — eskiden yalnız entitlement.mode kontrol ediliyordu.
+      // runAgent() (virtualAgentService.ts, manuel agent çalıştırma) her zaman
+      // `plugin.allowedModes.includes('AUTONOMOUS')` ile ÇİFT KİLİT uyguluyordu;
+      // bu boş-koltuk/skip-logic yolu bu ikinci kilidi UYGULAMIYORDU — bir bug/
+      // migration entitlement.mode'u AGENT_FINANCE/AGENT_LEGAL için (API'nin
+      // normalde reddettiği) AUTONOMOUS yaparsa, "asla otonom değil" garantisi
+      // burada delinebiliyordu (bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md §6.3).
+      // runAgent() ile simetrik hale getirildi.
+      const allowedAuto = (plugin.allowedModes ?? ['ADVISORY', 'AUTONOMOUS']).includes('AUTONOMOUS');
+      autonomousAgent = active && ent!.mode === 'AUTONOMOUS' && allowedAuto;
     }
     if (autonomousAgent && plugin) {
       // Köken etiketi: her agent-onaylı aşama için bir AgentRun (RATIFIED) oluştur,

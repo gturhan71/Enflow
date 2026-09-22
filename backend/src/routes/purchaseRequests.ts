@@ -185,23 +185,29 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
   });
   if (!pr) return res.status(404).json({ error: 'Bulunamadı.' });
 
-  const nextStatus: Record<string, string> = {
-    DRAFT: 'PENDING_UNIT',
-    PENDING_UNIT: 'PENDING_PROCUREMENT',
-    PENDING_PROCUREMENT: 'PENDING_GM',
-    PENDING_GM: 'PO_ISSUED',
-  };
+  if (!['DRAFT', 'PENDING_UNIT', 'PENDING_PROCUREMENT', 'PENDING_GM'].includes(pr.status)) {
+    return res.status(400).json({ error: `${pr.status} durumundan onay verilemez.` });
+  }
 
-  const fieldMap: Record<string, string> = {
-    PENDING_UNIT: 'approvedByUnit',
-    PENDING_PROCUREMENT: 'approvedByProcurement',
-    PENDING_GM: 'approvedByGM',
+  // stage.order -> "kim onayladı" alanı + "kim bekleniyor" statüsü. Eskiden bu
+  // ikisi de `pr.status`'a göre TEK ADIM ileri sabitleniyordu (nextStatus map) —
+  // bir aşama (orphan-skip veya AUTONOMOUS agent onayı ile) advanceProcess
+  // ÇAĞRISI SIRASINDA kendiliğinden atlanırsa PurchaseRequest.status gerçek
+  // zincir durumunu YANLIŞ yansıtıyordu (bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md §6.2).
+  // Artık status, advanceProcess SONRASI zincirin GERÇEK durumundan türetiliyor.
+  const APPROVER_FIELD_BY_ORDER: Record<number, string> = {
+    0: 'approvedByUnit',
+    1: 'approvedByProcurement',
+    2: 'approvedByGM',
   };
-
-  const next = nextStatus[pr.status];
-  if (!next) return res.status(400).json({ error: `${pr.status} durumundan onay verilemez.` });
+  const STATUS_BY_MIN_PENDING_ORDER: Record<number, string> = {
+    0: 'PENDING_UNIT',
+    1: 'PENDING_PROCUREMENT',
+    2: 'PENDING_GM',
+  };
 
   const NOT_CONFIGURED_MSG = 'Satınalma onay süreci henüz yapılandırılmamış. Ayarlar → İş Akışı Tasarımcısı\'ndan "Satınalma Onayı" sürecini kurgulayın.';
+  let approvedOrder: number | null = null;
   try {
     if (pr.status === 'DRAFT') {
       await advanceProcess(req.tenantId, 'PURCHASE_APPROVAL', 'PURCHASE_REQUEST', pr.id, { actorUserId: req.userId });
@@ -221,6 +227,7 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
         if (await resolveEffectiveApprover(req.tenantId, { role: s.role, unitId: s.unitId, delegateUserId: s.delegateUserId }, req.userId)) { myStage = s; break; }
       }
       if (!myStage) return res.status(403).json({ error: 'Sırası gelmiş bir onay aşamanız yok — önceki aşamaların tamamlanması bekleniyor.' });
+      approvedOrder = myStage.order;
       await advanceProcess(req.tenantId, 'PURCHASE_APPROVAL', 'PURCHASE_REQUEST', pr.id, {
         stageId: myStage.id, decision: 'APPROVE', actorUserId: req.userId,
       });
@@ -230,8 +237,24 @@ router.post('/:id/approve', asyncHandler(async (req: Request, res: Response) => 
     throw e;
   }
 
+  const freshChain = await prisma.approvalChain.findFirst({
+    where: { tenantId: req.tenantId, entityType: 'PURCHASE_REQUEST', entityId: pr.id, processKey: 'PURCHASE_APPROVAL' },
+    orderBy: { createdAt: 'desc' },
+    include: { stages: { orderBy: { order: 'asc' } } },
+  });
+  let next: string;
+  if (!freshChain || freshChain.status === 'COMPLETED') {
+    next = 'PO_ISSUED';
+  } else {
+    const pendingOrders = freshChain.stages.filter(s => s.status === 'PENDING').map(s => s.order);
+    const minPending = Math.min(...pendingOrders);
+    next = STATUS_BY_MIN_PENDING_ORDER[minPending] ?? pr.status;
+  }
+
   const updateData: Record<string, unknown> = { status: next };
-  if (fieldMap[pr.status]) updateData[fieldMap[pr.status]] = approverId || req.userId;
+  if (approvedOrder !== null && APPROVER_FIELD_BY_ORDER[approvedOrder]) {
+    updateData[APPROVER_FIELD_BY_ORDER[approvedOrder]] = approverId || req.userId;
+  }
   if (next === 'PO_ISSUED') {
     const year = new Date().getFullYear();
     const count = await prisma.purchaseRequest.count({ where: { tenantId: req.tenantId } });

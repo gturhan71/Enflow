@@ -58,7 +58,10 @@ import dmoRouter from './routes/dmo';
 dotenv.config({ quiet: true });
 
 const app = express();
-const port = 3002;
+// PORT env override — varsayilan 3002 degismedi (yalniz izole test ortaminin
+// (tests/e2e-scenario) ayni makinede paralel bir backend process baslatabilmesi
+// icin eklendi, bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md).
+const port = Number(process.env.PORT) || 3002;
 
 import path from 'path';
 import fs from 'fs';
