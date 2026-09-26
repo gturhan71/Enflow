@@ -8,7 +8,7 @@
 ## 0. Otomatik (CI) — yeşil olmalı
 - [ ] `verify` job'u (tsc, guard'lar, birim testleri, node:test, build)
 - [ ] `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → health → setup/login/yaz-oku → pg_dump → SIGTERM)
-- [ ] RBAC süiti (`tests/rbac`) — commit öncesi **tek sefer** (repo kuralı)
+- [ ] RBAC süiti (`tests/rbac`) — CI `rbac-api` + `rbac-ui` job'ları koşar (taze DB + `pnpm seed:rbac`); yerelde `./scripts/ci-rbac.sh all`
 
 ## 1. Linux — Ubuntu 22.04+ VM (systemd)
 1. [ ] `./install/install.sh` → sihirbazda servis adımına **evet** → `systemctl is-active enflow`
@@ -20,7 +20,8 @@
 7. [ ] Postgres kurulumu: `pg_dump` PATH'te → yedek (STATE) dosyası oluşuyor (`backend/backups`)
 8. [ ] **Upgrade (SQLite):** yeni migration içeren bir sürüme yükselt → `upgrade-tool` servisi yeniden başlatır → health
 9. [ ] **Upgrade (Postgres, RLS açık):** `ENFLOW_MIGRATOR_URL` ile; ön-yedek `.dump` oluştu, `migrate deploy` migrator ile, RLS yeniden uygulandı
-10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra otomatik geri alma + önceki sürüm sağlıklı; log'da maskeli `pg_restore` komutu
+10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra kod otomatik geri alma + önceki sürüm sağlıklı; **veritabanı geri yüklenmez** (yükseltme sırasında yazılan veri korunur), log'da hazır geri yükleme komutu (SQLite `cp`, Postgres maskeli `pg_restore`)
+11. [ ] **Normal kullanıcıyla upgrade-tool (Linux):** `systemctl restart` yetki isterse `sudo -n` denenir; sudoers'ta parolasız kural yoksa yükseltme geri ALINMAZ, çıkış kodu 3 + elle komut. (Bu senaryo yalnız birim/entegrasyon testli — gerçek systemd'de doğrulayın.)
 
 ## 2. macOS (launchd)
 1. [ ] Sihirbaz → servis **evet** → LaunchDaemon (sudo) — `sudo launchctl print system/com.enflow.backend`
@@ -46,3 +47,16 @@
 - [ ] `install/build-package.*` zip'i temiz makinede açılıp kurulumu tamamlıyor (`lib/`, `service/` dahil mi?)
 - [ ] `git status --porcelain` kurulumdan sonra **boş** (SQLite ve Postgres yollarında) → upgrade-tool kirli-ağaç kontrolü geçiyor
 - [ ] Sürüm kararı: MINOR (v2.6.0) — `src/constants.ts` `APP_VERSION` + kök/`backend` `package.json` birlikte, **yalnız açık onayla**
+
+## 5. Oturum çerezi + CSP (P0-3)
+- [ ] Tarayıcıda giriş sonrası: DevTools → Application: `localStorage`'da token YOK; Cookies: `enflow_session` **HttpOnly** (+ HTTPS'te **Secure**, SameSite=Lax); konsolda `document.cookie` boş
+- [ ] Yanıt başlığı `Content-Security-Policy` (script-src 'self', object-src 'none', frame-ancestors 'none'); tüm ana modüller gezildiğinde konsolda CSP ihlali YOK (sunucu log'unda `[csp] ihlal` yok)
+- [ ] Ters proxy arkasında: giriş → bir kayıt oluştur/sil (çerezli POST/DELETE 403 dönmemeli — `Host` korunuyor mu / `CORS_ORIGINS` doğru mu)
+- [ ] Çıkış → çerez silinir; başka sekmede oturum iptali → arayüz girişe döner
+- [ ] PDF yükleme/ayrıştırma (Şartname Analizi) internetsiz makinede çalışır (pdf.js worker paketten)
+- [ ] Yazdırma pencereleri (proje raporu, PO, yönetim raporları): kullanıcı verisinde `<` `&` içeren bir ad HTML olarak yorumlanmaz
+
+## 6. Kiracı izolasyonu (çok kiracılı kurulum) — 2026-09-26 hata avından
+- [ ] İkinci kiracı varken birinci kiracının GM'si `POST /api/backup/jobs {"scope":"PLATFORM"}` → **403**; scope'suz → `TENANT` ve indirilen dosyada YALNIZ kendi satırları (otomatik: `tests/e2e-scenario/tests/backup-scope-isolation.spec.ts` + `ci-postgres.sh`)
+- [ ] `ls -l backend/.env` → `-rw-------`; `backend/backups` → `drwx------` (upgrade-tool eski kurulumları düzeltir)
+- [ ] upgrade-tool arayüzü token'sız `/api/status` → 401

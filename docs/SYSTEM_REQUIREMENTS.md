@@ -43,7 +43,7 @@ satır-sayısı doğrulaması geçmeden yapılandırmayı değiştirmeden Postgr
 | git | 2.30+ | güncel |
 | Tarayıcı (frontend — React 19) | Chrome/Edge/Firefox/Safari son 2 sürüm | aynı, güncel tutulan |
 | Açık portlar | 3000 (frontend, yalnız geliştirme) / 3002 (backend — üretimde tek origin) | yapılandırılabilir |
-| Ağ | İlk kurulumda internet (bağımlılık indirme) | üretimde reverse proxy (nginx/Caddy) + TLS |
+| Ağ | İlk kurulumda internet (bağımlılık indirme). Çalışma zamanında internet **gerekmez** (pdf.js worker paketten gelir; yalnız Google Fonts/PDF yazı tipleri için opsiyonel) | üretimde reverse proxy (nginx/Caddy) + **TLS** — oturum çerezi HTTPS'te `Secure` olur; ayrıntı: `install/README.md` § Ters proxy |
 | DB portu (Postgres) | **Hiçbir zaman internete açık olmamalı** — yalnız uygulama sunucusunun private network/VPC'sinden erişilebilir. Dışa açık olması gereken tek portlar: 22 (SSH) + reverse proxy'nin önündeki port (80/443). Prisma Studio de dahil hiçbir DB aracı prod sunucusunda internete açık çalıştırılmamalı — bkz. [`docs/VERITABANI_GUVENLIGI_PLAN.md`](VERITABANI_GUVENLIGI_PLAN.md). |
 
 ---
