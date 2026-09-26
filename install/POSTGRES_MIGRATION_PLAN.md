@@ -22,7 +22,7 @@
   `pg_dump -Fc` ön-yedek (RLS bayraklarıyla; alınamazsa durur, `ENFLOW_SKIP_PG_BACKUP=1` ile
   bilinçli atlanır) → git → install → `generate` + `migrate deploy` (migrator) → build → RLS
   kuruluysa `apply-postgres-rls` yeniden → OS servisini/`restartCommand` ile yeniden başlat →
-  `/api/health` (yeniden başlamış + `db:ok`) 60 sn. Başarısızlıkta kod otomatik geri alınır,
+  `/api/health` (yeniden başlamış + `db:ok`) 60 sn. Başarısızlıkta kod otomatik geri alınır (restart hatası hariç — o durumda yükseltme geri alınmaz, çıkış kodu 3),
   önceki sürüm yeniden başlatılır; **Postgres verisi otomatik geri yüklenmez** — log'a maskeli
   hazır `pg_restore` komutu yazılır.
 - **Eski `db push` kurulumları:** sahada canlı veri taşıyan yok (2026-09-26) → benimsetme aracı

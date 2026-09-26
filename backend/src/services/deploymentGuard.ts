@@ -10,6 +10,8 @@
 // erken-uyarı: süreci durdurmaz, tek-replika kurulumlarda (varsayılan) hiçbir
 // etkisi yok.
 
+import fs from 'fs';
+import path from 'path';
 import { logger } from '../utils/logger';
 
 export function checkDeploymentTopology(): void {
@@ -27,4 +29,28 @@ export function checkDeploymentTopology(): void {
     'bir replikaya yüklenen dosya diğerinden erişilemez. Bkz. ' +
     'docs/SYSTEM_REQUIREMENTS.md Senaryo 4.'
   );
+}
+
+/**
+ * Sır içeren dosyalardan grup/diğer kullanıcılara AÇIK olanları döndürür (POSIX). `.env` JWT imza
+ * anahtarını, tenant veri şifreleme ana anahtarını ve DB parolasını taşır; 0644 ise aynı makinedeki
+ * her yerel kullanıcı okuyabilir. Windows'ta mode anlamsız → boş.
+ */
+export function insecureSecretFiles(files: string[], platform: NodeJS.Platform = process.platform): { file: string; mode: string }[] {
+  if (platform === 'win32') return [];
+  const out: { file: string; mode: string }[] = [];
+  for (const file of files) {
+    try {
+      const mode = fs.statSync(file).mode & 0o777;
+      if ((mode & 0o077) !== 0) out.push({ file, mode: mode.toString(8) });
+    } catch { /* dosya yok */ }
+  }
+  return out;
+}
+
+export function checkSecretFilePermissions(): void {
+  const bad = insecureSecretFiles([path.resolve(process.cwd(), '.env')]);
+  for (const b of bad) {
+    logger.warn(`[deploymentGuard] ${b.file} izinleri ${b.mode} — gizli anahtarlar/parolalar diğer yerel kullanıcılara açık. Düzeltin: chmod 600 "${b.file}" (upgrade-tool bir sonraki yükseltmede de düzeltir).`);
+  }
 }

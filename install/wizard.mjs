@@ -9,7 +9,7 @@
 import { createInterface } from 'node:readline/promises';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, unlinkSync, chmodSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout, platform, exit } from 'node:process';
@@ -322,7 +322,10 @@ async function main() {
   } else if (existsSync(backendEnv) && !YES && !(await askYN('backend/.env zaten var — üzerine yazılsın mı?', false))) {
     warn('Mevcut backend/.env korundu.');
   } else {
-    writeFileSync(backendEnv, envLines.join('\n') + '\n');
+    // JWT anahtarı, veri şifreleme ana anahtarı ve DB parolası içerir → yalnız sahibi okuyabilsin (0600).
+    // (mode yalnız YENİ dosyada uygulanır; üzerine yazılan mevcut dosya için ayrıca chmod.)
+    writeFileSync(backendEnv, envLines.join('\n') + '\n', { mode: 0o600 });
+    try { chmodSync(backendEnv, 0o600); } catch { /* Windows: NTFS ACL */ }
     // Frontend dev portu — vite --port ile geçilir; .env.local opsiyonel
     writeFileSync(join(REPO, '.env.local'), `VITE_BACKEND_PORT=${backendPort}\n`);
     ok(`backend/.env yazıldı (${backendEnv})`);

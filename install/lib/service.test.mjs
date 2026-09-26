@@ -3,9 +3,10 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { resolveRestartCommand, launchdDaemonPlist, launchdAgentPlist, winswExePath } from './service.mjs';
+import { resolveRestartCommand, resolveRestartCommands, launchdDaemonPlist, launchdAgentPlist, winswExePath } from './service.mjs';
 
-const probe = ({ exists = [], systemctlOk = false, uid = 501 } = {}) => ({
+const probe = ({ exists = [], systemctlOk = false, uid = 501, root = false } = {}) => ({
+  isRoot: () => root,
   exists: (p) => exists.includes(p),
   status: (cmd, args) => (cmd === 'systemctl' && args[0] === 'is-enabled' && systemctlOk ? 0 : 1),
   uid: () => uid,
@@ -193,4 +194,22 @@ test('executePlan dry: hiçbir şey çalıştırmaz/yazmaz', () => {
 
 test('formatCommand: boşluklu argüman tırnaklanır', () => {
   assert.equal(formatCommand({ cmd: 'C:\\Program Files\\x.exe', args: ['install'], sudo: false }), '"C:\\Program Files\\x.exe" install');
+});
+
+test('restart adayları: root değilse doğrudan + sudo -n; root ise yalnız doğrudan', () => {
+  const nonRoot = resolveRestartCommands({ platform: 'linux', probe: probe({ systemctlOk: true }) });
+  assert.deepEqual(nonRoot, [
+    { cmd: 'systemctl', args: ['restart', 'enflow'] },
+    { cmd: 'sudo', args: ['-n', 'systemctl', 'restart', 'enflow'] },
+  ]);
+  assert.equal(resolveRestartCommands({ platform: 'linux', probe: probe({ systemctlOk: true, root: true }) }).length, 1);
+  assert.deepEqual(resolveRestartCommands({ platform: 'linux', probe: probe() }), []);
+});
+
+test('restart adayları: LaunchDaemon sudo\'lu yedek; LaunchAgent ve WinSW yalnız doğrudan', () => {
+  const d = resolveRestartCommands({ platform: 'darwin', probe: probe({ exists: [launchdDaemonPlist()] }) });
+  assert.equal(d.length, 2);
+  assert.deepEqual(d[1].args.slice(0, 3), ['-n', 'launchctl', 'kickstart']);
+  assert.equal(resolveRestartCommands({ platform: 'darwin', probe: probe({ exists: [launchdAgentPlist()] }) }).length, 1);
+  assert.equal(resolveRestartCommands({ platform: 'win32', home: 'C:\\e', probe: probe({ exists: [winswExePath('C:\\e')] }) }).length, 1);
 });

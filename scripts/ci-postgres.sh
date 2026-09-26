@@ -100,6 +100,19 @@ PGHOST="${PGHOST:-localhost}" PGPORT="${PGPORT:-5432}" PGUSER="$ENFLOW_APP_USER"
 pg_restore -f - --data-only -t Customer "$DUMP" | grep -q "RLS Müşteri" || fail "pg_dump çıktısında tenant verisi yok (RLS dump'ı boşaltıyor)"
 echo "✓ pg_dump RLS altında tam veri aldı"
 
+# Çok kiracılı izolasyon (yedek): ikinci kiracı eklenince tenant-1'in GM'si PLATFORM yedeği ALAMAZ / indiremez;
+# varsayılan TENANT olur (10x avı 2026-09-26: eskiden tüm kiracıların verisi tek dosyada sızıyordu).
+DATABASE_URL="$APP_URL" NODE_ENV=production AUTH_JWT_SECRET=x DATA_ENCRYPTION_MASTER_KEY="$(openssl rand -base64 32)" node -e '
+const { prisma } = require("./dist/prismaClient");
+const { runWithRlsBypass } = require("./dist/services/tenantContext");
+runWithRlsBypass(async () => { await prisma.tenant.create({ data: { id: "ci-other", name: "Başka Şirket" } }); })
+  .then(() => prisma.$disconnect()).catch((e) => { console.error(e.message); process.exit(1); });' || fail "ikinci kiracı oluşturulamadı"
+CODE=$(curl -s -o /dev/null -w '%{http_code}' "${AUTH[@]}" -X POST "$API/backup/jobs" -d '{"scope":"PLATFORM","kind":"DATA"}')
+[ "$CODE" = 403 ] || fail "çok kiracılıda PLATFORM yedeği 403 değil ($CODE) — kiracılar arası veri sızıntısı!"
+SCOPE=$(curl -s "${AUTH[@]}" -X POST "$API/backup/jobs" -d '{"kind":"DATA"}' | json scope)
+[ "$SCOPE" = TENANT ] || fail "çok kiracılıda varsayılan kapsam TENANT değil ($SCOPE)"
+echo "✓ yedek izolasyonu: çok kiracılıda PLATFORM=403, varsayılan=TENANT"
+
 step "7/7 SIGTERM → graceful shutdown (≤10 sn, exit 0)"
 kill -TERM "$PID"
 for _ in $(seq 1 24); do kill -0 "$PID" 2>/dev/null || break; sleep 0.5; done
