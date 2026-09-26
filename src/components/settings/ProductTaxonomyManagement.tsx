@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Tag, Layers, Edit3, Trash2, X, Save, Loader2, ChevronDown, ChevronUp, Building2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Brand, ProductCategory, BrandSource } from '../../types';
 import { apiService } from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useBrands, useProductCategories } from '../../hooks/useEnflowQueries';
 
 // Ayarlar → Marka & Ürün Grubu (GM-only) — Presales BoM kalemi, DMO kataloğu ve
 // (ileride) Satınalma/Servis'in ortak seçtiği yönetilebilir liste. Serbest metin
@@ -98,6 +101,7 @@ const ProductCategoryManager: React.FC<{ categories: ProductCategory[]; onChange
 
 // ── Markalar + her markanın Kaynakları (distribütör/bayi) ───────────────────
 const BrandManager: React.FC<{ brands: Brand[]; onChange: () => void }> = ({ brands, onChange }) => {
+  const queryClient = useQueryClient();
   const [newName, setNewName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
@@ -149,6 +153,7 @@ const BrandManager: React.FC<{ brands: Brand[]; onChange: () => void }> = ({ bra
   const refreshSources = async (brandId: string) => {
     const sources = await apiService.getBrandSources(brandId).catch(() => []);
     setSourcesByBrand(prev => ({ ...prev, [brandId]: sources }));
+    void queryClient.invalidateQueries({ queryKey: ['taxonomy', 'brand-sources'] });   // Presales'in paylaşılan kaynak listesi
   };
 
   const handleAddSource = async (brandId: string) => {
@@ -251,18 +256,16 @@ const BrandManager: React.FC<{ brands: Brand[]; onChange: () => void }> = ({ bra
 };
 
 export const ProductTaxonomyManagement: React.FC = () => {
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [categories, setCategories] = useState<ProductCategory[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
+  const brandsQ = useBrands(currentUser?.tenantId ?? '');
+  const categoriesQ = useProductCategories(currentUser?.tenantId ?? '');
+  const brands = (brandsQ.data ?? []) as Brand[];
+  const categories = (categoriesQ.data ?? []) as ProductCategory[];
+  const loading = brandsQ.isLoading || categoriesQ.isLoading;
 
-  const load = () => {
-    Promise.all([apiService.getBrands(), apiService.getProductCategories()])
-      .then(([b, c]) => { setBrands(b); setCategories(c); })
-      .catch(() => undefined)
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => { load(); }, []);
+  // Yönetici değişikliği tüm modüllerin paylaştığı ['taxonomy'] önbelleğini geçersiz kılar
+  const load = () => { void queryClient.invalidateQueries({ queryKey: ['taxonomy'] }); };
 
   return (
     <div className="space-y-6">

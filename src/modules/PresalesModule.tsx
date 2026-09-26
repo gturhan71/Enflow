@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   LayoutDashboard,
   FileSearch,
@@ -30,6 +31,7 @@ import SpecComplianceMatrix from './SpecComplianceMatrix';
 import { useAuth } from '../contexts/AuthContext';
 import { PermissionGate } from '../components/PermissionGate';
 import { useBoM } from '../hooks/useBoM';
+import { useBrands, useProductCategories, useBrandSources, useBomHandoffs, useBomQuotes } from '../hooks/useEnflowQueries';
 import { fmtCurrency } from '../lib/format';
 import { parseBoMFile } from '../utils/bomParser';
 import { SaveButton } from '../components/SaveButton';
@@ -116,17 +118,10 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
   });
 
   // Marka & Ürün Grubu — Ayarlar'dan yönetilen ortak liste (Faz 1).
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
-  const [brandSources, setBrandSources] = useState<BrandSource[]>([]);
-  useEffect(() => {
-    apiService.getBrands().then(setBrands).catch(() => {});
-    apiService.getProductCategories().then(setProductCategories).catch(() => {});
-  }, []);
-  useEffect(() => {
-    if (!newItem.brandId) { setBrandSources([]); return; }
-    apiService.getBrandSources(newItem.brandId).then(setBrandSources).catch(() => setBrandSources([]));
-  }, [newItem.brandId]);
+  const tenantIdForQueries = currentUser?.tenantId ?? '';
+  const brands = (useBrands(tenantIdForQueries).data ?? []) as Brand[];
+  const productCategories = (useProductCategories(tenantIdForQueries).data ?? []) as ProductCategory[];
+  const brandSources = (useBrandSources(tenantIdForQueries, newItem.brandId || undefined).data ?? []) as BrandSource[];
 
   const [showApprovalPreview, setShowApprovalPreview] = useState(false);
   const [quoteLine, setQuoteLine] = useState<{ lineKey: string; name: string } | null>(null);
@@ -565,16 +560,11 @@ const PresalesModule = ({ opportunities, setOpportunities, units, users, setTask
 const COMP_LABEL: Record<string, string> = { COMPLIANT: 'Uygun', PARTIAL: 'Kısmen Uygun', NON_COMPLIANT: 'Uygun Değil' };
 
 const BomHandoffsView: React.FC = () => {
-  const [handoffs, setHandoffs] = useState<BomHandoff[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { currentUser } = useAuth();
+  const handoffsQ = useBomHandoffs(currentUser?.tenantId ?? '');
+  const handoffs = (handoffsQ.data ?? []) as BomHandoff[];
+  const loading = handoffsQ.isFetching;
   const [selected, setSelected] = useState<BomHandoff | null>(null);
-
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    apiService.getBomHandoffs().then(d => { if (active) setHandoffs((d as BomHandoff[]) || []); }).finally(() => active && setLoading(false));
-    return () => { active = false; };
-  }, []);
 
   const fmtTotals = (json?: string | null) => {
     if (!json) return '—';
@@ -651,19 +641,16 @@ const BoMQuotePanel: React.FC<{
   opportunityId: string; lineKey: string; componentName: string;
   onClose: () => void; onSelected: (cost: number, vendor: string) => void;
 }> = ({ opportunityId, lineKey, componentName, onClose, onSelected }) => {
-  const [quotes, setQuotes] = useState<BoMLineQuote[]>([]);
-  const [loading, setLoading] = useState(false);
+  const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
+  const quotesQ = useBomQuotes(currentUser?.tenantId ?? '', opportunityId);
+  const quotes = useMemo(() => ((quotesQ.data ?? []) as BoMLineQuote[]).filter(q => q.lineKey === lineKey), [quotesQ.data, lineKey]);
+  const loading = quotesQ.isFetching;
   const [suggestId, setSuggestId] = useState<string | null>(null);
   const [f, setF] = useState({ vendorName: '', unitPrice: '', currency: 'TRY', technicalCompliance: 'COMPLIANT', specSummary: '', deliveryDays: '' });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const all = (await apiService.getBomQuotes(opportunityId)) as BoMLineQuote[];
-      setQuotes((all || []).filter(q => q.lineKey === lineKey));
-    } finally { setLoading(false); }
-  }, [opportunityId, lineKey]);
-  useEffect(() => { load(); }, [load]);
+  // Teklif ekle/seç/sil/yükle sonrası bu fırsatın kalem tekliflerini yenile
+  const load = () => queryClient.invalidateQueries({ queryKey: ['presales', 'bom-quotes'] });
 
   const addQuote = async () => {
     if (!f.vendorName.trim() || !f.unitPrice) return;

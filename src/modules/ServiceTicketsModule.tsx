@@ -3,6 +3,8 @@ import {
   Wrench, Plus, X, RefreshCw, AlertTriangle, CheckCircle2, Loader2,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
+import { useAuth } from '../contexts/AuthContext';
+import { useBrands, useProductCategories } from '../hooks/useEnflowQueries';
 import {
   Project, ServiceTicket, ServiceTicketCategory, ServiceTicketPriority, ServiceTicketStatus,
   SERVICE_TICKET_CATEGORY_LABEL, SERVICE_TICKET_PRIORITY_LABEL, SERVICE_TICKET_STATUS_LABEL,
@@ -48,12 +50,9 @@ export function ServiceTicketsModule({ projects }: Props) {
   const [saving, setSaving] = useState(false);
 
   // Marka & Ürün Grubu — Ayarlar'dan yönetilen ortak liste (Faz 3, opsiyonel tek etiket).
-  const [brands, setBrands] = useState<Brand[]>([]);
-  const [productCategories, setProductCategories] = useState<ProductCategory[]>([]);
-  useEffect(() => {
-    apiService.getBrands().then(setBrands).catch(() => {});
-    apiService.getProductCategories().then(setProductCategories).catch(() => {});
-  }, []);
+  const { currentUser } = useAuth();
+  const brands = (useBrands(currentUser?.tenantId ?? '').data ?? []) as Brand[];
+  const productCategories = (useProductCategories(currentUser?.tenantId ?? '').data ?? []) as ProductCategory[];
 
   const load = useCallback(async () => {
     setLoading(true);

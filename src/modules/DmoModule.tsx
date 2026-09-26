@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useBrands, useProductCategories } from '../hooks/useEnflowQueries';
 import { fmtCurrency as fmt } from '../lib/format';
 import type {
   DmoCatalogItem, DmoFrameworkAgreement, DmoExchangeRate, DmoOrder, DmoOrderItem,
@@ -364,12 +365,9 @@ const inp = 'input-glass w-full mt-1 text-sm';
 
 function CatalogForm({ initial, agreements, rates, onClose, onSaved }: { initial?: DmoCatalogItem; agreements: DmoFrameworkAgreement[]; rates: DmoExchangeRate[]; onClose: () => void; onSaved: () => void }) {
   const [f, setF] = useState({ dmoCode: initial?.dmoCode || '', name: initial?.name || '', unit: initial?.unit || 'ADET', listPrice: initial?.listPrice ?? 0, currency: initial?.currency || 'TRY', unitCost: initial?.unitCost ?? 0, costCurrency: initial?.costCurrency || 'TRY', brandId: initial?.brandId || '', model: initial?.model || '', categoryId: initial?.categoryId || '', frameworkAgreementId: initial?.frameworkAgreementId || '' });
-  const [brands, setBrands] = useState<import('../types').Brand[]>([]);
-  const [productCategories, setProductCategories] = useState<import('../types').ProductCategory[]>([]);
-  useEffect(() => {
-    apiService.getBrands().then(setBrands).catch(() => {});
-    apiService.getProductCategories().then(setProductCategories).catch(() => {});
-  }, []);
+  const { currentUser: formUser } = useAuth();
+  const brands = (useBrands(formUser?.tenantId ?? '').data ?? []) as import('../types').Brand[];
+  const productCategories = (useProductCategories(formUser?.tenantId ?? '').data ?? []) as import('../types').ProductCategory[];
   // Satış (DMO kuru) + alış maliyeti için döviz seçenekleri: TRY + tanımlı DMO kurları
   const currencyOpts = [...new Set(['TRY', ...rates.map(r => r.currency), f.currency, f.costCurrency])].filter(Boolean);
   const save = async () => { const d = { ...f, brandId: f.brandId || null, categoryId: f.categoryId || null, frameworkAgreementId: f.frameworkAgreementId || null }; if (initial) await apiService.updateDmoCatalog(initial.id, d); else await apiService.createDmoCatalog(d); onSaved(); };
