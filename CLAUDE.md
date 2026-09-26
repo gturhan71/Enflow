@@ -370,7 +370,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
-backend/src/lifecycle.ts ← services/periodic
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
@@ -448,6 +447,7 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
+backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, services/session, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
@@ -524,13 +524,13 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 66 minutes ago)
+## changes (last 10 commits — 59 minutes ago)
 ```
-backend/scripts/ensure-build.mjs              +needsBuild
-backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/scripts/db-migrate.mjs                +run
+backend/scripts/ensure-build.mjs              +needsBuild
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
+backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
@@ -550,26 +550,6 @@ install/wizard.mjs                            +offerServiceInstall  ~setSchemaPr
 ```
 
 ## backend
-
-### backend/scripts/ensure-build.mjs
-```
-export function needsBuild(backendDir)  :14-28  # dist/index
-```
-
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :15-25
-  server: Pick<Server, 'close' | 'closeAllCon  :16-16
-  stops: StopFn[]  :17-17
-  disconnect: () => Promise<void>  :18-18
-  timeoutMs?: number  :19-19
-  graceMs?: number  :21-21
-  exit?: (code: number) => void  :22-22
-  log?: { info: (...a: unknown[]) => void  :23-23
-  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
-export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
-export function installShutdown(deps) → void  :80-84
-```
 
 ### backend/pnpm-lock.yaml
 ```
@@ -655,6 +635,11 @@ key provider
 function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
+### backend/scripts/ensure-build.mjs
+```
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -681,6 +666,21 @@ export interface PrismaPaths  :5-9
   schema: string  :7-7
   migrationsPath: string  :8-8
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
+```
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/src/middleware.ts
