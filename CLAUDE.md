@@ -525,7 +525,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 4 minutes ago)
+## changes (last 10 commits — 15 seconds ago)
 ```
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
@@ -535,6 +535,7 @@ backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveSche
 backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
 backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
+backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
 backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 upgrade-tool/core.mjs                         ~runUpgrade
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
@@ -634,6 +635,13 @@ export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-
 ### backend/src/services/profitabilitySnapshotScheduler.ts
 ```
 export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
+```
+
+### backend/src/services/tenantContext.ts
+```
+export function getTenantContext() → TenantContext | undefined  :15-17
+export function runWithTenant(tenantId, fn) → T  :37-39
+export function runWithRlsBypass(fn) → T  :45-47
 ```
 
 ### backend/src/services/updateNotifier.ts
@@ -1224,13 +1232,6 @@ export interface SpecAnalysis  :20-33
   project_impacts?: string[]  :31-31
 export function mockDocuments() → AnalyzedDoc[]  :64-75
 export async function analyzeSpec(inputText, opts,) → Promise<  :105-108  # Şartname/sözleşme metnini analiz eder; tenant YZ'si yapıland
-```
-
-### backend/src/services/tenantContext.ts
-```
-export function getTenantContext() → TenantContext | undefined  :15-17
-export function runWithTenant(tenantId, fn) → T  :37-39
-export function runWithRlsBypass(fn) → T  :45-47
 ```
 
 ### backend/src/services/unitReportingService.ts
