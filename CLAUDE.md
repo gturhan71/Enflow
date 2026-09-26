@@ -369,17 +369,10 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 backend/src/lifecycle.ts ← services/periodic
-backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
-backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
-backend/src/services/documentNumberService.ts ← prismaClient
-backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
-backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -463,16 +456,23 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
+backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
+backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
+backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
+backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
 backend/src/services/deploymentGuard.ts ← utils/logger
+backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/governance.ts ← prismaClient
 backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
+backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
 backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
@@ -480,12 +480,12 @@ backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profit
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
+backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
-backend/src/services/virtualAgentService.ts ← prismaClient, entitlementService, pluginCatalog, agentProvenance
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
@@ -528,22 +528,16 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 49 seconds ago)
+## changes (last 10 commits — 35 seconds ago)
 ```
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
-backend/src/prismaClient.ts                   +runManagedTransaction
+backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
-backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
-backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/documentNumberService.ts ~incrementDocumentSequence
 backend/src/services/periodic.ts              +schedulePeriodic
-backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
-backend/src/services/restoreService.ts        ~applyLogicalRestore
-backend/src/services/tenantContext.ts         +getTenantContext  +runWithTenant  +runWithRlsBypass
-backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
+backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 upgrade-tool/core.mjs                         ~runUpgrade
 ```
 
@@ -563,17 +557,14 @@ export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
 export function installShutdown(deps) → void  :60-64
 ```
 
-### backend/src/middleware.ts
+### backend/src/routes/health.ts
 ```
-export const asyncHandler = (fn) =>  :9-11
-export const requireRole = (allowed) =>  :82-90
-export const requireEntitlement = (pluginKey) =>  :116-123
-```
-
-### backend/src/prismaClient.ts
-```
-export type ManagedTx  :112-112
-export async function runManagedTransaction(callback, options?,) → Promise<T>  :121-135
+export interface HealthDeps  :9-13
+  pingDb: () => Promise<unknown>  :10-10
+  timeoutMs?: number  :11-11
+  version?: string  :12-12
+export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
+export function createHealthRouter(deps) → Router  :38-52
 ```
 
 ### backend/src/services/activityLogArchiveScheduler.ts
@@ -596,86 +587,15 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 export function startBackupScheduler() → StopFn  :67-70
 ```
 
-### backend/src/services/backupVerifyService.ts
-```
-export async function verifyBackup(jobId) → Promise<  :47-47
-export async function drainVerifyQueue(limit = 5) → Promise<number>  :126-140  # verifyStatus=PENDING + COMPLETED yedekleri sırayla doğrular 
-```
-
-### backend/src/services/bootstrapTenant.ts
-```
-export interface BootstrapInput  :40-47
-  companyName: string  :41-41
-  admin: { name: string  :42-42
-  license?: string  :44-44
-  tenantId?: string  :46-46
-export interface BootstrapResult  :48-53
-  tenantId: string  :49-49
-  token: string  :50-50
-  user: { id: string  :51-51
-  subscription: { plan: string  :52-52
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :55-135
-```
-
-### backend/src/services/documentNumberService.ts
-```
-export async function incrementDocumentSequence(tenantId, categoryCode, year) → Promise<number>  :24-45  # (tenant, kategori, yıl) bazında atomik sayaç artırımı — satı
-export async function nextDocumentNumber(tenantId, categoryCode) → Promise<string | null>  :47-68
-export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date()) → Promise<string>  :80-104  # Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu ü
-export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
-```
-
 ### backend/src/services/periodic.ts
 ```
 export type StopFn  :5-5
 export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
 ```
 
-### backend/src/services/personnelTransferService.ts
-```
-export interface OwnedCategory  :24-29
-  key: string  :25-25
-  label: string  :26-26
-  count: number  :27-27
-  sample: { id: string  :28-28
-export interface OwnedItemsResult  :31-41
-  userId: string  :32-32
-  userName: string  :33-33
-  role: string  :34-34
-  status: string  :35-35
-  categories: OwnedCategory[]  :36-36
-  totalActive: number  :37-37
-  inboundDelegationCount: number  :38-38
-  createdOpportunityCount: number  :39-39
-  hardDeleteBlocked: boolean  :40-40
-export interface TransferResult  :43-46
-  transferred: Record<string, number>  :44-44
-  clearedInboundDelegations: number  :45-45
-export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResult>  :154-173
-export async function transferOwnership(params) → Promise<TransferResult>  :193-202
-export async function deactivateUser(tenantId, userId) → Promise<void>  :204-213
-export async function hardDeleteUser(tenantId, userId) → Promise<  :215-215
-```
-
 ### backend/src/services/profitabilitySnapshotScheduler.ts
 ```
 export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
-```
-
-### backend/src/services/restoreService.ts
-```
-export type LogicalPayloadData  :20-20
-export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :59-111  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
-export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :153-157  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
-export async function applyLogicalRestore(restoreId, actor?) → Promise<  :246-246  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
-export async function stageStateRestore(restoreId) → Promise<  :286-286  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
-```
-
-### backend/src/services/tenantContext.ts
-```
-export function getTenantContext() → TenantContext | undefined  :15-17
-export function runWithTenant(tenantId, fn) → T  :21-23
-export function runWithRlsBypass(fn) → T  :29-31
 ```
 
 ### backend/src/services/updateNotifier.ts
@@ -789,19 +709,27 @@ async function login()  :18-27
 async function main()  :29-57
 ```
 
+### backend/scripts/sync-postgres-schema.mjs
+```
+export function toPostgres(schema)  :21-25
+```
+
+### backend/src/middleware.ts
+```
+export const asyncHandler = (fn) =>  :9-11
+export const requireRole = (allowed) =>  :82-90
+export const requireEntitlement = (pluginKey) =>  :116-123
+```
+
 ### backend/src/planCatalog.ts
 ```
 export type PlanId  :5-5
 ```
 
-### backend/src/routes/health.ts
+### backend/src/prismaClient.ts
 ```
-export interface HealthDeps  :9-13
-  pingDb: () => Promise<unknown>  :10-10
-  timeoutMs?: number  :11-11
-  version?: string  :12-12
-export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
-export function createHealthRouter(deps) → Router  :38-52
+export type ManagedTx  :112-112
+export async function runManagedTransaction(callback, options?,) → Promise<T>  :121-135
 ```
 
 ### backend/src/services/agentProvenance.ts
@@ -823,6 +751,33 @@ export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | n
 export async function isAIConfigured(tenantId) → Promise<boolean>  :68-70
 export function assertSafeAiUrl(rawUrl) → void  :81-96  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
 export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
+```
+
+### backend/src/services/approvalSlaEscalation.ts
+```
+export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
+export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
+```
+
+### backend/src/services/backupVerifyService.ts
+```
+export async function verifyBackup(jobId) → Promise<  :47-47
+export async function drainVerifyQueue(limit = 5) → Promise<number>  :126-140  # verifyStatus=PENDING + COMPLETED yedekleri sırayla doğrular 
+```
+
+### backend/src/services/bootstrapTenant.ts
+```
+export interface BootstrapInput  :40-47
+  companyName: string  :41-41
+  admin: { name: string  :42-42
+  license?: string  :44-44
+  tenantId?: string  :46-46
+export interface BootstrapResult  :48-53
+  tenantId: string  :49-49
+  token: string  :50-50
+  user: { id: string  :51-51
+  subscription: { plan: string  :52-52
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :55-135
 ```
 
 ### backend/src/services/corporateDocumentReminders.ts
@@ -879,6 +834,14 @@ export function computeDeliveryDueDate(referenceStart, totalDays) → Date  :47-
 ### backend/src/services/deploymentGuard.ts
 ```
 export function checkDeploymentTopology() → void  :15-30
+```
+
+### backend/src/services/documentNumberService.ts
+```
+export async function incrementDocumentSequence(tenantId, categoryCode, year) → Promise<number>  :24-45  # (tenant, kategori, yıl) bazında atomik sayaç artırımı — satı
+export async function nextDocumentNumber(tenantId, categoryCode) → Promise<string | null>  :47-68
+export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date()) → Promise<string>  :80-104  # Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu ü
+export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
 ```
 
 ### backend/src/services/financingEffect.ts
@@ -948,6 +911,32 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/personnelTransferService.ts
+```
+export interface OwnedCategory  :24-29
+  key: string  :25-25
+  label: string  :26-26
+  count: number  :27-27
+  sample: { id: string  :28-28
+export interface OwnedItemsResult  :31-41
+  userId: string  :32-32
+  userName: string  :33-33
+  role: string  :34-34
+  status: string  :35-35
+  categories: OwnedCategory[]  :36-36
+  totalActive: number  :37-37
+  inboundDelegationCount: number  :38-38
+  createdOpportunityCount: number  :39-39
+  hardDeleteBlocked: boolean  :40-40
+export interface TransferResult  :43-46
+  transferred: Record<string, number>  :44-44
+  clearedInboundDelegations: number  :45-45
+export async function getOwnedItems(tenantId, userId) → Promise<OwnedItemsResult>  :154-173
+export async function transferOwnership(params) → Promise<TransferResult>  :193-202
+export async function deactivateUser(tenantId, userId) → Promise<void>  :204-213
+export async function hardDeleteUser(tenantId, userId) → Promise<  :215-215
 ```
 
 ### backend/src/services/processEngine.ts
@@ -1174,6 +1163,15 @@ export function asOfKeyOf(d) → string  :13-15
 export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
 ```
 
+### backend/src/services/restoreService.ts
+```
+export type LogicalPayloadData  :20-20
+export async function loadModelsIntoTarget(tx, data, provider, scope?, scopeTenant?,) → Promise<Record<string, number>  :59-111  # Tüm modelleri (sil +) yeniden yükler — hem in-place restore 
+export async function analyzeRestore(tenantId, backupId, startedBy?,) → Promise<  :153-157  # backup vs canlı veri farkını hesaplar; RestoreJob (AWAITING_
+export async function applyLogicalRestore(restoreId, actor?) → Promise<  :246-246  # Mantıksal geri yükleme: güvenlik snapshot + FK kapalı + sil/
+export async function stageStateRestore(restoreId) → Promise<  :286-286  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
+```
+
 ### backend/src/services/roleDefaultPermissions.ts
 ```
 export function defaultPermissionsForRole(role) → string[]  :64-66
@@ -1219,6 +1217,13 @@ export function mockDocuments() → AnalyzedDoc[]  :64-75
 export async function analyzeSpec(inputText, opts,) → Promise<  :105-108  # Şartname/sözleşme metnini analiz eder; tenant YZ'si yapıland
 ```
 
+### backend/src/services/tenantContext.ts
+```
+export function getTenantContext() → TenantContext | undefined  :15-17
+export function runWithTenant(tenantId, fn) → T  :21-23
+export function runWithRlsBypass(fn) → T  :29-31
+```
+
 ### backend/src/services/unitReportingService.ts
 ```
 export interface UnitDefinition  :6-10
@@ -1246,22 +1251,6 @@ export interface UnitMetricsResult  :90-97
   metrics: Metric[]  :95-95
   charts: ChartSeries[]  :96-96
 export interface WorkflowBottleneck  :457-461
-```
-
-### backend/src/services/virtualAgentService.ts
-```
-export interface AgentOutput  :13-25
-rationale: string  :14-14
-output: Record<string, unknown>  :15-15
-taskTitle: string  :17-17
-autonomousAction?: { kind: string  :19-20
-summary: string  :21-21
-reversible: boolean  :22-22
-execute:  :23-23
-export function scoreQuotes  :189-191
-export function hasHandler  :505-507
-export async function runAgent  :513-518
-export async function ratifyAgentRun  :633-639
 ```
 
 ### backend/src/services/workflowTemplate.ts
@@ -1369,6 +1358,11 @@ hook useState
 export HandOffModal
 handler onClick
 handler onChange
+```
+
+### src/components/InfoTooltip.tsx
+```
+component InfoTooltip
 ```
 
 ### src/components/MoneyInput.tsx
@@ -2662,4 +2656,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 197 file(s) omitted, 1 collapsed to anchors to stay under the 19175-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 196 file(s) omitted to stay under the 19184-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

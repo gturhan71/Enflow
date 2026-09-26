@@ -16,7 +16,8 @@
     "test:load": "node scripts/loadtest/mixed-read.mjs",
     "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
-    "start:ts": "ts-node src/index.ts"
+    "start:ts": "ts-node src/index.ts",
+    "db:sync-pg": "node scripts/sync-postgres-schema.mjs"
   },
   "keywords": [],
   "author": "",
