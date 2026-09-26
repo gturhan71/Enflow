@@ -61,7 +61,10 @@ describe('SESSION-COOKIE-AUTH', () => {
     expect(sb.user.email).toBe(admin.email);
     expect(sb.user.password).toBeUndefined();
     expect(sb.user.tenant.dekWrapped).toBeUndefined();
-    expect((await api('/auth/session')).status).toBe(401);
+    // oturum yok / kurcalanmış → 200 { user: null } (401 değil: konsolda gereksiz kırmızı hata düşmesin)
+    const none = await api('/auth/session');
+    expect(none.status).toBe(200);
+    expect((await none.json()).user).toBeNull();
   });
 
   it('çerezle durum değiştirme: CSRF başlığı yok → 403; başlıkla → 2xx', async () => {

@@ -53,14 +53,15 @@ router.post('/login', asyncHandler(async (req: Request, res: Response) => {
   res.json(isWebClient(req) ? { user: toSafeUser(user) } : { user: toSafeUser(user), token });
 }));
 
-// Mevcut oturumu doğrular (çerez ya da Bearer) → kullanıcı; yoksa/geçersizse 401. Arayüz açılışta bunu çağırır
-// (token artık JS'de olmadığından "girişli miyim?" sorusunun tek cevabı budur).
+// Mevcut oturumu doğrular (çerez ya da Bearer) → { user } ; oturum yoksa/geçersizse { user: null } (HTTP 200).
+// Arayüz açılışta bunu çağırır (token artık JS'de olmadığından "girişli miyim?" sorusunun tek cevabı budur);
+// 401 yerine 200 → giriş yapmamış her ziyaretçide tarayıcı konsoluna gereksiz kırmızı hata düşmez.
 router.get('/session', asyncHandler(async (req: Request, res: Response) => {
   const supplied = getRequestToken(req);
   const payload = supplied && verifyAuthToken(supplied.token);
-  if (!payload) return res.status(401).json({ error: 'Oturum yok.' });
+  if (!payload) return res.json({ user: null });
   const user = await loadUser({ id: payload.sub });
-  if (!user || user.status !== 'ACTIVE' || user.tenantId !== payload.tid) return res.status(401).json({ error: 'Oturum geçersiz.' });
+  if (!user || user.status !== 'ACTIVE' || user.tenantId !== payload.tid) return res.json({ user: null });
   res.json({ user: toSafeUser(user) });
 }));
 

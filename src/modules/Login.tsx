@@ -6,7 +6,7 @@ import { apiService } from '../services/apiService';
 import type { User as EnflowUser } from '../types';
 
 interface LoginProps {
-  onLogin: (tenantId: string, token: string, user: EnflowUser) => void;
+  onLogin: (tenantId: string, user: EnflowUser) => void;
 }
 
 const Login = ({ onLogin }: LoginProps) => {
@@ -25,9 +25,10 @@ const Login = ({ onLogin }: LoginProps) => {
     try {
       if (view === 'LOGIN') {
         const data = await apiService.login(email, password);
-        apiService.setAuth(data.user.tenantId, data.token);
+        apiService.setAuth(data.user.tenantId);
         // Kimliği doğrulanan GERÇEK kullanıcıyı taşı — UI artık kendi rolüne göre açılır.
-        onLogin(data.user.tenantId, data.token, data.user as EnflowUser);
+        // (Oturum httpOnly çerezde; yanıtta token yok.)
+        onLogin(data.user.tenantId, data.user as EnflowUser);
       } else {
         const data = await apiService.forgotPassword(email);
         setSuccessMessage(data.message);

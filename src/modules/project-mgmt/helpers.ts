@@ -1,6 +1,7 @@
 import { fmtCurrencyExact as fmt } from '../../lib/format';
 import { Project } from '../../types';
 import { MS_STATUS_CONFIG, COST_CAT_LABEL, type ProjectHandoverDoc } from './constants';
+import { escapeHtml } from '../../lib/html';
 
 export const fmtDate = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
@@ -37,13 +38,13 @@ export const printProjectReport = (project: Project, forCustomer = false) => {
   if (!w) return;
   const msRows = project.milestones.map(m => {
     const sc = MS_STATUS_CONFIG[m.status];
-    return `<tr><td>${m.title}</td><td>${sc.label}</td><td>%${m.progress}</td><td>${fmtDate(m.plannedStart)}</td><td>${fmtDate(m.plannedEnd)}</td><td>${fmtDate(m.actualEnd)}</td></tr>`;
+    return `<tr><td>${escapeHtml(m.title)}</td><td>${escapeHtml(sc.label)}</td><td>%${m.progress}</td><td>${fmtDate(m.plannedStart)}</td><td>${fmtDate(m.plannedEnd)}</td><td>${fmtDate(m.actualEnd)}</td></tr>`;
   }).join('');
   const costRows = forCustomer ? '' : project.projectCostItems.map(c =>
-    `<tr><td>${COST_CAT_LABEL[c.category]}</td><td>${c.description}</td><td>${fmt(c.plannedAmount)}</td><td>${fmt(c.amountTRY)}</td></tr>`
+    `<tr><td>${escapeHtml(COST_CAT_LABEL[c.category])}</td><td>${escapeHtml(c.description)}</td><td>${fmt(c.plannedAmount)}</td><td>${fmt(c.amountTRY)}</td></tr>`
   ).join('');
 
-  w.document.write(`<!DOCTYPE html><html><head><title>Proje Raporu — ${project.name}</title>
+  w.document.write(`<!DOCTYPE html><html><head><title>Proje Raporu — ${escapeHtml(project.name)}</title>
   <style>body{font-family:Arial,sans-serif;padding:40px;color:#1e293b;max-width:900px;margin:0 auto}
   h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin:24px 0 8px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
   table{width:100%;border-collapse:collapse;font-size:12px}td,th{padding:6px 8px;border:1px solid #e2e8f0;text-align:left}
@@ -52,14 +53,14 @@ export const printProjectReport = (project: Project, forCustomer = false) => {
   .val{font-size:16px;font-weight:700;margin-top:2px}.warn{background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:12px;color:#dc2626;font-size:12px}</style>
   </head><body>
   <h1>Proje Raporu${forCustomer ? ' (Müşteri)' : ''}</h1>
-  <p style="color:#64748b;font-size:13px">${project.name} · ${fmtDate(new Date().toISOString())}</p>
+  <p style="color:#64748b;font-size:13px">${escapeHtml(project.name)} · ${fmtDate(new Date().toISOString())}</p>
   <div class="grid">
-    <div class="card"><p class="label">Müşteri</p><p class="val" style="font-size:14px">${project.customerName ?? '—'}</p></div>
-    <div class="card"><p class="label">Proje Yöneticisi</p><p class="val" style="font-size:14px">${project.pmName ?? '—'}</p></div>
+    <div class="card"><p class="label">Müşteri</p><p class="val" style="font-size:14px">${escapeHtml(project.customerName ?? '—')}</p></div>
+    <div class="card"><p class="label">Proje Yöneticisi</p><p class="val" style="font-size:14px">${escapeHtml(project.pmName ?? '—')}</p></div>
     <div class="card"><p class="label">Sözleşme Bedeli</p><p class="val">${fmt(project.totalValue, project.contractCurrency)}</p></div>
     <div class="card"><p class="label">İlerleme</p><p class="val">%${project.progress}</p></div>
     <div class="card"><p class="label">Planlanan Bitiş</p><p class="val" style="font-size:14px">${fmtDate(project.plannedEndDate)}</p></div>
-    <div class="card"><p class="label">Aktif Faz</p><p class="val" style="font-size:14px">${project.phase}</p></div>
+    <div class="card"><p class="label">Aktif Faz</p><p class="val" style="font-size:14px">${escapeHtml(project.phase)}</p></div>
   </div>
   <h2>Kilometre Taşı Takibi</h2>
   <table><tr><th>Kilometre Taşı</th><th>Durum</th><th>İlerleme</th><th>Plan Başlangıç</th><th>Plan Bitiş</th><th>Gerçek Bitiş</th></tr>${msRows}</table>

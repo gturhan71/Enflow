@@ -17,12 +17,15 @@ for (const role of ROLE_NAMES) {
   test.describe(`UI erişimi — ${role}`, () => {
     test.use({ storageState: path.join(authDir, `${role}.json`) });
 
-    // Bir kez login sayfasını yükle ve localStorage doğrula
+    // Oturum httpOnly çerezde (JS göremez) → sunucudan doğrula; localStorage'da token OLMAMALI (P0-3)
     test("oturum doğrulama", async ({ page }) => {
       await page.goto(baseURL);
 
-      const token = await page.evaluate(() => localStorage.getItem("enflow_auth_token"));
-      expect(token, `${role} token'ı bulunamadı — auth setup başarısız olmuş olabilir`).toBeTruthy();
+      const sess = await page.request.get(`${baseURL}/api/auth/session`);
+      expect((await sess.json()).user, `${role} oturum çerezi yok/geçersiz — auth setup başarısız olmuş olabilir`).not.toBeNull();
+
+      const leaked = await page.evaluate(() => localStorage.getItem("enflow_auth_token"));
+      expect(leaked, "oturum token'ı localStorage'da OLMAMALI (XSS ile okunabilir)").toBeNull();
     });
 
     for (const c of uiMatrix) {
@@ -80,9 +83,10 @@ for (const role of ROLE_NAMES) {
 
     // Giriş yapılmamış durumda login sayfası göster
     test("oturum yokken login sayfasına yönlendirme", async ({ page }) => {
-      // Önce sayfayı yükle, sonra localStorage'ı temizleyerek oturum durumunu sıfırla
+      // Önce sayfayı yükle, sonra localStorage + oturum ÇEREZİNİ temizleyerek oturum durumunu sıfırla
       await page.goto(baseURL);
       await page.evaluate(() => localStorage.clear());
+      await page.context().clearCookies();
       await page.reload();
 
       // SPA'nın Login render etmesini bekle

@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { BackupJob, RestoreJob, BackupSettings } from '../types';
+import { authFetch } from '../services/apiClient';
 
 type TabKey = 'jobs' | 'restore' | 'schedule';
 const TABS: { key: TabKey; label: string; icon: React.ElementType }[] = [
@@ -36,14 +37,10 @@ const statusBadge = (s: string) => {
 };
 const targetIcon = (t: string) => t === 'NEXTCLOUD' ? <Cloud className="w-3.5 h-3.5" /> : t === 'S3' ? <Server className="w-3.5 h-3.5" /> : <HardDrive className="w-3.5 h-3.5" />;
 
-// Yetki header'lı indirme — tarayıcı navigasyonu x-tenant-id/Authorization gönderemez,
+// Kimlikli indirme — tarayıcı navigasyonu x-tenant-id başlığı gönderemez,
 // bu yüzden blob'u fetch ile çekip client-side indir.
 const downloadArtifact = async (id: string, artifact: 'data' | 'state') => {
-  const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-  const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-  const res = await fetch(`/api/backup/jobs/${id}/download?artifact=${artifact}`, {
-    headers: { 'x-tenant-id': tid, Authorization: `Bearer ${token}` },
-  });
+  const res = await authFetch(`/api/backup/jobs/${id}/download?artifact=${artifact}`);
   if (!res.ok) { alert('İndirme başarısız: ' + res.status); return; }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
