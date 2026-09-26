@@ -22,6 +22,7 @@ import presalesRouter from './routes/presales';
 import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
+import { uploadsTenantGuard } from './services/uploadsGuard';
 import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
 import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
@@ -112,7 +113,7 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 // Yüklenen dosyalar tarayıcıda ÇALIŞTIRILMAZ: her zaman indirme olarak servis
 // edilir + nosniff → depolanmış XSS (yüklü .html/.svg) engellenir.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', tenantMiddleware, uploadsTenantGuard, express.static(path.join(__dirname, '../uploads'), {
   setHeaders: (res) => {
     res.setHeader('Content-Disposition', 'attachment');
     res.setHeader('X-Content-Type-Options', 'nosniff');
