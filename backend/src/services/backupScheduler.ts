@@ -12,7 +12,7 @@ import { drainVerifyQueue } from './backupVerifyService';
 import { logActivity } from './activityLog';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
-import { schedulePeriodic, type StopFn } from './periodic';
+import { schedulePeriodic, reportSchedulerError, type StopFn } from './periodic';
 
 const LOCK_NAME = 'backup-scheduler';
 const LOCK_TTL_MS = 10 * 60_000; // 10dk — runBackup uzun sürebilir (VACUUM INTO)
@@ -52,13 +52,13 @@ async function tick(): Promise<void> {
             settings: s,
           });
           await logActivity({ tenantId: t.id, action: 'BACKUP_SCHEDULED_RUN', entityType: 'BACKUP_JOB', entityId: job.id, details: { intervalHours: s.intervalHours } });
-        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+        } catch (e) { reportSchedulerError('backup-scheduler', e, { scope: 'tenant' }); } // tek tenant hatası diğerlerini durdurmaz
       });
     }
 
     // Doğrulama kuyruğu (manuel + zamanlı tüm bekleyenler)
     await drainVerifyQueue(5);
-  } catch { /* sweep ana akışı bozmaz */ } finally {
+  } catch (e) { reportSchedulerError('backup-scheduler', e); } finally {
     await releaseLock(LOCK_NAME);
     running = false;
   }
@@ -66,5 +66,5 @@ async function tick(): Promise<void> {
 
 export function startBackupScheduler(): StopFn {
   // İlk tarama 30sn sonra (boot yükünü dağıt), sonra 60sn'de bir.
-  return schedulePeriodic(30_000, 60_000, () => { void tick(); });
+  return schedulePeriodic(30_000, 60_000, () => tick(), 'backup-scheduler');
 }

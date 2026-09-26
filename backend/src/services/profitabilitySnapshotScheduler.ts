@@ -9,7 +9,7 @@ import { prisma } from '../prismaClient';
 import { takeSnapshot, asOfKeyOf } from './profitabilitySnapshot';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
-import { schedulePeriodic, type StopFn } from './periodic';
+import { schedulePeriodic, reportSchedulerError, type StopFn } from './periodic';
 
 const LOCK_NAME = 'profitability-snapshot-scheduler';
 const LOCK_TTL_MS = 2 * 3_600_000;
@@ -35,15 +35,15 @@ async function tick(): Promise<void> {
         if (existing) return; // bu ay zaten alındı
         try {
           await takeSnapshot(t.id, { asOf: now });
-        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+        } catch (e) { reportSchedulerError('profitability-snapshot', e, { scope: 'tenant' }); } // tek tenant hatası diğerlerini durdurmaz
       });
     }
-  } catch { /* sweep ana akışı bozmaz */ } finally {
+  } catch (e) { reportSchedulerError('profitability-snapshot', e); } finally {
     await releaseLock(LOCK_NAME);
     running = false;
   }
 }
 
 export function startProfitabilitySnapshotScheduler(): StopFn {
-  return schedulePeriodic(60_000, 6 * 3_600_000, () => { void tick(); });  // 6 saatte bir
+  return schedulePeriodic(60_000, 6 * 3_600_000, () => tick(), 'profitability-snapshot');  // 6 saatte bir
 }
