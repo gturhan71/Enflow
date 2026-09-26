@@ -1,0 +1,7 @@
+{
+  "_not": "WinSW (MIT) — Windows servis sarmalayıcısı. sha256, resmi release varlığı indirilerek bir kez hesaplandı (2026-09-26); boyut GitHub API ile eşleşti. Sürüm değişirse üç alanı birlikte güncelleyin. Boş sha256 → sihirbaz indirmeyi reddeder.",
+  "version": "v2.12.0",
+  "url": "https://github.com/winsw/winsw/releases/download/v2.12.0/WinSW-x64.exe",
+  "size": 18243033,
+  "sha256": "05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da"
+}

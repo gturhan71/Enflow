@@ -379,7 +379,6 @@ src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
@@ -524,12 +523,11 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
 backend/scripts/db-migrate.mjs                +run
 backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
-backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
-install/lib/service.mjs                       +resolveRestartCommand
+install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall
 install/wizard.mjs                            ~setSchemaProvider  ~main  ~ensurePostgresServer
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
@@ -576,13 +574,6 @@ export interface RunBackupOpts  :124-134
   settings: BackupModuleSettings | null  :133-133
 export type BackupScope  :32-32
 export type BackupKind  :33-33
-```
-
-### backend/src/services/tenantContext.ts
-```
-export function getTenantContext() → TenantContext | undefined  :15-17
-export function runWithTenant(tenantId, fn) → T  :37-39
-export function runWithRlsBypass(fn) → T  :45-47
 ```
 
 ### backend/pnpm-lock.yaml
@@ -1224,6 +1215,13 @@ export function mockDocuments() → AnalyzedDoc[]  :64-75
 export async function analyzeSpec(inputText, opts,) → Promise<  :105-108  # Şartname/sözleşme metnini analiz eder; tenant YZ'si yapıland
 ```
 
+### backend/src/services/tenantContext.ts
+```
+export function getTenantContext() → TenantContext | undefined  :15-17
+export function runWithTenant(tenantId, fn) → T  :37-39
+export function runWithRlsBypass(fn) → T  :45-47
+```
+
 ### backend/src/services/unitReportingService.ts
 ```
 export interface UnitDefinition  :6-10
@@ -1330,12 +1328,14 @@ export type AgentMode  :14-14
 
 ### install/lib/service.mjs
 ```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :30-48  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :66-88  # Şablonu doldurur
-export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :95-154  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
-export const launchdDaemonPlist = () =>  :16-24
-export const launchdAgentPlist = () =>  :17-24
-export const winswExePath = (home) =>  :18-24
+export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
+export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
+export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
+export const launchdDaemonPlist = () =>  :18-26
+export const launchdAgentPlist = () =>  :19-26
+export const winswExePath = (home) =>  :20-26
 ```
 
 ### install/POSTGRES_MIGRATION_PLAN.md
@@ -1517,14 +1517,6 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :184-184
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -2776,4 +2768,4 @@ async function tick()  :62-71
 ```
 
 
-> **Not everything is here.** 202 file(s) omitted to stay under the 20029-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 203 file(s) omitted to stay under the 20084-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

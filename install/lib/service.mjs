@@ -6,6 +6,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import path, { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { homedir } from 'node:os';
+import { createHash } from 'node:crypto';
+import { mkdirSync, writeFileSync, renameSync, rmSync } from 'node:fs';
 
 export const SERVICE = {
   systemdUnit: 'enflow',                 // /etc/systemd/system/enflow.service
@@ -151,4 +153,29 @@ export function planInstall({ platform = process.platform, home, node, user, mod
     throw new Error(`Desteklenmeyen platform: ${platform}`);
   }
   return plan;
+}
+
+// ── WinSW indirme (T15) — sabit sürüm + SHA256; doğrulanmadan ASLA diske yazılmaz ────
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {}) {
+  return JSON.parse(readFileSync(lockPath, 'utf-8'));
+}
+
+/**
+ * WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleşmezse HATA (dosya yazılmaz).
+ * sha256 boşsa indirme reddedilir. fetchImpl testte enjekte edilir.
+ */
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {}) {
+  if (!lock.sha256 || !/^[0-9a-f]{64}$/i.test(lock.sha256)) {
+    throw new Error('winsw.lock.json içinde geçerli sha256 yok — indirme reddedildi. WinSW\'yi elle kurun: ' + lock.url);
+  }
+  const res = await fetchImpl(lock.url, { redirect: 'follow' });
+  if (!res.ok) throw new Error(`WinSW indirilemedi (HTTP ${res.status}).`);
+  const buf = Buffer.from(await res.arrayBuffer());
+  if (lock.size && buf.length !== lock.size) throw new Error(`WinSW boyutu beklenenden farklı (${buf.length} ≠ ${lock.size}) — indirme reddedildi.`);
+  const got = createHash('sha256').update(buf).digest('hex');
+  if (got.toLowerCase() !== lock.sha256.toLowerCase()) throw new Error(`WinSW SHA256 uyuşmuyor (beklenen ${lock.sha256}, gelen ${got}) — indirme reddedildi, dosya yazılmadı.`);
+  mkdirSync(dirname(exePath), { recursive: true });
+  const part = exePath + '.part';
+  try { writeFileSync(part, buf); renameSync(part, exePath); } catch (e) { try { rmSync(part, { force: true }); } catch { /* yut */ } throw e; }
+  return { version: lock.version, sha256: got, bytes: buf.length };
 }

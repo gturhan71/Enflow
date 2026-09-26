@@ -107,3 +107,42 @@ test('plan win32: WinSW exe/xml eşleşen ad, yönetici gerekli', () => {
 test('plan: desteklenmeyen platform', () => {
   assert.throws(() => planInstall({ platform: 'freebsd', home: '/h', node: '/n', user: 'u' }), /Desteklenmeyen/);
 });
+
+// ── WinSW indirme doğrulaması ───────────────────────────────────────────────────
+import { downloadWinsw } from './service.mjs';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync } from 'node:fs';
+
+const payload = Buffer.from('sahte-winsw-ikilisi');
+const okLock = { version: 'vT', url: 'https://x/y.exe', size: payload.length, sha256: createHash('sha256').update(payload).digest('hex') };
+const fakeFetch = (buf, ok = true, status = 200) => async () => ({ ok, status, arrayBuffer: async () => buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length) });
+
+test('downloadWinsw: hash eşleşirse yazar', async () => {
+  const exe = join(mkdtempSync(join(tmpdir(), 'wsw-')), 'service', 'enflow-service.exe');
+  const r = await downloadWinsw(exe, { lock: okLock, fetchImpl: fakeFetch(payload) });
+  assert.equal(r.sha256, okLock.sha256);
+  assert.deepEqual(readFileSync(exe), payload);
+  assert.equal(existsSync(exe + '.part'), false);
+});
+
+test('downloadWinsw: hash uyuşmazsa reddeder ve dosya YAZMAZ', async () => {
+  const exe = join(mkdtempSync(join(tmpdir(), 'wsw-')), 'enflow-service.exe');
+  const tampered = Buffer.from('sahte-winsw-ikilisX');
+  await assert.rejects(downloadWinsw(exe, { lock: okLock, fetchImpl: fakeFetch(tampered) }), /SHA256 uyuşmuyor/);
+  assert.equal(existsSync(exe), false);
+});
+
+test('downloadWinsw: boyut farkı, HTTP hatası ve boş hash reddedilir', async () => {
+  const exe = join(mkdtempSync(join(tmpdir(), 'wsw-')), 'e.exe');
+  await assert.rejects(downloadWinsw(exe, { lock: { ...okLock, size: 1 }, fetchImpl: fakeFetch(payload) }), /boyutu/);
+  await assert.rejects(downloadWinsw(exe, { lock: okLock, fetchImpl: fakeFetch(payload, false, 404) }), /HTTP 404/);
+  await assert.rejects(downloadWinsw(exe, { lock: { ...okLock, sha256: '' }, fetchImpl: fakeFetch(payload) }), /geçerli sha256 yok/);
+  assert.equal(existsSync(exe), false);
+});
+
+test('winsw.lock.json: sabit v2.12.0 + 64 hex sha256 + resmi github URL', () => {
+  const lock = JSON.parse(readFileSync(new URL('../service/winsw.lock.json', import.meta.url), 'utf-8'));
+  assert.match(lock.sha256, /^[0-9a-f]{64}$/);
+  assert.match(lock.url, /^https:\/\/github\.com\/winsw\/winsw\/releases\/download\/v2\.12\.0\//);
+  assert.equal(lock.size, 18243033);
+});
