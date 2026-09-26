@@ -1,6 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { autoSkipOrphanStages, getDelegatedRoles, resolveEffectiveApprover, resolveGroupAfterDecision } from '../services/approvalChainService';
 import { continueProcess } from '../services/processEngine';
 import { sweepApprovalSlaEscalations } from '../services/approvalSlaEscalation';
@@ -119,7 +119,10 @@ router.get('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Resp
 }));
 
 // POST / → { entityType, entityId, stages: [{ role, order? }] }
-router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+// Elle zincir oluşturma/silme yalnız GM: ensureApprovalChain "mevcut PENDING zinciri yeniden kullanır" — rolsüz bir kullanıcı
+// önceden sahte (kendi rolüne aşamalı) zincir yerleştirip gerçek onayı ele geçirebilir / zinciri silerek denetimi yok edebilir.
+// Süreç motoru zincirleri servis katmanından kurar (bu uçlar UI'da kullanılmıyor).
+router.post('/', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
   const { entityType, entityId, stages } = req.body as {
     entityType: string;
     entityId: string;
@@ -376,7 +379,7 @@ router.post('/:id/stages/:stageId/reject', tenantMiddleware, asyncHandler(async 
   res.json(updated);
 }));
 
-router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.delete('/:id', tenantMiddleware, requireRole(['GENERAL_MANAGER']), asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);
   const chain = await prisma.approvalChain.findFirst({ where: { id, tenantId: req.tenantId } });
   if (!chain) return res.status(404).json({ error: 'Onay zinciri bulunamadı.' });

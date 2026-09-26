@@ -370,14 +370,12 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 backend/src/lifecycle.ts ← services/periodic
-backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
-upgrade-tool/core.mjs ← install/lib/service
-upgrade-tool/server.mjs ← core
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
+src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
@@ -412,7 +410,6 @@ src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/for
 src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/Login.tsx ← constants, services/apiService, types
-src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
@@ -431,7 +428,6 @@ src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
-src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SetupWizard.tsx ← services/apiService, types
@@ -453,6 +449,7 @@ backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLo
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
+backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 backend/src/services/backupTargets.ts ← utils/fileUpload
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
@@ -483,6 +480,8 @@ backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstra
 backend/src/utils/fileUpload.ts ← logger, usageService
 install/wizard.mjs ← lib/pg, lib/service
 upgrade-tool/cli.mjs ← core
+upgrade-tool/core.mjs ← install/lib/service
+upgrade-tool/server.mjs ← core
 ```
 
 ## versions (installed direct deps)
@@ -521,20 +520,11 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 4 minutes ago)
+## changes (last 10 commits — 35 minutes ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
-backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
-upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
-upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
-src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
-src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
-src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
-src/modules/FinanceModule.tsx                 ~OverheadPoolTab
-src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
 src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
-src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
 src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
@@ -544,6 +534,7 @@ backend/src/routes/health.ts                  +readVersion  +checkDb  +createHea
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
+backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/documentNumberService.ts ~incrementDocumentSequence
@@ -558,7 +549,9 @@ install/lib/service.mjs                       +resolveRestartCommand  +renderSer
 install/POSTGRES_MIGRATION_PLAN.md            +Postgres
 install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
 upgrade-tool/cli.mjs                          ~main
+upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
+upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
 ```
 
 ## backend
@@ -581,35 +574,6 @@ export interface ShutdownDeps  :15-25
   onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
 export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
 export function installShutdown(deps) → void  :80-84
-```
-
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :49-53
-  name: string  :50-50
-  delegateKey: string  :51-51
-  hasTenantId: boolean  :52-52
-export interface BackupModuleSettings  :120-129
-  enabled?: boolean  :121-121
-  intervalHours?: number  :122-122
-  scope?: BackupScope  :123-123
-  kind?: BackupKind  :124-124
-  targetType?: TargetType  :125-125
-  location?: string  :126-126
-  nextcloud?: { url?: string  :127-127
-  s3?: { endpoint?: string  :128-128
-export interface RunBackupOpts  :131-141
-  tenantId: string  :132-132
-  scope: BackupScope  :133-133
-  kind: BackupKind  :134-134
-  targetType: TargetType  :135-135
-  location?: string | null  :136-136
-  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
-  startedById?: string  :138-138
-  startedByName?: string  :139-139
-  settings: BackupModuleSettings | null  :140-140
-export type BackupScope  :39-39
-export type BackupKind  :40-40
 ```
 
 ### backend/pnpm-lock.yaml
@@ -740,11 +704,6 @@ export const requireRole = (allowed) =>  :82-90
 export const requireEntitlement = (pluginKey) =>  :116-123
 ```
 
-### backend/src/planCatalog.ts
-```
-export type PlanId  :5-5
-```
-
 ### backend/src/prismaClient.ts
 ```
 export type ManagedTx  :112-112
@@ -792,6 +751,35 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 ### backend/src/services/backupScheduler.ts
 ```
 export function startBackupScheduler() → StopFn  :67-70
+```
+
+### backend/src/services/backupService.ts
+```
+export interface ModelMeta  :49-53
+  name: string  :50-50
+  delegateKey: string  :51-51
+  hasTenantId: boolean  :52-52
+export interface BackupModuleSettings  :120-129
+  enabled?: boolean  :121-121
+  intervalHours?: number  :122-122
+  scope?: BackupScope  :123-123
+  kind?: BackupKind  :124-124
+  targetType?: TargetType  :125-125
+  location?: string  :126-126
+  nextcloud?: { url?: string  :127-127
+  s3?: { endpoint?: string  :128-128
+export interface RunBackupOpts  :131-141
+  tenantId: string  :132-132
+  scope: BackupScope  :133-133
+  kind: BackupKind  :134-134
+  targetType: TargetType  :135-135
+  location?: string | null  :136-136
+  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
+  startedById?: string  :138-138
+  startedByName?: string  :139-139
+  settings: BackupModuleSettings | null  :140-140
+export type BackupScope  :39-39
+export type BackupKind  :40-40
 ```
 
 ### backend/src/services/backupTargets.ts
@@ -1215,8 +1203,8 @@ export function defaultPermissionsForRole(role) → string[]  :64-66
 
 ### backend/src/services/schedulerLock.ts
 ```
-export async function acquireLock(name, ttlMs) → Promise<boolean>  :23-42  # Kilidi devralmayı dener
-export async function releaseLock(name) → Promise<void>  :45-50  # İş bitince kilidi hemen serbest bırakır (expiresAt'i geçmişe
+export async function acquireLock  :23-42
+export async function releaseLock  :45-50
 ```
 
 ### backend/src/services/serviceTicketReminders.ts
@@ -1553,6 +1541,20 @@ export interface AbbreviatedBoMItem  :7-20
   categoryId?: string  :18-18
   source?: string  :19-19
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
+```
+
+### src/hooks/useEnflowQueries.ts
+```
+export const useOpportunities = (tenantId, options = {}) =>  :6-14
+export const useCustomers = (tenantId, options = {}) =>  :16-24
+export const useProjects = (tenantId, options = {}) =>  :26-34
+export const useContracts = (tenantId, options = {}) =>  :36-44
+export const useTasks = (tenantId, options = {}) =>  :46-54
+export const useUnits = (tenantId, options = {}) =>  :56-64
+export const useUsers = (tenantId, options = {}) =>  :66-74
+export const useDocuments = (tenantId, options = {}) =>  :76-84
+export const useProposals = (tenantId, options = {}) =>  :86-94
+export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
 ### src/layout/Header.tsx
@@ -2020,21 +2022,6 @@ handler onSubmit
 handler onChange
 ```
 
-### src/modules/ManagementReportingModule.tsx
-```
-component ManagementReportingModule
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-handler onChange
-handler onClick
-handler onEdit
-handler onSubmit
-handler onDelete
-handler onReviewed
-```
-
 ### src/modules/negotiation/AuctionBoard.tsx
 ```
 component AuctionBoard
@@ -2245,11 +2232,6 @@ export function printUnitReport(r)  :121-141
 export function printOverview(overview, start, end)  :143-153
 export const pct = (n) =>  :4-6
 export const esc = (s) =>  :69-69
-```
-
-### src/modules/reporting/OverviewTab.tsx
-```
-component OverviewTab
 ```
 
 ### src/modules/SalesSupport.tsx
@@ -2698,6 +2680,11 @@ export interface ApprovalStage  :160-174
 
 ## upgrade-tool
 
+### upgrade-tool/cli.mjs
+```
+async function main()  :16-51
+```
+
 ### upgrade-tool/core.mjs
 ```
 export function resolveHome()  :23-28  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
@@ -2725,20 +2712,6 @@ function restoreDb(snap, log)  :231-244
 function run(home, cmd, args, log, opts = {})  :246-255
 function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
 function pgRlsInstalled(url)  :298-303
-```
-
-### upgrade-tool/server.mjs
-```
-function loadConfig()  :29-31
-function saveConfig(c)  :33-33
-function inMaintenanceWindow()  :47-51
-async function performUpgrade()  :53-60
-async function tick()  :63-72
-```
-
-### upgrade-tool/cli.mjs
-```
-async function main()  :16-51
 ```
 
 ### upgrade-tool/public/index.html
@@ -2782,5 +2755,14 @@ code-fence cron
 code-fence powershell
 ```
 
+### upgrade-tool/server.mjs
+```
+function loadConfig()  :29-31
+function saveConfig(c)  :33-33
+function inMaintenanceWindow()  :47-51
+async function performUpgrade()  :53-60
+async function tick()  :63-72
+```
 
-> **Not everything is here.** 210 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+
+> **Not everything is here.** 212 file(s) omitted, 1 collapsed to anchors to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
