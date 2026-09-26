@@ -49,6 +49,7 @@ test('render launchd: XML kaçışı + UserName yalnız verilirse', () => {
   assert.match(withUser, /<string>\/Users\/a&amp;b\/Enflow\/backend<\/string>/);
   assert.match(withUser, /<key>UserName<\/key><string>ali<\/string>/);
   assert.match(withUser, /<key>Label<\/key><string>com\.enflow\.backend<\/string>/);
+  assert.match(withUser, /<key>PATH<\/key><string>\/opt\/homebrew\/bin:\/opt\/homebrew\/bin:/);
   assert.doesNotMatch(renderServiceFile('launchd', { home: '/h', node: '/n' }), /UserName/);
 });
 
@@ -145,4 +146,51 @@ test('winsw.lock.json: sabit v2.12.0 + 64 hex sha256 + resmi github URL', () => 
   assert.match(lock.sha256, /^[0-9a-f]{64}$/);
   assert.match(lock.url, /^https:\/\/github\.com\/winsw\/winsw\/releases\/download\/v2\.12\.0\//);
   assert.equal(lock.size, 18243033);
+});
+
+// ── executePlan ─────────────────────────────────────────────────────────────────
+import { executePlan, formatCommand } from './service.mjs';
+
+const linuxPlan = () => planInstall({ platform: 'linux', home: '/opt/enflow', node: '/usr/bin/node', user: 'enflow' });
+
+test('executePlan: dizin → dosya → komut sırası; sudo öneki', () => {
+  const calls = [];
+  const r = executePlan(linuxPlan(), {
+    run: (cmd, args) => { calls.push([cmd, ...args].join(' ')); return 0; },
+    mkdir: (d) => calls.push(`mkdir ${d}`),
+    write: (f) => calls.push(`write ${f}`),
+  });
+  assert.equal(r.ok, true);
+  assert.deepEqual(calls, [
+    'mkdir /opt/enflow/logs',
+    'write /opt/enflow/service/enflow.service',
+    'sudo cp /opt/enflow/service/enflow.service /etc/systemd/system/enflow.service',
+    'sudo systemctl daemon-reload',
+    'sudo systemctl enable --now enflow',
+  ]);
+});
+
+test('executePlan: komut hatasında durur, kalanları elle-talimat olarak verir', () => {
+  let n = 0;
+  const r = executePlan(linuxPlan(), { run: () => (++n === 2 ? 1 : 0), mkdir: () => {}, write: () => {} });
+  assert.equal(r.ok, false);
+  assert.equal(r.failed, 'sudo systemctl daemon-reload');
+  assert.deepEqual(r.manual, ['sudo systemctl daemon-reload', 'sudo systemctl enable --now enflow']);
+});
+
+test('executePlan: ignoreFailure komutu hata verse de devam eder', () => {
+  const p = planInstall({ platform: 'darwin', home: '/Users/a/Enflow', node: '/n', user: 'a' });
+  const seen = [];
+  const r = executePlan(p, { run: (cmd, args) => { seen.push(args[1] ?? args[0]); return args.includes('bootout') ? 3 : 0; }, mkdir: () => {}, write: () => {} });
+  assert.equal(r.ok, true);
+  assert.ok(seen.length >= 4);
+});
+
+test('executePlan dry: hiçbir şey çalıştırmaz/yazmaz', () => {
+  const r = executePlan(linuxPlan(), { dry: true, run: () => { throw new Error('çalışmamalı'); }, mkdir: () => { throw new Error('x'); }, write: () => { throw new Error('x'); } });
+  assert.equal(r.ok, true);
+});
+
+test('formatCommand: boşluklu argüman tırnaklanır', () => {
+  assert.equal(formatCommand({ cmd: 'C:\\Program Files\\x.exe', args: ['install'], sudo: false }), '"C:\\Program Files\\x.exe" install');
 });

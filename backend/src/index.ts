@@ -237,7 +237,11 @@ const server = app.listen(port, () => {
     const nodeFs = require('fs');
     const wikiBuild = path.join(__dirname, '../../wiki/build.mjs');
     if (nodeFs.existsSync(wikiBuild)) {
-      spawn('node', [wikiBuild], { stdio: 'ignore', detached: false });
+      // process.execPath: servis ortamlarında (launchd/systemd/Windows servisi) PATH'te `node`
+      // olmayabilir → 'node' adıyla spawn ENOENT verir. ChildProcess hatası ASENKRON 'error'
+      // olayıdır (try/catch yakalamaz) → dinleyici yoksa TÜM backend çöker.
+      const child = spawn(process.execPath, [wikiBuild], { stdio: 'ignore', detached: false });
+      child.on('error', (e: Error) => logger.warn('[wiki] üretim başlatılamadı (yoksayıldı):', e.message));
     }
   } catch { /* yut — wiki üretimi ana akışı etkilemez */ }
 });

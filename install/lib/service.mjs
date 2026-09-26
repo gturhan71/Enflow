@@ -77,7 +77,7 @@ export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {
     map = { USER: user, HOME: systemdEscape(home), NODE: systemdEscape(node) };
   } else if (kind === 'launchd') {
     map = {
-      LABEL: SERVICE.launchdLabel, HOME: xmlEscape(home), NODE: xmlEscape(node),
+      LABEL: SERVICE.launchdLabel, HOME: xmlEscape(home), NODE: xmlEscape(node), NODE_DIR: xmlEscape(path.posix.dirname(node)),
       USERNAME_KEY: user ? `  <key>UserName</key><string>${xmlEscape(user)}</string>\n` : '',
     };
   } else {
@@ -178,4 +178,38 @@ export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl
   const part = exePath + '.part';
   try { writeFileSync(part, buf); renameSync(part, exePath); } catch (e) { try { rmSync(part, { force: true }); } catch { /* yut */ } throw e; }
   return { version: lock.version, sha256: got, bytes: buf.length };
+}
+
+// ── Planı uygulama (T16) — wizard kullanır; exec/mkdir/write enjekte edilebilir ─────
+const quoteArg = (a) => (/\s/.test(a) ? `"${a}"` : a);
+/** İnsan-okur komut satırı (elle kurulum talimatı için). */
+export function formatCommand(c) {
+  return `${c.sudo ? 'sudo ' : ''}${[c.cmd, ...c.args].map(quoteArg).join(' ')}`;
+}
+
+/**
+ * planInstall çıktısını uygular: dizinler → dosyalar → komutlar (sırayla).
+ * Komut hatasında DURUR; kalan komutlar `manual`'da (operatöre elle çalıştırması için).
+ * dry=true → hiçbir şey yazmaz/çalıştırmaz, yalnız log. Döner: { ok, failed?, manual? }.
+ */
+export function executePlan(plan, {
+  run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status,
+  mkdir = (d) => mkdirSync(d, { recursive: true }),
+  write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); },
+  log = () => {},
+  dry = false,
+} = {}) {
+  for (const d of plan.dirs ?? []) { log(`dizin: ${d}`); if (!dry) mkdir(d); }
+  for (const f of plan.files) { log(`yaz: ${f.path}`); if (!dry) write(f.path, f.content); }
+  for (let i = 0; i < plan.commands.length; i++) {
+    const c = plan.commands[i];
+    log(`$ ${formatCommand(c)}`);
+    if (dry) continue;
+    const [cmd, args] = c.sudo ? ['sudo', [c.cmd, ...c.args]] : [c.cmd, c.args];
+    const status = run(cmd, args);
+    if (status !== 0 && !c.ignoreFailure) {
+      return { ok: false, failed: formatCommand(c), manual: plan.commands.slice(i).map(formatCommand) };
+    }
+  }
+  return { ok: true };
 }

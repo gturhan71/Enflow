@@ -15,6 +15,8 @@
   <key>EnvironmentVariables</key>
   <dict>
     <key>NODE_ENV</key><string>production</string>
+    <!-- launchd'nin varsayılan PATH'i Homebrew'u içermez → pg_dump (yedek) bulunamazdı -->
+    <key>PATH</key><string>{{NODE_DIR}}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
   </dict>
 {{USERNAME_KEY}}  <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
