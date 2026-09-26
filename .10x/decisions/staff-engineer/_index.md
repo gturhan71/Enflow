@@ -1,5 +1,5 @@
-# Staff Engineer — [DISCOVERED]
-- Güçlü: strict TS (1 `any`), logger, logActivity deseni, guard script'leri (no-mock/tenant-scope/no-console), CLAUDE.md çok detaylı.
-- Zayıf: FE veri erişimi tutarsız (React Query vs manuel fetch), büyük dosyalar (WorkflowBuilder 984, opportunities route 948, ProposalEditor 931).
-- Kök dizinde 10 log dosyası; `backend_log.txt`/`frontend_log.txt` git'te izleniyor (.gitignore yalnız *.log).
-- `App.tsx:195` `'mock-token'` fallback'i kaldırılmalı.
+# Staff Engineer — indeks
+## Genel [DISCOVERED]
+- Strict TS (1 `any`), logger + logActivity, guard script'leri. Zayıf: FE veri erişimi tutarsız, büyük dosyalar, izlenen log dosyaları, `App.tsx:195` mock-token.
+## Aktif işler
+- [prod-runtime-pg-pipeline](prod-runtime-pg-pipeline.md)

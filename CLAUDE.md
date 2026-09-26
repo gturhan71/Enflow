@@ -528,7 +528,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 64 seconds ago)
+## changes (last 10 commits — 62 seconds ago)
 ```
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
