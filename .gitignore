@@ -59,3 +59,10 @@ tests/e2e-scenario/test-results/
 tests/e2e-scenario/dev.db
 tests/e2e-scenario/node_modules/
 tests/e2e-scenario/.tmp-db/
+
+# Playwright RBAC generated artifacts (login JWTs, storageState, reports)
+tests/rbac/auth/*.token
+tests/rbac/auth/*.json
+tests/rbac/auth/*.tenantId
+tests/rbac/playwright-report/
+tests/rbac/test-results/
