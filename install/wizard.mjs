@@ -13,6 +13,7 @@ import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from '
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout, platform, exit } from 'node:process';
+import { pgReachable, provisionPostgresDb, grantRuntimePrivileges } from './lib/pg.mjs';
 
 const C = { r: '\x1b[0m', b: '\x1b[1m', g: '\x1b[32m', y: '\x1b[33m', red: '\x1b[31m', c: '\x1b[36m', dim: '\x1b[2m' };
 const log = (m = '') => console.log(m);
@@ -71,14 +72,6 @@ function setSchemaProvider(prov) {
   if (next !== s && !DRY) writeFileSync(schemaPath, next);
   log(`${C.dim}  schema.prisma datasource provider → ${prov}${C.r}`);
 }
-// psql ile bir SQL çalıştır (PGPASSWORD ile); status döner.
-function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {}) {
-  const a = ['-h', admin.host, '-p', String(admin.port), '-U', admin.user, '-d', db, '-v', 'ON_ERROR_STOP=1'];
-  if (command) a.push('-c', command); else a.push('-c', sqlOrDb);
-  const r = spawnSync('psql', a, { encoding: 'utf-8', env: { ...process.env, PGPASSWORD: admin.pass || '' }, shell: isWin });
-  return r;
-}
-const pgReachable = (admin) => psql(admin, 'SELECT 1;').status === 0;
 
 // PostgreSQL sunucusunu garanti et (yoksa Windows'ta winget ile kur).
 async function ensurePostgresServer(admin) {
@@ -96,46 +89,7 @@ async function ensurePostgresServer(admin) {
   return false;
 }
 
-// İKİ-ROL AYRIMI (en az yetki, Adım 0 madde 5): `migratorUser` DB'nin OWNER'ı
-// (DDL yetkili — yalnız kurulum/upgrade sırasında `db push`/`migrate deploy` için
-// kullanılır, backend/.env'e YAZILMAZ); `appUser` çalışma zamanı rolü — LOGIN var
-// ama DDL/CREATEROLE/SUPERUSER YOK, yalnız aşağıda grantRuntimePrivileges() ile
-// DML (SELECT/INSERT/UPDATE/DELETE) yetkisi verilir. İkisi de superuser ile
-// idempotent oluşturulur.
-function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass }) {
-  const esc = (v) => String(v).replace(/'/g, "''");
-  // migrator rolü (owner — DDL)
-  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(migratorUser)}') THEN CREATE ROLE "${migratorUser}" WITH LOGIN PASSWORD '${esc(migratorPass)}'; END IF; END $$;` });
-  psql(admin, null, { command: `ALTER ROLE "${migratorUser}" WITH LOGIN PASSWORD '${esc(migratorPass)}';` });
-  // runtime rolü (DML-only — NOSUPERUSER/NOCREATEDB/NOCREATEROLE açıkça verilir)
-  psql(admin, null, { command: `DO $$ BEGIN IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname='${esc(appUser)}') THEN CREATE ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}' NOSUPERUSER NOCREATEDB NOCREATEROLE; END IF; END $$;` });
-  psql(admin, null, { command: `ALTER ROLE "${appUser}" WITH LOGIN PASSWORD '${esc(appPass)}' NOSUPERUSER NOCREATEDB NOCREATEROLE;` });
-  // veritabanı — migrator sahipliğinde (CREATE DATABASE transaction-dışı; var mı diye bak)
-  const exists = (psql(admin, null, { command: `SELECT 1 FROM pg_database WHERE datname='${esc(db)}';` }).stdout || '').includes('1');
-  if (!exists) psql(admin, null, { command: `CREATE DATABASE "${db}" OWNER "${migratorUser}";` });
-  else psql(admin, null, { command: `ALTER DATABASE "${db}" OWNER TO "${migratorUser}";` }); // eski tek-rol kurulumundan yükseltme
-  const g = psql(admin, null, { command: `GRANT CONNECT ON DATABASE "${db}" TO "${appUser}";` });
-  return g.status === 0;
-}
-
-// db push/migrate SONRASI çağrılır — runtime rolüne yalnız DML yetkisi verir +
-// ALTER DEFAULT PRIVILEGES ile gelecekteki (bir sonraki db push'ta eklenen)
-// tablolar için de otomatik yetki devreder (elle tekrar grant gerekmez).
-// `conn` yeterli yetkiye sahip herhangi bir bağlantı olabilir (burada: superuser admin).
-function grantRuntimePrivileges(conn, { db, appUser, migratorUser }) {
-  const commands = [
-    `GRANT USAGE ON SCHEMA public TO "${appUser}";`,
-    `GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO "${appUser}";`,
-    `GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO "${appUser}";`,
-    `ALTER DEFAULT PRIVILEGES FOR ROLE "${migratorUser}" IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO "${appUser}";`,
-    `ALTER DEFAULT PRIVILEGES FOR ROLE "${migratorUser}" IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO "${appUser}";`,
-  ];
-  for (const command of commands) {
-    const r = psql({ host: conn.host, port: conn.port, user: conn.user, pass: conn.pass }, null, { db, command });
-    if (r.status !== 0) return false;
-  }
-  return true;
-}
+// Postgres rol/DB provizyonu + runtime GRANT'leri → install/lib/pg.mjs (CI ile ortak).
 
 // Uygulama sunucusunun gelen trafiğini SSH + backend portuna kısıtlar — yalnız
 // operatör AÇIKÇA onaylarsa çalışır (varsayılan HAYIR), mevcut kuralları SİLMEZ,

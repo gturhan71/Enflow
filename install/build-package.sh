@@ -14,10 +14,11 @@ PKG="$STAGE/enflow-installer"
 mkdir -p "$PKG"
 
 cp "$HERE/install.sh" "$HERE/install.ps1" "$HERE/install.bat" "$HERE/wizard.mjs" "$HERE/README.md" "$HERE/.env.example" "$PKG/"
+cp -R "$HERE/lib" "$PKG/lib"
 chmod +x "$PKG/install.sh" 2>/dev/null || true
 
 ( cd "$STAGE" && zip -rq "$ZIP" enflow-installer )
 rm -rf "$STAGE"
 echo "✓ Kurulum paketi: $ZIP"
-echo "  İçerik: install.sh · install.ps1 · install.bat · wizard.mjs · README.md · .env.example"
+echo "  İçerik: install.sh · install.ps1 · install.bat · wizard.mjs · lib/ · README.md · .env.example"
 echo "  Kullanım (hedef makinede): açın → ./install.sh (Linux/macOS) · install.bat çift-tık veya .\\install.ps1 (Windows)"

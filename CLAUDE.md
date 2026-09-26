@@ -374,6 +374,7 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
+install/wizard.mjs ← lib/pg
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
@@ -383,7 +384,6 @@ src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../servic
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
-src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
@@ -468,7 +468,6 @@ backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStr
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/governance.ts ← prismaClient
-backend/src/services/invoiceService.ts ← prismaClient, activityLog, documentNumberService
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
@@ -526,9 +525,10 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 39 seconds ago)
+## changes (last 10 commits — 71 seconds ago)
 ```
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
+backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
@@ -538,13 +538,57 @@ backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 upgrade-tool/core.mjs                         ~runUpgrade
+install/wizard.mjs                            ~main
 ```
 
 ## backend
 
+### backend/prisma/migrations-postgres/0000_baseline/migration.sql
+```
+TABLE Tenant
+TABLE Subscription
+TABLE UsageMetric
+TABLE Unit
+TABLE User
+TABLE Customer
+TABLE Contact
+TABLE Opportunity
+TABLE OpportunityRequiredDoc
+TABLE OpportunityProgressLog
+TABLE Proposal
+TABLE CostAnalysisVersion
+TABLE Brand
+TABLE ProductCategory
+TABLE BrandSource
+TABLE BoMItem
+TABLE BoMLineQuote
+TABLE CostItem
+TABLE WorkflowLog
+TABLE Project
+TABLE ServiceTicket
+TABLE PlatformTicket
+TABLE ProfitabilitySnapshot
+TABLE ProjectMilestone
+TABLE ProjectCostItem
+```
+
+### backend/prisma/migrations-postgres/migration_lock.toml
+```
+key provider
+```
+
 ### backend/scripts/sync-postgres-schema.mjs
 ```
 export function toPostgres(schema)  :21-25
+```
+
+### backend/src/config/prismaPaths.ts
+```
+export interface PrismaPaths  :5-9
+  provider: 'postgresql' | 'sqlite'  :6-6
+  schema: string  :7-7
+  migrationsPath: string  :8-8
+export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
 ### backend/src/lifecycle.ts
@@ -627,11 +671,6 @@ export function startUpdateNotifier() → StopFn  :124-127
 keys: [lockfileVersion, settings, importers, packages, snapshots]
 ```
 
-### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
-```
-TABLE new_WorkflowStep
-```
-
 ### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
 ```
 TABLE PlatformTicket
@@ -707,53 +746,10 @@ INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 key provider
 ```
 
-### backend/prisma/migrations-postgres/0000_baseline/migration.sql
-```
-TABLE Tenant
-TABLE Subscription
-TABLE UsageMetric
-TABLE Unit
-TABLE User
-TABLE Customer
-TABLE Contact
-TABLE Opportunity
-TABLE OpportunityRequiredDoc
-TABLE OpportunityProgressLog
-TABLE Proposal
-TABLE CostAnalysisVersion
-TABLE Brand
-TABLE ProductCategory
-TABLE BrandSource
-TABLE BoMItem
-TABLE BoMLineQuote
-TABLE CostItem
-TABLE WorkflowLog
-TABLE Project
-TABLE ServiceTicket
-TABLE PlatformTicket
-TABLE ProfitabilitySnapshot
-TABLE ProjectMilestone
-TABLE ProjectCostItem
-```
-
-### backend/prisma/migrations-postgres/migration_lock.toml
-```
-key provider
-```
-
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
 async function main()  :29-57
-```
-
-### backend/src/config/prismaPaths.ts
-```
-export interface PrismaPaths  :5-9
-  provider: 'postgresql' | 'sqlite'  :6-6
-  schema: string  :7-7
-  migrationsPath: string  :8-8
-export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
 ### backend/src/middleware.ts
@@ -915,29 +911,6 @@ export async function resolveApproverRoles(tenantId, amount?,) → Promise<strin
 export async function isSoDEnabled(tenantId) → Promise<boolean>  :41-47
 export async function resolveEntityCreator(entityType, entityId) → Promise<string | null>  :50-66  # Onay zinciri / domain entity'sinin oluşturanını çözer (yoksa
 export async function sodViolation(tenantId, actorUserId, entityType, entityId,) → Promise<string | null>  :72-85  # SoD ihlali varsa açıklama döner; ihlal yoksa/kapalıysa/çözül
-```
-
-### backend/src/services/invoiceService.ts
-```
-export interface CreateInvoiceInput  :9-27
-  type?: string  :10-10
-  invoiceNo?: string  :11-11
-  amount: number | string  :12-12
-  currency?: string  :13-13
-  issueDate?: string  :14-14
-  dueDate?: string  :15-15
-  status?: string  :16-16
-  projectId?: string | null  :17-17
-  contractId?: string | null  :18-18
-  milestoneId?: string | null  :19-19
-  customerId?: string | null  :20-20
-  customerName?: string | null  :21-21
-  vendorName?: string | null  :22-22
-  notes?: string | null  :23-23
-  createdById?: string | null  :24-24
-  categoryCode?: string  :25-25
-  issueRateToTRY?: number | string  :26-26
-export async function createInvoiceRecord(tenantId, data, actorUserId?)  :29-72
 ```
 
 ### backend/src/services/opportunityFolderService.ts
@@ -1355,6 +1328,106 @@ export type RACI  :13-13
 export type AgentMode  :14-14
 ```
 
+## install
+
+### install/wizard.mjs
+```
+async function ask(q, def)  :38-42
+async function askYN(q, def = true)  :43-48
+function run(cmd, cmdArgs, cwd)  :49-54
+function capture(cmd, cmdArgs)  :55-58
+function setSchemaProvider(prov)  :67-74
+async function ensurePostgresServer(admin)  :77-90
+async function offerFirewallHardening(backendPort)  :97-129
+async function main()  :141-408
+```
+
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
+### install/ILK_KURULUM_KILAVUZU.md
+```
+h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
+h2 İçindekiler
+h2 1. Sistem Gereksinimleri
+h2 2. Kurulum — İşletim Sisteminize Göre
+h3 2.1 Windows
+h1 A) Depo zaten bilgisayarınızdaysa:
+h1 B) Sıfırdan (depoyu kendisi indirir):
+h3 2.2 macOS
+h1 A) Depo zaten elinizdeyse (klasöre girip):
+h1 B) Sıfırdan — depoyu kendisi klonlar:
+h3 2.3 Linux
+h1 A) Depo zaten elinizdeyse:
+h1 B) Sıfırdan:
+h3 2.4 Sihirbaz Hangi Soruları Sorar?
+h3 2.5 Başlatma
+h1 ── ÜRETİM (önerilen) — derlenmiş sürüm, backend tek origin'den hem arayüzü hem API'yi sunar ──
+h1 ── GELİŞTİRME — canlı kaynak, iki ayrı süreç ──
+h3 2.5b Kurulumdan Sonra — Ağ Güvenliği
+h3 2.6 Sık Karşılaşılan Sorunlar
+h2 3. İlk Açılış — Kurulum Sihirbazı
+h2 4. Lisans Girişi
+h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
+h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
+h2 5. Birim (Unit) Oluşturma
+h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
+```
+
+### install/lib/pg.mjs
+```
+export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
+export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
+export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
+export const pgReachable = (admin) =>  :26-28
+```
+
+### install/POSTGRES_MIGRATION_PLAN.md
+```
+h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
+h2 Durum
+h2 Hedef
+h2 Zorluk
+h3 Yaklaşım A — Sağlayıcı-başına ayrı migration klasörü (önerilen)
+h3 Yaklaşım B — Tek kaynak model + generate-time provider switch
+h2 Önerilen yol haritası
+h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+h2 Kapasite teyidi (kurulum sihirbazı)
+h2 İlgili dosyalar
+h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/README.md
+```
+h1 Enflow — Kurulum Kılavuzu
+h2 Sistem Gereksinimleri
+h2 Hızlı Kurulum
+h3 Linux / macOS
+h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
+h1 B) Tek başına (sıfırdan — depoyu klonlar):
+h3 Windows
+h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
+h1 B) Tek başına:
+h3 Etkileşimsiz (CI / otomasyon)
+h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
+h2 Başlatma
+h1 ── ÜRETİM (önerilen): `pnpm build` sonrası backend dist'i TEK ORIGIN sunar ──
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
+h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h2 Dağıtılabilir Kurulum Zip'i Üretme
+h1 Linux/macOS
+h1 Windows
+h2 PostgreSQL (Üretim) Notu
+h2 Sorun Giderme
+h2 Güvenlik
+h3 Veritabanı ve Prisma Studio Erişimi
+code-fence bash
+code-fence plain
+code-fence powershell
+```
+
 ## src
 
 ### src/App.tsx
@@ -1475,20 +1548,6 @@ export interface AbbreviatedBoMItem  :7-20
   categoryId?: string  :18-18
   source?: string  :19-19
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
-```
-
-### src/hooks/useEnflowQueries.ts
-```
-export const useOpportunities = (tenantId, options = {}) =>  :6-14
-export const useCustomers = (tenantId, options = {}) =>  :16-24
-export const useProjects = (tenantId, options = {}) =>  :26-34
-export const useContracts = (tenantId, options = {}) =>  :36-44
-export const useTasks = (tenantId, options = {}) =>  :46-54
-export const useUnits = (tenantId, options = {}) =>  :56-64
-export const useUsers = (tenantId, options = {}) =>  :66-74
-export const useDocuments = (tenantId, options = {}) =>  :76-84
-export const useProposals = (tenantId, options = {}) =>  :86-94
-export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
 ### src/layout/Header.tsx
@@ -2677,4 +2736,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 199 file(s) omitted to stay under the 19320-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 200 file(s) omitted to stay under the 19803-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
