@@ -8,7 +8,7 @@
 ## 0. Otomatik (CI) — yeşil olmalı
 - [ ] `verify` job'u (tsc, guard'lar, birim testleri, node:test, build)
 - [ ] `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → health → setup/login/yaz-oku → pg_dump → SIGTERM)
-- [ ] RBAC süiti (`tests/rbac`) — commit öncesi **tek sefer** (repo kuralı)
+- [ ] RBAC süiti (`tests/rbac`) — CI `rbac-api` + `rbac-ui` job'ları koşar (taze DB + `pnpm seed:rbac`); yerelde `./scripts/ci-rbac.sh all`
 
 ## 1. Linux — Ubuntu 22.04+ VM (systemd)
 1. [ ] `./install/install.sh` → sihirbazda servis adımına **evet** → `systemctl is-active enflow`
