@@ -27,6 +27,8 @@ import { startActivityLogArchiveScheduler } from './services/activityLogArchiveS
 import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import { checkDeploymentTopology } from './services/deploymentGuard';
+import { helmetCsp } from './config/csp';
+import cspReportRouter from './routes/cspReport';
 import { installShutdown } from './lifecycle';
 import { createHealthRouter } from './routes/health';
 import { prisma } from './prismaClient';
@@ -62,6 +64,11 @@ import dmoRouter from './routes/dmo';
 dotenv.config({ quiet: true });
 
 const app = express();
+// Ters proxy (nginx/Caddy) arkasında req.secure / Secure çerez doğru çalışsın: TRUST_PROXY=true|<hop sayısı>|<ip/CIDR>
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? 1 : tp);
+}
 // PORT env override — varsayilan 3002 degismedi (yalniz izole test ortaminin
 // (tests/e2e-scenario) ayni makinede paralel bir backend process baslatabilmesi
 // icin eklendi, bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md).
@@ -73,7 +80,7 @@ import { logger } from './utils/logger';
 
 // Güvenlik başlıkları (clickjacking, MIME-sniff, referrer sızıntısı vb.).
 // SPA'yı bozmamak için CSP ve COEP kapalı (API + inline dist için).
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: helmetCsp(), crossOriginEmbedderPolicy: false }));
 
 // Kiracı verisi arama motorlarında ASLA görünmemeli (uyum gereksinimi) — tüm
 // yanıtlar (API + uploads + /wiki yansıması + SPA dist) tek noktadan noindex.
@@ -154,6 +161,7 @@ const authLimiter = rateLimit({
   message: { error: 'Çok fazla başarısız deneme. Lütfen bir süre sonra tekrar deneyin.' },
 });
 app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/csp-report', cspReportRouter); // kimliksiz (tarayıcı çerez eklemez); kendi hız sınırı+küçük gövde
 app.use('/api/tenants', tenantsRouter);
 app.use('/api', subscriptionRouter);
 app.use('/api/units', unitsRouter);
