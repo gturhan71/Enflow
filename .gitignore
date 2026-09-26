@@ -63,3 +63,14 @@ tests/e2e-scenario/.tmp-db/
 # Üretilen OS servis dosyaları + servis logları (install/lib/service.mjs) — makineye özel
 /service/
 /logs/
+
+# RBAC süiti (tests/rbac) — koşu çıktıları: oturum token'ları + raporlar üretilir, izlenmez (auth.setup.ts izlenir)
+tests/rbac/auth/*.json
+tests/rbac/auth/*.token
+tests/rbac/auth/*.tenantId
+tests/rbac/playwright-report/
+tests/rbac/test-results/
+
+# Kökteki geçici log çıktıları (*.log zaten yukarıda; .txt olanlar da)
+/*_log.txt
+/*_logs.txt
