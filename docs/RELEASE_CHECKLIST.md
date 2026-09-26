@@ -20,7 +20,8 @@
 7. [ ] Postgres kurulumu: `pg_dump` PATH'te → yedek (STATE) dosyası oluşuyor (`backend/backups`)
 8. [ ] **Upgrade (SQLite):** yeni migration içeren bir sürüme yükselt → `upgrade-tool` servisi yeniden başlatır → health
 9. [ ] **Upgrade (Postgres, RLS açık):** `ENFLOW_MIGRATOR_URL` ile; ön-yedek `.dump` oluştu, `migrate deploy` migrator ile, RLS yeniden uygulandı
-10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra otomatik geri alma + önceki sürüm sağlıklı; log'da maskeli `pg_restore` komutu
+10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra kod otomatik geri alma + önceki sürüm sağlıklı; **veritabanı geri yüklenmez** (yükseltme sırasında yazılan veri korunur), log'da hazır geri yükleme komutu (SQLite `cp`, Postgres maskeli `pg_restore`)
+11. [ ] **Normal kullanıcıyla upgrade-tool (Linux):** `systemctl restart` yetki isterse `sudo -n` denenir; sudoers'ta parolasız kural yoksa yükseltme geri ALINMAZ, çıkış kodu 3 + elle komut. (Bu senaryo yalnız birim/entegrasyon testli — gerçek systemd'de doğrulayın.)
 
 ## 2. macOS (launchd)
 1. [ ] Sihirbaz → servis **evet** → LaunchDaemon (sudo) — `sudo launchctl print system/com.enflow.backend`
@@ -46,3 +47,8 @@
 - [ ] `install/build-package.*` zip'i temiz makinede açılıp kurulumu tamamlıyor (`lib/`, `service/` dahil mi?)
 - [ ] `git status --porcelain` kurulumdan sonra **boş** (SQLite ve Postgres yollarında) → upgrade-tool kirli-ağaç kontrolü geçiyor
 - [ ] Sürüm kararı: MINOR (v2.6.0) — `src/constants.ts` `APP_VERSION` + kök/`backend` `package.json` birlikte, **yalnız açık onayla**
+
+## 5. Kiracı izolasyonu (çok kiracılı kurulum) — 2026-09-26 hata avından
+- [ ] İkinci kiracı varken birinci kiracının GM'si `POST /api/backup/jobs {"scope":"PLATFORM"}` → **403**; scope'suz → `TENANT` ve indirilen dosyada YALNIZ kendi satırları (otomatik: `tests/e2e-scenario/tests/backup-scope-isolation.spec.ts` + `ci-postgres.sh`)
+- [ ] `ls -l backend/.env` → `-rw-------`; `backend/backups` → `drwx------` (upgrade-tool eski kurulumları düzeltir)
+- [ ] upgrade-tool arayüzü token'sız `/api/status` → 401

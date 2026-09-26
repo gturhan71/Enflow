@@ -326,7 +326,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 | 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
 | 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı Faz 16'da (2026-09-26) CI'da doğrulandı — o sırada PG+RLS'te login kırığı bulunup düzeltildi**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
-| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (v2.6.0 adayı, onay bekliyor). | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
+| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (kullanıcı kararı 2026-09-26). **Merge sonrası 10x hata avı** (`.10x/reviews/2026-09-26-hunt-report.md`): 5 kanıtlı hata daha düzeltildi — **KRİTİK: PLATFORM yedeği çok kiracılıda tüm kiracıların verisini (parola hash'leri dahil) sızdırıyordu** (artık yalnız tek kiracılıda; çok kiracılıda 403/TENANT), upgrade rollback'i yükseltme sırasında yazılan veriyi siliyordu (artık DB otomatik geri yüklenmez; sıra build→migrate), restart hatası başarılı yükseltmeyi geri aldırıyordu (artık çıkış kodu 3), `.env`/yedek izinleri 0600/0700, upgrade-tool arayüzü token+Host denetimli. | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
 
 Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli; Faz 15: RBAC süiti artık 1027 test — SQLite'a karşı koşuldu, 1000 geçti/26 kaldı, `git stash` ile değişiklikler geri alınıp AYNI 26 test birebir aynı hatalarla yine başarısız olduğu doğrulandı → önceden var, Faz 15'ten bağımsız, sıfır regresyon; Postgres-özel Faz 2/3 değişikliği yerel bir Postgres örneğiyle henüz manuel doğrulanmadı). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -369,22 +369,24 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+backend/src/lifecycle.ts ← services/periodic
+backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
-install/wizard.mjs ← lib/pg, lib/service
+backend/src/services/backupTargets.ts ← utils/fileUpload
+backend/src/services/deploymentGuard.ts ← utils/logger
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/server.mjs ← core
+install/wizard.mjs ← lib/pg, lib/service
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
-src/lib/permissionTree.ts ← constants
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
 src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
@@ -448,24 +450,20 @@ src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, .
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
-src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
-backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
-backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/personnelTransferService.ts ← prismaClient
@@ -524,18 +522,59 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 9 minutes ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
-backend/src/services/backupService.ts         +pgConnEnv  ~toLibpqUrl  ~runBackup
-install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
-install/wizard.mjs                            +offerServiceInstall  ~ensurePostgresServer  ~main
+backend/scripts/ensure-build.mjs              +needsBuild
+backend/src/lifecycle.ts                      +createShutdown  +installShutdown
+backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
+backend/src/services/backupService.ts         +pgConnEnv  +PlatformScopeForbiddenError  +isMultiTenant  +assertScopeAllowed
+backend/src/services/backupTargets.ts         +restrictFile  ~LocalTarget  ~ensureDir
+backend/src/services/deploymentGuard.ts       +insecureSecretFiles  +checkSecretFilePermissions  ~checkDeploymentTopology
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
-upgrade-tool/public/index.html                ~renderSettings  ~refresh
-upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
+upgrade-tool/public/index.html                +refresh  ~refresh  ~renderSettings
+upgrade-tool/server.mjs                       +saveConfig  +sanitizePatch  +loadOrCreateToken  ~saveConfig
+install/lib/service.mjs                       +resolveRestartCommands  +resolveRestartCommand  +renderServiceFile  +planInstall
+install/wizard.mjs                            +offerServiceInstall  ~setSchemaProvider  ~psql  ~provisionPostgresDb
+backend/scripts/db-migrate.mjs                +run
+backend/scripts/sync-postgres-schema.mjs      +toPostgres
+backend/src/config/prismaPaths.ts             +resolvePrismaPaths
+backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
+backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
+backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
+backend/src/services/periodic.ts              +schedulePeriodic
+backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
+backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
+backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
+install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 ```
 
 ## backend
+
+### backend/scripts/ensure-build.mjs
+```
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
+```
+
+### backend/src/services/backupScheduler.ts
+```
+export function startBackupScheduler() → StopFn  :78-81
+```
 
 ### backend/src/services/backupService.ts
 ```
@@ -552,18 +591,50 @@ export interface BackupModuleSettings  :120-129
   location?: string  :126-126
   nextcloud?: { url?: string  :127-127
   s3?: { endpoint?: string  :128-128
-export interface RunBackupOpts  :131-141
-  tenantId: string  :132-132
-  scope: BackupScope  :133-133
-  kind: BackupKind  :134-134
-  targetType: TargetType  :135-135
-  location?: string | null  :136-136
-  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
-  startedById?: string  :138-138
-  startedByName?: string  :139-139
-  settings: BackupModuleSettings | null  :140-140
+export interface RunBackupOpts  :151-161
+  tenantId: string  :152-152
+  scope: BackupScope  :153-153
+  kind: BackupKind  :154-154
+  targetType: TargetType  :155-155
+  location?: string | null  :156-156
+  trigger?: 'MANUAL' | 'SCHEDULED'  :157-157
+  startedById?: string  :158-158
+  startedByName?: string  :159-159
+  settings: BackupModuleSettings | null  :160-160
 export type BackupScope  :39-39
 export type BackupKind  :40-40
+```
+
+### backend/src/services/backupTargets.ts
+```
+export interface BackupTarget  :11-17
+  put(localPath, remoteName)  :13-13
+  get(remoteName, localPath)  :15-15
+  list()  :16-16
+export class LocalTarget  :33-57
+  constructor(location?)  :35-37
+  async put(localPath, remoteName) → Promise<string>  :38-48
+  async get(remoteName, localPath) → Promise<void>  :49-52
+  async list() → Promise<string[]>  :53-56
+export class NextcloudTarget  :60-74
+  constructor(private cfg)  :61-61
+  async put(localPath, remoteName) → Promise<string>  :62-67
+  async get() → Promise<void>  :68-70
+  async list() → Promise<string[]>  :71-73
+export class S3Target  :78-119
+  constructor(private cfg,)  :79-81
+  async put(localPath, remoteName) → Promise<string>  :101-107
+  async get(remoteName, localPath) → Promise<void>  :108-113
+  async list() → Promise<string[]>  :114-118
+export function ensureDir(dir) → void  :24-26
+export function restrictFile(file) → void  :28-30  # Yedek dosyasını yalnız sahibi okuyabilsin (0600)
+```
+
+### backend/src/services/deploymentGuard.ts
+```
+export function checkDeploymentTopology() → void  :17-32
+export function insecureSecretFiles(files, platform = process.platform)  :39-39  # Sır içeren dosyalardan grup/diğer kullanıcılara AÇIK olanlar
+export function checkSecretFilePermissions() → void  :51-56
 ```
 
 ### backend/pnpm-lock.yaml
@@ -673,11 +744,6 @@ key provider
 function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
-### backend/scripts/ensure-build.mjs
-```
-export function needsBuild(backendDir)  :14-28  # dist/index
-```
-
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -698,31 +764,11 @@ export interface PrismaPaths  :5-9
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :15-25
-  server: Pick<Server, 'close' | 'closeAllCon  :16-16
-  stops: StopFn[]  :17-17
-  disconnect: () => Promise<void>  :18-18
-  timeoutMs?: number  :19-19
-  graceMs?: number  :21-21
-  exit?: (code: number) => void  :22-22
-  log?: { info: (...a: unknown[]) => void  :23-23
-  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
-export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
-export function installShutdown(deps) → void  :80-84
-```
-
 ### backend/src/middleware.ts
 ```
 export const asyncHandler = (fn) =>  :9-11
 export const requireRole = (allowed) =>  :82-90
 export const requireEntitlement = (pluginKey) =>  :116-123
-```
-
-### backend/src/planCatalog.ts
-```
-export type PlanId  :5-5
 ```
 
 ### backend/src/prismaClient.ts
@@ -767,11 +813,6 @@ export async function getDelegatedRoles(tenantId, userId) → Promise<string[]> 
 export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :250-268  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
 export async function resolveGroupAfterDecision(tenantId, chainId)  :278-335  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
 export async function resetApprovalChain(tenantId, entityType, entityId)  :338-351  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
-```
-
-### backend/src/services/backupScheduler.ts
-```
-export function startBackupScheduler() → StopFn  :67-70
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -844,11 +885,6 @@ export interface DeliveryTimelineStepInput  :19-23
 export function buildDeliveryTimeline(referenceStart, totalDays, phases = DEFAULT_DELIVERY_PHASES,) → DeliveryTimelineStepInput[]  :30-41  # `referenceStart`'tan itibaren `totalDays` süreye yayılan faz
 export function addDays(date, days) → Date  :43-45
 export function computeDeliveryDueDate(referenceStart, totalDays) → Date  :47-49
-```
-
-### backend/src/services/deploymentGuard.ts
-```
-export function checkDeploymentTopology() → void  :15-30
 ```
 
 ### backend/src/services/documentNumberService.ts
@@ -1320,6 +1356,48 @@ export type AgentMode  :14-14
 
 ## install
 
+### install/lib/service.mjs
+```
+export function resolveRestartCommands({ platform = process.platform, home, probe = defaultProbe } = {})  :36-56  # Kurulu Enflow servisinin yeniden başlatma komutları — DENEME
+export function resolveRestartCommand(opts = {})  :59-61  # Geriye uyumlu: ilk aday ya da null
+export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :79-101  # Şablonu doldurur
+export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :108-167  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :170-172
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :178-192  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
+export function formatCommand(c)  :197-199  # İnsan-okur komut satırı (elle kurulum talimatı için)
+export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :206-226  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
+export const launchdDaemonPlist = () =>  :18-27
+export const launchdAgentPlist = () =>  :19-27
+export const winswExePath = (home) =>  :20-27
+```
+
+### install/POSTGRES_MIGRATION_PLAN.md
+```
+h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
+h2 Durum (2026-09-26 — ADR-002, uygulandı)
+h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+h2 Kapasite teyidi (kurulum sihirbazı)
+h2 İlgili dosyalar
+h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/wizard.mjs
+```
+async function ask(q, def)  :40-44
+async function askYN(q, def = true)  :45-50
+function run(cmd, cmdArgs, cwd)  :51-56
+function capture(cmd, cmdArgs)  :57-60
+async function ensurePostgresServer(admin)  :72-85
+async function offerServiceInstall(backendPort)  :92-150
+async function offerFirewallHardening(backendPort)  :155-187
+async function main()  :199-472
+```
+
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
 ### install/ILK_KURULUM_KILAVUZU.md
 ```
 h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
@@ -1349,28 +1427,12 @@ h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
 ```
 
-### install/lib/service.mjs
+### install/lib/pg.mjs
 ```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
-export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
-export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
-export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
-export function formatCommand(c)  :186-188  # İnsan-okur komut satırı (elle kurulum talimatı için)
-export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :195-215  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
-export const launchdDaemonPlist = () =>  :18-26
-export const launchdAgentPlist = () =>  :19-26
-export const winswExePath = (home) =>  :20-26
-```
-
-### install/POSTGRES_MIGRATION_PLAN.md
-```
-h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
-h2 Durum (2026-09-26 — ADR-002, uygulandı)
-h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
-h2 Kapasite teyidi (kurulum sihirbazı)
-h2 İlgili dosyalar
-h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
+export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
+export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
+export const pgReachable = (admin) =>  :26-28
 ```
 
 ### install/README.md
@@ -1400,31 +1462,6 @@ h2 PostgreSQL (Üretim) Notu
 h2 Sorun Giderme
 h2 Güvenlik
 h3 Veritabanı ve Prisma Studio Erişimi
-```
-
-### install/wizard.mjs
-```
-async function ask(q, def)  :40-44
-async function askYN(q, def = true)  :45-50
-function run(cmd, cmdArgs, cwd)  :51-56
-function capture(cmd, cmdArgs)  :57-60
-async function ensurePostgresServer(admin)  :72-85
-async function offerServiceInstall(backendPort)  :92-150
-async function offerFirewallHardening(backendPort)  :155-187
-async function main()  :199-469
-```
-
-### install/build-package.sh
-```
-# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
-```
-
-### install/lib/pg.mjs
-```
-export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
-export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
-export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
-export const pgReachable = (admin) =>  :26-28
 ```
 
 ## src
@@ -1516,14 +1553,6 @@ export interface HelpArticle  :13-18
 export const getHelpArticle = (moduleId) =>  :184-184
 ```
 
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
-```
-
 ### src/hooks/useBoM.ts
 ```
 export interface AbbreviatedBoMItem  :7-20
@@ -1584,20 +1613,6 @@ export const parseMoneyInput = (raw) =>  :31-41
 ```
 export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
 export async function uploadGuaranteeSampleFile(guaranteeId, file) → Promise<void>  :25-40  # Talep aşamasında eklenen örnek teminat mektubu dosyasını Gua
-```
-
-### src/lib/permissionTree.ts
-```
-export interface PermChild  :15-18
-  permission: string  :16-16
-  label: string  :17-17
-export interface PermGroup  :19-25
-  id: string  :20-20
-  label: string  :21-21
-  icon: React.ComponentType<{ size?: number  :22-22
-  permission: string  :23-23
-  children: PermChild[]  :24-24
-export function buildPermissionGroups() → PermGroup[]  :50-67
 ```
 
 ### src/modules/ActivityLogModule.tsx
@@ -2398,19 +2413,6 @@ handler onDisable
 handler onRatify
 ```
 
-### src/modules/VisitPlanModule.tsx
-```
-props VisitPlanModuleProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VisitPlanModule
-handler onChange
-handler onClick
-handler onBlur
-```
-
 ### src/modules/WorkflowBuilder.tsx
 ```
 hook useUnsavedChanges
@@ -2695,36 +2697,36 @@ export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) 
 
 ### upgrade-tool/cli.mjs
 ```
-async function main()  :16-51
+async function main()  :16-56
 ```
 
 ### upgrade-tool/core.mjs
 ```
+export class RestartError  :320-322
+  constructor(message, manual)  :321-321
 export function resolveHome()  :23-28  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
 export function currentVersion(home)  :41-48
-export async function latestVersion(home, channel = 'auto')  :69-95  # En son yayınlanan sürüm
-export function compare(home, current, latest)  :98-112  # Yerel ile uzak karşılaştır → güncelleme var mı
-export function statusPath(home)  :115-115
-export function writeStatus(home, status)  :117-123
-export function readStatus(home)  :124-126
-export async function checkAndWrite(home, channel = 'auto')  :129-147  # Kontrol et + durum dosyası yaz
-export function toLibpqUrl(url)  :172-174
-export function redactUrl(url)  :176-178  # Log/ipucu için parola maskeleme
-export function pgConnEnv(url)  :185-194  # Bağlantı URL'sini libpq ortam değişkenlerine çevirir
-export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :263-278  # /api/health 200 + db:ok gelene dek yoklar
-export async function runUpgrade(home, opts = {})  :310-400  # Güvenli yükseltme
+export async function latestVersion(home, channel = 'auto')  :70-96  # En son yayınlanan sürüm
+export function compare(home, current, latest)  :99-113  # Yerel ile uzak karşılaştır → güncelleme var mı
+export function statusPath(home)  :116-116
+export function writeStatus(home, status)  :118-124
+export function readStatus(home)  :125-127
+export async function checkAndWrite(home, channel = 'auto')  :130-148  # Kontrol et + durum dosyası yaz
+export function toLibpqUrl(url)  :173-175
+export function redactUrl(url)  :177-179  # Log/ipucu için parola maskeleme
+export function pgConnEnv(url)  :186-195  # Bağlantı URL'sini libpq ortam değişkenlerine çevirir
+export function describeRestore(snap, dbTouched)  :246-260  # Rollback'te veritabanı KENDİLİĞİNDEN geri yüklenmez (SQLite 
+export function hardenSecretFiles(home)  :267-283  # Sır/yedek dosyalarını sahibine kısıtlar (POSIX): backend/
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :302-317  # /api/health 200 + db:ok gelene dek yoklar
+export async function runUpgrade(home, opts = {})  :370-483  # Güvenli yükseltme
 function git(home, args)  :15-17
 function gitSafe(home, args)  :18-20
 function parseSemver(tag)  :31-34  # semver "vX
 function cmpSemver(a, b)  :35-38
-function githubJson(path)  :51-63  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
-function readBackendEnv(home)  :150-159
-function dbProvider(home)  :161-168
-function backupDb(home, log, opts)  :199-229
-function restoreDb(snap, log)  :231-244
-function run(home, cmd, args, log, opts = {})  :246-255
-function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
-function pgRlsInstalled(url)  :298-303
+function githubJson(path)  :51-64  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
+function readBackendEnv(home)  :151-160
+function dbProvider(home)  :162-169
+function backupDb(home, log, opts)  :200-236
 ```
 
 ### upgrade-tool/public/index.html
@@ -2770,12 +2772,14 @@ code-fence powershell
 
 ### upgrade-tool/server.mjs
 ```
-function loadConfig()  :29-31
-function saveConfig(c)  :33-33
-function inMaintenanceWindow()  :47-51
-async function performUpgrade()  :53-60
-async function tick()  :63-72
+export function sanitizePatch(patch)  :47-54
+function loadConfig()  :37-39
+function saveConfig(c)  :41-41
+function loadOrCreateToken()  :56-65
+function inMaintenanceWindow()  :90-94
+async function performUpgrade()  :96-103
+async function tick()  :106-115
 ```
 
 
-> **Not everything is here.** 205 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 209 file(s) omitted to stay under the 20404-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
