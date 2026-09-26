@@ -396,6 +396,7 @@ src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext,
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext
+backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
@@ -466,7 +467,6 @@ src/services/apiService.ts ← apiClient, crmService, projectService, taskServic
 src/types/crm.ts ← auth, presales
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
-backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
@@ -528,7 +528,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 8 days ago)
+## changes (last 10 commits — 4 days ago)
 ```
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/ContextTab.tsx  ~ContextTab
@@ -542,6 +542,7 @@ src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
 src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/services/activityLogArchiveScheduler.ts ~tick
+backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       ~tick
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
@@ -593,6 +594,16 @@ export async function runManagedTransaction(callback, options?,) → Promise<T> 
 ### backend/src/services/activityLogArchiveScheduler.ts
 ```
 export function startActivityLogArchiveScheduler() → void  :53-58
+```
+
+### backend/src/services/approvalChainService.ts
+```
+export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
+export async function autoSkipOrphanStages(tenantId, chainId)  :74-217  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
+export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :225-237  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
+export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :250-268  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
+export async function resolveGroupAfterDecision(tenantId, chainId)  :278-335  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
+export async function resetApprovalChain(tenantId, entityType, entityId)  :338-351  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
 ```
 
 ### backend/src/services/backupScheduler.ts
@@ -870,16 +881,6 @@ export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | n
 export async function isAIConfigured(tenantId) → Promise<boolean>  :68-70
 export function assertSafeAiUrl(rawUrl) → void  :81-96  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
 export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
-```
-
-### backend/src/services/approvalChainService.ts
-```
-export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
-export async function autoSkipOrphanStages(tenantId, chainId)  :74-217  # Skip-logic: **hiçbir aktif kullanıcıya** karşılık gelmeyen P
-export async function getDelegatedRoles(tenantId, userId) → Promise<string[]>  :225-237  # B-08 — vekalet (delegasyon): kullanıcı X izinliyken (delegat
-export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :250-268  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
-export async function resolveGroupAfterDecision(tenantId, chainId)  :278-335  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
-export async function resetApprovalChain(tenantId, entityType, entityId)  :338-351  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
 ```
 
 ### backend/src/services/approvalSlaEscalation.ts
