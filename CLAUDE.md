@@ -385,7 +385,6 @@ src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
-src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
@@ -456,6 +455,7 @@ src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, co
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
+src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
@@ -528,7 +528,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 45 seconds ago)
+## changes (last 10 commits — 3 minutes ago)
 ```
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
@@ -686,13 +686,6 @@ export function startUpdateNotifier() → void  :123-127
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260813184227_add_process_engine_fields/migration.sql
-```
-TABLE new_ApprovalStage
-TABLE new_WorkflowStep
-INDEX Workflow_tenantId_processKey_key ON Workflow
 ```
 
 ### backend/prisma/migrations/20260813203000_add_delegate_and_manual_default/migration.sql
@@ -1563,12 +1556,6 @@ export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
 component PendingProposalApprovals
 ```
 
-### src/modules/todo/ResolvedApprovals.tsx
-```
-component ResolvedApprovals
-hook useState
-```
-
 ### src/modules/todo/TaskList.tsx
 ```
 component TaskRow
@@ -2338,6 +2325,12 @@ hook useEffect
 handler onChange
 ```
 
+### src/modules/todo/ResolvedApprovals.tsx
+```
+component ResolvedApprovals
+hook useState
+```
+
 ### src/modules/todo/UnifiedWorkQueue.tsx
 ```
 component Section
@@ -2629,41 +2622,25 @@ export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) 
 
 ### upgrade-tool/core.mjs
 ```
-export function resolveHome  :22-27
-export function currentVersion  :40-47
-export async function latestVersion  :68-94
-export function compare  :97-111
-export function statusPath  :114-114
-export function writeStatus  :116-122
-export function readStatus  :123-125
-export async function checkAndWrite  :128-146
-export async function runUpgrade  :198-259
-function git  :14-16
-function gitSafe  :17-19
-function parseSemver  :30-33
-function cmpSemver  :34-37
-function githubJson  :50-62
-function dbProvider  :149-159
-function backupDb  :161-175
-function restoreDb  :176-181
-function run  :183-192
-```
-
-### upgrade-tool/README.md
-```
-h1 Enflow Upgrade Tool
-h2 İlke
-h2 Sürüm kaynağı (kanal)
-h2 Çalıştırma
-h3 CLI (cron / otomasyon)
-h3 Web GUI (operatör)
-h2 Güvenlik
-h2 Üretilen dosyalar (commit edilmez)
-code-fence bash
-code-fence plain
-code-fence cron
-code-fence powershell
+export function resolveHome()  :22-27  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
+export function currentVersion(home)  :40-47
+export async function latestVersion(home, channel = 'auto')  :68-94  # En son yayınlanan sürüm
+export function compare(home, current, latest)  :97-111  # Yerel ile uzak karşılaştır → güncelleme var mı
+export function statusPath(home)  :114-114
+export function writeStatus(home, status)  :116-122
+export function readStatus(home)  :123-125
+export async function checkAndWrite(home, channel = 'auto')  :128-146  # Kontrol et + durum dosyası yaz
+export async function runUpgrade(home, opts = {})  :198-265  # Güvenli yükseltme
+function git(home, args)  :14-16
+function gitSafe(home, args)  :17-19
+function parseSemver(tag)  :30-33  # semver "vX
+function cmpSemver(a, b)  :34-37
+function githubJson(path)  :50-62  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
+function dbProvider(home)  :149-159
+function backupDb(home, log)  :161-175
+function restoreDb(snap, log)  :176-181
+function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 194 file(s) omitted, 1 collapsed to anchors to stay under the 19004-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 196 file(s) omitted to stay under the 19004-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "nodemon --ext ts --ignore 'prisma/*.db' --ignore 'prisma/*.db-shm' --ignore 'prisma/*.db-wal' --ignore 'uploads/' --exec ts-node src/index.ts",
-    "start": "ts-node src/index.ts",
+    "start": "node dist/index.js",
     "audit:roles": "ts-node --transpile-only src/scripts/auditRoles.ts",
     "test": "echo \"Error: no test specified\" && exit 1",
     "test:unit": "vitest run",
@@ -14,7 +14,9 @@
     "apply:postgres-rls": "ts-node --transpile-only src/scripts/apply-postgres-rls.ts",
     "verify:postgres-rls": "ts-node --transpile-only src/scripts/verify-postgres-rls.ts",
     "test:load": "node scripts/loadtest/mixed-read.mjs",
-    "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts"
+    "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "start:ts": "ts-node src/index.ts"
   },
   "keywords": [],
   "author": "",

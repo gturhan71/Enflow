@@ -230,7 +230,8 @@ export async function runUpgrade(home, opts = {}) {
     await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: join(home, 'backend') });
     await run(home, 'pnpm', ['prisma', 'migrate', 'deploy'], log, { cwd: join(home, 'backend') });
 
-    // 6) frontend build
+    // 6) build — backend (`pnpm start` = derlenmiş dist, ADR-001) + frontend
+    await run(home, 'pnpm', ['build'], log, { cwd: join(home, 'backend') });
     await run(home, 'pnpm', ['build'], log);
 
     const to = currentVersion(home);
@@ -252,7 +253,12 @@ export async function runUpgrade(home, opts = {}) {
     log('↩ ROLLBACK başlıyor...');
     try { if (prevRef) await run(home, 'git', ['reset', '--hard', prevRef], log); } catch (er) { log('git reset hata: ' + er.message); }
     restoreDb(snap, log);
-    try { await run(home, 'pnpm', ['install'], log); await run(home, 'pnpm', ['install'], log, { cwd: join(home, 'backend') }); } catch { /* yut */ }
+    try {
+      await run(home, 'pnpm', ['install'], log);
+      await run(home, 'pnpm', ['install'], log, { cwd: join(home, 'backend') });
+      // Geri alınan koda yeni sürümün dist'i eşlik etmesin
+      await run(home, 'pnpm', ['build'], log, { cwd: join(home, 'backend') });
+    } catch { /* yut */ }
     writeStatus(home, { checkedAt: new Date().toISOString(), current: currentVersion(home), update: { available: true, failed: true, error: e.message, ref: latest.ref, target: latest.target } });
     return { ok: false, from, error: e.message };
   }

@@ -406,17 +406,20 @@ async function main() {
   warn('`npx prisma studio` bu sunucuda ASLA çalıştırılmamalı — yalnız yerel geliştirmede kullanın (uzaktan bakmak gerekiyorsa SSH tüneli kullanın).');
 
   // ── 7) Derleme (opsiyonel — üretim) ────────────────────────────────────────────
-  head('7/7 · Frontend derleme');
+  head('7/7 · Derleme');
+  // Backend derlemesi ZORUNLU — `pnpm start` artık derlenmiş `backend/dist/index.js`'i
+  // çalıştırır (ADR-001; ts-node yalnız geliştirmede, `pnpm dev`).
+  run('pnpm', ['build'], join(REPO, 'backend')); ok('Backend derlendi → backend/dist/');
   const build = await askYN('Frontend üretim derlemesi (pnpm build → dist) yapılsın mı?', true);
   if (build) { run('pnpm', ['build'], REPO); ok('Frontend derlendi → dist/'); }
-  else warn('Derleme atlandı (geliştirme modunda `pnpm dev` kullanın).');
+  else warn('Frontend derlemesi atlandı (geliştirme modunda `pnpm dev` kullanın).');
 
   // ── Özet ───────────────────────────────────────────────────────────────────
   head('Kurulum tamamlandı 🎉');
   const py = isWin ? 'pwsh/cmd' : 'bash';
   log(`
 ${C.b}Başlatma:${C.r}
-  ${C.c}# Backend (port ${backendPort})${C.r}
+  ${C.c}# Backend (port ${backendPort}) — derlenmiş çıktı; kod değişince önce: pnpm build${C.r}
   cd "${join(REPO, 'backend')}" && pnpm start
 
   ${C.c}# Frontend — geliştirme (port ${frontendPort})${C.r}
