@@ -3,9 +3,10 @@
 // belirler (tag varsa semver tag, yoksa origin/main commit) ve istenirse
 // güvenli sıra ile yükseltir. UYGULAMANIN İÇİNDE DEĞİL — ayrı süreç.
 import { execFileSync, execFile } from 'node:child_process';
-import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveRestartCommand } from '../install/lib/service.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = 'gturhan71/Enflow'; // GitHub owner/repo (API best-effort)
@@ -146,44 +147,90 @@ export async function checkAndWrite(home, channel = 'auto') {
 }
 
 // ── Yükseltme (yıkıcı — ön-yedek + rollback) ────────────────────────────────────
-function dbProvider(home) {
+function readBackendEnv(home) {
+  const out = {};
   try {
-    const env = readFileSync(join(home, 'backend', '.env'), 'utf-8');
-    const m = /DATABASE_URL\s*=\s*"?([^"\n]+)"?/.exec(env);
-    if (m && /^postgres/i.test(m[1])) return { kind: 'postgres', url: m[1] };
-    if (m && /^file:/i.test(m[1])) return { kind: 'sqlite', file: m[1].replace(/^file:/, '') };
+    for (const line of readFileSync(join(home, 'backend', '.env'), 'utf-8').split('\n')) {
+      const m = /^\s*([A-Z0-9_]+)\s*=\s*"?([^"\n]*)"?\s*$/.exec(line);
+      if (m) out[m[1]] = m[2];
+    }
   } catch { /* yut */ }
+  return out;
+}
+
+function dbProvider(home) {
+  const url = readBackendEnv(home).DATABASE_URL;
+  if (url && /^postgres/i.test(url)) return { kind: 'postgres', url };
+  if (url && /^file:/i.test(url)) return { kind: 'sqlite', file: url.replace(/^file:/, '') };
   // Varsayılan dev: backend/dev.db
   if (existsSync(join(home, 'backend', 'dev.db'))) return { kind: 'sqlite', file: './dev.db' };
   return { kind: 'unknown' };
 }
 
-function backupDb(home, log) {
+// Prisma-özel URL parametreleri (ör. ?schema=public) libpq araçlarında (pg_dump/psql) hata verir.
+const PRISMA_ONLY_PARAMS = ['schema', 'connection_limit', 'pool_timeout', 'pgbouncer', 'statement_cache_size', 'socket_timeout'];
+export function toLibpqUrl(url) {
+  try { const u = new URL(url); for (const p of PRISMA_ONLY_PARAMS) u.searchParams.delete(p); return u.toString(); } catch { return url; }
+}
+/** Log/ipucu için parola maskeleme. */
+export function redactUrl(url) {
+  try { const u = new URL(url); if (u.password) u.password = '****'; return u.toString(); } catch { return '<url>'; }
+}
+
+// FORCE RLS altında pg_dump varsayılan olarak durur → --enable-row-security + app.bypass_rls=on
+const PG_RLS_ENV = () => ({ ...process.env, PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() });
+
+function backupDb(home, log, opts) {
   const db = dbProvider(home);
   if (db.kind === 'sqlite') {
     const abs = resolve(join(home, 'backend'), db.file);
-    if (existsSync(abs)) {
-      const dest = abs + '.pre-upgrade-' + Date.now();
-      copyFileSync(abs, dest);
-      log(`ön-yedek: SQLite → ${dest}`);
-      return { kind: 'sqlite', src: abs, backup: dest };
+    if (!existsSync(abs)) return null;
+    const stamp = Date.now();
+    const files = [];
+    // WAL modunda son yazılanlar -wal'dadır → üçü birlikte kopyalanır
+    for (const ext of ['', '-wal', '-shm']) {
+      if (existsSync(abs + ext)) { copyFileSync(abs + ext, `${abs}.pre-upgrade-${stamp}${ext}`); files.push(ext); }
     }
-  } else if (db.kind === 'postgres') {
-    log('ön-yedek: Postgres — pg_dump operatör sorumluluğunda (atlanıyor).');
+    log(`ön-yedek: SQLite → ${abs}.pre-upgrade-${stamp} (${files.map((e) => e || '.db').join(', ')})`);
+    return { kind: 'sqlite', src: abs, stamp, files };
+  }
+  if (db.kind === 'postgres') {
+    const dumpUrl = toLibpqUrl(opts.migratorUrl || db.url);
+    const dir = join(home, 'backend', 'backups');
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, `pre-upgrade-${Date.now()}.dump`);
+    try {
+      execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', file, dumpUrl], { stdio: ['ignore', 'ignore', 'pipe'], env: PG_RLS_ENV() });
+    } catch (e) {
+      const why = e.code === 'ENOENT' ? 'pg_dump bulunamadı' : String(e.stderr || e.message).trim().slice(0, 300);
+      if (opts.skipPgBackup) { log(`UYARI: Postgres ön-yedeği alınamadı (${why}) — skipPgBackup ile devam.`); return null; }
+      throw new Error(`Postgres ön-yedeği alınamadı (${why}). PostgreSQL istemci araçlarını kurun veya bilinçli olarak skipPgBackup ile atlayın.`);
+    }
+    log(`ön-yedek: Postgres → ${file}`);
+    return { kind: 'postgres', backup: file, url: dumpUrl };
   }
   return null;
 }
+
 function restoreDb(snap, log) {
-  if (snap?.kind === 'sqlite' && existsSync(snap.backup)) {
-    copyFileSync(snap.backup, snap.src);
-    log(`geri yükleme: SQLite ← ${snap.backup}`);
+  if (snap?.kind === 'sqlite') {
+    for (const ext of ['', '-wal', '-shm']) {
+      const bak = `${snap.src}.pre-upgrade-${snap.stamp}${ext}`;
+      if (snap.files.includes(ext)) copyFileSync(bak, snap.src + ext);
+      else if (ext && existsSync(snap.src + ext)) rmSync(snap.src + ext); // yedekte yoksa yeni sürümün WAL'ı kalmasın
+    }
+    log(`geri yükleme: SQLite ← ${snap.src}.pre-upgrade-${snap.stamp}`);
+  } else if (snap?.kind === 'postgres') {
+    // Postgres otomatik geri yüklenmez (ADR-002) — operatöre hazır komut
+    log('Postgres VERİTABANI OTOMATİK GERİ YÜKLENMEDİ. Gerekirse (servis durdurulmuşken, migrator/superuser ile):');
+    log(`  PGOPTIONS="-c app.bypass_rls=on" pg_restore --clean --if-exists --no-owner -d "${redactUrl(snap.url)}" "${snap.backup}"`);
   }
 }
 
 function run(home, cmd, args, log, opts = {}) {
   return new Promise((res, rej) => {
     log(`$ ${cmd} ${args.join(' ')}`);
-    const child = execFile(cmd, args, { cwd: opts.cwd || home, env: process.env, maxBuffer: 64 * 1024 * 1024 });
+    const child = execFile(cmd, args, { cwd: opts.cwd || home, env: opts.env || process.env, maxBuffer: 64 * 1024 * 1024 });
     child.stdout?.on('data', (d) => log(String(d).trimEnd()));
     child.stderr?.on('data', (d) => log(String(d).trimEnd()));
     child.on('close', (code) => (code === 0 ? res() : rej(new Error(`${cmd} ${args[0]} çıkış kodu ${code}`))));
@@ -192,20 +239,80 @@ function run(home, cmd, args, log, opts = {}) {
 }
 
 /**
- * Güvenli yükseltme. opts: { channel, log, allowDirty, restartCommand }.
- * Hata → git reset + DB geri yükleme (rollback). Döner: { ok, from, to, error? }.
+ * /api/health 200 + db:ok gelene dek yoklar. true=sağlıklı.
+ * maxUptimeSec: yanıttaki uptimeSec bundan büyükse süreç yeniden başlamamış demektir
+ * (eski süreç hâlâ sağlıklı yanıt veriyor) → sağlıklı SAYILMAZ. uptimeSec yoksa (eski
+ * sürüm) kontrol atlanır.
+ */
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {}) {
+  const deadline = now() + timeoutMs;
+  while (now() < deadline) {
+    try {
+      const r = await fetchImpl(url, { signal: AbortSignal.timeout(Math.min(intervalMs * 2, 5_000)) });
+      if (r.ok) {
+        const body = await r.json().catch(() => ({}));
+        const dbOk = body.db === undefined || body.db === 'ok';
+        const restarted = maxUptimeSec == null || typeof body.uptimeSec !== 'number' || body.uptimeSec <= maxUptimeSec;
+        if (dbOk && restarted) return true;
+      }
+    } catch { /* henüz ayakta değil */ }
+    await sleep(intervalMs);
+  }
+  return false;
+}
+
+/** Yeniden başlatır → true (health yoklanmalı) | false (mekanizma yok, elle). Hata fırlatır. */
+function restartBackend(home, opts, log) {
+  if (opts.restartCommand) {
+    log(`restart: ${opts.restartCommand}`);
+    if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', opts.restartCommand], { stdio: 'inherit' });
+    else execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' });
+    return true;
+  }
+  const svc = resolveRestartCommand({ home });
+  if (svc) {
+    log(`restart (servis): ${svc.cmd} ${svc.args.join(' ')}`);
+    execFileSync(svc.cmd, svc.args, { stdio: 'inherit' });
+    return true;
+  }
+  log('NOT: kurulu servis bulunamadı ve restartCommand ayarlı değil — backend\'i elle yeniden başlatın (sağlık kontrolü atlandı).');
+  return false;
+}
+
+function pgRlsInstalled(url) {
+  try {
+    const out = execFileSync('psql', [url, '-tAc', "SELECT count(*) FROM pg_policies WHERE policyname = 'tenant_isolation'"], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+    return Number(out.trim()) > 0;
+  } catch { return null; } // psql yok/erişim yok → bilinmiyor
+}
+
+/**
+ * Güvenli yükseltme. opts: { channel, log, allowDirty, restartCommand, migratorUrl,
+ * skipPgBackup, healthTimeoutMs }. Hata (sağlıksız açılış dahil) → kod geri alınır,
+ * SQLite geri yüklenir, Postgres için pg_restore komutu loglanır. Döner: { ok, from, to, error? }.
  */
 export async function runUpgrade(home, opts = {}) {
   const log = opts.log || (() => {});
   const channel = opts.channel || 'auto';
   const from = currentVersion(home);
   const prevRef = from.sha;
+  const backend = join(home, 'backend');
 
   // 1) preflight: temiz çalışma ağacı (.env, uploads, *.db git-ignore → porcelain'da görünmez)
   const dirty = gitSafe(home, ['status', '--porcelain']);
   if (dirty && !opts.allowDirty) {
     return { ok: false, from, error: 'Çalışma ağacı kirli (git status). allowDirty ile zorla ya da temizle.\n' + dirty };
   }
+
+  // Postgres: şema DDL'i yalnız migrator rolüyle (runtime rolünde DDL yok) — değişiklikten ÖNCE kontrol
+  const db = dbProvider(home);
+  const migratorUrl = opts.migratorUrl || process.env.ENFLOW_MIGRATOR_URL || null;
+  if (db.kind === 'postgres' && !migratorUrl) {
+    return { ok: false, from, error: 'Postgres yükseltmesi migrator (DDL) kimliği gerektirir: ENFLOW_MIGRATOR_URL ortam değişkeni veya upgrade-tool/config.json → migratorUrl. Hiçbir değişiklik yapılmadı.' };
+  }
+  const prismaEnv = db.kind === 'postgres' ? { ...process.env, DATABASE_URL: migratorUrl } : process.env;
+  const healthUrl = `http://127.0.0.1:${readBackendEnv(home).PORT || 3002}/api/health`;
+  const healthOpts = { timeoutMs: opts.healthTimeoutMs ?? 60_000 };
 
   // 2) hedef
   const latest = await latestVersion(home, channel);
@@ -215,7 +322,7 @@ export async function runUpgrade(home, opts = {}) {
   let snap = null;
   try {
     // 2b) ön-yedek
-    snap = backupDb(home, log);
+    snap = backupDb(home, log, { migratorUrl, skipPgBackup: opts.skipPgBackup });
 
     // 3) kaynak güncelle
     await run(home, 'git', ['fetch', '--all', '--tags', '--prune'], log);
@@ -224,29 +331,35 @@ export async function runUpgrade(home, opts = {}) {
 
     // 4) bağımlılıklar
     await run(home, 'pnpm', ['install'], log);
-    await run(home, 'pnpm', ['install'], log, { cwd: join(home, 'backend') });
+    await run(home, 'pnpm', ['install'], log, { cwd: backend });
 
-    // 5) DB şeması
-    await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: join(home, 'backend') });
-    await run(home, 'pnpm', ['prisma', 'migrate', 'deploy'], log, { cwd: join(home, 'backend') });
+    // 5) DB şeması — prisma.config.ts DATABASE_URL'den sağlayıcıya göre şema/migration klasörü seçer
+    await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: backend, env: prismaEnv });
+    await run(home, 'pnpm', ['prisma', 'migrate', 'deploy'], log, { cwd: backend, env: prismaEnv });
 
     // 6) build — backend (`pnpm start` = derlenmiş dist, ADR-001) + frontend
-    await run(home, 'pnpm', ['build'], log, { cwd: join(home, 'backend') });
+    await run(home, 'pnpm', ['build'], log, { cwd: backend });
     await run(home, 'pnpm', ['build'], log);
+
+    // 6b) Postgres RLS kuruluysa yeni tablolar için politikaları yeniden uygula (idempotent)
+    if (db.kind === 'postgres') {
+      const rls = pgRlsInstalled(toLibpqUrl(migratorUrl));
+      if (rls) await run(home, 'node', ['dist/scripts/apply-postgres-rls.js'], log, { cwd: backend, env: prismaEnv });
+      else if (rls === null) log('UYARI: RLS durumu okunamadı (psql?) — RLS kullanıyorsanız elle: DATABASE_URL=<migrator> node dist/scripts/apply-postgres-rls.js');
+    }
+
+    // 7) restart + sağlık doğrulaması
+    const restartedAt = Date.now();
+    if (restartBackend(home, opts, log)) {
+      log(`sağlık kontrolü: ${healthUrl} (en fazla ${Math.round(healthOpts.timeoutMs / 1000)} sn; süreç yeniden başlamış olmalı)`);
+      if (!(await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - restartedAt) / 1000) + 3 }))) {
+        throw new Error(`Yükseltme sonrası backend ${Math.round(healthOpts.timeoutMs / 1000)} sn içinde sağlıklı açılmadı (${healthUrl}).`);
+      }
+      log('✓ backend sağlıklı.');
+    }
 
     const to = currentVersion(home);
     writeStatus(home, { checkedAt: new Date().toISOString(), current: to, update: { available: false, applied: true, from: prevRef?.slice(0, 7), to: to.shortSha, appliedAt: new Date().toISOString() } });
-
-    // 7) restart (aracın başlatmadığı süreç → ayarlanabilir komut)
-    if (opts.restartCommand) {
-      log(`restart: ${opts.restartCommand}`);
-      try {
-        if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', opts.restartCommand], { stdio: 'inherit' });
-        else execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' });
-      } catch (e) { log('restart komutu hata verdi: ' + e.message); }
-    } else {
-      log('NOT: restartCommand ayarlı değil — backend/frontend süreçlerini elle yeniden başlatın.');
-    }
     return { ok: true, from, to };
   } catch (e) {
     log('HATA: ' + e.message);
@@ -255,10 +368,16 @@ export async function runUpgrade(home, opts = {}) {
     restoreDb(snap, log);
     try {
       await run(home, 'pnpm', ['install'], log);
-      await run(home, 'pnpm', ['install'], log, { cwd: join(home, 'backend') });
-      // Geri alınan koda yeni sürümün dist'i eşlik etmesin
-      await run(home, 'pnpm', ['build'], log, { cwd: join(home, 'backend') });
-    } catch { /* yut */ }
+      await run(home, 'pnpm', ['install'], log, { cwd: backend });
+      // Geri alınan koda yeni sürümün client'ı/dist'i eşlik etmesin
+      await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: backend, env: prismaEnv });
+      await run(home, 'pnpm', ['build'], log, { cwd: backend });
+      await run(home, 'pnpm', ['build'], log);
+      const rbAt = Date.now();
+      if (restartBackend(home, opts, log)) {
+        log((await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - rbAt) / 1000) + 3 })) ? '✓ önceki sürüm sağlıklı açıldı.' : 'UYARI: önceki sürüm de sağlıklı açılmadı — elle müdahale gerekli.');
+      }
+    } catch (er) { log('rollback adımı hata: ' + er.message); }
     writeStatus(home, { checkedAt: new Date().toISOString(), current: currentVersion(home), update: { available: true, failed: true, error: e.message, ref: latest.ref, target: latest.target } });
     return { ok: false, from, error: e.message };
   }

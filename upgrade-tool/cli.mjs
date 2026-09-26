@@ -4,7 +4,9 @@
 //   node upgrade-tool/cli.mjs status    → mevcut durum dosyasını göster
 //   node upgrade-tool/cli.mjs upgrade   → güvenli yükseltme (ön-yedek + rollback)
 // Çevre: ENFLOW_HOME (varsayılan: aracın üst dizini), ENFLOW_CHANNEL (auto|tag|commit),
-//        ENFLOW_RESTART_CMD (yükseltme sonrası restart komutu).
+//        ENFLOW_RESTART_CMD (yükseltme sonrası restart komutu; yoksa kurulu OS servisi
+//        otomatik bulunur), ENFLOW_MIGRATOR_URL (Postgres'te ZORUNLU — DDL rolü),
+//        ENFLOW_SKIP_PG_BACKUP=1 (pg_dump ön-yedeğini bilerek atla).
 import { resolveHome, checkAndWrite, readStatus, runUpgrade, currentVersion } from './core.mjs';
 
 const cmd = process.argv[2] || 'check';
@@ -35,10 +37,12 @@ async function main() {
       log: (m) => console.log(m),
       allowDirty: process.env.ENFLOW_ALLOW_DIRTY === '1',
       restartCommand: process.env.ENFLOW_RESTART_CMD || null,
+      migratorUrl: process.env.ENFLOW_MIGRATOR_URL || null,
+      skipPgBackup: process.env.ENFLOW_SKIP_PG_BACKUP === '1',
     });
     if (res.noop) { console.log('Zaten güncel.'); process.exit(0); }
     if (res.ok) { console.log(`✓ Yükseltildi: ${res.from.shortSha} → ${res.to.shortSha}`); process.exit(0); }
-    console.error(`✗ Yükseltme başarısız (rollback yapıldı): ${res.error}`);
+    console.error(`✗ Yükseltme başarısız: ${res.error}`);
     process.exit(1);
   }
 

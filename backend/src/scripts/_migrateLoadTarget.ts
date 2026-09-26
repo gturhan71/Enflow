@@ -1,8 +1,8 @@
 // Enflow — migrateToPostgres.ts'in dahili alt-süreç yardımcısı (doğrudan çalıştırılmaz).
 // ─────────────────────────────────────────────────────────────────────────────
 // Neden ayrı süreç: migrateToPostgres.ts önce KAYNAK (sqlite) `@prisma/client`'ı
-// import edip export alır, SONRA schema.prisma'yı postgresql'e çevirip yeniden
-// generate eder. Aynı Node süreci `@prisma/client`'ı bir kez require ettiği için
+// import edip export alır, SONRA Prisma client'ı hedef Postgres için yeniden
+// generate eder (prisma.config.ts → PG şeması). Aynı Node süreci `@prisma/client`'ı bir kez require ettiği için
 // disk'teki yeni (postgresql) üretimi görmez — Node require cache'i eski (sqlite)
 // bağlanmış modülü tutar. Bu script TAZE bir süreçte çalışır → disk'teki GÜNCEL
 // (postgresql) client'ı doğru yükler. Girdi: argv[2]=veri JSON dosyası,

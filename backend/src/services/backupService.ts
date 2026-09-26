@@ -6,6 +6,7 @@
 // Hedef: LOCAL | NEXTCLOUD | S3 (backupTargets).
 // Kimlik bilgileri moduleSettings.backup'tan; ASLA loglanmaz.
 
+import { logger } from '../utils/logger';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -13,6 +14,20 @@ import crypto from 'crypto';
 import { Prisma } from '@prisma/client';
 import { prisma } from '../prismaClient';
 import { BackupTarget, LocalTarget, NextcloudTarget, S3Target, BACKUPS_ROOT, ensureDir } from './backupTargets';
+
+// Prisma bağlantı URL'sindeki Prisma'ya özgü parametreler (ör. wizard'ın yazdığı
+// `?schema=public`) libpq araçlarında (pg_dump) "invalid URI query parameter" hatası
+// verir → pg_dump'a vermeden önce ayıklanır. libpq'nun tanıdıkları (sslmode vb.) kalır.
+const PRISMA_ONLY_PARAMS = ['schema', 'connection_limit', 'pool_timeout', 'pgbouncer', 'statement_cache_size', 'socket_timeout'];
+export function toLibpqUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    for (const p of PRISMA_ONLY_PARAMS) u.searchParams.delete(p);
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
 
 export type BackupScope = 'PLATFORM' | 'TENANT';
 export type BackupKind = 'FULL' | 'STATE' | 'DATA';
@@ -173,16 +188,25 @@ export async function runBackup(opts: RunBackupOpts): Promise<{ id: string }> {
         totalSize += fs.statSync(stateFile).size;
         stateRef = await target.put(stateFile, `${job.id}/state-${stamp}.db`);
       } else {
-        // POSTGRES — pg_dump (yoksa zarifçe atla)
+        // POSTGRES — pg_dump (yoksa zarifçe atla). RLS (FORCE) açıkken pg_dump varsayılan
+        // olarak "row-level security policy" hatasıyla durur (tablo sahibi dahil) →
+        // --enable-row-security + oturum-başı app.bypass_rls=on (politika bunu tanır).
         const dumpFile = path.join(tmpDir, `state-${stamp}.dump`);
         try {
           const { execFileSync } = await import('child_process');
-          const url = process.env.DATABASE_URL as string;
-          execFileSync('pg_dump', ['-Fc', '-f', dumpFile, url], { stdio: 'ignore' });
+          const url = toLibpqUrl(process.env.DATABASE_URL as string);
+          execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', dumpFile, url], {
+            stdio: ['ignore', 'ignore', 'pipe'],
+            env: { ...process.env, PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() },
+          });
           totalSize += fs.statSync(dumpFile).size;
           stateRef = await target.put(dumpFile, `${job.id}/state-${stamp}.dump`);
-        } catch {
-          // pg_dump yok → state atlanır (DATA yine alındıysa iş başarılı sayılır)
+        } catch (e: unknown) {
+          // pg_dump yok → state atlanır (DATA yine alındıysa iş başarılı sayılır).
+          // Başka bir hata SESSİZCE yutulmaz — iş yine COMPLETED (DATA var) ama loglanır.
+          const err = e as { code?: string; stderr?: Buffer };
+          if (err.code === 'ENOENT') logger.warn('[backup] pg_dump bulunamadı — STATE (pg dump) atlandı.');
+          else logger.error('[backup] pg_dump başarısız — STATE atlandı:', String(err.stderr ?? e).slice(0, 500));
         }
       }
     }

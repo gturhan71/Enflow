@@ -21,13 +21,18 @@ const DEFAULTS = {
   autoUpgrade: false,         // bakım penceresinde otomatik uygula
   maintenanceFrom: 2,         // bakım penceresi başlangıç saati (0-23, yerel)
   maintenanceTo: 5,           // bitiş saati
-  restartCommand: '',         // ör. "sudo systemctl restart enflow-backend"
+  restartCommand: '',         // boş = kurulu OS servisi otomatik (systemd/launchd/WinSW)
+  migratorUrl: '',            // Postgres'te ZORUNLU — DDL rolü (yanıtlarda maskelenir)
+  skipPgBackup: false,        // pg_dump ön-yedeğini bilerek atla
   allowDirty: false,
 };
 function loadConfig() {
   try { return { ...DEFAULTS, ...JSON.parse(readFileSync(CONFIG, 'utf-8')) }; } catch { return { ...DEFAULTS }; }
 }
 function saveConfig(c) { writeFileSync(CONFIG, JSON.stringify(c, null, 2)); }
+// Parola içeren migratorUrl GUI/API yanıtlarına ASLA düz yazılmaz.
+const MASK = '********';
+const publicConfig = (c) => ({ ...c, migratorUrl: c.migratorUrl ? MASK : '' });
 
 let config = loadConfig();
 const home = resolveHome();
@@ -48,7 +53,7 @@ async function performUpgrade() {
   if (busy) return { ok: false, error: 'Yükseltme zaten sürüyor.' };
   busy = true; logBuffer.length = 0;
   try {
-    const res = await runUpgrade(home, { channel: config.channel, log: pushLog, allowDirty: config.allowDirty, restartCommand: config.restartCommand || null });
+    const res = await runUpgrade(home, { channel: config.channel, log: pushLog, allowDirty: config.allowDirty, restartCommand: config.restartCommand || null, migratorUrl: config.migratorUrl || null, skipPgBackup: !!config.skipPgBackup });
     return res;
   } finally { busy = false; }
 }
@@ -72,7 +77,7 @@ const server = createServer(async (req, res) => {
       return res.end(readFileSync(join(HERE, 'public', 'index.html')));
     }
     if (req.method === 'GET' && req.url === '/api/status') {
-      return json(res, 200, { home, config, current: currentVersion(home), status: readStatus(home), busy, log: logBuffer });
+      return json(res, 200, { home, config: publicConfig(config), current: currentVersion(home), status: readStatus(home), busy, log: logBuffer });
     }
     if (req.method === 'POST' && req.url === '/api/check') {
       const s = await checkAndWrite(home, config.channel);
@@ -84,13 +89,14 @@ const server = createServer(async (req, res) => {
       return json(res, 202, { started: true });
     }
     if (req.method === 'GET' && req.url === '/api/settings') {
-      return json(res, 200, config);
+      return json(res, 200, publicConfig(config));
     }
     if (req.method === 'PUT' && req.url === '/api/settings') {
       const patch = JSON.parse((await body(req)) || '{}');
+      if (patch.migratorUrl === MASK) delete patch.migratorUrl; // maskeli değer geri gönderildiyse koru
       config = { ...config, ...patch };
       saveConfig(config);
-      return json(res, 200, config);
+      return json(res, 200, publicConfig(config));
     }
     res.writeHead(404); res.end('not found');
   } catch (e) {
