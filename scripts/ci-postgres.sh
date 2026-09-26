@@ -91,6 +91,13 @@ COUNT=$(curl -s "${AUTH[@]}" "$API/customers" | node -e 'let d="";process.stdin.
 [ "$COUNT" = 1 ] || fail "customers listesi 1 değil ($COUNT) — uygulama RLS yolu hatalı"
 echo "✓ uygulama RLS yolu: setup → 2. setup 403 → login → yaz/oku (1 müşteri)"
 
+# backupService STATE yedeği ile AYNI pg_dump çağrısı — FORCE RLS altında varsayılan
+# pg_dump "row-level security policy" hatası verir; bayraklar bunu çözmeli.
+DUMP="$(mktemp -d)/state.dump"
+PGOPTIONS="-c app.bypass_rls=on" pg_dump -Fc --enable-row-security -f "$DUMP" "${APP_URL%%\?*}" || fail "pg_dump (RLS altında) başarısız"
+pg_restore -f - --data-only -t Customer "$DUMP" | grep -q "RLS Müşteri" || fail "pg_dump çıktısında tenant verisi yok (RLS dump'ı boşaltıyor)"
+echo "✓ pg_dump RLS altında tam veri aldı"
+
 step "7/7 SIGTERM → graceful shutdown (≤10 sn, exit 0)"
 kill -TERM "$PID"
 for _ in $(seq 1 24); do kill -0 "$PID" 2>/dev/null || break; sleep 0.5; done

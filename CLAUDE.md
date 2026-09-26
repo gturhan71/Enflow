@@ -368,11 +368,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
-backend/src/lifecycle.ts ← services/periodic
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
-backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
-backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 install/wizard.mjs ← lib/pg
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -453,11 +448,14 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
+backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
-backend/src/services/agentProvenance.ts ← pluginCatalog
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
+backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
+backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
@@ -476,12 +474,14 @@ backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profit
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
 backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
+backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
@@ -524,18 +524,13 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 2 minutes ago)
+## changes (last 10 commits — 3 minutes ago)
 ```
+backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
-backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
-backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
-backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
-backend/src/services/periodic.ts              +schedulePeriodic
-backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
-backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
 ```
@@ -576,6 +571,11 @@ TABLE ProjectCostItem
 key provider
 ```
 
+### backend/scripts/db-migrate.mjs
+```
+function run(cmd, cmdArgs, env = {})  :32-35
+```
+
 ### backend/scripts/sync-postgres-schema.mjs
 ```
 export function toPostgres(schema)  :25-29
@@ -590,20 +590,6 @@ export interface PrismaPaths  :5-9
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :12-20
-  server: Pick<Server, 'close' | 'closeAllCon  :13-13
-  stops: StopFn[]  :14-14
-  disconnect: () => Promise<void>  :15-15
-  timeoutMs?: number  :16-16
-  exit?: (code: number) => void  :17-17
-  log?: { info: (...a: unknown[]) => void  :18-18
-  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
-export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
-export function installShutdown(deps) → void  :60-64
-```
-
 ### backend/src/routes/health.ts
 ```
 export interface HealthDeps  :9-13
@@ -614,52 +600,11 @@ export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
 export function createHealthRouter(deps) → Router  :38-52
 ```
 
-### backend/src/services/activityLogArchiveScheduler.ts
-```
-export function startActivityLogArchiveScheduler() → StopFn  :54-58
-```
-
-### backend/src/services/backupScheduler.ts
-```
-export function startBackupScheduler() → StopFn  :67-70
-```
-
-### backend/src/services/periodic.ts
-```
-export type StopFn  :5-5
-export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
-```
-
-### backend/src/services/profitabilitySnapshotScheduler.ts
-```
-export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
-```
-
 ### backend/src/services/tenantContext.ts
 ```
 export function getTenantContext() → TenantContext | undefined  :15-17
 export function runWithTenant(tenantId, fn) → T  :37-39
 export function runWithRlsBypass(fn) → T  :45-47
-```
-
-### backend/src/services/updateNotifier.ts
-```
-export interface UpdateStatus  :19-34
-  checkedAt?: string  :20-20
-  current?: { shortSha?: string | null  :21-21
-  update?: { available?: boolean  :22-23
-  applied?: boolean  :24-24
-  failed?: boolean  :25-25
-  kind?: 'tag' | 'commit'  :26-26
-  target?: string | null  :27-27
-  ref?: string | null  :28-28
-  notes?: string | null  :29-29
-  publishedAt?: string | null  :30-30
-  to?: string | null  :31-31
-  error?: string | null  :32-32
-export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
-export function readUpdateStatus() → UpdateStatus | null  :41-47
-export function startUpdateNotifier() → StopFn  :124-127
 ```
 
 ### backend/pnpm-lock.yaml
@@ -742,15 +687,24 @@ INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 key provider
 ```
 
-### backend/scripts/db-migrate.mjs
-```
-function run(cmd, cmdArgs, env = {})  :32-35
-```
-
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
 async function main()  :29-57
+```
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :12-20
+  server: Pick<Server, 'close' | 'closeAllCon  :13-13
+  stops: StopFn[]  :14-14
+  disconnect: () => Promise<void>  :15-15
+  timeoutMs?: number  :16-16
+  exit?: (code: number) => void  :17-17
+  log?: { info: (...a: unknown[]) => void  :18-18
+  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
+export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
+export function installShutdown(deps) → void  :60-64
 ```
 
 ### backend/src/middleware.ts
@@ -771,12 +725,9 @@ export type ManagedTx  :112-112
 export async function runManagedTransaction(callback, options?,) → Promise<T>  :121-135
 ```
 
-### backend/src/services/agentProvenance.ts
+### backend/src/services/activityLogArchiveScheduler.ts
 ```
-export function agentActorId(pluginKey) → string  :17-19  # Bir agent eklentisi için kanonik aktör kimliği üretir
-export function isAgentActor(actorId?) → boolean  :22-25  # Verilen aktör kimliği bir sanal agent'a mı ait
-export function parseAgentActor(actorId?)  :28-28  # Aktör kimliğinden pluginKey çözer; legacy etiket için null p
-export function agentDisplayLabel(actorId?) → string  :40-47  # UI/log için okunur agent adı
+export function startActivityLogArchiveScheduler() → StopFn  :54-58
 ```
 
 ### backend/src/services/aiClient.ts
@@ -800,6 +751,40 @@ export async function getDelegatedRoles(tenantId, userId) → Promise<string[]> 
 export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :250-268  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
 export async function resolveGroupAfterDecision(tenantId, chainId)  :278-335  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
 export async function resetApprovalChain(tenantId, entityType, entityId)  :338-351  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+```
+
+### backend/src/services/backupScheduler.ts
+```
+export function startBackupScheduler() → StopFn  :67-70
+```
+
+### backend/src/services/backupService.ts
+```
+export interface ModelMeta  :42-46
+  name: string  :43-43
+  delegateKey: string  :44-44
+  hasTenantId: boolean  :45-45
+export interface BackupModuleSettings  :113-122
+  enabled?: boolean  :114-114
+  intervalHours?: number  :115-115
+  scope?: BackupScope  :116-116
+  kind?: BackupKind  :117-117
+  targetType?: TargetType  :118-118
+  location?: string  :119-119
+  nextcloud?: { url?: string  :120-120
+  s3?: { endpoint?: string  :121-121
+export interface RunBackupOpts  :124-134
+  tenantId: string  :125-125
+  scope: BackupScope  :126-126
+  kind: BackupKind  :127-127
+  targetType: TargetType  :128-128
+  location?: string | null  :129-129
+  trigger?: 'MANUAL' | 'SCHEDULED'  :130-130
+  startedById?: string  :131-131
+  startedByName?: string  :132-132
+  settings: BackupModuleSettings | null  :133-133
+export type BackupScope  :32-32
+export type BackupKind  :33-33
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -916,12 +901,12 @@ export function buildFinancingEvents(boms, costs, installments, referenceStart?,
 ### backend/src/services/governance.ts
 ```
 export interface ApprovalTier  :13-13
-  maxAmount: number  :13-13
-export async function getApprovalMatrix(tenantId) → Promise<ApprovalTier[] | null>  :15-25
-export async function resolveApproverRoles(tenantId, amount?,) → Promise<string[] | null>  :30-39  # Tutara göre onay rolleri; matris yoksa veya tutar yoksa null
-export async function isSoDEnabled(tenantId) → Promise<boolean>  :41-47
-export async function resolveEntityCreator(entityType, entityId) → Promise<string | null>  :50-66  # Onay zinciri / domain entity'sinin oluşturanını çözer (yoksa
-export async function sodViolation(tenantId, actorUserId, entityType, entityId,) → Promise<string | null>  :72-85  # SoD ihlali varsa açıklama döner; ihlal yoksa/kapalıysa/çözül
+maxAmount: number  :13-13
+export async function getApprovalMatrix  :15-25
+export async function resolveApproverRoles  :30-39
+export async function isSoDEnabled  :41-47
+export async function resolveEntityCreator  :50-66
+export async function sodViolation  :72-85
 ```
 
 ### backend/src/services/opportunityFolderService.ts
@@ -931,6 +916,12 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/periodic.ts
+```
+export type StopFn  :5-5
+export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
 ```
 
 ### backend/src/services/personnelTransferService.ts
@@ -1183,6 +1174,11 @@ export function asOfKeyOf(d) → string  :13-15
 export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
 ```
 
+### backend/src/services/profitabilitySnapshotScheduler.ts
+```
+export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
+```
+
 ### backend/src/services/restoreService.ts
 ```
 export type LogicalPayloadData  :20-20
@@ -1264,6 +1260,26 @@ export interface UnitMetricsResult  :90-97
   metrics: Metric[]  :95-95
   charts: ChartSeries[]  :96-96
 export interface WorkflowBottleneck  :457-461
+```
+
+### backend/src/services/updateNotifier.ts
+```
+export interface UpdateStatus  :19-34
+  checkedAt?: string  :20-20
+  current?: { shortSha?: string | null  :21-21
+  update?: { available?: boolean  :22-23
+  applied?: boolean  :24-24
+  failed?: boolean  :25-25
+  kind?: 'tag' | 'commit'  :26-26
+  target?: string | null  :27-27
+  ref?: string | null  :28-28
+  notes?: string | null  :29-29
+  publishedAt?: string | null  :30-30
+  to?: string | null  :31-31
+  error?: string | null  :32-32
+export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
+export function readUpdateStatus() → UpdateStatus | null  :41-47
+export function startUpdateNotifier() → StopFn  :124-127
 ```
 
 ### backend/src/services/workflowTemplate.ts
@@ -2737,4 +2753,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 200 file(s) omitted to stay under the 19803-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 200 file(s) omitted, 1 collapsed to anchors to stay under the 19804-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
