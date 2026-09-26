@@ -38,7 +38,7 @@
 | Görev | Commit | Not |
 |---|---|---|
 | T14 şablonlar+plan | 78a0abf | `planInstall` (saf) + `renderServiceFile`; plutil OK |
-| T15 WinSW | (T15) | sabit v2.12.0 + SHA256 (kullanıcı onayıyla bir kez indirildi/silindi) |
+| T15 WinSW | 084aa52 | sabit v2.12.0 + SHA256 (kullanıcı onayıyla bir kez indirildi/silindi) |
 | T16 wizard 8/8 + **fix spawn** | c7c8c82 | executePlan; **gerçek launchd'de bulundu:** `spawn('node')` ENOENT → asenkron error → backend çöker |
 | T17+T18 docs | 6d4182e | README/KILAVUZ/SYSTEM_REQUIREMENTS/upgrade README/RELEASE_CHECKLIST |
 | **fix security** | ff1fa4f | pg parolası argv→env; config 0600 |

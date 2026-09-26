@@ -524,9 +524,8 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 16 minutes ago)
+## changes (last 10 commits — 56 seconds ago)
 ```
-backend/scripts/db-migrate.mjs                +run
 backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
 install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
 install/wizard.mjs                            +offerServiceInstall  ~ensurePostgresServer  ~main
@@ -537,16 +536,6 @@ upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~perform
 ```
 
 ## backend
-
-### backend/scripts/db-migrate.mjs
-```
-function run(cmd, cmdArgs, env = {})  :32-35
-```
-
-### backend/scripts/sync-postgres-schema.mjs
-```
-export function toPostgres(schema)  :25-29
-```
 
 ### backend/src/services/backupService.ts
 ```
@@ -679,10 +668,20 @@ TABLE ProjectCostItem
 key provider
 ```
 
+### backend/scripts/db-migrate.mjs
+```
+function run(cmd, cmdArgs, env = {})  :32-35
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
 async function main()  :29-57
+```
+
+### backend/scripts/sync-postgres-schema.mjs
+```
+export function toPostgres(schema)  :25-29
 ```
 
 ### backend/src/config/prismaPaths.ts
