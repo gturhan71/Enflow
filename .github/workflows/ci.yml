@@ -137,3 +137,28 @@ jobs:
         with:
           name: rbac-ui-report
           path: tests/rbac/playwright-report
+
+  # Uçtan uca oracle (tests/e2e-scenario): süreç motoru + sanal agent SONUÇ doğrulaması,
+  # her senaryo izole SQLite + ayrı backend süreci (~45 sn).
+  e2e-scenario:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (backend + e2e)
+        run: |
+          (cd backend && pnpm install --frozen-lockfile)
+          (cd tests/e2e-scenario && pnpm install --frozen-lockfile)
+      # ts-node ile başlayan test backend'i @prisma/client tiplerini ister → client üretilmiş olmalı
+      - name: Prisma client üret
+        working-directory: backend
+        run: npx prisma generate
+      - name: Uçtan uca oracle
+        working-directory: tests/e2e-scenario
+        run: pnpm test
