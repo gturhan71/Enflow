@@ -368,9 +368,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
-src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
-src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
@@ -448,6 +446,7 @@ src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
+src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
@@ -456,13 +455,14 @@ src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
 src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
+src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/lifecycle.ts ← services/periodic
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
@@ -528,26 +528,40 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 2 minutes ago)
+## changes (last 10 commits — 49 seconds ago)
 ```
-src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
-src/modules/todo/TaskList.tsx                 ~TaskRow
+backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/prismaClient.ts                   +runManagedTransaction
-backend/src/services/activityLogArchiveScheduler.ts ~tick
+backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
-backend/src/services/backupScheduler.ts       ~tick
+backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/documentNumberService.ts ~incrementDocumentSequence
+backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
-backend/src/services/profitabilitySnapshotScheduler.ts ~tick
+backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/restoreService.ts        ~applyLogicalRestore
 backend/src/services/tenantContext.ts         +getTenantContext  +runWithTenant  +runWithRlsBypass
-backend/src/services/updateNotifier.ts        +baz  +ref  ~baz  ~ref
+backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
 upgrade-tool/core.mjs                         ~runUpgrade
 ```
 
 ## backend
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :12-20
+  server: Pick<Server, 'close' | 'closeAllCon  :13-13
+  stops: StopFn[]  :14-14
+  disconnect: () => Promise<void>  :15-15
+  timeoutMs?: number  :16-16
+  exit?: (code: number) => void  :17-17
+  log?: { info: (...a: unknown[]) => void  :18-18
+  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
+export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
+export function installShutdown(deps) → void  :60-64
+```
 
 ### backend/src/middleware.ts
 ```
@@ -609,6 +623,12 @@ export async function incrementDocumentSequence(tenantId, categoryCode, year) �
 export async function nextDocumentNumber(tenantId, categoryCode) → Promise<string | null>  :47-68
 export async function nextOpportunityTrackingCode(tenantId, createdAt = new Date()) → Promise<string>  :80-104  # Fırsat (Opportunity) için benzersiz, kalıcı bir takip kodu ü
 export async function previewDocumentNumber(tenantId, categoryCode = 'ORN') → Promise<string | null>  :110-128  # Üretilecek numaranın bir ÖNİZLEMESİNİ döndürür (sayaç artırm
+```
+
+### backend/src/services/periodic.ts
+```
+export type StopFn  :5-5
+export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
 ```
 
 ### backend/src/services/personnelTransferService.ts
@@ -769,23 +789,19 @@ async function login()  :18-27
 async function main()  :29-57
 ```
 
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :12-20
-  server: Pick<Server, 'close' | 'closeAllCon  :13-13
-  stops: StopFn[]  :14-14
-  disconnect: () => Promise<void>  :15-15
-  timeoutMs?: number  :16-16
-  exit?: (code: number) => void  :17-17
-  log?: { info: (...a: unknown[]) => void  :18-18
-  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
-export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
-export function installShutdown(deps) → void  :60-64
-```
-
 ### backend/src/planCatalog.ts
 ```
 export type PlanId  :5-5
+```
+
+### backend/src/routes/health.ts
+```
+export interface HealthDeps  :9-13
+  pingDb: () => Promise<unknown>  :10-10
+  timeoutMs?: number  :11-11
+  version?: string  :12-12
+export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
+export function createHealthRouter(deps) → Router  :38-52
 ```
 
 ### backend/src/services/agentProvenance.ts
@@ -932,12 +948,6 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
-```
-
-### backend/src/services/periodic.ts
-```
-export type StopFn  :5-5
-export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
 ```
 
 ### backend/src/services/processEngine.ts
@@ -1241,17 +1251,17 @@ export interface WorkflowBottleneck  :457-461
 ### backend/src/services/virtualAgentService.ts
 ```
 export interface AgentOutput  :13-25
-  rationale: string  :14-14
-  output: Record<string, unknown>  :15-15
-  taskTitle: string  :17-17
-  autonomousAction?: { kind: string  :19-20
-  summary: string  :21-21
-  reversible: boolean  :22-22
-  execute: () => Promise<void>  :23-23
-export function scoreQuotes(quotes,)  :189-191
-export function hasHandler(pluginKey) → boolean  :505-507
-export async function runAgent(params) → Promise<  :513-518  # Bir agent eklentisini çalıştır
-export async function ratifyAgentRun(params) → Promise<  :633-639  # Devir alan gerçek kişi çıktıyı ratifiye eder veya reddeder
+rationale: string  :14-14
+output: Record<string, unknown>  :15-15
+taskTitle: string  :17-17
+autonomousAction?: { kind: string  :19-20
+summary: string  :21-21
+reversible: boolean  :22-22
+execute:  :23-23
+export function scoreQuotes  :189-191
+export function hasHandler  :505-507
+export async function runAgent  :513-518
+export async function ratifyAgentRun  :633-639
 ```
 
 ### backend/src/services/workflowTemplate.ts
@@ -1321,94 +1331,6 @@ export type AgentMode  :14-14
 ```
 
 ## src
-
-### src/modules/SalesSupport.tsx
-```
-component TenderList
-component TenderCalendar
-component ChecklistTab
-component GuaranteesTab
-component SubmittedTenders
-component TenderSelectorEmpty
-component Modal
-component TenderForm
-props SalesSupportProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-hook useAIGate
-export SalesSupport
-handler onOf
-handler onSelect
-handler onChanged
-handler onWithdraw
-handler onReleaseHold
-handler onSelectTender
-handler onChange
-handler onClick
-handler onKeyDown
-```
-
-### src/modules/todo/TaskList.tsx
-```
-component TaskRow
-component Section
-component TaskList
-hook useState
-hook useMemo
-handler onClick
-handler onChange
-```
-
-### src/modules/TodoModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export TodoModule
-handler onLoading
-handler onAction
-handler onPreview
-handler onApprove
-handler onReject
-handler onMarkRead
-handler onNavigate
-handler onToggleStatus
-handler onAssign
-handler onSubmit
-```
-
-### src/types/tender.ts
-```
-export interface DeliveryTimelineStep  :2-7
-  id: string  :3-3
-  title: string  :4-4
-  sortOrder: number  :5-5
-  plannedDate?: string | null  :6-6
-export interface TenderChecklistItem  :8-22
-  id: string  :9-9
-  tenderId: string  :10-10
-  name: string  :11-11
-  isRequired: boolean  :12-12
-  status: 'PENDING' | 'DONE' | 'WAIVED'  :13-13
-  fileUrl?: string | null  :14-14
-  sortOrder: number  :15-15
-  notes?: string | null  :16-16
-  docType?: string | null  :17-17
-  deadline?: string | null  :18-18
-  isAiGenerated?: boolean  :19-19
-  source?: 'MANUAL' | 'AI' | 'CORPORATE_DOC' |  :20-20
-  corporateDocId?: string | null  :21-21
-export interface Tender  :23-51
-  id: string  :24-24
-  tenantId: string  :25-25
-  name: string  :26-26
-  ikn?: string | null  :27-27
-  authority?: string | null  :28-28
-```
 
 ### src/App.tsx
 ```
@@ -2243,6 +2165,35 @@ component ConsolidationView
 component OverviewTab
 ```
 
+### src/modules/SalesSupport.tsx
+```
+component TenderList
+component TenderCalendar
+component ChecklistTab
+component GuaranteesTab
+component SubmittedTenders
+component TenderSelectorEmpty
+component Modal
+component TenderForm
+props SalesSupportProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+hook useMemo
+hook useAIGate
+export SalesSupport
+handler onOf
+handler onSelect
+handler onChanged
+handler onWithdraw
+handler onReleaseHold
+handler onSelectTender
+handler onChange
+handler onClick
+handler onKeyDown
+```
+
 ### src/modules/ServiceTicketsModule.tsx
 ```
 component ServiceTicketsModule
@@ -2340,6 +2291,17 @@ component ResolvedApprovals
 hook useState
 ```
 
+### src/modules/todo/TaskList.tsx
+```
+component TaskRow
+component Section
+component TaskList
+hook useState
+hook useMemo
+handler onClick
+handler onChange
+```
+
 ### src/modules/todo/UnifiedWorkQueue.tsx
 ```
 component Section
@@ -2347,6 +2309,25 @@ component UnifiedWorkQueue
 hook useState
 hook useMemo
 handler onClick
+```
+
+### src/modules/TodoModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export TodoModule
+handler onLoading
+handler onAction
+handler onPreview
+handler onApprove
+handler onReject
+handler onMarkRead
+handler onNavigate
+handler onToggleStatus
+handler onAssign
+handler onSubmit
 ```
 
 ### src/modules/VirtualAgentsTestModule.tsx
@@ -2591,6 +2572,35 @@ export interface OverviewUnit  :27-33
   role: string  :30-30
 ```
 
+### src/types/tender.ts
+```
+export interface DeliveryTimelineStep  :2-7
+  id: string  :3-3
+  title: string  :4-4
+  sortOrder: number  :5-5
+  plannedDate?: string | null  :6-6
+export interface TenderChecklistItem  :8-22
+  id: string  :9-9
+  tenderId: string  :10-10
+  name: string  :11-11
+  isRequired: boolean  :12-12
+  status: 'PENDING' | 'DONE' | 'WAIVED'  :13-13
+  fileUrl?: string | null  :14-14
+  sortOrder: number  :15-15
+  notes?: string | null  :16-16
+  docType?: string | null  :17-17
+  deadline?: string | null  :18-18
+  isAiGenerated?: boolean  :19-19
+  source?: 'MANUAL' | 'AI' | 'CORPORATE_DOC' |  :20-20
+  corporateDocId?: string | null  :21-21
+export interface Tender  :23-51
+  id: string  :24-24
+  tenantId: string  :25-25
+  name: string  :26-26
+  ikn?: string | null  :27-27
+  authority?: string | null  :28-28
+```
+
 ### src/types/workflow.ts
 ```
 export interface EntityFieldSpec  :88-88
@@ -2652,4 +2662,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 197 file(s) omitted to stay under the 19121-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 197 file(s) omitted, 1 collapsed to anchors to stay under the 19175-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

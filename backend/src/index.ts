@@ -28,6 +28,7 @@ import { startProfitabilitySnapshotScheduler } from './services/profitabilitySna
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import { checkDeploymentTopology } from './services/deploymentGuard';
 import { installShutdown } from './lifecycle';
+import { createHealthRouter } from './routes/health';
 import { prisma } from './prismaClient';
 import type { StopFn } from './services/periodic';
 import projectsRouter from './routes/projects';
@@ -118,9 +119,7 @@ const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://l
   .split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins, credentials: true }));
 
-app.get('/api/health', (_req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
-});
+app.use('/api/health', createHealthRouter({ pingDb: () => prisma.$queryRaw`SELECT 1` }));
 
 // Sürüm bilgisi (ayrı upgrade-tool'un yazdığı update-status.json'u yansıtır;
 // burada sürüm/upgrade mantığı YOK — yalnız okur). Frontend "Güncellemeler" kartı + dinamik sürüm.
