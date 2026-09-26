@@ -7,6 +7,8 @@
 // toplayıcılar (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-07)
 // parse edebilsin diye. Geliştirmede davranış aynı kalır (okunabilir çoklu-arg
 // console çıktısı) — çağıran taraf (`logger.info(...)`) hiç değişmez.
+import { getRequestId } from '../services/requestContext';
+
 const STRUCTURED = process.env.NODE_ENV === 'production' || process.env.LOG_FORMAT === 'json';
 
 function serialize(v: unknown): unknown {
@@ -16,12 +18,13 @@ function serialize(v: unknown): unknown {
 
 function emit(level: 'info' | 'warn' | 'error', args: unknown[]): void {
   const out = level === 'error' ? console.error : level === 'warn' ? console.warn : console.log;
-  if (!STRUCTURED) { out(...args); return; }
+  const reqId = getRequestId();
+  if (!STRUCTURED) { out(...(reqId ? [`[${reqId.slice(0, 8)}]`, ...args] : args)); return; }
 
   const [first, ...rest] = args;
   const msg = typeof first === 'string' ? first : undefined;
   const data = (msg ? rest : args).map(serialize);
-  out(JSON.stringify({ level, ts: new Date().toISOString(), msg, data: data.length ? data : undefined }));
+  out(JSON.stringify({ level, ts: new Date().toISOString(), reqId, msg, data: data.length ? data : undefined }));
 }
 
 export const logger = {
