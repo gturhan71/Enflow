@@ -238,15 +238,22 @@ function run(home, cmd, args, log, opts = {}) {
   });
 }
 
-/** /api/health 200 + db:ok gelene dek yoklar. true=sağlıklı. */
-export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {}) {
+/**
+ * /api/health 200 + db:ok gelene dek yoklar. true=sağlıklı.
+ * maxUptimeSec: yanıttaki uptimeSec bundan büyükse süreç yeniden başlamamış demektir
+ * (eski süreç hâlâ sağlıklı yanıt veriyor) → sağlıklı SAYILMAZ. uptimeSec yoksa (eski
+ * sürüm) kontrol atlanır.
+ */
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {}) {
   const deadline = now() + timeoutMs;
   while (now() < deadline) {
     try {
       const r = await fetchImpl(url, { signal: AbortSignal.timeout(Math.min(intervalMs * 2, 5_000)) });
       if (r.ok) {
         const body = await r.json().catch(() => ({}));
-        if (body.db === undefined || body.db === 'ok') return true;
+        const dbOk = body.db === undefined || body.db === 'ok';
+        const restarted = maxUptimeSec == null || typeof body.uptimeSec !== 'number' || body.uptimeSec <= maxUptimeSec;
+        if (dbOk && restarted) return true;
       }
     } catch { /* henüz ayakta değil */ }
     await sleep(intervalMs);
@@ -342,9 +349,10 @@ export async function runUpgrade(home, opts = {}) {
     }
 
     // 7) restart + sağlık doğrulaması
+    const restartedAt = Date.now();
     if (restartBackend(home, opts, log)) {
-      log(`sağlık kontrolü: ${healthUrl} (en fazla ${Math.round(healthOpts.timeoutMs / 1000)} sn)`);
-      if (!(await waitForHealth(healthUrl, healthOpts))) {
+      log(`sağlık kontrolü: ${healthUrl} (en fazla ${Math.round(healthOpts.timeoutMs / 1000)} sn; süreç yeniden başlamış olmalı)`);
+      if (!(await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - restartedAt) / 1000) + 3 }))) {
         throw new Error(`Yükseltme sonrası backend ${Math.round(healthOpts.timeoutMs / 1000)} sn içinde sağlıklı açılmadı (${healthUrl}).`);
       }
       log('✓ backend sağlıklı.');
@@ -365,8 +373,9 @@ export async function runUpgrade(home, opts = {}) {
       await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: backend, env: prismaEnv });
       await run(home, 'pnpm', ['build'], log, { cwd: backend });
       await run(home, 'pnpm', ['build'], log);
+      const rbAt = Date.now();
       if (restartBackend(home, opts, log)) {
-        log((await waitForHealth(healthUrl, healthOpts)) ? '✓ önceki sürüm sağlıklı açıldı.' : 'UYARI: önceki sürüm de sağlıklı açılmadı — elle müdahale gerekli.');
+        log((await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - rbAt) / 1000) + 3 })) ? '✓ önceki sürüm sağlıklı açıldı.' : 'UYARI: önceki sürüm de sağlıklı açılmadı — elle müdahale gerekli.');
       }
     } catch (er) { log('rollback adımı hata: ' + er.message); }
     writeStatus(home, { checkedAt: new Date().toISOString(), current: currentVersion(home), update: { available: true, failed: true, error: e.message, ref: latest.ref, target: latest.target } });

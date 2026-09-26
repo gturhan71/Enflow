@@ -370,13 +370,15 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ```
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 install/wizard.mjs ← lib/pg
+upgrade-tool/cli.mjs ← core
+upgrade-tool/core.mjs ← install/lib/service
+upgrade-tool/server.mjs ← core
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
@@ -482,10 +484,8 @@ backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
+backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
-upgrade-tool/cli.mjs ← core
-upgrade-tool/core.mjs ← install/lib/service
-upgrade-tool/server.mjs ← core
 ```
 
 ## versions (installed direct deps)
@@ -524,15 +524,19 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 13 minutes ago)
 ```
 backend/scripts/db-migrate.mjs                +run
-backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
+install/lib/service.mjs                       +resolveRestartCommand
 install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
+upgrade-tool/cli.mjs                          ~main
+upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
+upgrade-tool/public/index.html                ~renderSettings  ~refresh
+upgrade-tool/server.mjs                       ~performUpgrade  ~loadConfig  ~saveConfig
 ```
 
 ## backend
@@ -1280,6 +1284,13 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
+### backend/src/usageService.ts
+```
+export async function checkLimit  :16-41
+export async function checkUserSeatLimit  :46-46
+export async function incrementUsage  :54-61
+```
+
 ### backend/src/utils/entityTypeTab.ts
 ```
 export function entityTypeToTab(entityType?) → string | undefined  :25-27
@@ -1339,6 +1350,14 @@ export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46
 export const pgReachable = (admin) =>  :26-28
 ```
 
+### install/lib/service.mjs
+```
+export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :29-47  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
+export const launchdDaemonPlist = () =>  :15-23
+export const launchdAgentPlist = () =>  :16-23
+export const winswExePath = (home) =>  :17-23
+```
+
 ### install/wizard.mjs
 ```
 async function ask(q, def)  :38-42
@@ -1379,23 +1398,10 @@ h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
 ```
 
-### install/lib/service.mjs
-```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :29-47  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export const launchdDaemonPlist = () =>  :15-23
-export const launchdAgentPlist = () =>  :16-23
-export const winswExePath = (home) =>  :17-23
-```
-
 ### install/POSTGRES_MIGRATION_PLAN.md
 ```
 h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
-h2 Durum
-h2 Hedef
-h2 Zorluk
-h3 Yaklaşım A — Sağlayıcı-başına ayrı migration klasörü (önerilen)
-h3 Yaklaşım B — Tek kaynak model + generate-time provider switch
-h2 Önerilen yol haritası
+h2 Durum (2026-09-26 — ADR-002, uygulandı)
 h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
 h2 Kapasite teyidi (kurulum sihirbazı)
 h2 İlgili dosyalar
@@ -1518,14 +1524,6 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :184-184
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -2726,8 +2724,8 @@ export function readStatus(home)  :124-126
 export async function checkAndWrite(home, channel = 'auto')  :129-147  # Kontrol et + durum dosyası yaz
 export function toLibpqUrl(url)  :172-174
 export function redactUrl(url)  :176-178  # Log/ipucu için parola maskeleme
-export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :242-255  # /api/health 200 + db:ok gelene dek yoklar
-export async function runUpgrade(home, opts = {})  :287-375  # Güvenli yükseltme
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :247-262  # /api/health 200 + db:ok gelene dek yoklar
+export async function runUpgrade(home, opts = {})  :294-384  # Güvenli yükseltme
 function git(home, args)  :15-17
 function gitSafe(home, args)  :18-20
 function parseSemver(tag)  :31-34  # semver "vX
@@ -2738,8 +2736,8 @@ function dbProvider(home)  :161-168
 function backupDb(home, log, opts)  :183-213
 function restoreDb(snap, log)  :215-228
 function run(home, cmd, args, log, opts = {})  :230-239
-function restartBackend(home, opts, log)  :258-273  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
-function pgRlsInstalled(url)  :275-280
+function restartBackend(home, opts, log)  :265-280  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
+function pgRlsInstalled(url)  :282-287
 ```
 
 ### upgrade-tool/public/index.html
@@ -2777,4 +2775,4 @@ async function tick()  :62-71
 ```
 
 
-> **Not everything is here.** 202 file(s) omitted to stay under the 19989-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 202 file(s) omitted, 1 collapsed to anchors to stay under the 19964-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

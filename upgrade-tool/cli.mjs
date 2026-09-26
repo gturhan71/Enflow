@@ -42,7 +42,7 @@ async function main() {
     });
     if (res.noop) { console.log('Zaten güncel.'); process.exit(0); }
     if (res.ok) { console.log(`✓ Yükseltildi: ${res.from.shortSha} → ${res.to.shortSha}`); process.exit(0); }
-    console.error(`✗ Yükseltme başarısız (rollback yapıldı): ${res.error}`);
+    console.error(`✗ Yükseltme başarısız: ${res.error}`);
     process.exit(1);
   }
 

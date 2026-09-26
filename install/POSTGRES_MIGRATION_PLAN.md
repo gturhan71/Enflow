@@ -1,61 +1,37 @@
 # Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
 
-## Durum
+## Durum (2026-09-26 — ADR-002, uygulandı)
 
-- **SQLite (varsayılan):** `backend/prisma/migrations/` altındaki migration'lar **SQLite
-  lehçesindedir** ve `prisma migrate deploy` ile uygulanır. Adapter: `@prisma/adapter-libsql`.
-- **PostgreSQL (kurulum sihirbazında seçilir):** Kurulum sihirbazı (`install/wizard.mjs`)
-  şema `provider`'ını `postgresql`'e çevirir ve **interim olarak `prisma db push`** ile şemayı
-  doğrudan modellerden kurar (migration geçmişi tutulmaz). Adapter: `@prisma/adapter-pg`.
-  Adapter seçimi çalışma zamanında `DATABASE_URL` şemasından türetilir (`backend/src/prismaClient.ts`).
+- **SQLite (varsayılan):** `backend/prisma/migrations/` (SQLite lehçesi) + `prisma/schema.prisma`
+  (kanonik, provider=sqlite, **asla yerinde değiştirilmez**). Adapter: `@prisma/adapter-libsql`.
+- **PostgreSQL:** kendi migration hattı — `prisma/postgres/schema.prisma` (kanonikten
+  `scripts/sync-postgres-schema.mjs` ile üretilir, yalnız provider farkı) +
+  `prisma/migrations-postgres/` (`0000_baseline` + sonrakiler). Adapter: `@prisma/adapter-pg`.
+- **Seçim:** `backend/prisma.config.ts` → `resolvePrismaPaths(DATABASE_URL)`; `generate` /
+  `migrate deploy` her ortamda aynı komut. Kurulum sihirbazı artık `db push` YAPMAZ, izlenen
+  hiçbir dosyayı değiştirmez (çalışma ağacı temiz → upgrade-tool çalışır).
+- **Geliştirici akışı:** `cd backend && pnpm db:migrate <ad>` — SQLite `migrate dev` + PG
+  migration'ı (son PG migration şema anlık görüntüsü `prisma/postgres/.migrated-schema.prisma`
+  → güncel PG şeması farkı; yerel Postgres gerekmez). `pnpm verify` PG şeması/migration
+  eksikse kırılır. Rename gibi veri-koruyan dönüşümler diff'te DROP+ADD olur → SQL'i gözden geçirin.
+- **CI:** `postgres` job'u (`scripts/ci-postgres.sh`, yerelde de çalışır): provizyon → `migrate
+  deploy` → drift kontrolü → RLS uygula+doğrula → backend runtime rolüyle → setup/login/yaz-oku →
+  `pg_dump` (RLS altında) → SIGTERM.
+- **Yükseltme (upgrade-tool):** Postgres'te **migrator URL zorunlu** (`ENFLOW_MIGRATOR_URL` veya
+  `upgrade-tool/config.json → migratorUrl`; yoksa hiçbir değişiklik yapılmadan durur). Sıra:
+  `pg_dump -Fc` ön-yedek (RLS bayraklarıyla; alınamazsa durur, `ENFLOW_SKIP_PG_BACKUP=1` ile
+  bilinçli atlanır) → git → install → `generate` + `migrate deploy` (migrator) → build → RLS
+  kuruluysa `apply-postgres-rls` yeniden → OS servisini/`restartCommand` ile yeniden başlat →
+  `/api/health` (yeniden başlamış + `db:ok`) 60 sn. Başarısızlıkta kod otomatik geri alınır,
+  önceki sürüm yeniden başlatılır; **Postgres verisi otomatik geri yüklenmez** — log'a maskeli
+  hazır `pg_restore` komutu yazılır.
+- **Eski `db push` kurulumları:** sahada canlı veri taşıyan yok (2026-09-26) → benimsetme aracı
+  yapılmadı. Eski test kurulumları atılır ya da `pnpm migrate:to-postgres` ile yeniden taşınır.
+- **SQLite → Postgres veri taşıma:** `backend/src/scripts/migrateToPostgres.ts`
+  (`pnpm migrate:to-postgres`) — kaynağa dokunmaz; hedefe `migrate deploy` + mantıksal yükleme +
+  satır sayısı doğrulaması; doğrulama geçmeden `.env`'e dokunmaz.
 
-> **Neden interim db push?** Mevcut migration SQL'i SQLite'a özgüdür; Postgres'te aynen çalışmaz.
-> Temiz kurulum için `db push` yeterli ve güvenlidir (şemayı modellerden üretir). Kalıcı sürüm-yönetimi
-> (üretimde şema evrimi izlenebilirliği) için Postgres'e özel bir migration seti gerekir — bu dokümanın konusu.
-
-## Hedef
-
-Postgres için, SQLite migration setinden **bağımsız**, sürüm-kontrollü bir migration geçmişi üretmek;
-böylece Postgres'te de `migrate deploy` ile şema evrimi izlenebilir/tekrarlanabilir olur.
-
-## Zorluk
-
-Prisma şemasında **tek `provider`** olur. Aynı `schema.prisma` hem SQLite hem Postgres migration
-geçmişini taşıyamaz. İki yol var:
-
-### Yaklaşım A — Sağlayıcı-başına ayrı migration klasörü (önerilen)
-1. `backend/prisma/migrations-postgres/` klasörü aç (SQLite'ınki `migrations/` kalır).
-2. Postgres baseline'ı üret (boş bir Postgres'e karşı):
-   ```bash
-   # provider=postgresql + DATABASE_URL boş bir Postgres'e bakarken
-   pnpm prisma migrate diff \
-     --from-empty \
-     --to-schema-datamodel backend/prisma/schema.prisma \
-     --script > backend/prisma/migrations-postgres/0000_baseline/migration.sql
-   ```
-   veya temiz bir Postgres'te `prisma migrate dev --name baseline` (ayrı `--schema`/env ile).
-3. Uygulama: Postgres kurulumunda `db push` yerine
-   `prisma migrate deploy --schema <postgres-schema>` (klasörü işaret eden config/env ile).
-4. Sonraki şema değişikliklerinde **iki** migration üretilir (SQLite + Postgres) — CI'da ikisi de test edilir.
-
-### Yaklaşım B — Tek kaynak model + generate-time provider switch
-1. Şema modelleri tek dosyada; `provider` build/instalasyon anında yazılır (bugünkü `setSchemaProvider`).
-2. Migration geçmişi yalnız **bir** sağlayıcı için tutulur (bugün SQLite); Postgres daima `db push`.
-3. Basit ama Postgres'te şema-evrimi izlenemez (yalnız son durum). *Bugünkü interim durum budur.*
-
-## Önerilen yol haritası
-
-1. **Şimdilik:** `db push` (interim) — çalışıyor; temiz kurulum için yeterli.
-2. **Üretim öncesi:** Yaklaşım A ile Postgres baseline üret + sonraki migration'ları çift-üret.
-3. **CI:** SQLite + Postgres (docker `postgres:16`) matrisinde `migrate deploy` + RBAC/izolasyon süiti.
-4. **Veri taşıma (SQLite→Postgres):** ✅ **uygulandı** — `backend/src/scripts/migrateToPostgres.ts`
-   (`pnpm migrate:to-postgres`, backend/ içinde). Mevcut çalışan bir SQLite tenant'ını, kaynağa
-   dokunmadan (yalnız okur), hedefi `db push` ile kurup `backupService.exportLogicalData` +
-   `restoreService.loadModelsIntoTarget` (döngüsel FK'lar için Postgres-güvenli null+geri-yazma
-   stratejisi — Unit↔User çapraz döngüsü, Unit.parentId/User.delegateToUserId kendine-referans)
-   ile taşır, model-bazlı satır sayısı doğrulaması geçmeden `backend/.env`'e dokunmaz. Herhangi
-   bir adımda hata olursa `schema.prisma` otomatik sqlite'a geri alınır — repo her zaman
-   çalışır SQLite durumuna döner.
+> Aşağıdaki "Hedef / Zorluk / Yaklaşım" bölümleri tarihsel tasarım notudur (Yaklaşım A uygulandı).
 
 ## En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
 

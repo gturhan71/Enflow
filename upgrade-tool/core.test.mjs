@@ -31,3 +31,20 @@ test('waitForHealth: 200 ama db down → sağlıksız', async () => {
   const c = clock();
   assert.equal(await waitForHealth('x', { fetchImpl: async () => res(true, { db: 'down' }), ...c, timeoutMs: 3_000, intervalMs: 1_000 }), false);
 });
+
+test('waitForHealth: eski süreç (uptime yüksek) sağlıklı SAYILMAZ, yeniden başlayınca sayılır', async () => {
+  const c = clock(); let calls = 0;
+  const fetchImpl = async () => res(true, { db: 'ok', uptimeSec: ++calls < 4 ? 452 : 2 });
+  assert.equal(await waitForHealth('x', { fetchImpl, ...c, timeoutMs: 60_000, intervalMs: 1_000, maxUptimeSec: 10 }), true);
+  assert.equal(calls, 4);
+});
+
+test('waitForHealth: hiç yeniden başlamazsa false', async () => {
+  const c = clock();
+  assert.equal(await waitForHealth('x', { fetchImpl: async () => res(true, { db: 'ok', uptimeSec: 900 }), ...c, timeoutMs: 5_000, intervalMs: 1_000, maxUptimeSec: 10 }), false);
+});
+
+test('waitForHealth: uptimeSec yoksa (eski sürüm) uptime kontrolü atlanır', async () => {
+  const c = clock();
+  assert.equal(await waitForHealth('x', { fetchImpl: async () => res(true, { db: 'ok' }), ...c, maxUptimeSec: 10 }), true);
+});
