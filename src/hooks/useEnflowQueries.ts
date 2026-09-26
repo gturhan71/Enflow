@@ -102,6 +102,27 @@ export const useModuleSettings = (tenantId: string) => {
   });
 };
 
+// Marka & Ürün Grubu taksonomisi — Presales, DMO, Servis ve Ayarlar aynı listeyi paylaşır.
+// Ayarlar'daki değişiklikler ['taxonomy'] önekini geçersiz kılar.
+export const useBrands = (tenantId: string) => useQuery({
+  queryKey: ['taxonomy', 'brands', tenantId], queryFn: () => apiService.getBrands().catch(() => []), staleTime: 5 * 60 * 1000, enabled: !!tenantId,
+});
+export const useProductCategories = (tenantId: string) => useQuery({
+  queryKey: ['taxonomy', 'categories', tenantId], queryFn: () => apiService.getProductCategories().catch(() => []), staleTime: 5 * 60 * 1000, enabled: !!tenantId,
+});
+export const useBrandSources = (tenantId: string, brandId: string | undefined) => useQuery({
+  queryKey: ['taxonomy', 'brand-sources', tenantId, brandId ?? ''],
+  queryFn: () => apiService.getBrandSources(brandId as string).catch(() => []),
+  staleTime: 5 * 60 * 1000, enabled: !!tenantId && !!brandId,
+});
+
+// Presales — devredilen BoM'lar + kalem teklifleri
+export const useBomHandoffs = (tenantId: string) => useQuery({
+  queryKey: ['presales', 'handoffs', tenantId], queryFn: () => apiService.getBomHandoffs(), staleTime: 30 * 1000, enabled: !!tenantId,
+});
+export const useBomQuotes = (tenantId: string, opportunityId: string) => useQuery({
+  queryKey: ['presales', 'bom-quotes', tenantId, opportunityId], queryFn: () => apiService.getBomQuotes(opportunityId), staleTime: 30 * 1000, enabled: !!tenantId && !!opportunityId,
+});
 // CRM — salt-okunur yan sorgular (müşteri sağlığı, ziyaret özeti, fırsat ilerleme geçmişi)
 export const useCustomerHealth = (tenantId: string) => useQuery({
   queryKey: ['crm', 'customer-health', tenantId],
