@@ -17,7 +17,8 @@
     "test:load:sqlite-busy": "ts-node --transpile-only scripts/loadtest/sqlite-busy.ts",
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start:ts": "ts-node src/index.ts",
-    "db:sync-pg": "node scripts/sync-postgres-schema.mjs"
+    "db:sync-pg": "node scripts/sync-postgres-schema.mjs",
+    "db:migrate": "node scripts/db-migrate.mjs"
   },
   "keywords": [],
   "author": "",

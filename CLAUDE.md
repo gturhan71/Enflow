@@ -57,7 +57,7 @@ pnpm dev --port 3000
 cd backend && pnpm dev
 ```
 
-> ⚠️ **Migration sonrası:** `npx prisma migrate dev` + `npx prisma generate`, ardından **backend'i yeniden başlat** — nodemon eski Prisma client ile çökebilir (TS2339).
+> ⚠️ **Şema değişikliği:** `cd backend && pnpm db:migrate <ad_snake_case>` — SQLite (`prisma/migrations`) + Postgres (`prisma/migrations-postgres`) migration'ını birlikte üretir (ADR-002, yerel Postgres gerekmez). Doğrudan `npx prisma migrate dev` KULLANMA — PG migration'ı eksik kalır, `pnpm verify` kırılır. Sonra **backend'i yeniden başlat** — nodemon eski Prisma client ile çökebilir (TS2339).
 
 **Test kullanıcısı:** `gokhan@t-ecosystem.com` / şifre: `123456`  
 **Tenant:** `tenant-1`, Rol: `GENERAL_MANAGER`
@@ -377,7 +377,6 @@ install/wizard.mjs ← lib/pg
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
-src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
@@ -525,7 +524,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 60 seconds ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
@@ -537,7 +536,6 @@ backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
 backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
-upgrade-tool/core.mjs                         ~runUpgrade
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
 ```
@@ -580,7 +578,7 @@ key provider
 
 ### backend/scripts/sync-postgres-schema.mjs
 ```
-export function toPostgres(schema)  :21-25
+export function toPostgres(schema)  :25-29
 ```
 
 ### backend/src/config/prismaPaths.ts
@@ -742,6 +740,11 @@ INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 ### backend/prisma/migrations/migration_lock.toml
 ```
 key provider
+```
+
+### backend/scripts/db-migrate.mjs
+```
+function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
 ### backend/scripts/loadtest/mixed-read.mjs
@@ -1476,13 +1479,6 @@ hook useState
 hook useRef
 hook useEffect
 handler onChange
-```
-
-### src/components/ProcessTriggerButton.tsx
-```
-component ProcessTriggerButton
-hook useState
-hook useEffect
 ```
 
 ### src/components/settings/SubscriptionSettings.tsx
@@ -2346,6 +2342,11 @@ export const getPriorityLabel = (priority) =>  :115-120
 export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
 ```
 
+### src/modules/todo/icons.tsx
+```
+export ListTodo
+```
+
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
@@ -2736,4 +2737,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 200 file(s) omitted to stay under the 19794-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 200 file(s) omitted to stay under the 19803-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

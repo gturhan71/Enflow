@@ -1,0 +1,1889 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OTOMATİK ÜRETİLDİ — DÜZENLEMEYİN. Kaynak: prisma/schema.prisma
+// Yeniden üret: node scripts/sync-postgres-schema.mjs (veya pnpm db:migrate)
+// ─────────────────────────────────────────────────────────────────────────────
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Tenant {
+  id                      String                     @id @default(cuid())
+  name                    String
+  moduleSettings          String                     @default("{}")
+  // Tenant-başına Data Encryption Key, master key (DATA_ENCRYPTION_MASTER_KEY) ile AES-256-GCM
+  // sarmalanmış (envelope encryption) — bkz. backend/src/services/tenantEncryption.ts +
+  // docs/TENANT_DATA_ENCRYPTION_PLAN.md
+  dekWrapped              String?
+  // Dashboard SSE "bir şey değişti" sinyali — DB-native, çoklu-replika güvenli
+  // (bkz. backend/src/services/dashboardStream.ts, docs/OLCEKLENDIRME_DUZELTME_PLANI.md
+  // Faz C / S-02). Önceden bellek-içi EventEmitter idi, replikalar arası paylaşılmıyordu.
+  dashboardPingAt         DateTime?
+  createdAt               DateTime                   @default(now())
+  updatedAt               DateTime                   @updatedAt
+  subscription            Subscription?
+  usageMetrics            UsageMetric[]
+  customers               Customer[]
+  contacts                Contact[]
+  serviceTickets          ServiceTicket[]
+  platformTickets         PlatformTicket[]
+  fxAdjustments           FxAdjustment[]
+  opportunities           Opportunity[]
+  projects                Project[]
+  units                   Unit[]
+  users                   User[]
+  contracts               Contract[]
+  tasks                   TodoTask[]
+  archiveItems            ArchiveItem[]
+  documents               CorporateDocument[]
+  workflows               Workflow[]
+  costItems               CostItem[]
+  proposals               Proposal[]
+  contractWorkflows       ContractWorkflow[]
+  vendors                 Vendor[]
+  purchaseRequests        PurchaseRequest[]
+  approvalChains          ApprovalChain[]
+  visitPlans              VisitPlan[]
+  dailyReports            DailyReport[]
+  docCodingProfile        DocumentCodingProfile?
+  docCategoryCodes        DocumentCategoryCode[]
+  docSequences            DocumentSequence[]
+  lessonsLearned          LessonsLearned[]
+  riskOpportunities       RiskOpportunity[]
+  corporateMetrics        CorporateMetric[]
+  externalDocuments       ExternalDocumentRegister[]
+  invoices                Invoice[]
+  payments                Payment[]
+  guaranteeLetters        GuaranteeLetter[]
+  legalCases              LegalCase[]
+  tenders                 Tender[]
+  unitReports             UnitReport[]
+  pluginEntitlements      PluginEntitlement[]
+  agentRuns               AgentRun[]
+  dmoCatalogItems         DmoCatalogItem[]
+  dmoFrameworkAgreements  DmoFrameworkAgreement[]
+  dmoExchangeRates        DmoExchangeRate[]
+  dmoOrders               DmoOrder[]
+  operatingCostPools      OperatingCostPool[]
+  unitBudgets             UnitBudget[]
+  brands                  Brand[]
+  productCategories       ProductCategory[]
+  brandSources            BrandSource[]
+  opportunityProgressLogs OpportunityProgressLog[]
+  costAnalysisVersions    CostAnalysisVersion[]
+  profitabilitySnapshots  ProfitabilitySnapshot[]
+}
+
+enum SubscriptionPlan {
+  STARTER
+  PROFESSIONAL
+  ENTERPRISE
+}
+
+model Subscription {
+  id                   String           @id @default(cuid())
+  plan                 SubscriptionPlan @default(STARTER)
+  tenantId             String           @unique
+  tenant               Tenant           @relation(fields: [tenantId], references: [id])
+  licenseKey           String?
+  licenseModel         String?
+  licenseExpiryDate    DateTime?
+  licensedUserLimit    Int?
+  licensedStorageLimit Int?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
+}
+
+model UsageMetric {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  feature   String // e.g., "INTEGRATION_SYNC", "STORAGE"
+  count     Int      @default(0)
+  period    String // e.g., "2026-05"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, feature, period])
+}
+
+model Unit {
+  id                    String                     @id @default(cuid())
+  name                  String
+  description           String?
+  tenantId              String
+  managerId             String?
+  parentId              String? // üst birim (hiyerarşi — rapor escalation hedefi)
+  createdAt             DateTime                   @default(now())
+  updatedAt             DateTime                   @updatedAt
+  manager               User?                      @relation("UnitManager", fields: [managerId], references: [id])
+  parent                Unit?                      @relation("UnitHierarchy", fields: [parentId], references: [id])
+  children              Unit[]                     @relation("UnitHierarchy")
+  tenant                Tenant                     @relation(fields: [tenantId], references: [id])
+  users                 User[]
+  steps                 WorkflowStep[]
+  budgets               UnitBudget[]
+  projectParticipations ProjectUnitParticipation[]
+}
+
+model User {
+  id               String        @id @default(cuid())
+  name             String
+  email            String        @unique
+  password         String?
+  role             String
+  permissions      String
+  status           String        @default("ACTIVE")
+  tenantId         String
+  unitId           String?
+  delegateToUserId String? // onay vekaleti — bu kullanıcı izinliyken yerine onay verebilecek kişi
+  delegateUntil    DateTime? // null = süresiz vekalet
+  dashboardLayout  String? // JSON: kişiselleştirilmiş Dashboard widget seçimi/sıralaması — null ise rol varsayılanı kullanılır
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  createdOpps      Opportunity[] @relation("CreatedBy")
+  assignedOpps     Opportunity[] @relation("AssignedTo")
+  managedUnits     Unit[]        @relation("UnitManager")
+  unit             Unit?         @relation(fields: [unitId], references: [id])
+  tenant           Tenant        @relation(fields: [tenantId], references: [id])
+  delegateTo       User?         @relation("UserDelegate", fields: [delegateToUserId], references: [id], onDelete: SetNull)
+  delegatedFrom    User[]        @relation("UserDelegate")
+}
+
+model Customer {
+  id                String        @id @default(cuid())
+  name              String
+  shortName         String?
+  industry          String?
+  website           String?
+  logo              String?
+  email             String?
+  phone             String?
+  address           String?
+  city              String?
+  country           String?
+  postalCode        String?
+  taxOffice         String?
+  taxNumber         String?
+  chamberOfCommerce String?
+  tradeRegistryNo   String?
+  source            String? // B-06 — lead kaynağı (Referans/Web Sitesi/İhale Duyurusu/...)
+  riskScore         Int           @default(0)
+  creditLimit       Float         @default(0)
+  currency          String        @default("USD")
+  techStack         String?
+  socialMedia       String?
+  notes             String?
+  status            String        @default("ACTIVE")
+  parentId          String? // üst müşteri (şube/alt-birim — tek seviye, bkz. Unit.parentId deseni)
+  tenantId          String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
+  parent            Customer?     @relation("CustomerHierarchy", fields: [parentId], references: [id], onDelete: Restrict)
+  children          Customer[]    @relation("CustomerHierarchy")
+  opportunities     Opportunity[]
+  contacts          Contact[]
+  invoices          Invoice[]
+
+  @@index([tenantId, parentId])
+}
+
+// Kurumsal müşteride birden çok kişi (satınalma sorumlusu/teknik şartname yazarı/
+// muhasebe farklı kişiler olabilir — kamu idarelerinde sık). Customer.email/phone
+// dokunulmadı (genel/varsayılan iletişim); Contact bunun üstüne ek bir katman.
+model Contact {
+  id         String   @id @default(cuid())
+  tenantId   String
+  tenant     Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  name       String
+  role       String   @default("OTHER") // PURCHASING|TECHNICAL|FINANCE|MANAGEMENT|OTHER
+  title      String? // serbest unvan (ör. "Satınalma Müdürü")
+  email      String?
+  phone      String?
+  isPrimary  Boolean  @default(false)
+  notes      String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([tenantId, customerId])
+}
+
+model Opportunity {
+  id                    String                   @id @default(cuid())
+  trackingCode          String? // benzersiz takip kodu (açılış tarihi dahil) — nextOpportunityTrackingCode ile üretilir, immutable
+  title                 String
+  value                 Float
+  currency              String                   @default("TRY") // fırsatın tahmini bedeli hangi dövizde girildi
+  probability           Int
+  expectedCloseDate     DateTime?
+  status                String
+  description           String?
+  lostReason            String? // status='LOST' olduğunda kapanış nedeni
+  agentTriage           String? // JSON: { crm?:{recommendation,issues,at}, igpd?:{recommendation,expectedValue,valueTier,at} } — deterministik agent triyajı (annotation)
+  lastProgressCheckAt   DateTime? // son ilerleme teyidi zamanı (null ise createdAt baz alınır)
+  progressRemindersSent String? // JSON dizi — mevcut check-in döngüsünde gönderilen eşikler (ör. ["DUE"]); her teyitte sıfırlanır
+  procurementMethod     String? // OPEN|RESTRICTED|NEGOTIATED|DIRECT|PRIVATE — fırsatın hangi satınalma usulüyle teklife dönüşeceği (Satış Destek tetikleyici)
+  targetBidDate         DateTime? // son teklif/dönüşüm tarihi — Satış Destek dosya hazırlık deadline'ı
+  bomEvaluation         String? // JSON — handoff anında alınan BoM tedarikçi teklif değerlendirme snapshot'ı
+  technicalStatus       String                   @default("PENDING")
+  bomStatus             String                   @default("DRAFT")
+  costConfig            String? // JSON: { baseCurrency, rates, marginMode, globalMargin }
+  tenantId              String
+  customerId            String
+  assignedToId          String
+  createdById           String
+  presalesId            String?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  bomItems              BoMItem[]
+  costItems             CostItem[]
+  createdBy             User                     @relation("CreatedBy", fields: [createdById], references: [id])
+  assignedTo            User                     @relation("AssignedTo", fields: [assignedToId], references: [id])
+  customer              Customer                 @relation(fields: [customerId], references: [id])
+  tenant                Tenant                   @relation(fields: [tenantId], references: [id])
+  workflowLogs          WorkflowLog[]
+  contracts             Contract[]
+  proposals             Proposal[]
+  progressLogs          OpportunityProgressLog[]
+  costAnalysisVersions  CostAnalysisVersion[]
+  requiredDocs          OpportunityRequiredDoc[]
+
+  @@unique([tenantId, trackingCode])
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToId])
+}
+
+// Fırsat oluşturulurken zorunlu 3 evrak (teknik şartname/idari şartname/sözleşme
+// taslağı) + serbest ek evraklar (OTHER). Fırsat evraksız da oluşturulabilir —
+// zorunluluk yalnız BoM girişinde (Presales) kontrol edilir, bkz. opportunities.ts
+// POST /:id/bom. 3 sabit satırın tekilliği DB-seviyeli değil, uygulama katmanında
+// (ilk GET'te seed) garanti edilir — OTHER tipinden birden çok kayıt eklenebilsin diye.
+model OpportunityRequiredDoc {
+  id            String      @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  docType       String // TECH_SPEC | ADMIN_SPEC | CONTRACT_DRAFT | OTHER
+  name          String
+  status        String      @default("PENDING") // PENDING | UPLOADED
+  fileUrl       String?
+  fileName      String?
+  isRequired    Boolean     @default(true)
+  sortOrder     Int         @default(0)
+  notes         String?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([tenantId, opportunityId])
+}
+
+// Fırsat ilerleme teyidi geçmişi — periyodik zorunlu check-in + olasılık/aşama trendi
+model OpportunityProgressLog {
+  id                  String      @id @default(cuid())
+  tenantId            String
+  opportunityId       String
+  recordedById        String
+  previousStatus      String
+  newStatus           String
+  previousProbability Int
+  newProbability      Int
+  changed             Boolean // status veya probability fiilen değişti mi
+  note                String? // changed=false ise UI'da zorunlu
+  createdAt           DateTime    @default(now())
+  tenant              Tenant      @relation(fields: [tenantId], references: [id])
+  opportunity         Opportunity @relation(fields: [opportunityId], references: [id])
+
+  @@index([tenantId, opportunityId, createdAt])
+}
+
+model Proposal {
+  id              String      @id @default(cuid())
+  opportunityId   String
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  content         String // JSON string with items, terms, description, total
+  version         Int         @default(1)
+  status          String      @default("DRAFT") // DRAFT, SENT, EXPIRED, REJECTED, ACCEPTED
+  rejectionReason String? // B-21 — REJECTED olunca gerekçe (Opportunity.lostReason ile aynı kategori listesi)
+  tenantId        String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+}
+
+// Maliyet analizi versiyon geçmişi — her POST /:id/cost-analysis kaydında BoM/gider/
+// costConfig anlık görüntüsü ayrı bir satıra yazılır (Opportunity.bomItems/costItems
+// canlı tabloları her kayıtta silinip yeniden oluşturulduğu için geçmiş orada tutulmaz).
+// Fırsat kartından "kaç kez maliyet analizi yapıldı" + geçmiş rakamlara dönüp bakma bu tablodan.
+model CostAnalysisVersion {
+  id            String      @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+  version       Int // fırsat içinde 1'den başlayan sıra
+  bomItems      String // JSON — o anki priced BoM satırları
+  costItems     String // JSON — o anki (usul+manuel) gider kalemleri
+  costConfig    String // JSON — o anki CostConfig (usul, kur, marj, vb.)
+  grandCost     Float
+  offer         Float
+  marginPct     Float
+  belowFloor    Boolean     @default(false)
+  status        String      @default("PENDING_APPROVAL") // PENDING_APPROVAL | APPROVED | REJECTED — sonradan approve-cost ile güncellenir
+  createdById   String?
+  createdByName String?
+  createdAt     DateTime    @default(now())
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, opportunityId, version])
+}
+
+// ── Marka & Ürün Grubu Taksonomisi (2026-08-08, Faz 1) ───────────────────────
+// Tenant-yapılandırılabilir, yönetilebilir liste (serbest metin DEĞİL — analitik
+// bozulmasın diye). Presales BoM kalemi + DMO katalog kaydı bu ortak listelerden
+// seçim yapar. Ayarlar → Marka & Ürün Grubu (GM-only) ekranından yönetilir.
+model Brand {
+  id              String           @id @default(cuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  sources         BrandSource[]
+  bomItems        BoMItem[]
+  dmoCatalogItems DmoCatalogItem[]
+  vendors         Vendor[]
+  purchaseItems   PurchaseItem[]
+  serviceTickets  ServiceTicket[]
+
+  @@unique([tenantId, name])
+}
+
+model ProductCategory {
+  id              String           @id @default(cuid())
+  tenantId        String
+  tenant          Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name            String
+  isActive        Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  bomItems        BoMItem[]
+  dmoCatalogItems DmoCatalogItem[]
+  serviceTickets  ServiceTicket[]
+
+  @@unique([tenantId, name])
+}
+
+// Bir markanın kayıtlı kaynak/distribütörleri — BoMItem.source alanı marka
+// seçildikten sonra bu listeden doldurulur (serbest metin fallback korunur).
+model BrandSource {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  brandId   String
+  brand     Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  name      String
+  notes     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model BoMItem {
+  id               String           @id @default(cuid())
+  lineKey          String? // stabil satır kimliği (recreate'e rağmen teklif değerlendirme bağı)
+  partNumber       String
+  description      String
+  quantity         Int
+  purchaseCost     Float
+  marginPercentage Float
+  unitSalePrice    Float?
+  totalSalePrice   Float?
+  currency         String?
+  vatRate          Float            @default(20) // kalem bazında KDV % — teklif KDV hesabı bunu kullanır
+  source           String?
+  vendor           String?
+  paymentTermDays  Int? // alış ödeme vadesi (referans tarihten gün) — finansman etkisi
+  brandId          String?
+  brand            Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  categoryId       String?
+  category         ProductCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  opportunityId    String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  opportunity      Opportunity      @relation(fields: [opportunityId], references: [id])
+}
+
+// Presales BoM kalemi için vendor teklif değerlendirmesi (fiyat + teknik uygunluk)
+model BoMLineQuote {
+  id                  String    @id @default(cuid())
+  tenantId            String
+  opportunityId       String
+  lineKey             String // BoMItem.lineKey ile eşleşir
+  componentName       String? // değerlendirilen kalem adı (cache)
+  vendorId            String?
+  vendorName          String
+  unitPrice           Float
+  currency            String    @default("TRY")
+  technicalCompliance String    @default("COMPLIANT") // COMPLIANT | PARTIAL | NON_COMPLIANT
+  specSummary         String? // teknik uygunluk notu/özeti
+  deliveryDays        Int?
+  validUntil          DateTime?
+  notes               String?
+  isSelected          Boolean   @default(false)
+  fileUrl             String? // orijinal teklif dosyası (xls/xml/doc/pdf) — seçim kanıtı
+  fileName            String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([opportunityId, lineKey])
+}
+
+model CostItem {
+  id              String      @id @default(cuid())
+  description     String
+  category        String // CostCategory (procurementCosts.ts)
+  amount          Float
+  currency        String?
+  auto            Boolean     @default(false) // usule göre otomatik gelen masraf mı
+  paymentTermDays Int? // ödeme vadesi (referans tarihten gün) — finansman etkisi
+  opportunityId   String
+  tenantId        String
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  opportunity     Opportunity @relation(fields: [opportunityId], references: [id])
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+}
+
+model WorkflowLog {
+  id            String      @id @default(cuid())
+  fromUnitId    String
+  toUnitId      String
+  assignedBy    String
+  assignedTo    String
+  note          String?
+  status        String      @default("PENDING")
+  opportunityId String
+  timestamp     DateTime    @default(now())
+  opportunity   Opportunity @relation(fields: [opportunityId], references: [id])
+}
+
+model Project {
+  id                 String                     @id @default(cuid())
+  code               String? // insan-okunur proje kodu, örn. 2026-HW-00012 — sıra no üreticisi otomatik doldurur
+  name               String
+  type               String                     @default("HARDWARE") // HARDWARE | SOFTWARE | SERVICE | MIXED
+  description        String?
+  status             String                     @default("PLANNING")
+  // PLANNING | IN_PROGRESS | ON_HOLD | COMPLETED | CANCELLED
+  phase              String                     @default("PLANNING")
+  // Current active phase label for display
+  totalValue         Float                      @default(0) // contract value
+  contractCurrency   String                     @default("TRY")
+  budgetTotal        Float                      @default(0)
+  avgMargin          Float                      @default(0) // direkt (katkı) marj — overhead hariç
+  // İşletme maliyeti (overhead) — yönetim insiyatifi (default kapalı; eski projeler etkilenmez)
+  applyOverhead      Boolean                    @default(false)
+  overheadAmount     Float                      @default(0) // hesaplanan işletme maliyeti (TRY)
+  netMargin          Float                      @default(0) // tam-yüklü marj (değer − direkt − overhead)/değer
+  deadline           DateTime?
+  plannedEndDate     DateTime?
+  actualEndDate      DateTime?
+  startDate          DateTime?
+  progress           Int                        @default(0)
+  customerId         String?
+  customerName       String?
+  ownerId            String?
+  pmId               String?
+  pmName             String?
+  managerId          String?
+  opportunityId      String?                    @unique
+  contractId         String?
+  procurementNotes   String? // JSON string
+  tenantId           String
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+  tenant             Tenant                     @relation(fields: [tenantId], references: [id])
+  milestones         ProjectMilestone[]
+  projectCostItems   ProjectCostItem[]
+  handoverDocs       ProjectHandoverDoc[]
+  unitParticipations ProjectUnitParticipation[]
+  serviceTickets     ServiceTicket[]
+
+  @@index([tenantId, status])
+}
+
+// B-22 — Garanti/Servis: ACCEPTANCE sonrası (WARRANTY döneminde) arıza bildirimi,
+// yedek parça talebi, servis SLA takibi. Önceden WARRANTY yalnız bir milestone
+// etiketiydi; gerçek talep bu modele düşer.
+model ServiceTicket {
+  id                  String           @id @default(cuid())
+  tenantId            String
+  tenant              Tenant           @relation(fields: [tenantId], references: [id])
+  projectId           String
+  project             Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title               String
+  description         String?
+  category            String           @default("FAULT") // FAULT|SPARE_PART|MAINTENANCE|OTHER
+  priority            String           @default("NORMAL") // LOW|NORMAL|HIGH|URGENT
+  status              String           @default("OPEN") // OPEN|IN_PROGRESS|WAITING_PART|RESOLVED|CLOSED
+  reportedAt          DateTime         @default(now())
+  reportedByContactId String? // Customer.Contact — bildiren kişi (opsiyonel)
+  reportedByName      String? // Contact yoksa serbest metin
+  assignedToUserId    String?
+  unitId              String?
+  slaHours            Int? // hedef çözüm süresi (takvim-saati)
+  dueAt               DateTime? // slaHours verilmişse create'de otomatik hesaplanır
+  escalatedAt         DateTime? // SLA aşımı bildirimi bir kez gitti mi (idempotent)
+  resolvedAt          DateTime?
+  resolutionNotes     String?
+  costAmount          Float? // çözüm maliyeti (yedek parça/işçilik) — opsiyonel
+  costCurrency        String? // costAmount girildiyse zorunlu anlamda kullanılır
+  brandId             String? // ilgili ürünün markası (2026-08-09, Faz 3) — opsiyonel, tek etiket (satır granülaritesi yok)
+  brand               Brand?           @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  productCategoryId   String? // `category` alanı zaten arıza tipini taşıdığı için ayrı isim
+  productCategory     ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, projectId])
+}
+
+// Enflow SaaS'ı kullanan tenant'ların ürün geri bildirimi/hata/iyileştirme/mimari
+// değişiklik talepleri. ServiceTicket'tan FARKLI bir domain: ServiceTicket tenant'ın
+// KENDİ müşterisine verdiği garanti/servis kaydıdır (iş verisi); PlatformTicket ise
+// tenant'ın Enflow'un kendisine (vendor'a) gönderdiği platform-seviyesi bir talep.
+// category/priority/scope/status/targetTimeline/resolutionNote alanları YALNIZ
+// ayrı bir dış triage aracı (bu repo dışında) tarafından, platform-tickets-admin
+// API'si üzerinden doldurulur — tenant kullanıcısı title+description'a ek olarak
+// yalnız kendi ilk izlenimini (reportedType) bildirir; nihai sınıflandırma (category)
+// bundan bağımsız olarak dış araç tarafından belirlenir (örn. "yorum" olarak açılan
+// bir talep değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir).
+model PlatformTicket {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userId         String // gönderen — izolasyon değil, izleme amaçlı düz alan (ilişki yok)
+  userName       String // gönderim anındaki ad snapshot'ı (kullanıcı sonradan devredilebilir/pasifleşebilir)
+  title          String
+  description    String
+  reportedType   String   @default("BUG") // BUG|IMPROVEMENT|COMMENT — kullanıcının gönderirken seçtiği ilk tip
+  scope          String? // TENANT_SPECIFIC|PLATFORM_WIDE — yalnız dış triage aracı doldurur
+  category       String? // BUG|IMPROVEMENT|ARCHITECTURE_CHANGE — yalnız dış triage aracı doldurur (nihai sınıflandırma)
+  priority       String? // CRITICAL|HIGH|MEDIUM|LOW — yalnız dış triage aracı doldurur
+  status         String   @default("NEW") // NEW|TRIAGED|PLANNED|IN_PROGRESS|DONE|REJECTED
+  targetTimeline String? // serbest metin, örn. "Q3 2026" — dış triage aracı yazar
+  resolutionNote String? // tamamlanınca/reddedilince kullanıcıya görünecek not
+  metadata       String? // dış aracın serbest JSON notu (String, manuel parse — SQLite'ta native Json yok)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+// Kârlılık Faz C — planlı defterin dönemsel anlık görüntüsü ("plan-drift" izlemesi).
+// Aylık cron (profitabilitySnapshotScheduler) + on-demand POST /api/profitability/snapshot
+// ile yazılır. Bir (tenant, kapsam, dönem) için ayda bir satır: asOfKey="YYYY-MM"
+// idempotency anahtarı. Gerçekleşen (ACTUAL) burada tutulmaz — o her an canlı hesaplanır;
+// bu tablo yalnız "planın o gün ne dediği"ni dondurur. bkz. docs/KARLILIK_ANALIZI_PLAN.md §4
+model ProfitabilitySnapshot {
+  id               String   @id @default(cuid())
+  tenantId         String
+  tenant           Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  scope            String   @default("ALL") // ALL | PROJECT
+  projectKey       String   @default("ALL") // "ALL" veya projectId (nullable yerine — unique NULL sorununu önler)
+  asOf             DateTime // snapshot anı (tam timestamp)
+  asOfKey          String // "YYYY-MM" — aylık idempotency
+  grain            String   @default("MONTH")
+  periodKey        String // "2026-08" | "2026-Q3" | "2026"
+  currency         String   @default("TRY")
+  plannedRevenue   Float    @default(0)
+  plannedCost      Float    @default(0)
+  plannedMargin    Float    @default(0)
+  cashInPlanned    Float    @default(0)
+  cashOutPlanned   Float    @default(0)
+  financingCost    Float    @default(0)
+  financingBenefit Float    @default(0)
+  payloadJson      String   @default("{}") // tam PeriodRow + FX/faiz varsayımları
+  createdAt        DateTime @default(now())
+
+  @@unique([tenantId, scope, projectKey, periodKey, asOfKey])
+  @@index([tenantId, periodKey])
+}
+
+model ProjectMilestone {
+  id               String    @id @default(cuid())
+  projectId        String
+  project          Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  title            String
+  description      String?
+  milestoneType    String    @default("CUSTOM")
+  // PLANNING | PROCUREMENT | SHIPMENT | INSTALLATION | DEVELOPMENT | TESTING | ACCEPTANCE | INVOICING | COLLECTION | WARRANTY | DELIVERY | CUSTOM
+  status           String    @default("NOT_STARTED")
+  // NOT_STARTED | IN_PROGRESS | COMPLETED | BLOCKED | CANCELLED
+  progress         Int       @default(0)
+  assignedToId     String?
+  assignedToName   String?
+  plannedStart     DateTime?
+  plannedEnd       DateTime?
+  actualStart      DateTime?
+  actualEnd        DateTime?
+  budgetAmount     Float?
+  actualCost       Float?
+  currency         String    @default("TRY")
+  isParallel       Boolean   @default(false)
+  requiresApproval Boolean   @default(false)
+  approvedById     String?
+  approvedAt       DateTime?
+  order            Int       @default(0)
+  notes            String?
+  remindersSent    String? // JSON dizi — DELIVERY tipi milestone'lar için gönderilen teslim-tarihi hatırlatmaları
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model ProjectCostItem {
+  id                String    @id @default(cuid())
+  projectId         String
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  category          String    @default("OTHER")
+  // PROCUREMENT | TRAVEL | EXTERNAL_SERVICE | OTHER
+  description       String
+  plannedAmount     Float     @default(0)
+  actualAmount      Float     @default(0)
+  currency          String    @default("TRY")
+  amountTRY         Float     @default(0)
+  milestoneId       String?
+  purchaseRequestId String?
+  serviceTicketId   String? // Garanti & Servis maliyeti (idempotent anahtar)
+  bomLineKey        String? // BoMItem.lineKey — dolu ise BoM Maliyet Varyansı satır bazında karşılaştırır
+  date              DateTime?
+  invoiceNo         String?
+  notes             String?
+  createdById       String?
+  // Finans onayı (Faz 6) — geriye uyumlu: eski kayıtlar APPROVED
+  approvalStatus    String    @default("APPROVED") // PENDING | APPROVED | REJECTED
+  approvedById      String?
+  approvedAt        DateTime?
+  approvalNote      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model Contract {
+  id              String       @id @default(cuid())
+  title           String?
+  status          String       @default("DRAFT")
+  signedDate      DateTime?
+  endDate         DateTime?
+  guaranteeAmount Float        @default(0)
+  guaranteeExpiry DateTime?
+  projectId       String?
+  opportunityId   String?
+  tenantId        String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  opportunity     Opportunity? @relation(fields: [opportunityId], references: [id])
+  tenant          Tenant       @relation(fields: [tenantId], references: [id])
+}
+
+model TodoTask {
+  id               String    @id @default(cuid())
+  title            String
+  description      String?
+  unitId           String
+  assignedBy       String
+  assignedToUserId String? // kişi-bazlı atama (yoksa birim yöneticisine çözülür)
+  actionKey        String? // işlevsel görev eylemi (BOM_PREPARE vb.) — modül ekranına deep-link
+  priority         String    @default("MEDIUM")
+  status           String    @default("PENDING")
+  dueDate          DateTime?
+  slaBusinessDays  Int? // verildiyse dueDate bu kadar iş günü sonrasına otomatik hesaplanır
+  progressNotes    String? // JSON string
+  relatedModule    String? // PROJECT, OPPORTUNITY, CONTRACT, PROCUREMENT, GENERAL
+  relatedItemId    String?
+  agentRunId       String? // bu görevi üreten sanal agent çalıştırması (köken etiketi)
+  escalatedAt      DateTime? // SLA aşımı bir üst role bildirildi mi (B-16, idempotent tekil eskalasyon)
+  completedAt      DateTime? // status COMPLETED'e geçtiği an (routes/tasks.ts PUT'ta set/clear edilir — reversible)
+  tenantId         String
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  tenant           Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, status])
+  @@index([tenantId, assignedToUserId])
+}
+
+model ArchiveItem {
+  id          String   @id @default(cuid())
+  boxNo       String
+  shelfNo     String
+  category    String
+  description String?
+  owner       String
+  date        DateTime @default(now())
+  status      String   @default("IN_ARCHIVE")
+  tags        String? // Comma separated or JSON
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+}
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  action      String // "UPDATE", "CREATE", "DELETE"
+  entityType  String // "OPPORTUNITY", "CUSTOMER", vb.
+  entityId    String
+  details     String? // Değişiklik detayları (JSON string)
+  userId      String
+  actorType   String? // HUMAN | AGENT — işlemi yapan aktörün tipi (köken etiketi)
+  agentRunId  String? // AGENT ise ilgili sanal agent çalıştırması
+  actorName   String? // Yazma anında çözülen aktör adı (kullanıcı/agent) — silinen kullanıcıda bile kalır
+  entityLabel String? // Yazma anında çözülen varlık başlığı/adı (örn. fırsat başlığı) — silinen kayıtta bile kalır
+  summary     String? // Türkçe tek-satır okunabilir özet (Denetim İzi ekranında birincil satır)
+  tenantId    String
+  timestamp   DateTime @default(now())
+
+  @@index([tenantId, timestamp])
+}
+
+// Denetim izi arşivleme işi — periyodik olarak eski ActivityLog kayıtlarını
+// NDJSON dosyasına (sha256 mühürlü) dışa aktarır, hedefe yazar, doğrulanınca
+// canlı tablodan siler (bkz. activityLogArchiveService.ts). BackupJob ile
+// aynı desen (LOCAL|NEXTCLOUD|S3 hedef, checksum, MANUAL|SCHEDULED tetik).
+model ActivityLogArchive {
+  id            String    @id @default(cuid())
+  tenantId      String
+  trigger       String    @default("MANUAL") // MANUAL | SCHEDULED
+  targetType    String    @default("LOCAL") // LOCAL | NEXTCLOUD | S3
+  location      String? // dosyanın yazıldığı yol/uri
+  format        String    @default("NDJSON")
+  fromTimestamp DateTime? // arşivlenen en eski kayıt zamanı
+  toTimestamp   DateTime? // arşivlenen en yeni kayıt zamanı
+  recordCount   Int       @default(0)
+  sizeBytes     Int       @default(0)
+  checksum      String? // sha256 — içerik mührü
+  status        String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED
+  pruned        Boolean   @default(false) // arşivlenen kayıtlar canlı tablodan silindi mi
+  error         String?
+  startedAt     DateTime  @default(now()) // zaman mührü
+  completedAt   DateTime?
+
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+}
+
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  title         String
+  message       String
+  type          String
+  relatedModule String? // tıklayınca gidilecek sekme (deep-link)
+  relatedItemId String? // ilgili kayıt (fırsat/proje) — hedef modülde açılır
+  isRead        Boolean  @default(false)
+  timestamp     DateTime @default(now())
+  tenantId      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, userId])
+}
+
+model CorporateDocument {
+  id            String    @id @default(cuid())
+  name          String
+  category      String
+  expiryDate    DateTime?
+  fileUrl       String?
+  tags          String?
+  docNumber     String? // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
+  remindersSent String? // JSON dizi — gönderilen geçerlilik hatırlatmaları (guaranteeReminders.ts ile aynı desen)
+  tenantId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+}
+
+model Workflow {
+  id          String         @id @default(cuid())
+  name        String
+  description String?
+  isActive    Boolean        @default(true)
+  isDefault   Boolean        @default(false) // tenant başına tek varsayılan şablon (legacy, processKey=null kayıtlar için)
+  processKey  String? // süreç motoru anahtarı (OPPORTUNITY_APPROVAL, CONTRACT_SIGNING, ...) — bkz. processEngine.ts
+  entityType  String? // tenant-özel (custom) süreçler için hedef varlık türü (OPPORTUNITY, PROJECT, ...) — generic tetikleme/COPY_FIELDS_TO_TASK bunu kullanır; sabit süreçlerde entityType zaten ilgili route'a hardcoded, burada boş kalabilir
+  tenantId    String
+  tenant      Tenant         @relation(fields: [tenantId], references: [id])
+  steps       WorkflowStep[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([tenantId, processKey])
+}
+
+model WorkflowStep {
+  id                 String   @id @default(cuid())
+  workflowId         String
+  workflow           Workflow @relation(fields: [workflowId], references: [id])
+  unitId             String
+  unit               Unit     @relation(fields: [unitId], references: [id])
+  role               String? // unitId içinde belirli bir role kısıtla; null = birimdeki herkes
+  delegateUserId     String? // VEKİL — birimde aktif kullanıcı yoksa (boş koltuk) düşülecek kişi; resolveStepRecipients bunu unit üyeleri/yöneticisinden sonra dener
+  recipientField     String? // doluysa alıcı Unit/Role yerine işlenen kaydın bu alanından (User ID, ör. 'assignedToId') çözülür — beyaz liste: processEngine.ts ENTITY_RECIPIENT_FIELDS. Bulunamazsa role/unit/delegate zincirine düşer.
+  approvalMode       String   @default("ANY") // ANY|ALL — aynı (workflowId, order) değerini paylaşan satırlar için
+  actionKey          String? // type=AUTO adımlarda çalıştırılacak kayıtlı eylem anahtarı (processEngine.ts STAGE_ACTIONS)
+  actionConfig       String? // actionKey'e özel yapılandırma (JSON string) — örn. COPY_FIELDS_TO_TASK için {"fields":["title","value"]}
+  order              Int
+  // Değişmez kural: bir adım yalnız tenant AÇIKÇA "otomatik devir" (AUTO) olarak
+  // işaretlerse insan onayı olmadan ilerler — varsayılan MANUAL'dır (bkz. memory
+  // process_engine_immutable_rule.md). AUTO'nun eski varsayılan olması bu kuralı
+  // ihlal ediyordu, Faz C'de düzeltildi.
+  type               String   @default("MANUAL") // AUTO, MANUAL
+  description        String
+  nextStepId         String?
+  enabled            Boolean  @default(true) // false = birim akıştan çıkarıldı, görevler sıradaki aktif birime yönlenir
+  requiresCompletion Boolean  @default(false) // devretmeden önce birimin gereklilikleri tamamlaması gerekir
+  completionNote     String? // gereklilik açıklaması (uyarıda gösterilir)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+// ── CONTRACT WORKFLOW (TEST MODULE) ─────────────────────────────────────────
+
+model ContractWorkflow {
+  id                   String                 @id @default(cuid())
+  title                String
+  opportunityId        String?
+  contractId           String?
+  contractValue        Float                  @default(0)
+  tenderName           String? // İhale adı (SalesSupport'tan veya manuel)
+  tenderNo             String? // İKN - İhale Kayıt Numarası
+  projectName          String? // Şartnameden AI tarafından çıkarılan proje adı
+  contractText         String?
+  specText             String?
+  aiAnalysis           String? // JSON
+  status               String                 @default("DRAFT")
+  // DRAFT | ANALYSIS_DONE | PREPARATION | READY_TO_SIGN | PENDING_SIGNATURE_APPROVAL | SIGNED | TRANSFERRED | CANCELLED | TERMINATED
+  signedDate           DateTime?
+  deadline             DateTime?
+  notes                String?
+  cancelReason         String? // CANCELLED/TERMINATED geçişinde zorunlu gerekçe
+  cancelledAt          DateTime?
+  cancelledById        String?
+  projectId            String? // /transfer ile oluşturulan Project (idempotency + bağ)
+  procurementRequestId String? // /handoff-procurement ile oluşturulan PurchaseRequest (idempotency + bağ)
+  // Teslim süresi takibi — sözleşmenin kendi geçerlilik/hazırlık süresinden (deadline) BAĞIMSIZ,
+  // malın/işin fiili teslim tarihi. imza gününden itibaren başlar, aşılması cezai şart doğurur.
+  deliveryPeriodDays   Int? // sözleşmedeki teslim süresi (gün) — WON'da Tender.expectedDeliveryDays'ten kopyalanır
+  deliveryDueDate      DateTime? // denormalize: (signedDate ?? now) + deliveryPeriodDays, her değişiklikte yeniden hesaplanır
+  penaltyClauseText    String? // cezai şart maddesi notu
+  penaltyDailyRatePct  Float? // günlük gecikme cezası oranı (%)
+  penaltyCapPct        Float? // ceza tavanı (%, opsiyonel)
+  remindersSent        String? // JSON dizi — gönderilen teslim-tarihi hatırlatmaları (Tender.remindersSent ile aynı desen)
+  tenantId             String
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id])
+  documents            ContractWorkflowDoc[]
+  deliveryTimeline     DeliveryTimelineStep[]
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, projectId])
+}
+
+model ContractWorkflowDoc {
+  id            String           @id @default(cuid())
+  workflowId    String
+  workflow      ContractWorkflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  name          String
+  docType       String // TAX | BANK | LEGAL | FIRM_CERT | SPEC | ADMIN | OTHER
+  description   String?
+  deadline      DateTime?
+  status        String           @default("PENDING")
+  // PENDING | IN_PROGRESS | UPLOADED | VERIFIED | WAIVED
+  fileUrl       String?
+  isRequired    Boolean          @default(true)
+  isAiGenerated Boolean          @default(false)
+  sortOrder     Int              @default(0)
+  notes         String?
+  docNumber     String? // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
+  tenantId      String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+}
+
+// Teslim süresi — alt kırılımlı tahmini takvim (Sipariş Onayı/Üretim/Sevkiyat/Teslim).
+// İhale ve Sözleşme aşamalarında salt-okunur, sistem-üretimi tahmin; gerçek etkileşimli
+// takip (actualEnd/status) yalnız T4'te üretilen ProjectMilestone(DELIVERY) satırlarında olur.
+model DeliveryTimelineStep {
+  id                 String            @id @default(cuid())
+  tenantId           String
+  tenderId           String?
+  tender             Tender?           @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  contractWorkflowId String?
+  contractWorkflow   ContractWorkflow? @relation(fields: [contractWorkflowId], references: [id], onDelete: Cascade)
+  title              String // "Sipariş Onayı" | "Üretim/Tedarik" | "Sevkiyat" | "Teslim/Kabul"
+  sortOrder          Int               @default(0)
+  plannedDate        DateTime?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([tenantId, tenderId])
+  @@index([tenantId, contractWorkflowId])
+}
+
+// ── Satınalma Modülü ──────────────────────────────────────────────────────
+
+model Vendor {
+  id          String          @id @default(cuid())
+  tenantId    String
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  name        String
+  taxNo       String?
+  address     String?
+  phone       String?
+  email       String?
+  contactName String?
+  iban        String?
+  bankName    String?
+  categories  String          @default("[]") // JSON string[]
+  rating      Float?
+  notes       String?
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  quotes      PurchaseQuote[]
+  brands      Brand[] // taşıdığı/yetkili satıcısı olduğu markalar (2026-08-08, Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
+}
+
+model PurchaseRequest {
+  id                    String           @id @default(cuid())
+  tenantId              String
+  tenant                Tenant           @relation(fields: [tenantId], references: [id])
+  title                 String
+  description           String?
+  sourceType            String           @default("MANUAL")
+  // MANUAL | BOM | PROJECT | UNIT
+  sourceBomId           String? // Opportunity.id (BoM kaynaksa)
+  projectId             String?
+  requestedBy           String // User.id
+  requestedByName       String?
+  unitId                String?
+  unitName              String?
+  status                String           @default("DRAFT")
+  // DRAFT | PENDING_UNIT | PENDING_PROCUREMENT | PENDING_GM | PO_ISSUED | IN_DELIVERY | INVOICED | CLOSED | REJECTED
+  urgency               String           @default("NORMAL")
+  // LOW | NORMAL | HIGH | URGENT
+  neededBy              DateTime?
+  budgetAmount          Float?
+  currency              String           @default("TRY")
+  budgetAmountTRY       Float?
+  selectedVendorId      String?
+  selectedVendorName    String?
+  poNumber              String?
+  poIssuedAt            DateTime?
+  invoiceNo             String?
+  invoiceAmount         Float?
+  invoiceDate           DateTime?
+  invoicePaidAt         DateTime?
+  approvedByUnit        String?
+  approvedByProcurement String?
+  approvedByGM          String?
+  rejectedBy            String?
+  rejectionNote         String?
+  resubmitCount         Int              @default(0) // B-04 — REJECTED→DRAFT (resubmit) kaç kez yapıldı; kayıt/bağlantı (BoM/Proje) korunur
+  notes                 String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+  items                 PurchaseItem[]
+  quotes                PurchaseQuote[]
+  deliveries            DeliveryRecord[]
+
+  @@index([tenantId, status])
+}
+
+model PurchaseItem {
+  id                 String              @id @default(cuid())
+  purchaseRequestId  String
+  purchaseRequest    PurchaseRequest     @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  name               String
+  description        String?
+  quantity           Float
+  unit               String              @default("adet")
+  estimatedUnitPrice Float?
+  currency           String              @default("TRY")
+  actualUnitPrice    Float?
+  refVendor          String? // BoM kaynağı: üretici/distribütör adı (referans alış fiyatının kaynağı)
+  refSource          String? // BoM source — referans fiyat kaynağı türü
+  lineKey            String? // BoMItem.lineKey — BoM'dan devredildiyse satır-bazlı maliyet varyansı bağı
+  brandId            String? // BoM handoff'ta BoMItem.brandId'den taşınır (2026-08-08, Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
+  brand              Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  createdAt          DateTime            @default(now())
+  quoteLines         PurchaseQuoteItem[]
+}
+
+model PurchaseQuote {
+  id                String              @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest     @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  vendorId          String?
+  vendor            Vendor?             @relation(fields: [vendorId], references: [id])
+  vendorName        String
+  totalAmount       Float
+  currency          String              @default("TRY")
+  totalAmountTRY    Float?
+  deliveryDays      Int?
+  validUntil        DateTime?
+  notes             String?
+  isSelected        Boolean             @default(false)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  items             PurchaseQuoteItem[]
+}
+
+// Kalem bazlı tedarikçi teklifi — her PurchaseQuote, talebin her PurchaseItem'ı
+// için ayrı miktar+birim fiyat taşır (2026-08-08). totalAmount bu satırların
+// toplamından backend'de otorite olarak yeniden hesaplanır (client'a güvenilmez).
+model PurchaseQuoteItem {
+  id              String        @id @default(cuid())
+  purchaseQuoteId String
+  purchaseQuote   PurchaseQuote @relation(fields: [purchaseQuoteId], references: [id], onDelete: Cascade)
+  purchaseItemId  String
+  purchaseItem    PurchaseItem  @relation(fields: [purchaseItemId], references: [id], onDelete: Cascade)
+  quantity        Float
+  unitPrice       Float
+  createdAt       DateTime      @default(now())
+
+  @@unique([purchaseQuoteId, purchaseItemId])
+}
+
+// ── Onay Zinciri (Faz 0 — kalıcı ApprovalChain altyapısı) ──────────────────
+// workflowService.ts'teki in-memory yapının DB-backed karşılığı.
+// Proposal ve ContractWorkflow kendi statü alanlarını korur; bu model
+// paralel/ek bir onay geçmişi katmanı olarak eklenir.
+
+model ApprovalChain {
+  id         String          @id @default(cuid())
+  entityType String // OPPORTUNITY | PROPOSAL | CONTRACT_WORKFLOW
+  entityId   String
+  status     String          @default("PENDING") // PENDING | COMPLETED | REJECTED
+  processKey String? // processEngine.ts tarafından üretildiyse hangi processKey'den; null = legacy/DMO gibi motor-dışı zincir
+  tenantId   String
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  stages     ApprovalStage[]
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@index([entityType, entityId])
+}
+
+model ApprovalStage {
+  id             String        @id @default(cuid())
+  chainId        String
+  chain          ApprovalChain @relation(fields: [chainId], references: [id], onDelete: Cascade)
+  role           String? // FINANCE_MGR | IGPD_MGR | GENERAL_MANAGER | KSU_MGR | ... — null = yalnız unitId (birimdeki herkes)
+  unitId         String? // processEngine.ts tarafından üretilen aşamalarda: WorkflowStep.unitId (rol + birim ikilisi)
+  delegateUserId String? // WorkflowStep.delegateUserId'den kopyalanır (aşama oluşturma anında) — boş koltukta vekil kimin onaylayabileceği
+  mode           String        @default("ANY") // ANY|ALL — aynı (chainId, order) değerini paylaşan satırlar için (çoklu onaylayıcı)
+  order          Int           @default(0)
+  status         String        @default("PENDING") // PENDING | APPROVED | REJECTED | SKIPPED
+  approverId     String? // 'AGENT:<pluginKey>' ise sanal agent onayladı
+  note           String?
+  approvedAt     DateTime?
+  agentRunId     String? // bu aşamayı onaylayan sanal agent çalıştırması (köken etiketi)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  // B-05 — SLA eskalasyonu (approvalSlaEscalation.ts): stage "current" (sıradaki
+  // ilk PENDING) olduğunda dueDate atanır; süresi geçip escalatedAt boşsa
+  // escalatedToRole (GENERAL_MANAGER) o stage için ek onay yetkisi kazanır —
+  // orijinal role sahibinin yetkisi kaldırılmaz, ikisinden ilk onaylayan geçerli olur.
+  dueDate         DateTime?
+  escalatedAt     DateTime?
+  escalatedToRole String?
+}
+
+// ── Ziyaret Planı & Günlük Rapor (Faz 2) ────────────────────────────────────
+// Diyagramdaki "süreç öncesi" katman: haftalık müşteri ziyaret planı + günlük
+// rapor, haftalık olarak bağlı bulunan yöneticiyle (İGPD) paylaşılır.
+
+model VisitPlan {
+  id             String   @id @default(cuid())
+  tenantId       String
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+  weekOf         DateTime // o haftanın Pazartesi tarihi
+  preparedById   String
+  preparedByName String?
+  status         String   @default("DRAFT") // DRAFT | APPROVED | COMPLETED
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  visits         Visit[]
+}
+
+model Visit {
+  id            String    @id @default(cuid())
+  visitPlanId   String
+  visitPlan     VisitPlan @relation(fields: [visitPlanId], references: [id], onDelete: Cascade)
+  customerId    String?
+  customerName  String?
+  type          String    @default("OTHER") // DEMO | TECHNICAL_MEETING | PRESENTATION | OTHER
+  plannedDate   DateTime
+  actualDate    DateTime?
+  status        String    @default("PLANNED") // PLANNED | COMPLETED | CANCELLED
+  needsCaptured String? // müşteri ihtiyaçları / görüşme notları
+  tenantId      String
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model DailyReport {
+  id                String    @id @default(cuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  userId            String
+  userName          String?
+  date              DateTime
+  content           String // serbest metin günlük rapor
+  // İş bağlantısı matrisi (2 eksen): hangi iş üzerine raporlandı
+  meetingKind       String    @default("OTHER") // INTRO(tanışma)|PLANNED|FOLLOWUP|OTHER
+  linkType          String    @default("NEW_CONTACT") // NEW_CONTACT|VISIT|OPPORTUNITY|PROJECT
+  linkId            String? // bağlı varlık id (soft-link); NEW_CONTACT'ta null
+  linkLabel         String? // anlık etiket (müşteri/fırsat/proje adı veya yeni iletişim)
+  isKnownToSystem   Boolean   @default(false) // linkType != NEW_CONTACT (backend türetir)
+  sharedWithManager Boolean   @default(false) // dönem-toplu yöneticiyle paylaşıldı mı
+  sharedAt          DateTime? // toplu paylaşım anı
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+// ── Proje Devir Paketi (Faz 2) ───────────────────────────────────────────────
+// ContractWorkflowDoc pattern'inin doğrudan klonu — zorunlu evrak checklist'i,
+// otomatik durum ilerletme ve multer/Nextcloud upload aynı şekilde çalışır.
+
+model ProjectHandoverDoc {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  docType     String // FEASIBILITY | TENDER_DOCS | CONTRACT | PRICE_SCHEDULE | COST_TABLE | BOM_TREE | RECEIVED_QUOTES | TENDER_DECISION | GUARANTEE_LETTERS | HANDOVER_FORM | STAFF_LIST | OTHER
+  description String?
+  status      String   @default("PENDING") // PENDING | IN_PROGRESS | UPLOADED | VERIFIED | WAIVED
+  fileUrl     String?
+  isRequired  Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  notes       String?
+  docNumber   String? // tenant doküman kodlama profilinden üretilen özgün kod (opsiyonel)
+  tenantId    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model DeliveryRecord {
+  id                String          @id @default(cuid())
+  purchaseRequestId String
+  purchaseRequest   PurchaseRequest @relation(fields: [purchaseRequestId], references: [id], onDelete: Cascade)
+  deliveredAt       DateTime        @default(now())
+  receivedBy        String?
+  quantityOrdered   Float?
+  quantityReceived  Float?
+  quantityDamaged   Float?
+  status            String          @default("RECEIVED")
+  // RECEIVED | PARTIAL | DAMAGED | REJECTED
+  notes             String?
+  createdAt         DateTime        @default(now())
+}
+
+// ── Özgün Doküman Kodlama Sistemi (Faz 3) ────────────────────────────────────
+// Hiçbir üçüncü-taraf notasyonu gömülmez. Her tenant kendi ISO 9001 doküman
+// kontrol standardını Ayarlar → Şirket Profili'nden tanımlar. Varsayılan
+// kategori/önek YOKTUR — tenant ilk kurulumda kendi notasyonunu girer.
+
+model DocumentCodingProfile {
+  id             String   @id @default(cuid())
+  tenantId       String   @unique
+  tenant         Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  companyCode    String   @default("") // örn. tenant'ın kendi belirlediği şirket kısaltması
+  separator      String   @default("-") // kod parçaları arasındaki ayraç
+  includeYear    Boolean  @default(true) // koda yıl eklensin mi
+  sequenceDigits Int      @default(5) // sıra no kaç haneli sıfır-dolgulu
+  isActive       Boolean  @default(true) // kapalıysa docNumber üretilmez
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model DocumentCategoryCode {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  code      String // tenant'ın kendi tanımladığı kategori kodu (örn. "SOZ")
+  label     String // insan-okunur açıklama (örn. "Sözleşme Evrakları")
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([tenantId, code])
+}
+
+model DocumentSequence {
+  id           String   @id @default(cuid())
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  categoryCode String // hangi kategori için sayaç
+  year         Int // yıl bazlı sıfırlama için
+  lastNumber   Int      @default(0)
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, categoryCode, year])
+}
+
+// ── Genel Hususlar / Kurumsal Yönetim (Faz 3) ────────────────────────────────
+
+model LessonsLearned {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String? // proje seviyesinde veya null → kurumsal seviye
+  title         String
+  category      String   @default("OTHER") // TECHNICAL | COMMERCIAL | PROCESS | CUSTOMER | SUPPLIER | OTHER
+  situation     String // ne oldu
+  rootCause     String? // kök neden
+  action        String? // alınan/önerilen aksiyon
+  impact        String   @default("MEDIUM") // LOW | MEDIUM | HIGH
+  status        String   @default("OPEN") // OPEN | APPLIED | CLOSED
+  createdById   String?
+  createdByName String?
+  docNumber     String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model RiskOpportunity {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type        String   @default("RISK") // RISK | OPPORTUNITY
+  title       String
+  description String?
+  category    String   @default("OTHER")
+  probability Int      @default(3) // 1..5
+  impact      Int      @default(3) // 1..5
+  score       Int      @default(9) // probability * impact (uygulamada hesaplanır)
+  response    String? // azaltma/değerlendirme aksiyonu
+  owner       String?
+  status      String   @default("OPEN") // OPEN | MITIGATING | CLOSED
+  docNumber   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CorporateMetric {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String // KPI adı (örn. "Müşteri Memnuniyeti")
+  period      String // örn. "2026-Q2" veya "2026-06"
+  targetValue Float?
+  actualValue Float?
+  unit        String? // "%", "adet", "gün", "₺" vb.
+  category    String   @default("OTHER")
+  note        String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, name, period])
+}
+
+model ExternalDocumentRegister {
+  id          String    @id @default(cuid())
+  tenantId    String
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name        String // dış kaynaklı doküman adı (standart/şartname/yönetmelik)
+  source      String? // kaynak kurum/yayıncı
+  externalRef String? // dış referans/doküman no
+  version     String?
+  publishedAt DateTime?
+  reviewedAt  DateTime?
+  status      String    @default("ACTIVE") // ACTIVE | SUPERSEDED | WITHDRAWN
+  fileUrl     String?
+  notes       String?
+  docNumber   String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+// ── Faz 6 — Finans Modülü ────────────────────────────────────────────────
+model Invoice {
+  id                String         @id @default(cuid())
+  tenantId          String
+  tenant            Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId         String?
+  contractId        String?
+  purchaseRequestId String? // Satınalma faturasından türeyen finans faturası (idempotency + bağ)
+  dmoOrderId        String? // DMO teslim siparişinden türeyen SALES fatura (idempotency + bağ)
+  type              String         @default("SALES") // SALES | PURCHASE
+  invoiceNo         String?
+  amount            Float          @default(0)
+  currency          String         @default("TRY")
+  issueDate         DateTime?
+  dueDate           DateTime?
+  status            String         @default("DRAFT") // DRAFT|ISSUED|SENT|PARTIAL|PAID|OVERDUE|CANCELLED
+  paidAmount        Float          @default(0)
+  paidAt            DateTime?
+  milestoneId       String?
+  customerId        String? // B-xx — Müşteri Sağlık Skoru'nda isim-eşleştirme yerine doğrudan FK (opsiyonel, geriye dönük)
+  customer          Customer?      @relation(fields: [customerId], references: [id])
+  customerName      String?
+  vendorName        String?
+  docNumber         String?
+  notes             String?
+  createdById       String?
+  issueRateToTRY    Float? // B-18 — kesim anındaki TRY kuru (yabancı para birimli faturada)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  payments          Payment[]
+  fxAdjustments     FxAdjustment[]
+
+  @@index([tenantId, status])
+}
+
+model Payment {
+  id           String        @id @default(cuid())
+  tenantId     String
+  tenant       Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId    String
+  invoice      Invoice       @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  amount       Float         @default(0)
+  currency     String        @default("TRY")
+  paidAt       DateTime      @default(now())
+  method       String? // BANK_TRANSFER | CHEQUE | CASH | OTHER
+  reference    String?
+  notes        String?
+  fxAdjustment FxAdjustment?
+  createdAt    DateTime      @default(now())
+
+  @@index([tenantId])
+}
+
+// B-18 — Döviz kur farkı: yabancı para birimli faturada kesim kuru ile tahsilat
+// (ödeme) kurunun farkı gerçek TRY kâr/zararı olarak ayrı kalem halinde kaydedilir.
+// Kurlar (issueRate/paymentRate) bu kod tabanının genel deseniyle (DMO/CostAnalysis)
+// tutarlı biçimde kullanıcı tarafından girilir — canlı kur API'si yok.
+model FxAdjustment {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  paymentId   String   @unique
+  payment     Payment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  currency    String // yabancı para birimi (Invoice.currency)
+  amountFx    Float // ödeme tutarı (yabancı para)
+  issueRate   Float // fatura kesim kuru (1 yabancı = ? TRY)
+  paymentRate Float // tahsilat anındaki kur
+  gainLossTRY Float // (paymentRate − issueRate) × amountFx — pozitif=kazanç, negatif=zarar
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, invoiceId])
+}
+
+// ── Faz 6b — Hukuk (Sözleşme Yönetimi modülüne sekme) ────────────────────────
+model LegalCase {
+  id                String    @id @default(cuid())
+  tenantId          String
+  tenant            Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  type              String    @default("CONTRACT_REVIEW") // CONTRACT_REVIEW|LEGAL_OPINION|DISPUTE|LITIGATION|OTHER
+  title             String
+  status            String    @default("OPEN") // OPEN|IN_REVIEW|RESPONDED|ESCALATED|CLOSED
+  priority          String    @default("MEDIUM") // LOW|MEDIUM|HIGH
+  relatedEntityType String? // contract | project | opportunity | contractWorkflow
+  relatedEntityId   String?
+  summary           String?
+  opinion           String?
+  assignedToId      String?
+  assignedToName    String?
+  requestedById     String?
+  requestedByName   String?
+  sourceTaskId      String? // LEGAL TodoTask'tan dönüştürülmüşse
+  dueDate           DateTime?
+  docNumber         String?
+  fileUrl           String?
+  closedAt          DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model GuaranteeLetter {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  projectId     String?
+  contractId    String?
+  tenderId      String? // Faz 3 İhale (BID_BOND) ile paylaşımlı
+  type          String    @default("PERFORMANCE") // BID_BOND|PERFORMANCE|ADVANCE|WARRANTY
+  bankName      String?
+  amount        Float     @default(0)
+  currency      String    @default("TRY")
+  issueDate     DateTime?
+  expiryDate    DateTime?
+  isIndefinite  Boolean   @default(false) // süresiz teminat (expiryDate yok)
+  status        String    @default("ACTIVE") // REQUESTED|ACTIVE|RELEASED|EXPIRED|CALLED
+  refNo         String?
+  docNumber     String?
+  fileUrl       String?
+  notes         String?
+  requestedById String? // Satış Destek talep eden (status=REQUESTED)
+  requestNote   String? // talep notu
+  sampleText    String? // idari şartnameden örnek teminat metni
+  sampleFileUrl String? // yüklü örnek teminat dosyası
+  remindersSent String? // JSON dizi — gönderilen sona-erme hatırlatmaları ['30d','15d','7d'] (B-07)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId, status])
+}
+
+// Faz 6c — İhale / İSAB (SalesSupport backend modeli)
+model Tender {
+  id                          String                 @id @default(cuid())
+  tenantId                    String
+  tenant                      Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name                        String
+  ikn                         String? // İhale Kayıt Numarası (manuel, EKAP yer tutucu)
+  authority                   String? // idare adı
+  method                      String                 @default("OPEN") // OPEN|RESTRICTED|NEGOTIATED|DIRECT
+  status                      String                 @default("DRAFT") // DRAFT|PREPARING|SUBMITTED|EVALUATING|WON|LOST|CANCELLED|WITHDRAWN (B-10 — bilinçli iştirak etmeme, CANCELLED'dan ayrı, KPI-nötr)
+  submissionDeadline          DateTime?
+  estimatedValue              Float                  @default(0)
+  currency                    String                 @default("TRY")
+  opportunityId               String?
+  contractWorkflowId          String?
+  ekapRef                     String?
+  ownerId                     String?
+  ownerName                   String?
+  docNumber                   String?
+  notes                       String?
+  specText                    String? // idari/teknik şartname + atıf yapılan hususlar metni (analiz girdisi)
+  aiAnalysis                  String? // JSON — şartname analizi çıktısı
+  remindersSent               String? // JSON dizi — gönderilen zaman-eşiği hatırlatmaları ['72h','48h','12h','6h']
+  submittedAt                 DateTime? // "Teklif İletildi" zamanı
+  withdrawnAt                 DateTime? // yönetim "iştirak etme" kararı zamanı (status=WITHDRAWN)
+  withdrawnById               String? // kararı veren GM
+  withdrawReason              String? // çekilme gerekçesi (yönetimsel)
+  // Teslim süresi — ihale teklifi hazırlanırken girilen tahmini süre; WON'da ContractWorkflow.deliveryPeriodDays'e kopyalanır
+  expectedDeliveryDays        Int? // tahmini teslim süresi (gün)
+  vendorDeliveryConfirmed     Boolean                @default(false) // tedarikçi bu süreyi teyit etti mi (teklif öncesi risk göstergesi)
+  vendorDeliveryConfirmedNote String?
+  createdAt                   DateTime               @default(now())
+  updatedAt                   DateTime               @updatedAt
+  checklist                   TenderChecklistItem[]
+  deliveryTimeline            DeliveryTimelineStep[]
+
+  @@index([tenantId, status])
+}
+
+model TenderChecklistItem {
+  id             String    @id @default(cuid())
+  tenderId       String
+  tender         Tender    @relation(fields: [tenderId], references: [id], onDelete: Cascade)
+  name           String
+  isRequired     Boolean   @default(true)
+  status         String    @default("PENDING") // PENDING|DONE|WAIVED
+  fileUrl        String?
+  sortOrder      Int       @default(0)
+  notes          String?
+  docType        String? // TAX|BANK|LEGAL|FIRM_CERT|SPEC|ADMIN|OTHER
+  deadline       DateTime?
+  isAiGenerated  Boolean   @default(false)
+  source         String? // MANUAL|AI|CORPORATE_DOC — evrak kaynağı
+  corporateDocId String? // Şirket Evrakları envanterinden otomatik eşlenen belge bağı
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([tenderId])
+}
+
+// ── Faz 7 — Birim Raporu (yönetici-yazımı + gönderim/inceleme) ───────────────
+model UnitReport {
+  id                    String    @id @default(cuid())
+  tenantId              String
+  tenant                Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unitKey               String // UNIT_DEFINITIONS key: CRM|PRESALES|PROCUREMENT|FINANCE|LEGAL|TENDER|PROJECT
+  unitLabel             String
+  periodStart           DateTime
+  periodEnd             DateTime
+  periodLabel           String?
+  status                String    @default("DRAFT") // DRAFT|SUBMITTED|REVIEWED|RETURNED
+  authorId              String?
+  authorName            String?
+  metricsSnapshot       String? // gönderim anında computeUnitMetrics JSON snapshot'ı
+  consolidationSnapshot String? // gönderim anı konsolidasyon JSON (personel günlük rapor + ziyaret plan-gerçekleşen)
+  escalatedToId         String? // raporun yönlendiği üst birim yöneticisi (snapshot)
+  escalatedToName       String?
+  highlights            String? // öne çıkanlar
+  issues                String? // sorunlar
+  plannedActions        String? // planlanan aksiyonlar
+  risks                 String? // riskler
+  summary               String? // genel değerlendirme
+  submittedAt           DateTime?
+  reviewedById          String?
+  reviewedByName        String?
+  reviewedAt            DateTime?
+  reviewNote            String?
+  docNumber             String? // opsiyonel ENF-RPR-...
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@index([tenantId, unitKey])
+  @@index([tenantId, status])
+}
+
+// ── Eklenti Lisanslama (Plugin Entitlement) ──────────────────────────────────
+// Çekirdek abonelik planından (STARTER/PRO/ENTERPRISE) BAĞIMSIZ add-on katmanı.
+// Her satılabilir eklenti (örn. sanal agent) tenant bazında ayrı lisanslanır.
+// Katalog kod-seviyesinde (PLUGIN_CATALOG) tanımlı; burada sadece tenant'ın
+// hangi eklentiye sahip olduğu + durumu + ayarı tutulur.
+model PluginEntitlement {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pluginKey     String // PLUGIN_CATALOG.key (örn. AGENT_TENDER)
+  status        String    @default("DISABLED") // ACTIVE|TRIAL|EXPIRED|DISABLED
+  licenseKey    String? // aktivasyonda kullanılan anahtar
+  mode          String    @default("ADVISORY") // agent eklentileri için: ADVISORY|AUTONOMOUS
+  config        String? // eklenti-özel ayar JSON (eşikler, fallback rol vb.)
+  activatedById String?
+  activatedAt   DateTime?
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@unique([tenantId, pluginKey])
+  @@index([tenantId, status])
+}
+
+// ── Sanal Agent Çalıştırması (Agent Run) ─────────────────────────────────────
+// Bir sanal agent bir birimin işini yaptığında üretilen çıktı + ratifikasyon kaydı.
+// Danışman modunda: PENDING_RATIFICATION → gerçek kişi RATIFIED/REJECTED yapar.
+model AgentRun {
+  id            String    @id @default(cuid())
+  tenantId      String
+  tenant        Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pluginKey     String // hangi agent eklentisi
+  unitKey       String // hangi birim adına çalıştı
+  entityType    String // TENDER|PROJECT|... işlenen varlık tipi
+  entityId      String
+  mode          String    @default("ADVISORY") // ADVISORY|AUTONOMOUS
+  status        String    @default("PENDING_RATIFICATION") // PENDING_RATIFICATION|RATIFIED|REJECTED
+  rationale     String? // agent gerekçesi (insan-okunur)
+  outputJson    String? // yapısal çıktı (eksik kalemler, risk vb.)
+  triggeredById String? // çalıştıran (manuel) veya null (otomatik)
+  handoffTaskId String? // oluşturulan devir TodoTask id'si
+  actionTaken   String? // otonom modda yürütülen eylemin özeti (null=eylem yok)
+  ratifiedById  String?
+  ratifiedAt    DateTime?
+  ratifyNote    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, pluginKey])
+}
+
+// Presales → Satışa devredilen BoM kaydı (fırsat-bazlı upsert; KPI + liste/detay)
+model BomHandoff {
+  id               String   @id @default(cuid())
+  tenantId         String
+  opportunityId    String
+  oppTitle         String
+  customerName     String?
+  handedOffById    String?
+  handedOffByName  String?
+  handoffCount     Int      @default(1)
+  itemCount        Int      @default(0)
+  totalsByCurrency String? // JSON {TRY:x,USD:y} — mixed-currency güvenliği (tek toplam yok)
+  snapshot         String? // JSON: BoM kalemleri + vendor değerlendirme özeti (devir anının içeriği)
+  firstHandoffAt   DateTime @default(now())
+  lastHandoffAt    DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([tenantId, opportunityId])
+  @@index([tenantId, lastHandoffAt])
+}
+
+// Taksitli tahsilat planı (finansman etkisi hesabı için)
+model CollectionInstallment {
+  id            String   @id @default(cuid())
+  tenantId      String
+  opportunityId String
+  dueDate       DateTime
+  amount        Float    @default(0)
+  currency      String   @default("TRY")
+  note          String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, opportunityId])
+}
+
+// ── Yedekleme / Geri Yükleme (faz_backup) ───────────────────────────────────
+// Backup Admin tarafından yönetilir; salt-okunur rol /api/backup'ta mutasyona izinli.
+model BackupJob {
+  id            String    @id @default(cuid())
+  tenantId      String
+  scope         String    @default("PLATFORM") // PLATFORM | TENANT
+  kind          String    @default("FULL") // FULL | STATE | DATA
+  dbProvider    String    @default("SQLITE") // SQLITE | POSTGRES
+  trigger       String    @default("MANUAL") // MANUAL | SCHEDULED
+  targetType    String    @default("LOCAL") // LOCAL | NEXTCLOUD | S3
+  location      String? // hedef dizin/uri
+  status        String    @default("PENDING") // PENDING | RUNNING | COMPLETED | FAILED
+  sizeBytes     Int       @default(0)
+  checksum      String? // sha256 (data artefaktı)
+  stateRef      String? // state dosyası adı/yolu
+  dataRef       String? // logical data dosyası adı/yolu
+  modelCounts   String? // JSON: model -> satır sayısı
+  verifyStatus  String    @default("PENDING") // PENDING | PASSED | FAILED
+  verifyReport  String? // JSON
+  verifiedAt    DateTime?
+  startedById   String?
+  startedByName String?
+  error         String?
+  startedAt     DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([tenantId, status])
+  @@index([tenantId, startedAt])
+}
+
+model RestoreJob {
+  id                 String    @id @default(cuid())
+  tenantId           String
+  backupId           String
+  mode               String    @default("LOGICAL") // LOGICAL | STATE
+  status             String    @default("ANALYZING") // ANALYZING | AWAITING_CONFIRM | RESTORING | COMPLETED | FAILED
+  diffReport         String? // JSON: model -> {added,removed,changed,samples}
+  preRestoreBackupId String? // güvenlik snapshot
+  startedById        String?
+  startedByName      String?
+  error              String?
+  startedAt          DateTime  @default(now())
+  completedAt        DateTime?
+
+  @@index([tenantId, status])
+  @@index([tenantId, backupId])
+}
+
+// ── DMO Katalog & Kârlılık Modülü ────────────────────────────────────────────
+// Devlet Malzeme Ofisi satıcı tarafı: katalog + çerçeve anlaşma + kur + sipariş
+// + her sipariş için maliyetlendirme/kârlılık snapshot'ı ve alarm.
+
+model DmoCatalogItem {
+  id                   String                 @id @default(cuid())
+  tenantId             String
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  dmoCode              String // DMO stok/malzeme kodu
+  name                 String
+  brandId              String?
+  brand                Brand?                 @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  model                String?
+  unit                 String                 @default("ADET")
+  listPrice            Float                  @default(0) // DMO katalog satış fiyatı (DMO kuru cinsinden, para birimi currency)
+  vatRate              Float                  @default(20)
+  currency             String                 @default("TRY")
+  unitCost             Float                  @default(0) // kendi alış maliyeti (costCurrency cinsinden)
+  costCurrency         String                 @default("TRY")
+  categoryId           String?
+  category             ProductCategory?       @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  validFrom            DateTime?
+  validTo              DateTime?
+  status               String                 @default("ACTIVE") // ACTIVE | PASSIVE | EXPIRED
+  frameworkAgreementId String?
+  frameworkAgreement   DmoFrameworkAgreement? @relation(fields: [frameworkAgreementId], references: [id], onDelete: SetNull)
+  docNumber            String?
+  notes                String?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model DmoFrameworkAgreement {
+  id           String           @id @default(cuid())
+  tenantId     String
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  agreementNo  String
+  title        String
+  validFrom    DateTime?
+  validTo      DateTime?
+  quotaTotal   Float?
+  quotaUsed    Float            @default(0)
+  status       String           @default("ACTIVE") // ACTIVE | EXPIRED | SUSPENDED | CANCELLED
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  catalogItems DmoCatalogItem[]
+  orders       DmoOrder[]
+
+  @@index([tenantId, status])
+}
+
+model DmoExchangeRate {
+  id        String    @id @default(cuid())
+  tenantId  String
+  tenant    Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  currency  String // USD | EUR | ...
+  rate      Float // 1 birim yabancı para = rate TRY (DMO'nun belirlediği)
+  validFrom DateTime  @default(now())
+  validTo   DateTime? // null = belirsiz / açık uçlu
+  source    String?
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([tenantId, currency])
+}
+
+model DmoOrder {
+  id                   String                 @id @default(cuid())
+  tenantId             String
+  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  orderNo              String
+  institutionName      String // alıcı kamu kurumu
+  orderDate            DateTime               @default(now())
+  deliveryDeadline     DateTime?
+  frameworkAgreementId String?
+  frameworkAgreement   DmoFrameworkAgreement? @relation(fields: [frameworkAgreementId], references: [id], onDelete: SetNull)
+  currency             String                 @default("TRY")
+  status               String                 @default("EVALUATION")
+  // EVALUATION | CONFIRMED | IN_DELIVERY | DELIVERED | INVOICED | CLOSED | REJECTED | CANCELLED
+  ownerId              String?
+  ownerName            String?
+  docNumber            String?
+  notes                String?
+  // ── Maliyetlendirme / kârlılık snapshot'ı (o anki koşullar) ──
+  revenueTotal         Float                  @default(0)
+  costTotal            Float                  @default(0)
+  dmoRateSnapshot      Float? // kullanılan DMO kuru (ana yabancı para kalemi için, bilgi amaçlı)
+  rateCurrency         String?
+  rateValidFrom        DateTime?
+  rateValidTo          DateTime?
+  risturnRateApplied   Float                  @default(0)
+  risturnDeduction     Float                  @default(0)
+  commissionType       String                 @default("PERCENT") // PERCENT | FIXED
+  commissionValue      Float                  @default(0)
+  commissionBasis      String                 @default("REVENUE") // REVENUE | PROFIT
+  commissionDeduction  Float                  @default(0)
+  grossProfit          Float                  @default(0)
+  netProfit            Float                  @default(0)
+  netMarginPct         Float                  @default(0)
+  isProfitable         Boolean                @default(true)
+  alarmReason          String?
+  costedAt             DateTime?
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  items                DmoOrderItem[]
+
+  @@index([tenantId, status])
+}
+
+model DmoOrderItem {
+  id            String   @id @default(cuid())
+  orderId       String
+  order         DmoOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItemId String?
+  name          String
+  qty           Float    @default(1)
+  unitPrice     Float    @default(0) // DMO satış fiyatı (sellCurrency)
+  sellCurrency  String   @default("TRY") // DMO satış para birimi (kalem bazlı; DMO kuru buna uygulanır)
+  unitCost      Float    @default(0) // kendi alış maliyeti (costCurrency)
+  costCurrency  String   @default("TRY")
+  vatRate       Float    @default(20)
+  lineRevenue   Float    @default(0)
+  lineCost      Float    @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([orderId])
+}
+
+// ── İşletme Maliyeti (Overhead) + Birim Bütçeleme (Faz 1) ────────────────────
+// Çekirdek Finance + Unit uzantısı (ayrı lisans değil; yönetim insiyatifi).
+
+model OperatingCostPool {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  periodStart   DateTime
+  periodEnd     DateTime
+  personnelCost Float    @default(0) // dönem personel gideri
+  otherOpex     Float    @default(0) // kira/enerji/lisans/idari…
+  totalPool     Float    @default(0) // personnelCost + otherOpex (server hesaplar)
+  method        String   @default("PCT_OF_VALUE") // PCT_OF_VALUE | PCT_OF_DIRECT_COST | POOL_RATE
+  rate          Float    @default(0) // yüzde (PCT_*) veya oran (POOL_RATE)
+  status        String   @default("ACTIVE") // ACTIVE | CLOSED
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([tenantId, status])
+}
+
+model UnitBudget {
+  id              String   @id @default(cuid())
+  tenantId        String
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unitId          String
+  unit            Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  periodStart     DateTime
+  periodEnd       DateTime
+  personnelBudget Float    @default(0)
+  opexBudget      Float    @default(0)
+  totalBudget     Float    @default(0) // personnelBudget + opexBudget (server hesaplar)
+  periodCost      Float    @default(0) // fiili dönem maliyeti (Katman-2 tabanı)
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([tenantId, unitId])
+}
+
+model ProjectUnitParticipation {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  unitId      String
+  unit        Unit     @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  coefficient Float    @default(0) // 0..1 — birim dönem maliyetinin bu projeye yüklenen payı (Katman-2)
+  role        String? // birimin projedeki rolü
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([projectId, unitId])
+  @@index([projectId])
+}
+
+// Çoklu-replika koordinasyonu — in-process zamanlayıcıların (backupScheduler,
+// activityLogArchiveScheduler, updateNotifier) yalnız bir replikada çalışmasını
+// garanti eden DB-native kilit. Platform-geneli (tenant'tan bağımsız) — süreç
+// bazında çalışır. bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01,
+// backend/src/services/schedulerLock.ts
+model SchedulerLock {
+  name      String   @id
+  holder    String
+  expiresAt DateTime
+  updatedAt DateTime @updatedAt
+}
