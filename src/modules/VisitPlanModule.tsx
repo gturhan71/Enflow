@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
   X,
@@ -16,6 +17,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useVisitPlans, useDailyReports, useVisitReportSettings, useVisitScoreboard } from '../hooks/useEnflowQueries';
 
 // Diyagramdaki "süreç öncesi" katman: haftalık müşteri ziyaret planı + günlük
 // rapor. ContractWorkflow/ContractWorkflowDoc konvansiyonuna uyarak tipler
@@ -110,9 +112,22 @@ interface VisitPlanModuleProps {
 const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], opportunities = [], projects = [] }) => {
   const { currentUser } = useAuth();
   const canSetInterval = currentUser?.role === 'SALES_MGR' || currentUser?.role === 'GENERAL_MANAGER';
-  const [plans, setPlans] = useState<VisitPlan[]>([]);
-  const [reports, setReports] = useState<DailyReport[]>([]);
-  const [loading, setLoading] = useState(false);
+  const tenantId = currentUser?.tenantId ?? '';
+  const queryClient = useQueryClient();
+  const plansQ = useVisitPlans(tenantId);
+  const reportsQ = useDailyReports(tenantId, currentUser?.id || '');
+  const settingsQ = useVisitReportSettings(tenantId);
+  const plans = (plansQ.data ?? []) as VisitPlan[];
+  const reports = (reportsQ.data ?? []) as DailyReport[];
+  // Yerel iyimser güncellemeler (eski setPlans/setReports semantiği) → önbelleği doğrudan günceller
+  const plansKey = ['visit-plan', 'plans', tenantId];
+  const reportsKey = ['visit-plan', 'reports', tenantId, currentUser?.id || ''];
+  const setPlans = (fn: (prev: VisitPlan[]) => VisitPlan[]) =>
+    queryClient.setQueryData<VisitPlan[]>(plansKey, (old) => fn(old ?? []));
+  const setReports = (fn: (prev: DailyReport[]) => DailyReport[]) =>
+    queryClient.setQueryData<DailyReport[]>(reportsKey, (old) => fn(old ?? []));
+  const [saving, setLoading] = useState(false);       // mutasyon (kaydet/ekle) süresince
+  const loading = saving || plansQ.isLoading;
   const [showNewVisitRow, setShowNewVisitRow] = useState<string | null>(null);
   const [newVisit, setNewVisit] = useState<{ customerId: string; type: VisitType; plannedDate: string }>({
     customerId: '', type: 'DEMO', plannedDate: mondayOf(new Date()),
@@ -126,7 +141,7 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
   const [targetRate, setTargetRate] = useState(80);
   const [sharing, setSharing] = useState(false);
   // Personel skor tablosu (yalnız yönetici) — görüntülenen haftanın konsolidasyonu
-  const [scoreboard, setScoreboard] = useState<{ userId: string; name: string; isManager: boolean; plannedVisits: number; completedVisits: number; matchedVisits: number; matchRate: number }[]>([]);
+  type ScoreRow = { userId: string; name: string; isManager: boolean; plannedVisits: number; completedVisits: number; matchedVisits: number; matchRate: number };
 
   const todayWeek = mondayOf(new Date());
   // Geçmiş/gelecek haftalara göz atmak için — plans zaten tüm haftaları içeriyor,
@@ -138,35 +153,19 @@ const VisitPlanModule: React.FC<VisitPlanModuleProps> = ({ customers = [], oppor
     setSelectedWeek(mondayOf(d));
   };
 
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [planList, reportList, settings] = await Promise.all([
-        apiService.getVisitPlans() as Promise<VisitPlan[]>,
-        apiService.getDailyReports({ userId: currentUser?.id || '' }) as Promise<DailyReport[]>,
-        apiService.getReportSettings().catch(() => ({ shareIntervalDays: 7, visitTargetRate: 80 })) as Promise<{ shareIntervalDays: number; visitTargetRate: number }>,
-      ]);
-      setPlans(planList);
-      setReports(reportList);
-      setShareInterval(settings?.shareIntervalDays ?? 7);
-      setTargetRate(settings?.visitTargetRate ?? 80);
-    } catch {
-      // sessizce geç
-    } finally {
-      setLoading(false);
-    }
-  }, [currentUser?.id]);
-
-  useEffect(() => { refresh(); }, [refresh]);
-
-  // Yönetici: görüntülenen hafta için personel ziyaret-eşleşme skorları (hafta değişince yeniden çek)
+  // Ayarlar sunucudan gelince yerel (düzenlenebilir) değerlere yansır
   useEffect(() => {
-    if (!canSetInterval) { setScoreboard([]); return; }
-    const wEnd = new Date(selectedWeek); wEnd.setDate(wEnd.getDate() + 6);
-    apiService.getReportConsolidation('CRM', { start: selectedWeek, end: wEnd.toISOString().slice(0, 10) })
-      .then((c: { people?: typeof scoreboard }) => setScoreboard(c?.people ?? []))
-      .catch(() => setScoreboard([]));
-  }, [selectedWeek, canSetInterval]);
+    const st = settingsQ.data as { shareIntervalDays?: number; visitTargetRate?: number } | undefined;
+    if (!st) return;
+    setShareInterval(st.shareIntervalDays ?? 7);
+    setTargetRate(st.visitTargetRate ?? 80);
+  }, [settingsQ.data]);
+
+  const refresh = useCallback(async () => {
+    await queryClient.invalidateQueries({ queryKey: ['visit-plan'] });
+  }, [queryClient]);
+
+  const scoreboard = ((useVisitScoreboard(tenantId, selectedWeek, canSetInterval).data as { people?: ScoreRow[] } | undefined)?.people ?? []);
 
   const currentPlan = plans.find(p => p.weekOf.slice(0, 10) === selectedWeek);
 
