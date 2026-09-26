@@ -103,13 +103,22 @@ function renderSettings(c) {
   $('maintenanceTo').value = c.maintenanceTo; $('restartCommand').value = c.restartCommand || '';
   $('migratorUrl').value = c.migratorUrl || ''; $('skipPgBackup').checked = !!c.skipPgBackup;
 }
-async function refresh() { const d = await (await fetch('/api/status')).json(); renderStatus(d); if (d.config) renderSettings(d.config); }
+// Token: sunucunun yazdığı URL'nin #token=… parçasından (sunucuya/Referer'a gitmez) → sessionStorage
+let TOKEN = ''; try { TOKEN = sessionStorage.getItem('enflowToken') || ''; } catch {}
+const tm = /token=([0-9a-f]{64})/.exec(location.hash);
+if (tm) { TOKEN = tm[1]; try { sessionStorage.setItem('enflowToken', TOKEN); } catch {} history.replaceState(null, '', location.pathname); }
+const api = (path, init = {}) => fetch(path, { ...init, headers: { ...(init.headers || {}), 'X-Enflow-Token': TOKEN } });
+async function refresh() {
+  const r = await api('/api/status');
+  if (r.status === 401) { $('log').textContent = 'Token gerekli: upgrade-tool sunucusunun başlangıç çıktısındaki "Arayüz:" URL\'sini (…/#token=…) açın.'; return; }
+  const d = await r.json(); renderStatus(d); if (d.config) renderSettings(d.config);
+}
 
-$('btnCheck').onclick = async () => { $('btnCheck').disabled = true; try { await fetch('/api/check', { method:'POST' }); await refresh(); } finally { $('btnCheck').disabled = false; } };
-$('btnUpgrade').onclick = async () => { if (!confirm('Yükseltme yıkıcıdır (ön-yedek alınır, hata olursa geri alınır). Devam?')) return; await fetch('/api/upgrade', { method:'POST' }); if (!pollTimer) pollTimer = setInterval(refresh, 1500); };
+$('btnCheck').onclick = async () => { $('btnCheck').disabled = true; try { await api('/api/check', { method:'POST' }); await refresh(); } finally { $('btnCheck').disabled = false; } };
+$('btnUpgrade').onclick = async () => { if (!confirm('Yükseltme yıkıcıdır (ön-yedek alınır, hata olursa geri alınır). Devam?')) return; await api('/api/upgrade', { method:'POST' }); if (!pollTimer) pollTimer = setInterval(refresh, 1500); };
 $('btnSave').onclick = async () => {
   const patch = { channel:$('channel').value, autoCheckHours:Number($('autoCheckHours').value), autoUpgrade:$('autoUpgrade').checked, maintenanceFrom:Number($('maintenanceFrom').value), maintenanceTo:Number($('maintenanceTo').value), restartCommand:$('restartCommand').value, migratorUrl:$('migratorUrl').value, skipPgBackup:$('skipPgBackup').checked };
-  await fetch('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
+  await api('/api/settings', { method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(patch) });
   $('saved').textContent = 'kaydedildi ✓'; setTimeout(() => $('saved').textContent = '', 2000);
 };
 refresh();

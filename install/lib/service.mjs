@@ -23,30 +23,41 @@ const defaultProbe = {
   exists: (p) => existsSync(p),
   status: (cmd, args) => spawnSync(cmd, args, { stdio: 'ignore' }).status,
   uid: () => (typeof process.getuid === 'function' ? process.getuid() : 0),
+  isRoot: () => typeof process.getuid === 'function' && process.getuid() === 0,
 };
 
 /**
- * Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, args } | null (servis yok).
+ * Kurulu Enflow servisinin yeniden başlatma komutları — DENEME SIRASIYLA ({ cmd, args }[]; boş = servis yok).
+ * Sistem düzeyi servisler (systemd, LaunchDaemon) yeniden başlatmak için root ister; upgrade-tool normal
+ * kullanıcıyla çalıştığından root değilse ikinci aday `sudo -n` (parolasız sudo, etkileşimsiz) olur.
+ * Windows (WinSW) yönetici ister — sudo yoktur, yetki yoksa tek aday başarısız olur ve operatöre bildirilir.
  * Shell KULLANILMAZ (execFile) — argümanlar ayrı. `probe` testte enjekte edilir.
  */
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {}) {
+export function resolveRestartCommands({ platform = process.platform, home, probe = defaultProbe } = {}) {
+  const isRoot = typeof probe.isRoot === 'function' ? probe.isRoot() : false;
+  const withSudo = (c) => (isRoot ? [c] : [c, { cmd: 'sudo', args: ['-n', c.cmd, ...c.args] }]);
   if (platform === 'linux') {
     if (probe.status('systemctl', ['is-enabled', SERVICE.systemdUnit]) === 0) {
-      return { cmd: 'systemctl', args: ['restart', SERVICE.systemdUnit] };
+      return withSudo({ cmd: 'systemctl', args: ['restart', SERVICE.systemdUnit] });
     }
-    return null;
+    return [];
   }
   if (platform === 'darwin') {
-    if (probe.exists(launchdDaemonPlist())) return { cmd: 'launchctl', args: ['kickstart', '-k', `system/${SERVICE.launchdLabel}`] };
-    if (probe.exists(launchdAgentPlist())) return { cmd: 'launchctl', args: ['kickstart', '-k', `gui/${probe.uid()}/${SERVICE.launchdLabel}`] };
-    return null;
+    if (probe.exists(launchdDaemonPlist())) return withSudo({ cmd: 'launchctl', args: ['kickstart', '-k', `system/${SERVICE.launchdLabel}`] });
+    if (probe.exists(launchdAgentPlist())) return [{ cmd: 'launchctl', args: ['kickstart', '-k', `gui/${probe.uid()}/${SERVICE.launchdLabel}`] }];
+    return [];
   }
   if (platform === 'win32') {
     const exe = winswExePath(home);
-    if (probe.exists(exe)) return { cmd: exe, args: ['restart'] };
-    return null;
+    if (probe.exists(exe)) return [{ cmd: exe, args: ['restart'] }];
+    return [];
   }
-  return null;
+  return [];
+}
+
+/** Geriye uyumlu: ilk aday ya da null. */
+export function resolveRestartCommand(opts = {}) {
+  return resolveRestartCommands(opts)[0] ?? null;
 }
 
 // ── Şablon üretimi + kurulum planı (M3 / T14–T16) ─────────────────────────────────

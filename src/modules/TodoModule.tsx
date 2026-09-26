@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback, type Dispatch, type SetStateAction } from 'react';
+import { useState, type Dispatch, type SetStateAction } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import {
   TodoTask,
@@ -12,6 +13,7 @@ import {
 } from '../types';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { usePendingApprovalChains } from '../hooks/useEnflowQueries';
 import {
   itemsForModule,
   composedTitle,
@@ -52,22 +54,19 @@ const TodoModule = ({
 }) => {
   const { currentUser } = useAuth();
   const [filterUnit, setFilterUnit] = useState<string>('all');
-  const [pendingChainApprovals, setPendingChainApprovals] = useState<ApprovalChain[]>([]);
+  const queryClient = useQueryClient();
+  const pendingChainApprovals = (usePendingApprovalChains(currentUser?.tenantId ?? '', currentUser?.role).data ?? []) as ApprovalChain[];
   const [chainActionLoading, setChainActionLoading] = useState<string | null>(null);
 
   // Bekleyen Onaylarım — Onay Zinciri (Faz 1, Finans/İGB/Üst Yönetim/KSU swimlane'i).
   // Kullanıcının rolü zincirde hangi aşamadaysa, sırası gelmiş onaylar burada listelenir.
-  const refreshPendingChainApprovals = useCallback(async () => {
-    if (!currentUser?.role) return;
-    try {
-      const chains = await apiService.getPendingApprovalChainsForRole(currentUser.role);
-      setPendingChainApprovals(chains);
-    } catch {
-      // sessizce geç — bu görünüm opsiyonel bir ek katman
-    }
-  }, [currentUser?.role]);
-
-  useEffect(() => { refreshPendingChainApprovals(); }, [refreshPendingChainApprovals]);
+  // Onay/ret sonrası: bekleyen liste + görev listesi (zincir ilerleyince devir görevleri doğar) yenilenir.
+  const refreshPendingChainApprovals = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['approval-chains'] }),
+      queryClient.invalidateQueries({ queryKey: ['tasks'] }),
+    ]);
+  };
 
   const handleChainStageAction = async (chain: ApprovalChain, stageId: string, action: 'approve' | 'reject', note?: string, assigneeUserId?: string) => {
     if (!currentUser?.id) return;

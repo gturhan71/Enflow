@@ -35,6 +35,7 @@ import { parseBoMFile } from '../utils/bomParser';
 import { SaveButton } from '../components/SaveButton';
 import { apiService } from '../services/apiService';
 import OpportunityRequiredDocsPanel from './crm/OpportunityRequiredDocsPanel';
+import { authFetch } from '../services/apiClient';
 
 interface PresalesModuleProps {
   opportunities: Opportunity[];
@@ -700,9 +701,7 @@ const BoMQuotePanel: React.FC<{
     setUploadingId(q.id);
     try {
       const fd = new FormData(); fd.append('file', file);
-      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-      const r = await fetch(`/api/bom-quotes/${q.id}/upload`, { method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd });
+      const r = await authFetch(`/api/bom-quotes/${q.id}/upload`, { method: 'POST', body: fd });
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || `HTTP ${r.status}`);
       await load();

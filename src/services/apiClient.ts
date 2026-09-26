@@ -1,28 +1,52 @@
 const API_BASE_URL = '/api';
 
+// Oturum httpOnly çerezde (`enflow_session`) — JavaScript OKUYAMAZ (XSS token'ı çalamaz). Tarayıcı çerezi
+// `credentials: 'same-origin'` ile kendisi ekler; burada yalnız tenant doğrulaması + CSRF başlığı gönderilir
+// (sunucu: çerezle gelen durum-değiştiren isteklerde X-Enflow-CSRF zorunlu, bkz. backend services/session.ts).
+export const activeTenantId = (): string => localStorage.getItem('enflow_active_tenant_id') || '';
+export const authHeaders = (extra: Record<string, string> = {}): Record<string, string> => ({
+  'x-tenant-id': activeTenantId(),
+  'X-Enflow-CSRF': '1',
+  ...extra,
+});
+
+/** Oturum süresi doldu/geçersiz (401) → App dinler, girişe yönlendirir. */
+export const SESSION_EXPIRED_EVENT = 'enflow:session-expired';
+let expiredNotified = false;
+export const resetSessionExpiredNotice = () => { expiredNotified = false; };
+function notifyIfExpired(res: Response): Response {
+  if (res.status === 401 && !expiredNotified) {
+    expiredNotified = true;
+    window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
+  }
+  return res;
+}
+
+/** Kimlikli `fetch` — çerez + tenant + CSRF başlıkları otomatik (FormData/blob/SSE çağrıları için). */
+export async function authFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const res = await fetch(input, {
+    ...init,
+    credentials: 'same-origin',
+    headers: { ...authHeaders(), ...((init.headers as Record<string, string> | undefined) ?? {}) },
+  });
+  return notifyIfExpired(res);
+}
+
 class ApiClient {
   private tenantId: string | null = null;
-  private token: string | null = null;
 
-  setAuth(tenantId: string, token: string) {
+  setAuth(tenantId: string) {
     this.tenantId = tenantId;
-    this.token = token;
   }
 
   async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-    const effectiveTenantId = this.tenantId || localStorage.getItem('enflow_active_tenant_id') || '';
-    const effectiveToken = this.token || localStorage.getItem('enflow_auth_token') || 'mock-token';
-
-    const headers = {
-      ...options.headers,
-      'Content-Type': 'application/json',
-      'x-tenant-id': effectiveTenantId,
-      'Authorization': `Bearer ${effectiveToken}`
-    };
-
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const response = await authFetch(`${API_BASE_URL}${endpoint}`, {
       ...options,
-      headers
+      headers: {
+        ...((options.headers as Record<string, string> | undefined) ?? {}),
+        'Content-Type': 'application/json',
+        ...(this.tenantId ? { 'x-tenant-id': this.tenantId } : {}),
+      },
     });
 
     const contentType = response.headers.get('content-type');
@@ -43,16 +67,10 @@ class ApiClient {
     return response;
   }
 
-  // Dashboard gerçek-zamanlılık (SSE) — EventSource özel header desteklemediği için
-  // (Authorization/x-tenant-id gerekiyor) fetch + ReadableStream ile aynı auth deseni kullanılır.
+  // Dashboard gerçek-zamanlılık (SSE) — fetch + ReadableStream (çerez + tenant + CSRF başlıkları authFetch'te).
   // Her "data:" satırında onMessage çağrılır; frontend tam veriyi ayrıca REST'ten çeker.
   async streamDashboard(onMessage: () => void, signal: AbortSignal): Promise<void> {
-    const effectiveTenantId = this.tenantId || localStorage.getItem('enflow_active_tenant_id') || '';
-    const effectiveToken = this.token || localStorage.getItem('enflow_auth_token') || 'mock-token';
-    const response = await fetch(`${API_BASE_URL}/reports/dashboard/stream`, {
-      headers: { 'x-tenant-id': effectiveTenantId, Authorization: `Bearer ${effectiveToken}` },
-      signal,
-    });
+    const response = await authFetch(`${API_BASE_URL}/reports/dashboard/stream`, { signal });
     if (!response.ok || !response.body) return;
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -72,7 +90,8 @@ class ApiClient {
   async login(email: string, password: string) {
     const response = await fetch(`${API_BASE_URL}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-Enflow-Client': 'web' },
       body: JSON.stringify({ email, password })
     });
 
