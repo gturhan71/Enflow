@@ -371,7 +371,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/hooks/useEnflowQueries.ts ← services/apiService
-src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, hooks/useEnflowQueries, todo/helpers
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, hooks/useEnflowQueries, components/HealthCards, lib/format
 backend/src/lifecycle.ts ← services/periodic
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 upgrade-tool/core.mjs ← install/lib/service
@@ -432,7 +432,6 @@ src/modules/project-mgmt/CostForm.tsx ← ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants, ../lib/html
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
 src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
-src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
@@ -447,6 +446,7 @@ src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
+src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, hooks/useEnflowQueries, todo/helpers
 src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
@@ -1484,37 +1484,43 @@ export const useUsers = (tenantId, options = {}) =>  :66-74
 export const useDocuments = (tenantId, options = {}) =>  :76-84
 export const useProposals = (tenantId, options = {}) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
-export const usePendingApprovalChains = (tenantId, role) =>  :106-112
-export const useVisitPlans = (tenantId) =>  :114-116
-export const useDailyReports = (tenantId, userId) =>  :117-119
-export const useVisitReportSettings = (tenantId) =>  :120-124
-export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :127-134
-export const useInvoices = (tenantId) =>  :137-139
-export const useGuarantees = (tenantId) =>  :140-142
-export const useCostApprovals = (tenantId) =>  :143-145
-export const useFinanceSummary = (tenantId) =>  :146-148
-export const useFinanceAging = (tenantId) =>  :150-152
-export const usePurchaseRequests = (tenantId, params?) =>  :153-160
-export const useVendors = (tenantId) =>  :162-169
+export const useProjectHealth = (tenantId) =>  :105-110
+export const usePendingApprovalChains = (tenantId, role) =>  :112-118
+export const useVisitPlans = (tenantId) =>  :120-122
+export const useDailyReports = (tenantId, userId) =>  :123-125
+export const useVisitReportSettings = (tenantId) =>  :126-130
+export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :133-140
+export const useInvoices = (tenantId) =>  :143-145
+export const useGuarantees = (tenantId) =>  :146-148
+export const useCostApprovals = (tenantId) =>  :149-151
+export const useFinanceSummary = (tenantId) =>  :152-154
+export const useFinanceAging = (tenantId) =>  :156-158
+export const usePurchaseRequests = (tenantId, params?) =>  :159-166
+export const useVendors = (tenantId) =>  :168-175
 ```
 
-### src/modules/TodoModule.tsx
+### src/modules/ProjectManagementModule.tsx
 ```
+props ProjectManagementModuleProps
 hook useAuth
 hook useState
 hook useQueryClient
-hook usePendingApprovalChains
-export TodoModule
-handler onLoading
-handler onAction
-handler onPreview
-handler onApprove
-handler onReject
-handler onMarkRead
-handler onNavigate
-handler onToggleStatus
-handler onAssign
-handler onSubmit
+hook useProjects
+hook useOpportunities
+hook useMemo
+hook useProjectHealth
+hook useCallback
+hook useEffect
+export ProjectManagementModule
+handler onOpportunities
+handler onClick
+handler onChange
+handler onSelect
+handler onEdit
+handler onDelete
+handler onRefresh
+handler onPrintReport
+handler onSave
 ```
 
 ### src/App.tsx
@@ -2255,26 +2261,6 @@ handler onApplied
 handler onSave
 ```
 
-### src/modules/ProjectManagementModule.tsx
-```
-props ProjectManagementModuleProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-hook useMemo
-export ProjectManagementModule
-handler onOpportunities
-handler onClick
-handler onChange
-handler onSelect
-handler onEdit
-handler onDelete
-handler onRefresh
-handler onPrintReport
-handler onSave
-```
-
 ### src/modules/reporting/BottleneckPanel.tsx
 ```
 component BottleneckPanel
@@ -2450,6 +2436,25 @@ component UnifiedWorkQueue
 hook useState
 hook useMemo
 handler onClick
+```
+
+### src/modules/TodoModule.tsx
+```
+hook useAuth
+hook useState
+hook useQueryClient
+hook usePendingApprovalChains
+export TodoModule
+handler onLoading
+handler onAction
+handler onPreview
+handler onApprove
+handler onReject
+handler onMarkRead
+handler onNavigate
+handler onToggleStatus
+handler onAssign
+handler onSubmit
 ```
 
 ### src/modules/VisitPlanModule.tsx
@@ -2845,4 +2850,4 @@ code-fence powershell
 ```
 
 
-> **Not everything is here.** 216 file(s) omitted to stay under the 21157-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 216 file(s) omitted to stay under the 21184-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

@@ -102,6 +102,12 @@ export const useModuleSettings = (tenantId: string) => {
   });
 };
 
+export const useProjectHealth = (tenantId: string) => useQuery({
+  queryKey: ['projects', 'health', tenantId],
+  queryFn: () => apiService.getProjectHealth().catch(() => null),
+  staleTime: 60 * 1000,
+  enabled: !!tenantId,
+});
 // Bekleyen Onaylarım — kullanıcının rolüne sırası gelmiş onay zincirleri. Opsiyonel katman: hata → boş liste.
 export const usePendingApprovalChains = (tenantId: string, role: string | undefined) => useQuery({
   queryKey: ['approval-chains', 'pending', tenantId, role ?? ''],
