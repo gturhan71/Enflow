@@ -101,3 +101,12 @@ export const useModuleSettings = (tenantId: string) => {
     enabled: !!tenantId,
   });
 };
+
+// Bekleyen Onaylarım — kullanıcının rolüne sırası gelmiş onay zincirleri. Opsiyonel katman: hata → boş liste.
+export const usePendingApprovalChains = (tenantId: string, role: string | undefined) => useQuery({
+  queryKey: ['approval-chains', 'pending', tenantId, role ?? ''],
+  queryFn: () => apiService.getPendingApprovalChainsForRole(role as string).catch(() => []),
+  staleTime: 30 * 1000,
+  refetchOnMount: 'always',   // başka ekranlardan (süreç butonları) verilen onaylar önbelleği geçersiz kılmaz → her açılışta taze
+  enabled: !!tenantId && !!role,
+});
