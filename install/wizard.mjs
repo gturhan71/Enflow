@@ -9,7 +9,7 @@
 import { createInterface } from 'node:readline/promises';
 import { spawnSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { existsSync, writeFileSync, readFileSync, mkdirSync, unlinkSync } from 'node:fs';
+import { existsSync, writeFileSync, mkdirSync, unlinkSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout, platform, exit } from 'node:process';
@@ -63,15 +63,8 @@ const commandExists = (cmd) => {
   const r = spawnSync(isWin ? 'where' : 'which', [cmd], { encoding: 'utf-8', shell: isWin });
   return r.status === 0;
 };
-// schema.prisma datasource provider'ını sqlite ↔ postgresql arasında çevir.
-function setSchemaProvider(prov) {
-  const schemaPath = join(REPO, 'backend', 'prisma', 'schema.prisma');
-  if (!existsSync(schemaPath)) return;
-  let s = readFileSync(schemaPath, 'utf-8');
-  const next = s.replace(/(datasource\s+db\s*\{[^}]*?provider\s*=\s*")(sqlite|postgresql)(")/s, `$1${prov}$3`);
-  if (next !== s && !DRY) writeFileSync(schemaPath, next);
-  log(`${C.dim}  schema.prisma datasource provider → ${prov}${C.r}`);
-}
+// Şema/migration klasörü backend/prisma.config.ts'te DATABASE_URL'e göre seçilir
+// (ADR-002) — izlenen schema.prisma artık ASLA yerinde değiştirilmez.
 
 // PostgreSQL sunucusunu garanti et (yoksa Windows'ta winget ile kur).
 async function ensurePostgresServer(admin) {
@@ -186,7 +179,7 @@ async function main() {
   }
 
   let dbUrl = 'file:./dev.db';
-  let migratorUrl = null; // yalnız usePg true ise dolar — db push/migrate deploy İÇİN, .env'e YAZILMAZ
+  let migratorUrl = null; // yalnız usePg true ise dolar — migrate deploy İÇİN, .env'e YAZILMAZ
   const usePg = await askYN('PostgreSQL kullanılsın mı? (Hayır = SQLite)', overCapacity);
   if (!usePg && overCapacity) {
     warn('SQLite ile devam ediliyor. Büyüdüğünüzde sorunsuz geçiş için: `pnpm migrate:to-postgres` (backend/ içinde).');
@@ -222,16 +215,13 @@ async function main() {
       if (provisioned) ok(`PostgreSQL hazır: migrator rolü "${migratorUser}" (DDL) + runtime rolü "${appUser}" (DML-only) + veritabanı "${db}" (mevcutsa korunur).`);
       else warn('DB/rol otomatik oluşturulamadı — superuser bilgilerini/erişimi kontrol edip elle oluşturun.');
     } else {
-      warn('PostgreSQL sağlanamadı — .env yine de yazılır; sunucuyu hazırlayıp `pnpm prisma db push` (migrator kimlik bilgileriyle) çalıştırın.');
+      warn('PostgreSQL sağlanamadı — .env yine de yazılır; sunucuyu hazırlayıp `pnpm prisma migrate deploy` (migrator kimlik bilgileriyle, backend/ içinde) çalıştırın.');
     }
     dbUrl = `postgresql://${appUser}:${appPass}@${host}:${port}/${db}?schema=public`;
     migratorUrl = `postgresql://${migratorUser}:${migratorPass}@${host}:${port}/${db}?schema=public`;
-    setSchemaProvider('postgresql'); // Prisma provider'ını Postgres'e çevir
     // Özette gösterilecek not
     globalThis.__pgSummary = { host, port, db, appUser, appPass, migratorUser, migratorPass, superuser: admin.user };
-    globalThis.__pgGrant = { admin, db, appUser, migratorUser }; // 5/7'de db push sonrası grantRuntimePrivileges için
-  } else {
-    setSchemaProvider('sqlite'); // SQLite yolunda provider'ı geri al (önceki PG denemesi kalmışsa)
+    globalThis.__pgGrant = { admin, db, appUser, migratorUser }; // 5/7'de migrate deploy sonrası grantRuntimePrivileges için
   }
 
   const jwt = secret(48);
@@ -281,7 +271,7 @@ async function main() {
 
   // ── 5) Veritabanı ─────────────────────────────────────────────────────────────
   head('5/7 · Veritabanı (Prisma)');
-  // Postgres'te şema DDL'i (db push) migrator kimlik bilgileriyle çalışır — runtime
+  // Postgres'te şema DDL'i (migrate deploy) migrator kimlik bilgileriyle çalışır — runtime
   // (appUser) rolünün DDL yetkisi yok (en az yetki, Adım 0 madde 5). SQLite'ta tek
   // rol kavramı olmadığı için dbUrl zaten doğrudan kullanılır.
   const env = { ...process.env, DATABASE_URL: usePg ? migratorUrl : dbUrl };
@@ -308,12 +298,11 @@ async function main() {
 
   prismaRun(['generate']);
   if (usePg) {
-    // PostgreSQL: mevcut migration'lar SQLite lehçesinde → şema modellerden `db push`
-    // ile kurulur (migration geçmişi yok). Postgres migration seti sonra üretilecek
-    // (bkz. install/POSTGRES_MIGRATION_PLAN.md). Migrator kimlik bilgileriyle (DDL).
-    prismaRun(['db', 'push', '--accept-data-loss']);
-    // db push tabloları migrator sahipliğinde oluşturur — runtime rolüne (appUser)
-    // yalnız DML yetkisi verilir (+ gelecekteki tablolar için ALTER DEFAULT PRIVILEGES).
+    // PostgreSQL: kendi migration hattı (prisma/migrations-postgres, ADR-002) —
+    // prisma.config.ts DATABASE_URL'den Postgres şemasını seçer. Migrator (DDL) ile.
+    prismaRun(['migrate', 'deploy']);
+    // Tablolar migrator sahipliğinde oluşur — runtime rolüne (appUser) yalnız DML
+    // (+ gelecekteki tablolar için ALTER DEFAULT PRIVILEGES).
     const grantInfo = globalThis.__pgGrant;
     if (grantInfo && !DRY) {
       const grantOk = grantRuntimePrivileges(grantInfo.admin, grantInfo);
@@ -322,11 +311,11 @@ async function main() {
     }
 
     // Row-Level Security (Faz 3, docs/VERITABANI_GUVENLIGI_PLAN.md) — DB-seviyesi
-    // tenant izolasyonu. HENÜZ gerçek bir Postgres'e karşı ucu-uca doğrulanmadı
-    // (yalnız kod incelemesi + tip kontrolü) — bilerek OPT-IN, varsayılan HAYIR.
+    // tenant izolasyonu. CI `postgres` job'unda gerçek Postgres 16'ya karşı her PR'da
+    // doğrulanır (scripts/ci-postgres.sh). Opt-in, varsayılan HAYIR (davranış korunur).
     if (!DRY) {
       const applyRls = await askYN(
-        'PostgreSQL Row-Level Security (RLS) uygulansın mı? (DB seviyesinde tenant izolasyonu — YENİ, henüz gerçek bir Postgres\'e karşı ucu-uca doğrulanmadı; kabul ederseniz kurulum sonunda `pnpm verify:postgres-rls` çalıştırıp sonucu kontrol edin)',
+        'PostgreSQL Row-Level Security (RLS) uygulansın mı? (DB seviyesinde ikinci tenant izolasyon katmanı; kurulum sonunda `pnpm verify:postgres-rls` ile canlı doğrulayabilirsiniz)',
         false,
       );
       if (applyRls) {
@@ -344,7 +333,7 @@ async function main() {
   } else {
     prismaRun(['migrate', 'deploy']);
   }
-  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : (usePg ? 'Prisma client üretildi + şema Postgres\'e db push edildi' : 'Prisma client üretildi + migration\'lar uygulandı'));
+  ok(DRY ? 'Prisma adımları (dry-run) listelendi' : (usePg ? 'Prisma client üretildi + Postgres migration\'ları uygulandı' : 'Prisma client üretildi + migration\'lar uygulandı'));
 
   // NOT: Hiçbir kullanıcı/tenant tohumlanmaz. Veritabanı BOŞ kalmalı ki ilk açılışta
   // tarayıcıdaki Kurulum Sihirbazı şirket + ilk yönetici + lisansı tanımlasın.
@@ -401,7 +390,7 @@ ${C.b}${C.y}PostgreSQL — DB erişim bilgileri (GÜVENLE SAKLAYIN):${C.r}
   ${C.b}Migrator rolü${C.r} (DDL — yalnız gelecekteki şema güncellemelerinde/upgrade'de kullanılır, .env'de YOK):
     Kullanıcı: ${pg.migratorUser}
     Şifre    : ${C.b}${pg.migratorPass}${C.r}
-  ${C.dim}Migrator şifresini de güvenle saklayın — bir sonraki \`prisma db push\`/şema güncellemesi
+  ${C.dim}Migrator şifresini de güvenle saklayın — bir sonraki şema güncellemesi/upgrade
   için gerekecek (bkz. install/POSTGRES_MIGRATION_PLAN.md). Postgres portu (${pg.port}) ASLA
   genel internete açılmamalı.${C.r}`);
   }
