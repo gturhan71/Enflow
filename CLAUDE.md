@@ -484,7 +484,6 @@ backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
 ```
 
@@ -524,14 +523,13 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 55 seconds ago)
+## changes (last 10 commits — 38 minutes ago)
 ```
 backend/scripts/db-migrate.mjs                +run
 backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
-install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/lib/service.mjs                       +resolveRestartCommand
-install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
+install/wizard.mjs                            ~setSchemaProvider  ~main  ~ensurePostgresServer
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
@@ -589,12 +587,6 @@ export function runWithRlsBypass(fn) → T  :45-47
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260816193936_add_platform_ticket/migration.sql
-```
-TABLE PlatformTicket
-INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
 ```
 
 ### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
@@ -700,6 +692,11 @@ TABLE ProjectCostItem
 key provider
 ```
 
+### backend/scripts/ensure-build.mjs
+```
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -717,16 +714,17 @@ export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 
 ### backend/src/lifecycle.ts
 ```
-export interface ShutdownDeps  :12-20
-  server: Pick<Server, 'close' | 'closeAllCon  :13-13
-  stops: StopFn[]  :14-14
-  disconnect: () => Promise<void>  :15-15
-  timeoutMs?: number  :16-16
-  exit?: (code: number) => void  :17-17
-  log?: { info: (...a: unknown[]) => void  :18-18
-  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
-export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
-export function installShutdown(deps) → void  :60-64
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/src/middleware.ts
@@ -1283,13 +1281,6 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/usageService.ts
-```
-export async function checkLimit  :16-41
-export async function checkUserSeatLimit  :46-46
-export async function incrementUsage  :54-61
-```
-
 ### backend/src/utils/entityTypeTab.ts
 ```
 export function entityTypeToTab(entityType?) → string | undefined  :25-27
@@ -1336,19 +1327,6 @@ export type AgentMode  :14-14
 
 ## install
 
-### install/build-package.sh
-```
-# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
-```
-
-### install/lib/pg.mjs
-```
-export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
-export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
-export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
-export const pgReachable = (admin) =>  :26-28
-```
-
 ### install/lib/service.mjs
 ```
 export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :29-47  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
@@ -1378,6 +1356,11 @@ async function offerFirewallHardening(backendPort)  :90-122
 async function main()  :134-397
 ```
 
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
 ### install/ILK_KURULUM_KILAVUZU.md
 ```
 h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
@@ -1405,6 +1388,14 @@ h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
 h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
 h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
+```
+
+### install/lib/pg.mjs
+```
+export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
+export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
+export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
+export const pgReachable = (admin) =>  :26-28
 ```
 
 ### install/README.md
@@ -2773,5 +2764,21 @@ async function performUpgrade()  :52-59
 async function tick()  :62-71
 ```
 
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
+code-fence powershell
+```
 
-> **Not everything is here.** 202 file(s) omitted, 1 collapsed to anchors to stay under the 19964-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+
+> **Not everything is here.** 204 file(s) omitted to stay under the 19988-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
