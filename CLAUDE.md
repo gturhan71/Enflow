@@ -395,7 +395,6 @@ backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, ag
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
-backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext
@@ -466,6 +465,7 @@ src/types/crm.ts ← auth, presales
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
+backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
@@ -528,7 +528,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 62 seconds ago)
+## changes (last 10 commits — 45 seconds ago)
 ```
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
@@ -544,7 +544,6 @@ backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       ~tick
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/corporateDocumentReminders.ts +sweepCorporateDocumentReminders  +safeParse
 backend/src/services/documentNumberService.ts ~incrementDocumentSequence
 backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
 backend/src/services/profitabilitySnapshotScheduler.ts ~tick
@@ -607,11 +606,6 @@ export interface BootstrapResult  :48-53
   user: { id: string  :51-51
   subscription: { plan: string  :52-52
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :55-135
-```
-
-### backend/src/services/corporateDocumentReminders.ts
-```
-export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
 ```
 
 ### backend/src/services/documentNumberService.ts
@@ -817,6 +811,11 @@ export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant Y
 ```
 export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
 export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
+```
+
+### backend/src/services/corporateDocumentReminders.ts
+```
+export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
 ```
 
 ### backend/src/services/dashboardService.ts

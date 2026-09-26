@@ -1,3 +1,3 @@
-# Handoff → EM / Senior Engineer
-ADR-001 (runtime/servis/shutdown) + ADR-002 (çift migration hattı) kabul. Bileşen tablosu: decisions/architect/prod-runtime-pg-pipeline.md.
-Prisma 7: drift kontrolü `--from-config-datasource` (shadow DB yok). Planlama: ≤yarım günlük görevler, M1 = CI'da PG+RLS yeşil.
+# Handoff → SDE
+Plan: decisions/engineering-manager/prod-runtime-pg-pipeline.md (sıra), decisions/senior-engineer/prod-runtime-pg-pipeline.md (yaklaşım). ADR-001/002 var → uygulama serbest.
+Başla: T1. Her görev sonrası tsc + ilgili vitest; RBAC yalnız T19'da. Branch: feat/prod-runtime-pg-pipeline.
