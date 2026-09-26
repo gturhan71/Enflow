@@ -71,7 +71,7 @@ cd backend && pnpm dev
 - `src/hooks/useEnflowQueries.ts` — TanStack Query hooks (useOpportunities, useProposals, vb.)
 - `src/services/apiClient.ts` — `ApiClient` sınıfı; **`fetchWithAuth(path, init)`** zaten parse edilmiş JSON döner, üstüne `.ok` veya `.json()` çağırma
 - `src/services/apiService.ts` — `ApiService` sınıfı, apiClient'ı wrap eder
-- `src/contexts/AuthContext.tsx` — `useAuth()` → `currentUser`, `setAuth(token, tenantId)`
+- `src/contexts/AuthContext.tsx` — `useAuth()` → `currentUser`. **Oturum token'ı tarayıcı JS'inde YOK** (P0-3): httpOnly `enflow_session` çerezi; `apiClient.authFetch`/`fetchWithAuth` çerez + `x-tenant-id` + `X-Enflow-CSRF` başlıklarını kendisi ekler (FormData/blob için de `authFetch`). Ham `fetch` + `localStorage` token/`Bearer` YASAK (`pnpm check:no-client-token` guard'ı)
 
 **API path kuralı:** `apiClient.fetchWithAuth(path)` çağrısında path `/api` **olmadan** yaz — client zaten ekliyor. Örn: `/contract-workflows` → tam URL `/api/contract-workflows` olur.
 
@@ -215,6 +215,7 @@ const STATUS_RANK = { APPROVED: 4, ACCEPTED: 3, SENT: 2, PENDING_APPROVAL: 1, DR
 - **Migration sonrası** — `prisma generate` + **backend restart** (nodemon eski client'la çöker)
 - **Portlar** — dev frontend **3000**, backend **3002** (vite.config server.port=5173 default, `--port 3000` ile çalıştırılır)
 - **Servis yeniden kullanımı** — proje oluşturma `backend/src/services/projectFactory.ts` `createProjectWithMilestones` (projects.ts POST + contractWorkflow `/transfer` ortak); create metod imzaları `Partial<X>`
+- **Oturum + CSP (P0-3, ADR-003)** — JWT httpOnly çerezde (`backend/src/services/session.ts`; SameSite=Lax; Secure yalnız HTTPS/`COOKIE_SECURE`); `Authorization: Bearer` HÂLÂ desteklenir (API istemcileri/RBAC+e2e testleri; CSRF'e tabi değil). Çerezli durum-değiştiren isteklerde `X-Enflow-CSRF` + Origin denetimi. Giriş: `X-Enflow-Client: web` → gövdede token dönmez; `GET /api/auth/session` ({user}|{user:null}), `POST /api/auth/logout`. **Sıkı CSP açık** (`config/csp.ts`; `CSP_MODE=enforce|report-only|off`, `report-uri /api/csp-report`); pdf.js worker paketten. Yeni HTML popup (`document.write`) yazarken kullanıcı verisini `escapeHtml` (`src/lib/html.ts`) ile kaçışla. Ters proxy: `TRUST_PROXY`, `CORS_ORIGINS` (bkz. `install/README.md`).
 - **Denetim-izi** — mutasyon sonrası `logActivity({ tenantId, userId, action, entityType, entityId, details? })` (`backend/src/services/activityLog.ts`, **non-throwing** — ana akışı bozmaz); okuma `GET /api/activity-logs`. Agent işlemleri `actorType:'AGENT'`+`agentRunId` (Faz 8.3). Yeni mutasyon endpoint'i = logActivity çağrısı ekle.
 - **YZ entegrasyonu — sağlayıcıdan bağımsız** — Tüm YZ çağrıları `backend/src/services/aiClient.ts` (`chatJSON`, **OpenAI-uyumlu `/chat/completions`** `fetch`) üzerinden. Sağlayıcı **hard-code edilmez** ("istenilen YZ"): tenant kendi `{ baseUrl, apiKey, model }` değerini **Ayarlar→Entegrasyonlar**'dan girer → `Tenant.moduleSettings.ai`. Route: `GET/PUT /api/tenants/ai-settings` (GM-only; key **maskeli**, GET'te yalnız `hasKey`, **asla loglanmaz/echo edilmez**). Kullanan: `specAnalysis.analyzeSpec` (sözleşme/ihale) + `POST /api/presales/spec-extract` (şartname→ürün) + `POST /api/presales/spec-compliance` (şartname maddeleri ↔ ürün specsheet uygunluk matrisi; grup başına 1 `chatJSON`; **deterministik fallback YOK** — YZ yoksa `{usedAI:false, groups:[], message}` döner, istemci "Karşılaştır"ı pasifleştirir; sonuç istemcide xlsx'e dönüşür, DB'ye yazılmaz). Config yoksa/hata → deterministik **mock fallback** (yalnız fallback'i olan çağrılar; spec-compliance hariç). **Client-side YZ çağrısı yasak** (eski Gemini/`@google/genai` kaldırıldı; `@anthropic-ai/sdk` de kaldırıldı).
 - **Tenant verisi şifreleme** (Faz 12) — `backend/src/services/tenantEncryption.ts`: `encryptForTenant`/`decryptForTenant`, AES-256-GCM, tenant-başına DEK (envelope, `Tenant.dekWrapped`, master key `DATA_ENCRYPTION_MASTER_KEY`). Şifreli değer öneki `enc:v1:` — önek yoksa düz metin kabul edilir (kademeli geçiş, decrypt kırılmaz). Kapsam: YZ `apiKey` + `Vendor.iban`/`bankName` + `Customer.taxNumber`/`taxOffice`. Yeni alan eklerken: route'ta `encryptForTenant` (yazım) / `decryptForTenant` (okuma) çağır, **genel Prisma `$extends`'e ekleme** (money-rounding hot path'i tüm modeller için uniform, alan şifreleme seçici — ayrı tutulmalı). `Tenant` döndüren route'larda `dekWrapped` **her zaman** `omit` edilmeli. bkz. `docs/TENANT_DATA_ENCRYPTION_PLAN.md`.
@@ -326,7 +327,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 | 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
 | 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı Faz 16'da (2026-09-26) CI'da doğrulandı — o sırada PG+RLS'te login kırığı bulunup düzeltildi**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
-| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (v2.6.0 adayı, onay bekliyor). | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
+| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (kullanıcı kararı 2026-09-26). **Merge sonrası 10x hata avı** (`.10x/reviews/2026-09-26-hunt-report.md`): 5 kanıtlı hata daha düzeltildi — **KRİTİK: PLATFORM yedeği çok kiracılıda tüm kiracıların verisini (parola hash'leri dahil) sızdırıyordu** (artık yalnız tek kiracılıda; çok kiracılıda 403/TENANT), upgrade rollback'i yükseltme sırasında yazılan veriyi siliyordu (artık DB otomatik geri yüklenmez; sıra build→migrate), restart hatası başarılı yükseltmeyi geri aldırıyordu (artık çıkış kodu 3), `.env`/yedek izinleri 0600/0700, upgrade-tool arayüzü token+Host denetimli. | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
 
 Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli; Faz 15: RBAC süiti artık 1027 test — SQLite'a karşı koşuldu, 1000 geçti/26 kaldı, `git stash` ile değişiklikler geri alınıp AYNI 26 test birebir aynı hatalarla yine başarısız olduğu doğrulandı → önceden var, Faz 15'ten bağımsız, sıfır regresyon; Postgres-özel Faz 2/3 değişikliği yerel bir Postgres örneğiyle henüz manuel doğrulanmadı). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -372,14 +373,16 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 backend/src/lifecycle.ts ← services/periodic
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
+src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
-src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
-src/modules/BackupModule.tsx ← services/apiService, types
+src/lib/guaranteeText.ts ← services/apiClient
+src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types, services/apiClient
+src/modules/BackupModule.tsx ← services/apiService, types, services/apiClient
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types, DeliveryTimelinePanel
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
@@ -401,13 +404,14 @@ src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procu
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, crm/constants
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
-src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
+src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService, services/apiClient
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
@@ -421,7 +425,7 @@ src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext,
 src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
 src/modules/project-mgmt/CostForm.tsx ← ../types, constants
-src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants
+src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants, ../lib/html
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
 src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
@@ -440,13 +444,13 @@ src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
+backend/src/middleware.ts ← prismaClient, services/auth, services/session, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
-backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
@@ -470,18 +474,18 @@ backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedg
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
-backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
+backend/src/services/uploadsGuard.ts ← prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
-install/wizard.mjs ← lib/pg, lib/service
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/server.mjs ← core
+install/wizard.mjs ← lib/pg, lib/service
 ```
 
 ## versions (installed direct deps)
@@ -520,12 +524,10 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 35 minutes ago)
+## changes (last 10 commits — 2 hours ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
-src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
-src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
@@ -544,14 +546,14 @@ backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapsh
 backend/src/services/restoreService.ts        ~applyLogicalRestore
 backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
 backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
-install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
-install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
-install/POSTGRES_MIGRATION_PLAN.md            +Postgres
-install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
 upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
+install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
+install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
+install/POSTGRES_MIGRATION_PLAN.md            +Postgres
+install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
 ```
 
 ## backend
@@ -579,23 +581,6 @@ export function installShutdown(deps) → void  :80-84
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260823213111_add_scheduler_lock/migration.sql
-```
-TABLE SchedulerLock
-```
-
-### backend/prisma/migrations/20260823213343_add_scale_indexes/migration.sql
-```
-INDEX ContractWorkflow_tenantId_status_idx ON ContractWorkflow
-INDEX Notification_tenantId_userId_idx ON Notification
-INDEX Opportunity_tenantId_status_idx ON Opportunity
-INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
-INDEX Project_tenantId_status_idx ON Project
-INDEX PurchaseRequest_tenantId_status_idx ON PurchaseRequest
-INDEX TodoTask_tenantId_status_idx ON TodoTask
-INDEX TodoTask_tenantId_assignedToUserId_idx ON TodoTask
 ```
 
 ### backend/prisma/migrations/20260825131003_add_opportunity_tracking_code/migration.sql
@@ -688,6 +673,14 @@ async function main()  :29-57
 export function toPostgres(schema)  :25-29
 ```
 
+### backend/src/config/csp.ts
+```
+export type CspMode  :12-12
+export function cspMode(env = process.env) → CspMode  :14-17
+export function cspDirectives(env = process.env) → Record<string, string[]>  :21-39
+export function helmetCsp(env = process.env)  :42-46  # helmet({ contentSecurityPolicy }) değeri: false (kapalı) ya 
+```
+
 ### backend/src/config/prismaPaths.ts
 ```
 export interface PrismaPaths  :5-9
@@ -699,7 +692,7 @@ export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 
 ### backend/src/middleware.ts
 ```
-export const asyncHandler = (fn) =>  :9-11
+export const asyncHandler = (fn) =>  :10-12
 export const requireRole = (allowed) =>  :82-90
 export const requireEntitlement = (pluginKey) =>  :116-123
 ```
@@ -725,19 +718,6 @@ export function createHealthRouter(deps) → Router  :38-52
 export function startActivityLogArchiveScheduler() → StopFn  :54-58
 ```
 
-### backend/src/services/aiClient.ts
-```
-export interface TenantAIConfig  :36-41
-  baseUrl: string  :37-37
-  apiKey: string  :38-38
-  model: string  :39-39
-  label?: string  :40-40
-export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | null>  :44-66  # moduleSettings
-export async function isAIConfigured(tenantId) → Promise<boolean>  :68-70
-export function assertSafeAiUrl(rawUrl) → void  :81-96  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
-export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
-```
-
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
@@ -750,7 +730,7 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 
 ### backend/src/services/backupScheduler.ts
 ```
-export function startBackupScheduler() → StopFn  :67-70
+export function startBackupScheduler() → StopFn  :78-81
 ```
 
 ### backend/src/services/backupService.ts
@@ -768,16 +748,16 @@ export interface BackupModuleSettings  :120-129
   location?: string  :126-126
   nextcloud?: { url?: string  :127-127
   s3?: { endpoint?: string  :128-128
-export interface RunBackupOpts  :131-141
-  tenantId: string  :132-132
-  scope: BackupScope  :133-133
-  kind: BackupKind  :134-134
-  targetType: TargetType  :135-135
-  location?: string | null  :136-136
-  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
-  startedById?: string  :138-138
-  startedByName?: string  :139-139
-  settings: BackupModuleSettings | null  :140-140
+export interface RunBackupOpts  :151-161
+  tenantId: string  :152-152
+  scope: BackupScope  :153-153
+  kind: BackupKind  :154-154
+  targetType: TargetType  :155-155
+  location?: string | null  :156-156
+  trigger?: 'MANUAL' | 'SCHEDULED'  :157-157
+  startedById?: string  :158-158
+  startedByName?: string  :159-159
+  settings: BackupModuleSettings | null  :160-160
 export type BackupScope  :39-39
 export type BackupKind  :40-40
 ```
@@ -788,22 +768,23 @@ export interface BackupTarget  :11-17
   put(localPath, remoteName)  :13-13
   get(remoteName, localPath)  :15-15
   list()  :16-16
-export class LocalTarget  :27-47
-  constructor(location?)  :29-31
-  async put(localPath, remoteName) → Promise<string>  :32-38
-  async get(remoteName, localPath) → Promise<void>  :39-42
-  async list() → Promise<string[]>  :43-46
-export class NextcloudTarget  :50-64
-  constructor(private cfg)  :51-51
-  async put(localPath, remoteName) → Promise<string>  :52-57
-  async get() → Promise<void>  :58-60
-  async list() → Promise<string[]>  :61-63
-export class S3Target  :68-109
-  constructor(private cfg,)  :69-71
-  async put(localPath, remoteName) → Promise<string>  :91-97
-  async get(remoteName, localPath) → Promise<void>  :98-103
-  async list() → Promise<string[]>  :104-108
-export function ensureDir(dir) → void  :22-24
+export class LocalTarget  :33-57
+  constructor(location?)  :35-37
+  async put(localPath, remoteName) → Promise<string>  :38-48
+  async get(remoteName, localPath) → Promise<void>  :49-52
+  async list() → Promise<string[]>  :53-56
+export class NextcloudTarget  :60-74
+  constructor(private cfg)  :61-61
+  async put(localPath, remoteName) → Promise<string>  :62-67
+  async get() → Promise<void>  :68-70
+  async list() → Promise<string[]>  :71-73
+export class S3Target  :78-119
+  constructor(private cfg,)  :79-81
+  async put(localPath, remoteName) → Promise<string>  :101-107
+  async get(remoteName, localPath) → Promise<void>  :108-113
+  async list() → Promise<string[]>  :114-118
+export function ensureDir(dir) → void  :24-26
+export function restrictFile(file) → void  :28-30  # Yedek dosyasını yalnız sahibi okuyabilsin (0600)
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -839,8 +820,8 @@ export async function computeDashboard(tenantId, userId?)  :15-150
 
 ### backend/src/services/dashboardStream.ts
 ```
-export function pingDashboard(tenantId) → void  :15-17
-export async function getDashboardPingAt(tenantId) → Promise<number | null>  :20-23  # Son sinyal zamanını epoch-ms olarak döner; hiç ping atılmamı
+export function pingDashboard  :15-17
+export async function getDashboardPingAt  :20-23
 ```
 
 ### backend/src/services/deliveryDeadlineReminders.ts
@@ -880,7 +861,9 @@ export function computeDeliveryDueDate(referenceStart, totalDays) → Date  :47-
 
 ### backend/src/services/deploymentGuard.ts
 ```
-export function checkDeploymentTopology() → void  :15-30
+export function checkDeploymentTopology() → void  :17-32
+export function insecureSecretFiles(files, platform = process.platform)  :39-39  # Sır içeren dosyalardan grup/diğer kullanıcılara AÇIK olanlar
+export function checkSecretFilePermissions() → void  :51-56
 ```
 
 ### backend/src/services/documentNumberService.ts
@@ -1201,15 +1184,25 @@ export async function stageStateRestore(restoreId) → Promise<  :286-286  # Sta
 export function defaultPermissionsForRole(role) → string[]  :64-66
 ```
 
-### backend/src/services/schedulerLock.ts
-```
-export async function acquireLock  :23-42
-export async function releaseLock  :45-50
-```
-
 ### backend/src/services/serviceTicketReminders.ts
 ```
 export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
+```
+
+### backend/src/services/session.ts
+```
+export interface RequestToken  :36-36
+  token: string  :36-36
+export type TokenSource  :35-35
+export function parseCookies(header?) → Record<string, string>  :20-33  # `Cookie:` başlığını ayrıştırır (bağımlılık yok)
+export function getRequestToken(req) → RequestToken | undefined  :39-47  # İstekteki oturum token'ı: Bearer önceliklidir (API istemcile
+export function allowedOrigins() → string[]  :50-53  # CORS izinli origin'ler — index
+export function csrfViolation(req, via, allowed = allowedOrigins(),) → string | null  :64-83  # Çerezle doğrulanmış, durum değiştiren bir istek CSRF şüpheli
+export function cookieSecure(req) → boolean  :86-91  # Secure çerez: COOKIE_SECURE=true|false zorlar; auto (varsayı
+export function tokenRemainingSeconds(token) → number  :94-97  # Token'ın kalan ömrü (sn) — çerez Max-Age'i JWT'nin kendi exp
+export function setSessionCookie(req, res, token) → void  :99-107
+export function clearSessionCookie(req, res) → void  :109-111
+export const isWebClient = (req) =>  :114-114  # Tarayıcı arayüzü mü
 ```
 
 ### backend/src/services/slaEscalation.ts
@@ -1295,6 +1288,13 @@ export interface UpdateStatus  :19-34
 export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
 export function readUpdateStatus() → UpdateStatus | null  :41-47
 export function startUpdateNotifier() → StopFn  :124-127
+```
+
+### backend/src/services/uploadsGuard.ts
+```
+export function discoverRefFields(models = Prisma.dmmf.datamodel.models) → RefField[]  :16-27  # tenantId'li tablolarda dosya yolu tutabilecek String alanlar
+export async function ownersOfUpload(urlPath) → Promise<Set<string>>  :32-45  # Bu dosya yoluna bağlı kayıtların sahibi kiracılar (boş küme 
+export async function uploadsTenantGuard(req, res, next) → Promise<void>  :60-70  # tenantMiddleware'DEN SONRA çalışır (req
 ```
 
 ### backend/src/services/workflowTemplate.ts
@@ -1396,16 +1396,17 @@ export const pgReachable = (admin) =>  :26-28
 
 ### install/lib/service.mjs
 ```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
-export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
-export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
-export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
-export function formatCommand(c)  :186-188  # İnsan-okur komut satırı (elle kurulum talimatı için)
-export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :195-215  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
-export const launchdDaemonPlist = () =>  :18-26
-export const launchdAgentPlist = () =>  :19-26
-export const winswExePath = (home) =>  :20-26
+export function resolveRestartCommands({ platform = process.platform, home, probe = defaultProbe } = {})  :36-56  # Kurulu Enflow servisinin yeniden başlatma komutları — DENEME
+export function resolveRestartCommand(opts = {})  :59-61  # Geriye uyumlu: ilk aday ya da null
+export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :79-101  # Şablonu doldurur
+export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :108-167  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :170-172
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :178-192  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
+export function formatCommand(c)  :197-199  # İnsan-okur komut satırı (elle kurulum talimatı için)
+export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :206-226  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
+export const launchdDaemonPlist = () =>  :18-27
+export const launchdAgentPlist = () =>  :19-27
+export const winswExePath = (home) =>  :20-27
 ```
 
 ### install/POSTGRES_MIGRATION_PLAN.md
@@ -1441,10 +1442,10 @@ h3 Servis olarak çalıştırma (ADR-001)
 h2 Dağıtılabilir Kurulum Zip'i Üretme
 h1 Linux/macOS
 h1 Windows
+h2 Ters proxy, HTTPS ve oturum çerezi (P0-3)
 h2 PostgreSQL (Üretim) Notu
 h2 Sorun Giderme
 h2 Güvenlik
-h3 Veritabanı ve Prisma Studio Erişimi
 ```
 
 ### install/wizard.mjs
@@ -1456,7 +1457,7 @@ function capture(cmd, cmdArgs)  :57-60
 async function ensurePostgresServer(admin)  :72-85
 async function offerServiceInstall(backendPort)  :92-150
 async function offerFirewallHardening(backendPort)  :155-187
-async function main()  :199-469
+async function main()  :199-472
 ```
 
 ## src
@@ -1490,6 +1491,16 @@ hook useState
 hook useRef
 hook useEffect
 handler onChange
+```
+
+### src/components/settings/ProductTaxonomyManagement.tsx
+```
+hook useState
+hook useEffect
+export ProductTaxonomyManagement
+handler onChange
+handler onKeyDown
+handler onClick
 ```
 
 ### src/components/settings/TenantSettings.tsx
@@ -1597,8 +1608,13 @@ export const parseMoneyInput = (raw) =>  :31-41
 
 ### src/lib/guaranteeText.ts
 ```
-export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :4-16
-export async function uploadGuaranteeSampleFile(guaranteeId, file) → Promise<void>  :25-40  # Talep aşamasında eklenen örnek teminat mektubu dosyasını Gua
+export function sampleGuaranteeText(workName, refNo, type, amount, currency, expiry, indefinite,) → string  :5-17
+export async function uploadGuaranteeSampleFile(guaranteeId, file) → Promise<void>  :26-38  # Talep aşamasında eklenen örnek teminat mektubu dosyasını Gua
+```
+
+### src/lib/html.ts
+```
+export function escapeHtml(v) → string  :8-11  # Metin/öznitelik bağlamı için güvenli; null/undefined → ''
 ```
 
 ### src/modules/ActivityLogModule.tsx
@@ -1861,6 +1877,15 @@ hook useCallback
 hook useEffect
 handler onClick
 handler onChange
+```
+
+### src/modules/crm/ProgressCheckInModal.tsx
+```
+component ProgressCheckInModal
+hook useState
+hook useEffect
+handler onChange
+handler onClick
 ```
 
 ### src/modules/crm/ProposalsView.tsx
@@ -2153,12 +2178,12 @@ handler onChange
 
 ### src/modules/project-mgmt/helpers.ts
 ```
-export function isHandoverComplete(docs) → boolean  :27-30
-export const fmtDate = (d?) =>  :5-6
-export const fmtShort = (d?) =>  :7-8
-export const isOverdue = (d?) =>  :9-25
-export const calcFinancials = (p) =>  :13-25
-export const printProjectReport = (project, forCustomer = false) =>  :34-80
+export function isHandoverComplete(docs) → boolean  :28-31
+export const fmtDate = (d?) =>  :6-7
+export const fmtShort = (d?) =>  :8-9
+export const isOverdue = (d?) =>  :10-26
+export const calcFinancials = (p) =>  :14-26
+export const printProjectReport = (project, forCustomer = false) =>  :35-81
 ```
 
 ### src/modules/project-mgmt/KanbanView.tsx
@@ -2395,6 +2420,19 @@ handler onAssign
 handler onSubmit
 ```
 
+### src/modules/VisitPlanModule.tsx
+```
+props VisitPlanModuleProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VisitPlanModule
+handler onChange
+handler onClick
+handler onBlur
+```
+
 ### src/modules/WorkflowBuilder.tsx
 ```
 hook useUnsavedChanges
@@ -2409,41 +2447,44 @@ handler onChange
 
 ### src/services/apiClient.ts
 ```
-class ApiClient  :3-100
-  setAuth(tenantId, token)  :7-10
-  async fetchWithAuth(endpoint, options = {})  :12-44
-  async streamDashboard(onMessage, signal) → Promise<void>  :49-70
-  async login(email, password)  :72-85
-  async forgotPassword(email)  :87-99
+class ApiClient  :35-119
+  setAuth(tenantId)  :38-40
+  async fetchWithAuth(endpoint, options = {})  :42-68
+  async streamDashboard(onMessage, signal) → Promise<void>  :72-88
+  async login(email, password)  :90-104
+  async forgotPassword(email)  :106-118
+export async function authFetch(input, init = {}) → Promise<Response>  :26-33  # Kimlikli `fetch` — çerez + tenant + CSRF başlıkları otomatik
+export const activeTenantId = () =>  :6-7
+export const resetSessionExpiredNotice = () =>  :16-16
 ```
 
 ### src/services/apiService.ts
 ```
-class ApiService  :24-850
-  setAuth(tenantId, token)  :25-27
-  async login(email, password)  :29-31
-  async forgotPassword(email)  :33-35
-  async getSetupStatus() → Promise<  :38-38
-  async runSetup(payload) → Promise<  :43-43
-  async getCustomers()  :51-51
-  async createCustomer(data)  :52-52
-  async updateCustomer(id, data)  :53-53
-  async deleteCustomer(id)  :54-54
-  async getContacts(customerId)  :55-55
-  async createContact(customerId, data)  :56-56
-  async updateContact(customerId, contactId, data)  :57-57
-  async deleteContact(customerId, contactId)  :58-58
-  async getOpportunities()  :61-61
-  async createOpportunity(data)  :62-62
-  async updateOpportunity(id, data)  :63-63
-  async deleteOpportunity(id)  :64-64
-  async checkInOpportunityProgress(id, data)  :65-65
-  async getOpportunityProgressLog(id)  :66-66
-  async saveBoMItems(oppId, items, opts?)  :67-67
-  async saveCostItems(oppId, items)  :68-68
-  async saveCostAnalysis(oppId, data)  :69-69
-  async getCostAnalysisVersions(oppId)  :70-70
-  async getSalesSettings()  :71-71
+class ApiService  :24-859
+  setAuth(tenantId)  :25-27
+  async getSession() → Promise<  :30-30
+  async logout() → Promise<void>  :37-39
+  async login(email, password)  :41-43
+  async forgotPassword(email)  :45-47
+  async getSetupStatus() → Promise<  :50-50
+  async runSetup(payload) → Promise<  :55-55
+  async getCustomers()  :63-63
+  async createCustomer(data)  :64-64
+  async updateCustomer(id, data)  :65-65
+  async deleteCustomer(id)  :66-66
+  async getContacts(customerId)  :67-67
+  async createContact(customerId, data)  :68-68
+  async updateContact(customerId, contactId, data)  :69-69
+  async deleteContact(customerId, contactId)  :70-70
+  async getOpportunities()  :73-73
+  async createOpportunity(data)  :74-74
+  async updateOpportunity(id, data)  :75-75
+  async deleteOpportunity(id)  :76-76
+  async checkInOpportunityProgress(id, data)  :77-77
+  async getOpportunityProgressLog(id)  :78-78
+  async saveBoMItems(oppId, items, opts?)  :79-79
+  async saveCostItems(oppId, items)  :80-80
+  async saveCostAnalysis(oppId, data)  :81-81
 ```
 
 ### src/types/crm.ts
@@ -2682,36 +2723,36 @@ export interface ApprovalStage  :160-174
 
 ### upgrade-tool/cli.mjs
 ```
-async function main()  :16-51
+async function main()  :16-56
 ```
 
 ### upgrade-tool/core.mjs
 ```
+export class RestartError  :320-322
+  constructor(message, manual)  :321-321
 export function resolveHome()  :23-28  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
 export function currentVersion(home)  :41-48
-export async function latestVersion(home, channel = 'auto')  :69-95  # En son yayınlanan sürüm
-export function compare(home, current, latest)  :98-112  # Yerel ile uzak karşılaştır → güncelleme var mı
-export function statusPath(home)  :115-115
-export function writeStatus(home, status)  :117-123
-export function readStatus(home)  :124-126
-export async function checkAndWrite(home, channel = 'auto')  :129-147  # Kontrol et + durum dosyası yaz
-export function toLibpqUrl(url)  :172-174
-export function redactUrl(url)  :176-178  # Log/ipucu için parola maskeleme
-export function pgConnEnv(url)  :185-194  # Bağlantı URL'sini libpq ortam değişkenlerine çevirir
-export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :263-278  # /api/health 200 + db:ok gelene dek yoklar
-export async function runUpgrade(home, opts = {})  :310-400  # Güvenli yükseltme
+export async function latestVersion(home, channel = 'auto')  :70-96  # En son yayınlanan sürüm
+export function compare(home, current, latest)  :99-113  # Yerel ile uzak karşılaştır → güncelleme var mı
+export function statusPath(home)  :116-116
+export function writeStatus(home, status)  :118-124
+export function readStatus(home)  :125-127
+export async function checkAndWrite(home, channel = 'auto')  :130-148  # Kontrol et + durum dosyası yaz
+export function toLibpqUrl(url)  :173-175
+export function redactUrl(url)  :177-179  # Log/ipucu için parola maskeleme
+export function pgConnEnv(url)  :186-195  # Bağlantı URL'sini libpq ortam değişkenlerine çevirir
+export function describeRestore(snap, dbTouched)  :246-260  # Rollback'te veritabanı KENDİLİĞİNDEN geri yüklenmez (SQLite 
+export function hardenSecretFiles(home)  :267-283  # Sır/yedek dosyalarını sahibine kısıtlar (POSIX): backend/
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :302-317  # /api/health 200 + db:ok gelene dek yoklar
+export async function runUpgrade(home, opts = {})  :370-483  # Güvenli yükseltme
 function git(home, args)  :15-17
 function gitSafe(home, args)  :18-20
 function parseSemver(tag)  :31-34  # semver "vX
 function cmpSemver(a, b)  :35-38
-function githubJson(path)  :51-63  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
-function readBackendEnv(home)  :150-159
-function dbProvider(home)  :161-168
-function backupDb(home, log, opts)  :199-229
-function restoreDb(snap, log)  :231-244
-function run(home, cmd, args, log, opts = {})  :246-255
-function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
-function pgRlsInstalled(url)  :298-303
+function githubJson(path)  :51-64  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
+function readBackendEnv(home)  :151-160
+function dbProvider(home)  :162-169
+function backupDb(home, log, opts)  :200-236
 ```
 
 ### upgrade-tool/public/index.html
@@ -2757,12 +2798,14 @@ code-fence powershell
 
 ### upgrade-tool/server.mjs
 ```
-function loadConfig()  :29-31
-function saveConfig(c)  :33-33
-function inMaintenanceWindow()  :47-51
-async function performUpgrade()  :53-60
-async function tick()  :63-72
+export function sanitizePatch(patch)  :47-54
+function loadConfig()  :37-39
+function saveConfig(c)  :41-41
+function loadOrCreateToken()  :56-65
+function inMaintenanceWindow()  :90-94
+async function performUpgrade()  :96-103
+async function tick()  :106-115
 ```
 
 
-> **Not everything is here.** 212 file(s) omitted, 1 collapsed to anchors to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 214 file(s) omitted, 1 collapsed to anchors to stay under the 20822-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

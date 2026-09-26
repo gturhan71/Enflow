@@ -69,15 +69,33 @@ node upgrade-tool/server.mjs         # → http://127.0.0.1:7071
 
 ## Güvenlik
 
-- Sunucu yalnız `127.0.0.1`'e bağlanır — dışa açmayın.
+- Sunucu yalnız `127.0.0.1`'e bağlanır — dışa açmayın. Ama loopback yetmez: aynı makinedeki her kullanıcı
+  ve DNS-rebinding yapan bir web sayfası bu porta erişebilir; ayarlardaki `restartCommand` yükseltmede
+  `sh -c` ile **çalıştırılır**. Bu yüzden:
+  - **Token:** tüm `/api/*` uçları `X-Enflow-Token` ister. Token ilk açılışta rastgele üretilip
+    `upgrade-tool/.gui-token` dosyasına (0600 — yalnız sahibi okur) yazılır. Sunucu başlangıç çıktısı arayüz
+    URL'sini verir: `http://127.0.0.1:7071/#token=…` — bu URL'yi tarayıcıda açın (token `#` parçasındadır,
+    sunucuya/Referer'a gitmez; sayfa onu `sessionStorage`'a alıp adres çubuğundan siler).
+  - **Host denetimi:** `Host` başlığı yalnız `127.0.0.1`/`localhost`/`[::1]` + port olabilir (DNS rebinding → 403).
+  - Ayar alanları allowlist'li ve tip denetimli; `config.json` 0600; istek gövdesi ≤64 KB.
 - Aracı **install'ın sahibi OS kullanıcısı** ile çalıştırın (git + pnpm + restart yetkisi gerekir).
 - Yükseltme **yıkıcıdır**: önce DB ön-yedeği alınır — SQLite: `.db` + `-wal` + `-shm` kopyası;
   Postgres: `pg_dump -Fc` (`backend/backups/pre-upgrade-<ts>.dump`; RLS bayraklarıyla). `pg_dump`
   yoksa/başarısızsa yükseltme **başlamaz** (`ENFLOW_SKIP_PG_BACKUP=1` ile bilinçli atlanır).
-- Herhangi bir adım hata verirse **otomatik rollback**: `git reset --hard` + `generate` + build +
-  önceki sürümü yeniden başlat + sağlık kontrolü. SQLite veritabanı otomatik geri yüklenir.
-  **Postgres verisi otomatik geri yüklenmez** (riskli): araç, log'a parolası maskeli hazır
-  `pg_restore --clean --if-exists …` komutunu yazar; servis durdurulmuşken siz çalıştırırsınız.
+- **Adım sırası:** ön-yedek → git → install → `prisma generate` → **build (backend + frontend)** →
+  **`migrate deploy`** → (RLS) → restart → sağlık. Build migration'dan ÖNCE: derleme/tip hataları
+  veritabanına hiç dokunulmadan yakalanır.
+- Adım hatası ya da sağlıksız açılışta **kod otomatik geri alınır**: `git reset --hard` + `generate` +
+  build + önceki sürümü yeniden başlat + sağlık kontrolü.
+- **Veritabanı (SQLite dahil) KENDİLİĞİNDEN geri yüklenmez.** Servis yükseltme boyunca çalışır ve
+  kullanıcılar yazar; ön-yedek yükseltmenin başında alındığından otomatik geri yükleme, o andan sonra
+  yazılan tüm veriyi silerdi (denemede 58 satırdan 23'ü kayboldu). Migration hiç başlamadıysa (ör. build
+  hatası) geri yükleme zaten gerekmez ve log bunu söyler. Migration başladıysa log'a parolası maskeli
+  hazır komut yazılır (SQLite: `cp <ön-yedek> <db>` + `-wal/-shm`; Postgres: `pg_restore --clean --if-exists …`);
+  servis durdurulmuşken, bilinçli karar olarak siz çalıştırırsınız.
+- **Yeniden başlatma başarısızsa** (yetki, servis hatası) yükseltme **geri alınmaz** — kod, build ve şema
+  tamamdır. Araç `ok:true, restartFailed` döner, CLI **çıkış kodu 3** verir ve elle komutu yazar (Linux/macOS'ta
+  önce doğrudan, olmazsa parolasız `sudo -n` denenir; ikisi de olmazsa `sudo systemctl restart enflow` gibi).
 - **Sağlık doğrulaması:** yeniden başlatmadan sonra `http://127.0.0.1:<PORT>/api/health`
   60 sn boyunca yoklanır; `db: ok` **ve** sürecin gerçekten yeniden başlamış olması (yanıttaki
   `uptimeSec`) beklenir — eski sürecin sağlıklı yanıtı yükseltmeyi "başarılı" göstermez.
