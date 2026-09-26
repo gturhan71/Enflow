@@ -1,4 +1,5 @@
 # Handoff
-M1 tamam (branch feat/prod-runtime-pg-pipeline → PR). Kritik bulgu: PG+RLS'te login kırıktı, düzeltildi (a85101b) — Faz 15 artık gerçek PG'de doğrulanmış.
-Sıradaki M2 (branch M1 üstünden): T9 db-migrate · T10 wizard migrate deploy · T11 migrateToPostgres · T12 upgrade restart/health/rollback · T13 upgrade PG yolu.
-Yerel PG: scratchpad/pgdata, port 55432 (LC_ALL=en_US.UTF-8, socket /private/tmp/claude-501/pgs).
+M2 tamam (branch feat/m2-pg-upgrade, PR base=feat/prod-runtime-pg-pipeline). Kritik bulgu: PG STATE yedeği sessizce hiç alınmıyordu (düzeltildi 49fef93).
+Sıradaki M3 (branch M2 üstünden): T14 systemd/launchd şablonları + `install/lib/service.mjs` render · T15 WinSW (sabit sürüm+SHA256) · T16 wizard servis adımı · T17 dokümanlar · T18 release checklist · T19 RBAC+QA/Sec+sürüm kararı.
+`install/lib/service.mjs` SERVICE sabitleri (enflow / com.enflow.backend / enflow-service.exe) şablon adlarıyla eşleşmeli.
+Yerel PG: scratchpad/pgdata:55432 (LC_ALL=en_US.UTF-8, -k /private/tmp/claude-501/pgs). Upgrade deneme düzeneği: scratchpad/upg (remote.git, home, dev).

@@ -14,3 +14,7 @@
 - **T15:** WinSW sürümü + SHA256 sabit olarak `install/service/winsw.lock.json`'da.
 ## Zor noktalar
 RLS'in PG'de ilk koşusu (T8); SSE kapanışı (T3); Windows servis kullanıcısı/izinleri (T15/T16).
+
+## M2 notları
+- T9: anlık görüntü yaklaşımı benimsendi (bkz. sde). · T13: `pgDump` backend TS'e bağlanmadan upgrade-tool içinde (kopya + testli `toLibpqUrl`).
+- Test düzeneği tuzağı: `cmd && nohup x &` tüm listeyi alt kabukta arkaya atar, boruyu açık tutar → restart script'lerinde `cd` ayrı satır, çıktı+stdin yönlendirmeli.

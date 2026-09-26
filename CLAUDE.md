@@ -524,10 +524,9 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 13 minutes ago)
+## changes (last 10 commits — 55 seconds ago)
 ```
 backend/scripts/db-migrate.mjs                +run
-backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
@@ -541,40 +540,6 @@ upgrade-tool/server.mjs                       ~performUpgrade  ~loadConfig  ~sav
 
 ## backend
 
-### backend/prisma/migrations-postgres/0000_baseline/migration.sql
-```
-TABLE Tenant
-TABLE Subscription
-TABLE UsageMetric
-TABLE Unit
-TABLE User
-TABLE Customer
-TABLE Contact
-TABLE Opportunity
-TABLE OpportunityRequiredDoc
-TABLE OpportunityProgressLog
-TABLE Proposal
-TABLE CostAnalysisVersion
-TABLE Brand
-TABLE ProductCategory
-TABLE BrandSource
-TABLE BoMItem
-TABLE BoMLineQuote
-TABLE CostItem
-TABLE WorkflowLog
-TABLE Project
-TABLE ServiceTicket
-TABLE PlatformTicket
-TABLE ProfitabilitySnapshot
-TABLE ProjectMilestone
-TABLE ProjectCostItem
-```
-
-### backend/prisma/migrations-postgres/migration_lock.toml
-```
-key provider
-```
-
 ### backend/scripts/db-migrate.mjs
 ```
 function run(cmd, cmdArgs, env = {})  :32-35
@@ -583,15 +548,6 @@ function run(cmd, cmdArgs, env = {})  :32-35
 ### backend/scripts/sync-postgres-schema.mjs
 ```
 export function toPostgres(schema)  :25-29
-```
-
-### backend/src/config/prismaPaths.ts
-```
-export interface PrismaPaths  :5-9
-  provider: 'postgresql' | 'sqlite'  :6-6
-  schema: string  :7-7
-  migrationsPath: string  :8-8
-export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
 ### backend/src/services/backupService.ts
@@ -710,10 +666,53 @@ INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 key provider
 ```
 
+### backend/prisma/migrations-postgres/0000_baseline/migration.sql
+```
+TABLE Tenant
+TABLE Subscription
+TABLE UsageMetric
+TABLE Unit
+TABLE User
+TABLE Customer
+TABLE Contact
+TABLE Opportunity
+TABLE OpportunityRequiredDoc
+TABLE OpportunityProgressLog
+TABLE Proposal
+TABLE CostAnalysisVersion
+TABLE Brand
+TABLE ProductCategory
+TABLE BrandSource
+TABLE BoMItem
+TABLE BoMLineQuote
+TABLE CostItem
+TABLE WorkflowLog
+TABLE Project
+TABLE ServiceTicket
+TABLE PlatformTicket
+TABLE ProfitabilitySnapshot
+TABLE ProjectMilestone
+TABLE ProjectCostItem
+```
+
+### backend/prisma/migrations-postgres/migration_lock.toml
+```
+key provider
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
 async function main()  :29-57
+```
+
+### backend/src/config/prismaPaths.ts
+```
+export interface PrismaPaths  :5-9
+  provider: 'postgresql' | 'sqlite'  :6-6
+  schema: string  :7-7
+  migrationsPath: string  :8-8
+export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
 ### backend/src/lifecycle.ts
@@ -1358,6 +1357,16 @@ export const launchdAgentPlist = () =>  :16-23
 export const winswExePath = (home) =>  :17-23
 ```
 
+### install/POSTGRES_MIGRATION_PLAN.md
+```
+h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
+h2 Durum (2026-09-26 — ADR-002, uygulandı)
+h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+h2 Kapasite teyidi (kurulum sihirbazı)
+h2 İlgili dosyalar
+h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
 ### install/wizard.mjs
 ```
 async function ask(q, def)  :38-42
@@ -1396,16 +1405,6 @@ h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
 h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
 h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
-```
-
-### install/POSTGRES_MIGRATION_PLAN.md
-```
-h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
-h2 Durum (2026-09-26 — ADR-002, uygulandı)
-h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
-h2 Kapasite teyidi (kurulum sihirbazı)
-h2 İlgili dosyalar
-h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
 ```
 
 ### install/README.md
