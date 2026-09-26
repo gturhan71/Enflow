@@ -25,6 +25,22 @@ function parsePermissions<T extends { permissions: string }>(user: T): Omit<T, '
   return { ...rest, permissions: clean } as Omit<T, 'permissions' | 'password'> & { permissions: string[] };
 }
 
+// Çapraz-kiracı referans koruması: unitId / vekil kullanıcı aynı kiracıya ait olmalı (aksi halde başka kiracının
+// birimine kullanıcı bağlanabiliyor / başka kiracıdaki kullanıcıya vekalet verilebiliyordu).
+async function validateTenantRefs(tenantId: string, refs: { unitId?: string | null; delegateToUserId?: string | null }): Promise<string | null> {
+  if (refs.unitId) {
+    const unit = await prisma.unit.findFirst({ where: { id: refs.unitId, tenantId }, select: { id: true } });
+    if (!unit) return 'Birim bulunamadı.';
+  }
+  if (refs.delegateToUserId) {
+    const u = await prisma.user.findFirst({ where: { id: refs.delegateToUserId, tenantId }, select: { id: true } });
+    if (!u) return 'Vekalet verilecek kullanıcı bulunamadı.';
+  }
+  return null;
+}
+
+const isUniqueViolation = (e: unknown) => typeof e === 'object' && e !== null && (e as { code?: string }).code === 'P2002';
+
 router.get('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const users = await prisma.user.findMany({
     where: { tenantId: req.tenantId },
@@ -38,11 +54,15 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
   if (typeof password !== 'string' || password.length < 6) {
     return res.status(400).json({ error: 'Kullanıcı için en az 6 karakterli bir şifre zorunludur.' });
   }
+  const refErr = await validateTenantRefs(req.tenantId, { unitId });
+  if (refErr) return res.status(400).json({ error: refErr });
   const seat = await checkUserSeatLimit(req.tenantId);
   if (!seat.ok) {
     return res.status(402).json({ error: `Kullanıcı limitinize ulaştınız (${seat.current}/${seat.limit}). Planınızı yükseltin ya da pasif kullanıcıları temizleyin.` });
   }
-  const user = await prisma.user.create({
+  let user;
+  try {
+    user = await prisma.user.create({
     data: {
       name, email, role, unitId: unitId || null,
       password: await hashPassword(password),
@@ -50,7 +70,11 @@ router.post('/', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Re
       permissions: typeof permissions === 'string' ? permissions : JSON.stringify(permissions || defaultPermissionsForRole(role)),
       status: 'ACTIVE'
     }
-  });
+    });
+  } catch (e) {
+    if (isUniqueViolation(e)) return res.status(409).json({ error: 'Bu e-posta adresi zaten kayıtlı.' });
+    throw e;
+  }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'USER', entityId: user.id, details: { email: user.email, role: user.role } });
   res.json(parsePermissions(user));
 }));
@@ -103,6 +127,8 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
 
   const record = await prisma.user.findFirst({ where: { id, tenantId } });
   if (!record) return res.status(404).json({ error: 'Yetkisiz erişim' });
+  const putRefErr = await validateTenantRefs(tenantId, { unitId, delegateToUserId });
+  if (putRefErr) return res.status(400).json({ error: putRefErr });
 
   // B-08 — vekalet: null gönderilirse vekalet kaldırılır (Prisma'da undefined = "değiştirme").
   const data: Record<string, unknown> = { name, email, role, unitId, status };
@@ -116,7 +142,13 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
     if (password.length < 6) return res.status(400).json({ error: 'Şifre en az 6 karakter olmalıdır.' });
     data.password = await hashPassword(password);
   }
-  const user = await prisma.user.update({ where: { id }, data });
+  let user;
+  try {
+    user = await prisma.user.update({ where: { id }, data });
+  } catch (e) {
+    if (isUniqueViolation(e)) return res.status(409).json({ error: 'Bu e-posta adresi zaten kayıtlı.' });
+    throw e;
+  }
   await logActivity({ tenantId, userId: req.userId, action: 'UPDATE', entityType: 'USER', entityId: id, details: { email: user.email, role: user.role, status: user.status } });
   res.json(parsePermissions(user));
 }));
@@ -158,7 +190,7 @@ router.post('/:id/transfer', tenantMiddleware, GM, asyncHandler(async (req: Requ
 router.delete('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
   const id = req.params.id as string;
-  const { transferToUserId, hardDelete } = req.body as { transferToUserId?: string; hardDelete?: boolean };
+  const { transferToUserId, hardDelete } = (req.body ?? {}) as { transferToUserId?: string; hardDelete?: boolean };  // DELETE gövdesiz gelebilir
 
   if (id === req.userId) return res.status(400).json({ error: 'Kendi hesabınızı silemez/pasifleştiremezsiniz.' });
 

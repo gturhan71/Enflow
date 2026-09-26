@@ -128,6 +128,26 @@ export interface BackupModuleSettings {
   s3?: { endpoint?: string; region?: string; bucket?: string; accessKeyId?: string; secretAccessKey?: string; prefix?: string };
 }
 
+// PLATFORM kapsamı TÜM kiracıların verisini (kullanıcı parola hash'leri dahil) tek dosyaya yazar.
+// Çok kiracılı kurulumda bir kiracının GM/Backup Admin'i bunu alıp indirebilirse diğer kiracıların
+// verisini okur (RLS yalnız Postgres'te ve opt-in; SQLite'ta hiç yok). Bu yüzden PLATFORM kapsamı
+// YALNIZ tek kiracılı kurulumda (PLATFORM == kiracı) kullanılabilir; çok kiracılıda TENANT kapsamı
+// kullanılır, tüm platformun yedeği operatör düzeyindedir (pg_dump / SQLite kopyası — upgrade-tool).
+export class PlatformScopeForbiddenError extends Error {
+  readonly status = 403;
+  constructor() {
+    super('Çok kiracılı kurulumda PLATFORM kapsamı kullanılamaz (diğer kiracıların verisini içerir). TENANT kapsamını kullanın; tüm platformun yedeği operatör düzeyinde (pg_dump / SQLite dosya kopyası) alınır.');
+  }
+}
+/** Birden fazla kiracı var mı? (Tenant tablosu RLS istisnasıdır → bağlamdan bağımsız doğru sayı.) */
+export async function isMultiTenant(): Promise<boolean> {
+  return (await prisma.tenant.count()) > 1;
+}
+/** PLATFORM kapsamı bu kurulumda izinli mi — değilse PlatformScopeForbiddenError. */
+export async function assertScopeAllowed(scope: BackupScope): Promise<void> {
+  if (scope === 'PLATFORM' && (await isMultiTenant())) throw new PlatformScopeForbiddenError();
+}
+
 export interface RunBackupOpts {
   tenantId: string;
   scope: BackupScope;
@@ -142,6 +162,7 @@ export interface RunBackupOpts {
 
 /** Bir yedek işini baştan sona çalıştırır; BackupJob kaydı döner. */
 export async function runBackup(opts: RunBackupOpts): Promise<{ id: string }> {
+  await assertScopeAllowed(opts.scope); // derinlemesine savunma — route/scheduler de ayrıca kontrol eder
   const provider = detectProvider();
   const job = await prisma.backupJob.create({
     data: {
