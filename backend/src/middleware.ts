@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { timingSafeEqual } from 'crypto';
 import { prisma } from './prismaClient';
 import { verifyAuthToken } from './services/auth';
+import { getRequestToken, csrfViolation } from './services/session';
 import { logger } from './utils/logger';
 import { runWithTenant, runWithRlsBypass } from './services/tenantContext';
 
@@ -10,23 +11,22 @@ export const asyncHandler = (fn: Function) => (req: Request, res: Response, next
   Promise.resolve(fn(req, res, next)).catch(next);
 };
 
-function bearerToken(req: Request): string | undefined {
-  const h = req.headers['authorization'] as string | undefined;
-  if (!h || !h.startsWith('Bearer ')) return undefined;
-  const t = h.slice(7).trim();
-  return t || undefined;
-}
 
-// Kimlik doğrulama + tenant izolasyonu. İmzalı JWT ZORUNLU.
+// Kimlik doğrulama + tenant izolasyonu. İmzalı JWT ZORUNLU — Authorization: Bearer (API istemcileri)
+// YA DA httpOnly `enflow_session` çerezi (tarayıcı; XSS token'ı okuyamaz — bkz. services/session.ts).
+// Çerezle gelen durum-değiştiren isteklerde CSRF denetimi uygulanır.
 // Tenant kimliği yalnız TOKEN'dan (imzalı `tid`) türetilir — x-tenant-id header'ı
 // yalnızca doğrulama içindir; uyuşmazlık 403. Böylece header-spoofing ile
 // çapraz-tenant erişim (IDOR) kapatılır.
 export const tenantMiddleware = asyncHandler(async (req: Request, res: Response, next: NextFunction) => {
-  const token = bearerToken(req);
-  if (!token) return res.status(401).json({ error: 'Kimlik doğrulama gerekli.' });
+  const supplied = getRequestToken(req);
+  if (!supplied) return res.status(401).json({ error: 'Kimlik doğrulama gerekli.' });
 
-  const payload = verifyAuthToken(token);
+  const payload = verifyAuthToken(supplied.token);
   if (!payload) return res.status(401).json({ error: 'Geçersiz veya süresi dolmuş oturum.' });
+
+  const csrf = csrfViolation(req, supplied.via);
+  if (csrf) return res.status(403).json({ error: csrf });
 
   // Kullanıcı hâlâ mevcut ve aktif mi? (token iptali/rol değişimi için canlı kontrol)
   // Tenant henüz context'te DEĞİL (bunu bulmak için sorguyu çalıştırıyoruz) — Postgres
@@ -66,11 +66,11 @@ export const enforceReadOnlyRoles = asyncHandler(async (req: Request, res: Respo
   // Yedek/restore + oturum muaf
   if (p.startsWith('/api/backup') || p.startsWith('/backup') || p.startsWith('/api/auth') || p.startsWith('/auth')) return next();
 
-  const token = bearerToken(req);
-  if (!token) return next();
+  const supplied = getRequestToken(req);
+  if (!supplied) return next();
   // İmzalı JWT'den rolü al (payload). Geçersiz token → guard atlanır, ilgili
   // route kendi auth'unu (tenantMiddleware) uygular.
-  const role = verifyAuthToken(token)?.role;
+  const role = verifyAuthToken(supplied.token)?.role;
 
   if (role && READ_ONLY_ROLES.has(role)) {
     return res.status(403).json({ error: 'Salt-okunur rol: bu işlem için değişiklik yetkiniz yok (yalnız yedekleme).' });

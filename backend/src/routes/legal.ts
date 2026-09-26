@@ -3,12 +3,17 @@ import path from 'path';
 import fs from 'fs';
 import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { prisma } from '../prismaClient';
-import { asyncHandler, tenantMiddleware } from '../middleware';
+import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { slugify, getUploadDir, tryUploadToNextcloud } from '../utils/fileUpload';
 import { logActivity } from '../services/activityLog';
 
 const router: Router = Router();
+
+// Hukuk vakaları gizli görüş/dava bilgisi içerir: yalnız sözleşme/hukuk yönetimi rolleri (contract-workflows kapısıyla aynı 7 rol).
+// Önceden hiç rol kapısı yoktu — SALES_REP dahil her kiracı kullanıcısı vakaları okuyup silebiliyordu.
+const LEGAL_ROLES = requireRole(['GENERAL_MANAGER', 'KSU_MGR', 'SALES_MGR', 'PROJECT_MGR', 'LEGAL_MGR', 'FINANCE_MGR', 'IGPD_MGR']);
+router.use(tenantMiddleware, LEGAL_ROLES);
 
 const LEGAL_UPLOADS_ROOT = path.join(__dirname, '../../uploads/legal');
 const legalUpload = documentUpload(50);

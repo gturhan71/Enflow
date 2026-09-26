@@ -41,8 +41,13 @@ async function main() {
       skipPgBackup: process.env.ENFLOW_SKIP_PG_BACKUP === '1',
     });
     if (res.noop) { console.log('Zaten güncel.'); process.exit(0); }
+    if (res.ok && res.restartFailed) {
+      console.log(`✓ Yükseltildi: ${res.from.shortSha} → ${res.to.shortSha}`);
+      console.error(`⚠ AMA servis yeniden başlatılamadı (${res.warning}). Elle: ${res.manual.join('  |  ')}`);
+      process.exit(3); // 0 = tam başarı; 3 = yükseltildi, elle restart gerekli (cron/otomasyon uyarısı)
+    }
     if (res.ok) { console.log(`✓ Yükseltildi: ${res.from.shortSha} → ${res.to.shortSha}`); process.exit(0); }
-    console.error(`✗ Yükseltme başarısız: ${res.error}`);
+    console.error(`✗ Yükseltme başarısız (kod geri alındı; veritabanı otomatik geri yüklenmez — log'a bakın): ${res.error}`);
     process.exit(1);
   }
 
