@@ -84,8 +84,10 @@ Bittiğinde başlatma komutlarını ekrana yazar.
 
 ```bash
 # ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
-cd backend && pnpm build && pnpm start   # derlenmiş `node dist/index.js` → http://localhost:3002 (UI + API tek origin)
-#   Ayrı frontend süreci / preview / proxy GEREKMEZ. Kod değişince önce `pnpm build`.
+cd backend && pnpm start                  # derlenmiş `node dist/index.js` → http://localhost:3002 (UI + API tek origin)
+#   `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+#   çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
+#   Ayrı frontend süreci / preview / proxy GEREKMEZ.
 
 # ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
 cd backend && pnpm dev          # nodemon + ts-node (3002)
@@ -96,7 +98,7 @@ pnpm dev --port 3000            # frontend (3000) — ayrı terminal  (ya da: ru
 ### Servis olarak çalıştırma (ADR-001)
 
 Sihirbazın 8/8 adımı (ya da `--service` bayrağı) Enflow'u işletim sistemi servisi kurar —
-**açılışta otomatik başlar, çökünce yeniden başlar, durdurulunca temiz kapanır** (≤10 sn).
+**açılışta otomatik başlar, çökünce yeniden başlar, durdurulunca temiz kapanır**: sürmekte olan istekler ~3 sn boyunca bitirilir, kalan uzun ömürlü bağlantılar (canlı akış) kapatılır, toplam en çok 10 sn.
 Yönetici/sudo yetkisi ister; onay vermezseniz hiçbir şey kurulmaz.
 
 | OS | Mekanizma | Yönetim | Loglar |

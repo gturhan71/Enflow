@@ -380,6 +380,7 @@ src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
+src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
@@ -421,7 +422,6 @@ src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
 src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
-src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
@@ -524,9 +524,9 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 56 seconds ago)
+## changes (last 10 commits — 9 minutes ago)
 ```
-backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
+backend/src/services/backupService.ts         +pgConnEnv  ~toLibpqUrl  ~runBackup
 install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
 install/wizard.mjs                            +offerServiceInstall  ~ensurePostgresServer  ~main
 upgrade-tool/cli.mjs                          ~main
@@ -673,6 +673,11 @@ key provider
 function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
+### backend/scripts/ensure-build.mjs
+```
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -695,16 +700,17 @@ export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 
 ### backend/src/lifecycle.ts
 ```
-export interface ShutdownDeps  :12-20
-  server: Pick<Server, 'close' | 'closeAllCon  :13-13
-  stops: StopFn[]  :14-14
-  disconnect: () => Promise<void>  :15-15
-  timeoutMs?: number  :16-16
-  exit?: (code: number) => void  :17-17
-  log?: { info: (...a: unknown[]) => void  :18-18
-  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
-export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
-export function installShutdown(deps) → void  :60-64
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/src/middleware.ts
@@ -1382,7 +1388,9 @@ h3 Etkileşimsiz (CI / otomasyon)
 h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
 h2 Başlatma
 h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
-h1 Ayrı frontend süreci / preview / proxy GEREKMEZ. Kod değişince önce `pnpm build`.
+h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
 h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
 h3 Servis olarak çalıştırma (ADR-001)
 h2 Dağıtılabilir Kurulum Zip'i Üretme
@@ -1392,8 +1400,6 @@ h2 PostgreSQL (Üretim) Notu
 h2 Sorun Giderme
 h2 Güvenlik
 h3 Veritabanı ve Prisma Studio Erişimi
-code-fence bash
-code-fence plain
 ```
 
 ### install/wizard.mjs
@@ -1508,6 +1514,14 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :184-184
+```
+
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -2066,18 +2080,6 @@ handler onWinner
 handler onNewAuction
 handler onSubmitRound
 handler onLog
-```
-
-### src/modules/PlatformTicketsModule.tsx
-```
-component PlatformTicketsModule
-hook useState
-hook useCallback
-hook useEffect
-export PlatformTicketsModule
-handler onClick
-handler onChange
-handler onSubmit
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -2776,4 +2778,4 @@ async function tick()  :63-72
 ```
 
 
-> **Not everything is here.** 204 file(s) omitted to stay under the 20212-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 205 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
