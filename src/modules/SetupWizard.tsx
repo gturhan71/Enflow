@@ -5,7 +5,7 @@ import { User } from '../types';
 
 interface SetupWizardProps {
   // Kurulum tamamlanınca mevcut handleLogin ile otomatik giriş.
-  onComplete: (tenantId: string, token: string, user: User) => void;
+  onComplete: (tenantId: string, user: User) => void;
 }
 
 const STEPS = ['Sistem', 'Şirket', 'Yönetici', 'Lisans', 'Tamamla'];
@@ -49,7 +49,7 @@ export const SetupWizard = ({ onComplete }: SetupWizardProps) => {
         admin: { name: adminName.trim(), email: adminEmail.trim(), password: adminPassword },
         license: useTrial ? undefined : license.trim(),
       });
-      onComplete(res.tenantId, res.token, res.user as unknown as User);
+      onComplete(res.tenantId, res.user as unknown as User);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Kurulum başarısız.');
       setSubmitting(false);
