@@ -522,32 +522,25 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 32 minutes ago)
+## changes (last 10 commits — 12 minutes ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
-backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
 backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
-backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
-backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/documentNumberService.ts ~incrementDocumentSequence
 backend/src/services/periodic.ts              +schedulePeriodic
-backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
-backend/src/services/restoreService.ts        ~applyLogicalRestore
-backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
-backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
+backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
+backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
-install/POSTGRES_MIGRATION_PLAN.md            +Postgres
-install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
+install/wizard.mjs                            +offerServiceInstall  ~setSchemaProvider  ~psql  ~provisionPostgresDb
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
