@@ -326,7 +326,7 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 | 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
 | 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı Faz 16'da (2026-09-26) CI'da doğrulandı — o sırada PG+RLS'te login kırığı bulunup düzeltildi**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
-| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (v2.6.0 adayı, onay bekliyor). | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
+| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (kullanıcı kararı 2026-09-26). **Merge sonrası 10x hata avı** (`.10x/reviews/2026-09-26-hunt-report.md`): 5 kanıtlı hata daha düzeltildi — **KRİTİK: PLATFORM yedeği çok kiracılıda tüm kiracıların verisini (parola hash'leri dahil) sızdırıyordu** (artık yalnız tek kiracılıda; çok kiracılıda 403/TENANT), upgrade rollback'i yükseltme sırasında yazılan veriyi siliyordu (artık DB otomatik geri yüklenmez; sıra build→migrate), restart hatası başarılı yükseltmeyi geri aldırıyordu (artık çıkış kodu 3), `.env`/yedek izinleri 0600/0700, upgrade-tool arayüzü token+Host denetimli. | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
 
 Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli; Faz 15: RBAC süiti artık 1027 test — SQLite'a karşı koşuldu, 1000 geçti/26 kaldı, `git stash` ile değişiklikler geri alınıp AYNI 26 test birebir aynı hatalarla yine başarısız olduğu doğrulandı → önceden var, Faz 15'ten bağımsız, sıfır regresyon; Postgres-özel Faz 2/3 değişikliği yerel bir Postgres örneğiyle henüz manuel doğrulanmadı). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -376,6 +376,7 @@ backend/src/services/backupTargets.ts ← utils/fileUpload
 backend/src/services/deploymentGuard.ts ← utils/logger
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
+upgrade-tool/server.mjs ← core
 install/wizard.mjs ← lib/pg, lib/service
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -483,7 +484,6 @@ backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
-upgrade-tool/server.mjs ← core
 ```
 
 ## versions (installed direct deps)
@@ -522,7 +522,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
@@ -532,27 +532,20 @@ backend/src/services/backupTargets.ts         +restrictFile  ~LocalTarget  ~ensu
 backend/src/services/deploymentGuard.ts       +insecureSecretFiles  +checkSecretFilePermissions  ~checkDeploymentTopology
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
+upgrade-tool/public/index.html                +refresh  ~refresh  ~renderSettings
+upgrade-tool/server.mjs                       +saveConfig  +sanitizePatch  +loadOrCreateToken  ~saveConfig
 install/lib/service.mjs                       +resolveRestartCommands  +resolveRestartCommand  +renderServiceFile  +planInstall
-install/POSTGRES_MIGRATION_PLAN.md            +Postgres
-install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
+install/wizard.mjs                            +offerServiceInstall  ~setSchemaProvider  ~psql  ~provisionPostgresDb
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
-backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
-backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
-backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/documentNumberService.ts ~incrementDocumentSequence
 backend/src/services/periodic.ts              +schedulePeriodic
-backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
-backend/src/services/restoreService.ts        ~applyLogicalRestore
-backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
-backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
-upgrade-tool/public/index.html                ~renderSettings  ~refresh
-upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
+backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
+backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 ```
 
@@ -2736,22 +2729,6 @@ function dbProvider(home)  :162-169
 function backupDb(home, log, opts)  :200-236
 ```
 
-### upgrade-tool/README.md
-```
-h1 Enflow Upgrade Tool
-h2 İlke
-h2 Sürüm kaynağı (kanal)
-h2 Çalıştırma
-h3 CLI (cron / otomasyon)
-h3 Web GUI (operatör)
-h2 Güvenlik
-h2 Üretilen dosyalar (commit edilmez)
-code-fence bash
-code-fence plain
-code-fence cron
-code-fence powershell
-```
-
 ### upgrade-tool/public/index.html
 ```
 title: Enflow Upgrade Tool
@@ -2775,6 +2752,22 @@ input#skipPgBackup
 button#btnSave
 span#saved
 pre#log
+```
+
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
+code-fence powershell
 ```
 
 ### upgrade-tool/server.mjs
