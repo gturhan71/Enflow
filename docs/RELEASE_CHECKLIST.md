@@ -48,7 +48,15 @@
 - [ ] `git status --porcelain` kurulumdan sonra **boş** (SQLite ve Postgres yollarında) → upgrade-tool kirli-ağaç kontrolü geçiyor
 - [ ] Sürüm kararı: MINOR (v2.6.0) — `src/constants.ts` `APP_VERSION` + kök/`backend` `package.json` birlikte, **yalnız açık onayla**
 
-## 5. Kiracı izolasyonu (çok kiracılı kurulum) — 2026-09-26 hata avından
+## 5. Oturum çerezi + CSP (P0-3)
+- [ ] Tarayıcıda giriş sonrası: DevTools → Application: `localStorage`'da token YOK; Cookies: `enflow_session` **HttpOnly** (+ HTTPS'te **Secure**, SameSite=Lax); konsolda `document.cookie` boş
+- [ ] Yanıt başlığı `Content-Security-Policy` (script-src 'self', object-src 'none', frame-ancestors 'none'); tüm ana modüller gezildiğinde konsolda CSP ihlali YOK (sunucu log'unda `[csp] ihlal` yok)
+- [ ] Ters proxy arkasında: giriş → bir kayıt oluştur/sil (çerezli POST/DELETE 403 dönmemeli — `Host` korunuyor mu / `CORS_ORIGINS` doğru mu)
+- [ ] Çıkış → çerez silinir; başka sekmede oturum iptali → arayüz girişe döner
+- [ ] PDF yükleme/ayrıştırma (Şartname Analizi) internetsiz makinede çalışır (pdf.js worker paketten)
+- [ ] Yazdırma pencereleri (proje raporu, PO, yönetim raporları): kullanıcı verisinde `<` `&` içeren bir ad HTML olarak yorumlanmaz
+
+## 6. Kiracı izolasyonu (çok kiracılı kurulum) — 2026-09-26 hata avından
 - [ ] İkinci kiracı varken birinci kiracının GM'si `POST /api/backup/jobs {"scope":"PLATFORM"}` → **403**; scope'suz → `TENANT` ve indirilen dosyada YALNIZ kendi satırları (otomatik: `tests/e2e-scenario/tests/backup-scope-isolation.spec.ts` + `ci-postgres.sh`)
 - [ ] `ls -l backend/.env` → `-rw-------`; `backend/backups` → `drwx------` (upgrade-tool eski kurulumları düzeltir)
 - [ ] upgrade-tool arayüzü token'sız `/api/status` → 401

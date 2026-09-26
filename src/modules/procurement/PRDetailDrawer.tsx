@@ -10,6 +10,7 @@ import {
 } from '../../types';
 import { STATUS_CONFIG, URGENCY_CONFIG, SOURCE_LABEL, CURRENCIES, formatDate } from './constants';
 import StatusBadge from './StatusBadge';
+import { escapeHtml } from '../../lib/html';
 
 interface PRDetailDrawerProps {
   pr: PurchaseRequest;
@@ -149,21 +150,21 @@ const PRDetailDrawer: FC<PRDetailDrawerProps> = ({ pr, vendors, currentUserRole,
     const w = window.open('', '_blank');
     if (!w) return;
     const selected = pr.quotes.find(q => q.isSelected);
-    w.document.write(`<!DOCTYPE html><html><head><title>Satın Alma Emri — ${pr.poNumber}</title>
+    w.document.write(`<!DOCTYPE html><html><head><title>Satın Alma Emri — ${escapeHtml(pr.poNumber)}</title>
     <style>body{font-family:Arial,sans-serif;padding:40px;color:#1e293b}h1{font-size:24px}table{width:100%;border-collapse:collapse}td,th{padding:8px 12px;border:1px solid #e2e8f0;text-align:left}th{background:#f8fafc;font-weight:600}.label{color:#64748b;font-size:12px}</style>
     </head><body>
     <h1>Satın Alma Emri (PO)</h1>
-    <p class="label">PO No</p><p><strong>${pr.poNumber ?? '—'}</strong></p>
+    <p class="label">PO No</p><p><strong>${escapeHtml(pr.poNumber ?? '—')}</strong></p>
     <p class="label">Tarih</p><p>${formatDate(pr.poIssuedAt)}</p>
-    <p class="label">Tedarikçi</p><p>${pr.selectedVendorName ?? selected?.vendorName ?? '—'}</p>
-    <p class="label">Başlık</p><p>${pr.title}</p>
+    <p class="label">Tedarikçi</p><p>${escapeHtml(pr.selectedVendorName ?? selected?.vendorName ?? '—')}</p>
+    <p class="label">Başlık</p><p>${escapeHtml(pr.title)}</p>
     <h3 style="margin-top:24px">Kalemler</h3>
     <table><tr><th>Ürün/Hizmet</th><th>Miktar</th><th>Birim</th><th>Tahmini Fiyat</th></tr>
-    ${pr.items.map(i => `<tr><td>${i.name}</td><td>${i.quantity}</td><td>${i.unit}</td><td>${formatCurrency(i.estimatedUnitPrice, i.currency)}</td></tr>`).join('')}
+    ${pr.items.map(i => `<tr><td>${escapeHtml(i.name)}</td><td>${escapeHtml(i.quantity)}</td><td>${escapeHtml(i.unit)}</td><td>${formatCurrency(i.estimatedUnitPrice, i.currency)}</td></tr>`).join('')}
     </table>
-    ${selected ? `<h3 style="margin-top:24px">Seçilen Teklif</h3><p>${selected.vendorName} — ${formatCurrency(selected.totalAmountTRY, 'TRY')} (${selected.deliveryDays} gün teslimat)</p>` : ''}
+    ${selected ? `<h3 style="margin-top:24px">Seçilen Teklif</h3><p>${escapeHtml(selected.vendorName)} — ${formatCurrency(selected.totalAmountTRY, 'TRY')} (${escapeHtml(selected.deliveryDays)} gün teslimat)</p>` : ''}
     <div style="margin-top:48px;border-top:1px solid #e2e8f0;padding-top:16px">
-    <p>Onaylayan GM: ${pr.approvedByGM ?? '—'}</p>
+    <p>Onaylayan GM: ${escapeHtml(pr.approvedByGM ?? '—')}</p>
     </div></body></html>`);
     w.document.close();
     w.print();
