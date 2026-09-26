@@ -1,5 +1,5 @@
-# DBA — [DISCOVERED]
-- Migration geçmişi SQLite'a özgü; Postgres yolu `db push` + provider regex → Postgres'te migration geçmişi yok, şema drift riski.
-- SQLite WAL + tek yazar: çok kiracılı SaaS için yazma eşzamanlılığı tavanı.
-- Ölçek indeksleri eklenmiş (add_scale_indexes). Para: temiz-yuvarlama, BigInt göçü ertelenmiş.
-- RLS: 64 doğrudan + 13 dolaylı politika, gerçek Postgres'te hiç koşulmadı.
+# DBA — indeks
+## Genel [DISCOVERED]
+SQLite WAL varsayılan; Postgres opsiyonel. Ölçek indeksleri var. BigInt para göçü ertelenmiş.
+## Aktif işler
+- [prod-runtime-pg-pipeline](prod-runtime-pg-pipeline.md)
