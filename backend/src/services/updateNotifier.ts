@@ -9,6 +9,7 @@ import path from 'path';
 import { prisma } from '../prismaClient';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
+import { schedulePeriodic, type StopFn } from './periodic';
 
 // Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
 // (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
@@ -120,8 +121,7 @@ async function tick(): Promise<void> {
   }
 }
 
-export function startUpdateNotifier(): void {
+export function startUpdateNotifier(): StopFn {
   // İlk tarama 20sn sonra (boot yükünü dağıt), sonra 10 dakikada bir.
-  setTimeout(() => { void tick(); }, 20_000);
-  setInterval(() => { void tick(); }, 10 * 60_000);
+  return schedulePeriodic(20_000, 10 * 60_000, () => { void tick(); });
 }

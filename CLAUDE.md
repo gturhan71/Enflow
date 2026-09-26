@@ -368,58 +368,49 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
-src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
-src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
-src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
-src/modules/BackupModule.tsx ← services/apiService, types
-src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
-src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
-src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
-src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
-src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, crm/constants
-src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
-src/modules/project-mgmt/CostForm.tsx ← ../types, constants
-src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants
-src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
-src/modules/todo/helpers.ts ← ../types
-src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/personnelTransferService.ts ← prismaClient
-backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
-backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext
+backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
 src/components/MoneyInput.tsx ← lib/format
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/SubscriptionSettings.tsx ← ../types
+src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← services/apiService
+src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/lib/permissionTree.ts ← constants
+src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
+src/modules/BackupModule.tsx ← services/apiService, types
 src/modules/contract-workflow/AnalysisTab.tsx ← types
 src/modules/contract-workflow/ContextTab.tsx ← ../types, types, DeliveryTimelinePanel
 src/modules/contract-workflow/DetailHeader.tsx ← types, constants, helpers, ../components/ProcessTriggerButton
 src/modules/contract-workflow/DocumentsTab.tsx ← ../services/apiService, ../types, ../lib/guaranteeText, types, constants
 src/modules/contract-workflow/helpers.ts ← ../services/apiClient, ../types, constants, types
+src/modules/contract-workflow/LegalCaseForm.tsx ← ../services/apiService, constants, types
+src/modules/contract-workflow/LegalView.tsx ← ../services/apiService, ../types, constants, helpers, types
 src/modules/contract-workflow/SigningTab.tsx ← types
 src/modules/contract-workflow/types.ts ← ../types
 src/modules/contract-workflow/WorkflowListPanel.tsx ← ../types, ../types/tender, types, constants, helpers
 src/modules/ContractWorkflowModule.tsx ← services/apiService, contexts/AIGateContext, contexts/AuthContext, types/tender, contract-workflow/types
+src/modules/CorporateGovernanceModule.tsx ← services/apiService, contexts/AuthContext
 src/modules/CostAnalysisModule.tsx ← lib/utils, types, services/apiService, contexts/AuthContext, lib/procurementCosts
 src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
@@ -431,7 +422,11 @@ src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../ser
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
+src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
+src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, crm/constants
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
+src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/LicenseTypesModule.tsx ← lib/utils, contexts/AuthContext, services/apiService
 src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
@@ -445,16 +440,21 @@ src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/fo
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
 src/modules/profitability/DmoChannelTab.tsx ← ../services/apiService, ../lib/format, project-mgmt/MarginBadge, ../types
 src/modules/ProfitabilityModule.tsx ← services/apiService, lib/format, project-mgmt/MarginBadge, profitability/DmoChannelTab, types
+src/modules/project-mgmt/CostForm.tsx ← ../types, constants
+src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
 src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
 src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, components/HealthCards, lib/format, types
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
+src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SettingsModule.tsx ← types, IntegrationWizard, WorkflowBuilder, components/settings/TenantSettings, components/settings/UnitManagement
 src/modules/SpecAnalysis.tsx ← lib/utils, services/apiService, lib/docText, contexts/AIGateContext, utils/logger
 src/modules/SpecComplianceMatrix.tsx ← lib/utils, lib/docText, services/apiService, contexts/AIGateContext, utils/logger
+src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← ../types, ../components/AgentTag, ../lib/agentProvenance, helpers, ../lib/procurementCosts
+src/modules/todo/PendingProposalApprovals.tsx ← ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/VirtualAgentsTestModule.tsx ← services/apiService, contexts/AuthContext, types, lib/agentProvenance
@@ -462,9 +462,9 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
+backend/src/lifecycle.ts ← services/periodic
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
-backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/dashboardStream.ts ← prismaClient
@@ -528,15 +528,9 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
-src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
-src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
-src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
-src/modules/FinanceModule.tsx                 ~OverheadPoolTab
-src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
 src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
-src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
 src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/services/activityLogArchiveScheduler.ts ~tick
@@ -550,6 +544,7 @@ backend/src/services/profitabilitySnapshotScheduler.ts ~tick
 backend/src/services/restoreService.ts        ~applyLogicalRestore
 backend/src/services/tenantContext.ts         +getTenantContext  +runWithTenant  +runWithRlsBypass
 backend/src/services/updateNotifier.ts        +baz  +ref  ~baz  ~ref
+upgrade-tool/core.mjs                         ~runUpgrade
 ```
 
 ## backend
@@ -569,7 +564,7 @@ export async function runManagedTransaction(callback, options?,) → Promise<T> 
 
 ### backend/src/services/activityLogArchiveScheduler.ts
 ```
-export function startActivityLogArchiveScheduler() → void  :53-58
+export function startActivityLogArchiveScheduler() → StopFn  :54-58
 ```
 
 ### backend/src/services/approvalChainService.ts
@@ -584,7 +579,7 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 
 ### backend/src/services/backupScheduler.ts
 ```
-export function startBackupScheduler() → void  :66-70
+export function startBackupScheduler() → StopFn  :67-70
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -644,7 +639,7 @@ export async function hardDeleteUser(tenantId, userId) → Promise<  :215-215
 
 ### backend/src/services/profitabilitySnapshotScheduler.ts
 ```
-export function startProfitabilitySnapshotScheduler() → void  :46-49
+export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
 ```
 
 ### backend/src/services/restoreService.ts
@@ -665,22 +660,22 @@ export function runWithRlsBypass(fn) → T  :29-31
 
 ### backend/src/services/updateNotifier.ts
 ```
-export interface UpdateStatus  :18-33
-  checkedAt?: string  :19-19
-  current?: { shortSha?: string | null  :20-20
-  update?: { available?: boolean  :21-22
-  applied?: boolean  :23-23
-  failed?: boolean  :24-24
-  kind?: 'tag' | 'commit'  :25-25
-  target?: string | null  :26-26
-  ref?: string | null  :27-27
-  notes?: string | null  :28-28
-  publishedAt?: string | null  :29-29
-  to?: string | null  :30-30
-  error?: string | null  :31-31
-export function enflowHome() → string  :36-38  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
-export function readUpdateStatus() → UpdateStatus | null  :40-46
-export function startUpdateNotifier() → void  :123-127
+export interface UpdateStatus  :19-34
+  checkedAt?: string  :20-20
+  current?: { shortSha?: string | null  :21-21
+  update?: { available?: boolean  :22-23
+  applied?: boolean  :24-24
+  failed?: boolean  :25-25
+  kind?: 'tag' | 'commit'  :26-26
+  target?: string | null  :27-27
+  ref?: string | null  :28-28
+  notes?: string | null  :29-29
+  publishedAt?: string | null  :30-30
+  to?: string | null  :31-31
+  error?: string | null  :32-32
+export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
+export function readUpdateStatus() → UpdateStatus | null  :41-47
+export function startUpdateNotifier() → StopFn  :124-127
 ```
 
 ### backend/pnpm-lock.yaml
@@ -774,6 +769,20 @@ async function login()  :18-27
 async function main()  :29-57
 ```
 
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :12-20
+  server: Pick<Server, 'close' | 'closeAllCon  :13-13
+  stops: StopFn[]  :14-14
+  disconnect: () => Promise<void>  :15-15
+  timeoutMs?: number  :16-16
+  exit?: (code: number) => void  :17-17
+  log?: { info: (...a: unknown[]) => void  :18-18
+  onSignal?: (signal: NodeJS.Signals, handler: (  :19-19
+export function createShutdown(deps) → (signal: string) => Promise<vo  :22-58
+export function installShutdown(deps) → void  :60-64
+```
+
 ### backend/src/planCatalog.ts
 ```
 export type PlanId  :5-5
@@ -798,12 +807,6 @@ export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | n
 export async function isAIConfigured(tenantId) → Promise<boolean>  :68-70
 export function assertSafeAiUrl(rawUrl) → void  :81-96  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
 export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
-```
-
-### backend/src/services/approvalSlaEscalation.ts
-```
-export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
-export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
 ```
 
 ### backend/src/services/corporateDocumentReminders.ts
@@ -929,6 +932,12 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/periodic.ts
+```
+export type StopFn  :5-5
+export function schedulePeriodic(firstDelayMs, intervalMs, tick) → StopFn  :7-17
 ```
 
 ### backend/src/services/processEngine.ts
@@ -1313,186 +1322,6 @@ export type AgentMode  :14-14
 
 ## src
 
-### src/components/settings/TenantSettings.tsx
-```
-props TenantSettingsProps
-hook useState
-hook useEffect
-hook useCallback
-export TenantSettings
-handler onChange
-handler onClick
-```
-
-### src/layout/Header.tsx
-```
-hook useAuth
-hook useTheme
-hook useState
-hook useRef
-hook useOpportunities
-hook useCustomers
-hook useProjects
-hook useTasks
-hook useMemo
-hook useEffect
-export Header
-handler onAccess
-handler onClick
-handler onChange
-handler onKeyDown
-```
-
-### src/modules/ActivityLogModule.tsx
-```
-component ArchivesTab
-component ActivityLogModule
-hook useState
-hook useCallback
-hook useEffect
-export ActivityLogModule
-handler onClick
-handler onChange
-```
-
-### src/modules/BackupModule.tsx
-```
-hook useState
-hook useCallback
-hook useEffect
-export BackupModule
-handler onRun
-handler onVerify
-handler onRestore
-handler onChange
-handler onClick
-```
-
-### src/modules/contract-workflow/constants.ts
-```
-export type TabId  :15-15
-```
-
-### src/modules/contract-workflow/LegalCaseForm.tsx
-```
-component LegalCaseForm
-hook useState
-handler onClick
-handler onChange
-```
-
-### src/modules/contract-workflow/LegalView.tsx
-```
-component LegalView
-hook useState
-hook useCallback
-hook useEffect
-handler onClick
-```
-
-### src/modules/CorporateGovernanceModule.tsx
-```
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export CorporateGovernanceModule
-handler onDelete
-handler onTrack
-handler onClick
-handler onChange
-```
-
-### src/modules/dashboard/KpiDetailDrawer.tsx
-```
-props Props
-export KpiKey
-export KpiDetailDrawer
-handler onClose
-handler onClick
-```
-
-### src/modules/dashboard/WidgetDetailDrawer.tsx
-```
-component Rows
-component Row
-props Props
-export WidgetDetailDrawer
-handler onClose
-handler onNavigate
-```
-
-### src/modules/DmoModule.tsx
-```
-component DmoModule
-component OrdersTab
-component OrderDrawer
-component CatalogTab
-component AgreementsTab
-component RatesTab
-component ReconciliationTab
-component Modal
-component CatalogForm
-component AgreementForm
-component RateForm
-component OrderForm
-component ParamsModal
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export DmoModule
-handler onClick
-handler onSelect
-handler onEdit
-handler onDelete
-handler onSaved
-handler onClose
-handler onChange
-```
-
-### src/modules/FinanceModule.tsx
-```
-component OverheadPoolTab
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
-handler onChange
-handler onBlur
-handler onClose
-```
-
-### src/modules/project-mgmt/CostForm.tsx
-```
-props CostFormProps
-hook useState
-export CostForm
-handler onClick
-handler onChange
-```
-
-### src/modules/project-mgmt/helpers.ts
-```
-export function isHandoverComplete(docs) → boolean  :27-30
-export const fmtDate = (d?) =>  :5-6
-export const fmtShort = (d?) =>  :7-8
-export const isOverdue = (d?) =>  :9-25
-export const calcFinancials = (p) =>  :13-25
-export const printProjectReport = (project, forCustomer = false) =>  :34-80
-```
-
-### src/modules/reporting/ConsolidationView.tsx
-```
-component ConsolidationView
-```
-
 ### src/modules/SalesSupport.tsx
 ```
 component TenderList
@@ -1520,40 +1349,6 @@ handler onSelectTender
 handler onChange
 handler onClick
 handler onKeyDown
-```
-
-### src/modules/todo/helpers.ts
-```
-export interface ProposalDetailItem  :177-188
-  partNumber: string  :178-178
-  description: string  :179-179
-  quantity: number  :180-180
-  purchaseCost?: number  :181-181
-  purchaseCostBase?: number  :184-184
-  unitSalePrice?: number  :185-185
-  totalSalePrice?: number  :186-186
-  marginPercentage?: number  :187-187
-export interface ProposalDetail  :190-199
-  price: string  :191-191
-  totalPrice: number  :192-192
-  totalCost: number  :193-193
-  items: ProposalDetailItem[]  :194-194
-  description: string  :195-195
-  terms: string  :196-196
-  version: number  :197-197
-  opportunityTitle: string  :198-198
-export const taskTargetTab = (t) =>  :56-65
-export const fmtCompletedAt = (d?) =>  :76-77
-export const daysUntil = (iso?) =>  :83-88
-export const fmtDueDate = (iso?) =>  :91-97
-export const getPriorityColor = (priority) =>  :105-112
-export const getPriorityLabel = (priority) =>  :115-120
-export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
-```
-
-### src/modules/todo/PendingProposalApprovals.tsx
-```
-component PendingProposalApprovals
 ```
 
 ### src/modules/todo/TaskList.tsx
@@ -1676,6 +1471,17 @@ props SubscriptionSettingsProps
 export SubscriptionSettings
 ```
 
+### src/components/settings/TenantSettings.tsx
+```
+props TenantSettingsProps
+hook useState
+hook useEffect
+hook useCallback
+export TenantSettings
+handler onChange
+handler onClick
+```
+
 ### src/components/settings/UnitManagement.tsx
 ```
 props UnitManagementProps
@@ -1748,6 +1554,25 @@ export const useProposals = (tenantId, options = {}) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
+### src/layout/Header.tsx
+```
+hook useAuth
+hook useTheme
+hook useState
+hook useRef
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useTasks
+hook useMemo
+hook useEffect
+export Header
+handler onAccess
+handler onClick
+handler onChange
+handler onKeyDown
+```
+
 ### src/layout/Sidebar.tsx
 ```
 hook useUnsavedChanges
@@ -1787,11 +1612,41 @@ export interface PermGroup  :19-25
 export function buildPermissionGroups() → PermGroup[]  :50-67
 ```
 
+### src/modules/ActivityLogModule.tsx
+```
+component ArchivesTab
+component ActivityLogModule
+hook useState
+hook useCallback
+hook useEffect
+export ActivityLogModule
+handler onClick
+handler onChange
+```
+
+### src/modules/BackupModule.tsx
+```
+hook useState
+hook useCallback
+hook useEffect
+export BackupModule
+handler onRun
+handler onVerify
+handler onRestore
+handler onChange
+handler onClick
+```
+
 ### src/modules/contract-workflow/AnalysisTab.tsx
 ```
 component AnalysisTab
 handler onChange
 handler onClick
+```
+
+### src/modules/contract-workflow/constants.ts
+```
+export type TabId  :15-15
 ```
 
 ### src/modules/contract-workflow/ContextTab.tsx
@@ -1832,6 +1687,23 @@ export function bestProposalPrice(opportunityId, proposals) → number | null  :
 export function computeDeadlineAlarm(wf) → DeadlineAlarm  :54-68
 export const stepIndex = (status) =>  :38-52
 export const isDocsComplete = (wf) =>  :70-70
+```
+
+### src/modules/contract-workflow/LegalCaseForm.tsx
+```
+component LegalCaseForm
+hook useState
+handler onClick
+handler onChange
+```
+
+### src/modules/contract-workflow/LegalView.tsx
+```
+component LegalView
+hook useState
+hook useCallback
+hook useEffect
+handler onClick
 ```
 
 ### src/modules/contract-workflow/SigningTab.tsx
@@ -1906,6 +1778,19 @@ handler onDocFieldUpdate
 handler onFetchFromArchive
 handler onMarkReadyToSign
 handler onSendForApproval
+```
+
+### src/modules/CorporateGovernanceModule.tsx
+```
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export CorporateGovernanceModule
+handler onDelete
+handler onTrack
+handler onClick
+handler onChange
 ```
 
 ### src/modules/CostAnalysisModule.tsx
@@ -2023,6 +1908,15 @@ handler onWonOpportunity
 handler onLostOpportunity
 ```
 
+### src/modules/dashboard/KpiDetailDrawer.tsx
+```
+props Props
+export KpiKey
+export KpiDetailDrawer
+handler onClose
+handler onClick
+```
+
 ### src/modules/dashboard/widgetCatalog.ts
 ```
 export interface WidgetMeta  :15-19
@@ -2037,6 +1931,16 @@ export type DecisionHorizon  :13-13
 export function resolveRoleDefault(role, roleTemplateOverride?) → WK[]  :204-209
 export function resolveEffectiveWidgets(role, saved, roleTemplateOverride?) → WK[]  :213-219
 export function buildEditableLayout(role, saved, roleTemplateOverride?)  :223-223
+```
+
+### src/modules/dashboard/WidgetDetailDrawer.tsx
+```
+component Rows
+component Row
+props Props
+export WidgetDetailDrawer
+handler onClose
+handler onNavigate
 ```
 
 ### src/modules/Dashboard.tsx
@@ -2061,6 +1965,53 @@ handler onSave
 props DeliveryTimelinePanelProps
 export DeliveryTimelineStepLike
 export DeliveryTimelinePanel
+```
+
+### src/modules/DmoModule.tsx
+```
+component DmoModule
+component OrdersTab
+component OrderDrawer
+component CatalogTab
+component AgreementsTab
+component RatesTab
+component ReconciliationTab
+component Modal
+component CatalogForm
+component AgreementForm
+component RateForm
+component OrderForm
+component ParamsModal
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export DmoModule
+handler onClick
+handler onSelect
+handler onEdit
+handler onDelete
+handler onSaved
+handler onClose
+handler onChange
+```
+
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
 ```
 
 ### src/modules/LicenseTypesModule.tsx
@@ -2220,6 +2171,25 @@ handler onTab
 handler onChange
 ```
 
+### src/modules/project-mgmt/CostForm.tsx
+```
+props CostFormProps
+hook useState
+export CostForm
+handler onClick
+handler onChange
+```
+
+### src/modules/project-mgmt/helpers.ts
+```
+export function isHandoverComplete(docs) → boolean  :27-30
+export const fmtDate = (d?) =>  :5-6
+export const fmtShort = (d?) =>  :7-8
+export const isOverdue = (d?) =>  :9-25
+export const calcFinancials = (p) =>  :13-25
+export const printProjectReport = (project, forCustomer = false) =>  :34-80
+```
+
 ### src/modules/project-mgmt/KanbanView.tsx
 ```
 component KanbanView
@@ -2261,6 +2231,11 @@ handler onSave
 ### src/modules/reporting/BottleneckPanel.tsx
 ```
 component BottleneckPanel
+```
+
+### src/modules/reporting/ConsolidationView.tsx
+```
+component ConsolidationView
 ```
 
 ### src/modules/reporting/OverviewTab.tsx
@@ -2317,12 +2292,46 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :177-188
+  partNumber: string  :178-178
+  description: string  :179-179
+  quantity: number  :180-180
+  purchaseCost?: number  :181-181
+  purchaseCostBase?: number  :184-184
+  unitSalePrice?: number  :185-185
+  totalSalePrice?: number  :186-186
+  marginPercentage?: number  :187-187
+export interface ProposalDetail  :190-199
+  price: string  :191-191
+  totalPrice: number  :192-192
+  totalCost: number  :193-193
+  items: ProposalDetailItem[]  :194-194
+  description: string  :195-195
+  terms: string  :196-196
+  version: number  :197-197
+  opportunityTitle: string  :198-198
+export const taskTargetTab = (t) =>  :56-65
+export const fmtCompletedAt = (d?) =>  :76-77
+export const daysUntil = (iso?) =>  :83-88
+export const fmtDueDate = (iso?) =>  :91-97
+export const getPriorityColor = (priority) =>  :105-112
+export const getPriorityLabel = (priority) =>  :115-120
+export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
+```
+
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
 hook useState
 hook useEffect
 handler onChange
+```
+
+### src/modules/todo/PendingProposalApprovals.tsx
+```
+component PendingProposalApprovals
 ```
 
 ### src/modules/todo/ResolvedApprovals.tsx
@@ -2643,4 +2652,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 196 file(s) omitted to stay under the 19004-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 197 file(s) omitted to stay under the 19121-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

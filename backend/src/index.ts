@@ -27,6 +27,9 @@ import { startActivityLogArchiveScheduler } from './services/activityLogArchiveS
 import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
 import { checkDeploymentTopology } from './services/deploymentGuard';
+import { installShutdown } from './lifecycle';
+import { prisma } from './prismaClient';
+import type { StopFn } from './services/periodic';
 import projectsRouter from './routes/projects';
 import serviceTicketsRouter from './routes/serviceTickets';
 import platformTicketsRouter from './routes/platformTickets';
@@ -218,13 +221,16 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
   });
 });
 
-app.listen(port, () => {
+const stops: StopFn[] = [];
+const server = app.listen(port, () => {
   logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
   checkDeploymentTopology();
-  startBackupScheduler();
-  startActivityLogArchiveScheduler();
-  startProfitabilitySnapshotScheduler();
-  startUpdateNotifier();
+  stops.push(
+    startBackupScheduler(),
+    startActivityLogArchiveScheduler(),
+    startProfitabilitySnapshotScheduler(),
+    startUpdateNotifier(),
+  );
   // Wiki'yi açılışta §27'den yeniden üret (best-effort; deterministik → çıktı
   // yalnız §27 değiştiyse değişir). GET /wiki güncel kalır.
   try {
@@ -236,3 +242,6 @@ app.listen(port, () => {
     }
   } catch { /* yut — wiki üretimi ana akışı etkilemez */ }
 });
+
+// Graceful shutdown (ADR-001) — servis yöneticisi / upgrade-tool SIGTERM gönderir.
+installShutdown({ server, stops, disconnect: () => prisma.$disconnect(), log: logger });

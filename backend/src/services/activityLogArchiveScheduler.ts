@@ -12,6 +12,7 @@ import { prisma } from '../prismaClient';
 import { runArchive, getArchiveSettings } from './activityLogArchiveService';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
+import { schedulePeriodic, type StopFn } from './periodic';
 
 const LOCK_NAME = 'activity-log-archive-scheduler';
 const LOCK_TTL_MS = 2 * 3_600_000; // 2sa — tick aralığından (1sa) büyük
@@ -50,9 +51,8 @@ async function tick(): Promise<void> {
   }
 }
 
-export function startActivityLogArchiveScheduler(): void {
+export function startActivityLogArchiveScheduler(): StopFn {
   // İlk tarama 45sn sonra (boot yükünü backup scheduler'ın 30sn'lik ilk
   // taramasıyla çakıştırmamak için), sonra 1 saatte bir.
-  setTimeout(() => { void tick(); }, 45_000);
-  setInterval(() => { void tick(); }, 3_600_000);
+  return schedulePeriodic(45_000, 3_600_000, () => { void tick(); });
 }
