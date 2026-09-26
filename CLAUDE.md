@@ -371,7 +371,9 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/hooks/useEnflowQueries.ts ← services/apiService
-src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, hooks/useEnflowQueries, components/HealthCards, lib/format
+src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../contexts/AuthContext, ../hooks/useEnflowQueries
+src/modules/crm/ProgressCheckInModal.tsx ← ../contexts/AuthContext, ../hooks/useEnflowQueries, ../lib/utils, ../types, ../services/apiService
+src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 backend/src/lifecycle.ts ← services/periodic
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 upgrade-tool/core.mjs ← install/lib/service
@@ -404,13 +406,10 @@ src/modules/crm/constants.ts ← ../types
 src/modules/crm/CustomersView.tsx ← ../lib/utils, ../types, ../components/HealthCards, ../components/PermissionGate, ../components/InfoTooltip
 src/modules/crm/DashboardView.tsx ← ../types, constants, ../components/InfoTooltip
 src/modules/crm/NewCustomerModal.tsx ← ../types, ../components/CustomerCombobox
-src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procurementCosts, ../services/apiService, ../components/MoneyInput
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
-src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
-src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
 src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widgetCatalog, helpers, crm/constants
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
@@ -432,9 +431,11 @@ src/modules/project-mgmt/CostForm.tsx ← ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants, ../lib/html
 src/modules/project-mgmt/KanbanView.tsx ← ../types, constants, helpers, MarginBadge
 src/modules/project-mgmt/ProjectDetail.tsx ← ../services/apiService, ../lib/format, ../types, constants, helpers
+src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthContext, hooks/useEnflowQueries, components/HealthCards, lib/format
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
+src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SetupWizard.tsx ← services/apiService, types
@@ -696,12 +697,6 @@ key provider
 ### backend/scripts/db-migrate.mjs
 ```
 function run(cmd, cmdArgs, env = {})  :32-35
-```
-
-### backend/scripts/loadtest/mixed-read.mjs
-```
-async function login()  :18-27
-async function main()  :29-57
 ```
 
 ### backend/scripts/sync-postgres-schema.mjs
@@ -1484,43 +1479,71 @@ export const useUsers = (tenantId, options = {}) =>  :66-74
 export const useDocuments = (tenantId, options = {}) =>  :76-84
 export const useProposals = (tenantId, options = {}) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
-export const useProjectHealth = (tenantId) =>  :105-110
-export const usePendingApprovalChains = (tenantId, role) =>  :112-118
-export const useVisitPlans = (tenantId) =>  :120-122
-export const useDailyReports = (tenantId, userId) =>  :123-125
-export const useVisitReportSettings = (tenantId) =>  :126-130
-export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :133-140
-export const useInvoices = (tenantId) =>  :143-145
-export const useGuarantees = (tenantId) =>  :146-148
-export const useCostApprovals = (tenantId) =>  :149-151
-export const useFinanceSummary = (tenantId) =>  :152-154
-export const useFinanceAging = (tenantId) =>  :156-158
-export const usePurchaseRequests = (tenantId, params?) =>  :159-166
-export const useVendors = (tenantId) =>  :168-175
+export const useCustomerHealth = (tenantId) =>  :106-110
+export const useCustomerVisitSummary = (tenantId, customerId, windowMonths = 3) =>  :111-115
+export const useOpportunityProgressLog = (tenantId, opportunityId) =>  :116-120
+export const useProjectHealth = (tenantId) =>  :121-126
+export const usePendingApprovalChains = (tenantId, role) =>  :128-134
+export const useVisitPlans = (tenantId) =>  :136-138
+export const useDailyReports = (tenantId, userId) =>  :139-141
+export const useVisitReportSettings = (tenantId) =>  :142-146
+export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :149-156
+export const useInvoices = (tenantId) =>  :159-161
+export const useGuarantees = (tenantId) =>  :162-164
+export const useCostApprovals = (tenantId) =>  :165-167
+export const useFinanceSummary = (tenantId) =>  :168-170
+export const useFinanceAging = (tenantId) =>  :172-174
+export const usePurchaseRequests = (tenantId, params?) =>  :175-182
 ```
 
-### src/modules/ProjectManagementModule.tsx
+### src/modules/crm/NewOpportunityModal.tsx
 ```
-props ProjectManagementModuleProps
+component NewOpportunityModal
+hook useAuth
+hook useCustomerVisitSummary
+handler onClick
+handler onSubmit
+handler onChange
+```
+
+### src/modules/crm/ProgressCheckInModal.tsx
+```
+component ProgressCheckInModal
+hook useState
+hook useAuth
+hook useQueryClient
+hook useOpportunityProgressLog
+handler onChange
+handler onClick
+```
+
+### src/modules/CRMModule.tsx
+```
 hook useAuth
 hook useState
-hook useQueryClient
-hook useProjects
-hook useOpportunities
-hook useMemo
-hook useProjectHealth
-hook useCallback
+hook useCustomerHealth
 hook useEffect
-export ProjectManagementModule
-handler onOpportunities
-handler onClick
-handler onChange
-handler onSelect
-handler onEdit
-handler onDelete
-handler onRefresh
-handler onPrintReport
+hook useSearch
+hook useMemo
+export CRMModule
+handler onProposal
+handler onOpportunity
 handler onSave
+handler onSaveAll
+handler onProgressStatus
+handler onMarkLost
+handler onHandOff
+handler onEdit
+handler onCheckIn
+handler onEditProposal
+handler onGoToCostAnalysis
+handler onRequestApproval
+handler onOpenReport
+handler onOpenContacts
+handler onEditCustomer
+handler onDeleteCustomer
+handler onCreateProposal
+handler onWonOpportunity
 ```
 
 ### src/App.tsx
@@ -1886,16 +1909,6 @@ handler onChange
 handler onPick
 ```
 
-### src/modules/crm/NewOpportunityModal.tsx
-```
-component NewOpportunityModal
-hook useState
-hook useEffect
-handler onClick
-handler onSubmit
-handler onChange
-```
-
 ### src/modules/crm/OpportunitiesView.tsx
 ```
 component OpportunitiesView
@@ -1926,47 +1939,9 @@ handler onClick
 handler onChange
 ```
 
-### src/modules/crm/ProgressCheckInModal.tsx
-```
-component ProgressCheckInModal
-hook useState
-hook useEffect
-handler onChange
-handler onClick
-```
-
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
-```
-
-### src/modules/CRMModule.tsx
-```
-hook useAuth
-hook useState
-hook useEffect
-hook useSearch
-hook useMemo
-export CRMModule
-handler onProposal
-handler onOpportunity
-handler onSave
-handler onSaveAll
-handler onProgressStatus
-handler onMarkLost
-handler onHandOff
-handler onEdit
-handler onCheckIn
-handler onEditProposal
-handler onGoToCostAnalysis
-handler onRequestApproval
-handler onOpenReport
-handler onOpenContacts
-handler onEditCustomer
-handler onDeleteCustomer
-handler onCreateProposal
-handler onWonOpportunity
-handler onLostOpportunity
 ```
 
 ### src/modules/dashboard/KpiDetailDrawer.tsx
@@ -2261,6 +2236,30 @@ handler onApplied
 handler onSave
 ```
 
+### src/modules/ProjectManagementModule.tsx
+```
+props ProjectManagementModuleProps
+hook useAuth
+hook useState
+hook useQueryClient
+hook useProjects
+hook useOpportunities
+hook useMemo
+hook useProjectHealth
+hook useCallback
+hook useEffect
+export ProjectManagementModule
+handler onOpportunities
+handler onClick
+handler onChange
+handler onSelect
+handler onEdit
+handler onDelete
+handler onRefresh
+handler onPrintReport
+handler onSave
+```
+
 ### src/modules/reporting/BottleneckPanel.tsx
 ```
 component BottleneckPanel
@@ -2294,6 +2293,11 @@ export function printUnitReport(r)  :121-141
 export function printOverview(overview, start, end)  :143-153
 export const pct = (n) =>  :4-6
 export const esc = (s) =>  :69-69
+```
+
+### src/modules/reporting/OverviewTab.tsx
+```
+component OverviewTab
 ```
 
 ### src/modules/SalesSupport.tsx
@@ -2850,4 +2854,4 @@ code-fence powershell
 ```
 
 
-> **Not everything is here.** 216 file(s) omitted to stay under the 21184-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 216 file(s) omitted to stay under the 21233-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

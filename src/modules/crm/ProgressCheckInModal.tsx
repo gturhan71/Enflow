@@ -1,4 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '../../contexts/AuthContext';
+import { useOpportunityProgressLog } from '../../hooks/useEnflowQueries';
 import { motion } from 'motion/react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
 import { cn } from '../../lib/utils';
@@ -20,23 +23,14 @@ export default function ProgressCheckInModal({
   const [note, setNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [logs, setLogs] = useState<OpportunityProgressLog[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(true);
+  const { currentUser } = useAuth();
+  const queryClient = useQueryClient();
+  const logsQ = useOpportunityProgressLog(currentUser?.tenantId ?? '', opp.id);
+  const logs: OpportunityProgressLog[] = Array.isArray(logsQ.data) ? (logsQ.data as OpportunityProgressLog[]) : [];
+  const loadingLogs = logsQ.isLoading;   // yüklenemezse teyit formunu engelleme (hata → boş geçmiş)
 
   const changed = probability !== opp.probability || status !== opp.status;
   const noteRequired = !changed;
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const data = await apiService.getOpportunityProgressLog(opp.id) as OpportunityProgressLog[];
-        if (!cancelled) setLogs(Array.isArray(data) ? data : []);
-      } catch { /* geçmiş yüklenemezse teyit formunu engelleme */ }
-      finally { if (!cancelled) setLoadingLogs(false); }
-    })();
-    return () => { cancelled = true; };
-  }, [opp.id]);
 
   const chartData = [...logs].reverse().map(l => ({ name: fmtShort(l.createdAt), value: l.newProbability }));
 
@@ -51,6 +45,7 @@ export default function ProgressCheckInModal({
       const updated = await apiService.checkInOpportunityProgress(opp.id, {
         probability, status, note: note.trim() || undefined,
       }) as Opportunity;
+      queryClient.invalidateQueries({ queryKey: ['crm', 'progress-log'] });
       onSaved(updated);
       onClose();
     } catch (e) {
