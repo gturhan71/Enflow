@@ -69,7 +69,15 @@ node upgrade-tool/server.mjs         # → http://127.0.0.1:7071
 
 ## Güvenlik
 
-- Sunucu yalnız `127.0.0.1`'e bağlanır — dışa açmayın.
+- Sunucu yalnız `127.0.0.1`'e bağlanır — dışa açmayın. Ama loopback yetmez: aynı makinedeki her kullanıcı
+  ve DNS-rebinding yapan bir web sayfası bu porta erişebilir; ayarlardaki `restartCommand` yükseltmede
+  `sh -c` ile **çalıştırılır**. Bu yüzden:
+  - **Token:** tüm `/api/*` uçları `X-Enflow-Token` ister. Token ilk açılışta rastgele üretilip
+    `upgrade-tool/.gui-token` dosyasına (0600 — yalnız sahibi okur) yazılır. Sunucu başlangıç çıktısı arayüz
+    URL'sini verir: `http://127.0.0.1:7071/#token=…` — bu URL'yi tarayıcıda açın (token `#` parçasındadır,
+    sunucuya/Referer'a gitmez; sayfa onu `sessionStorage`'a alıp adres çubuğundan siler).
+  - **Host denetimi:** `Host` başlığı yalnız `127.0.0.1`/`localhost`/`[::1]` + port olabilir (DNS rebinding → 403).
+  - Ayar alanları allowlist'li ve tip denetimli; `config.json` 0600; istek gövdesi ≤64 KB.
 - Aracı **install'ın sahibi OS kullanıcısı** ile çalıştırın (git + pnpm + restart yetkisi gerekir).
 - Yükseltme **yıkıcıdır**: önce DB ön-yedeği alınır — SQLite: `.db` + `-wal` + `-shm` kopyası;
   Postgres: `pg_dump -Fc` (`backend/backups/pre-upgrade-<ts>.dump`; RLS bayraklarıyla). `pg_dump`
