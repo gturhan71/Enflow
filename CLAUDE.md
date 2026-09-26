@@ -375,9 +375,11 @@ upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/server.mjs ← core
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
+src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
+src/hooks/useEnflowQueries.ts ← services/apiService
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
 src/modules/ActivityLogModule.tsx ← services/apiService, lib/agentProvenance, types
@@ -403,6 +405,7 @@ src/modules/crm/NewOpportunityModal.tsx ← ../lib/utils, ../types, ../lib/procu
 src/modules/crm/OpportunitiesView.tsx ← ../lib/utils, ../types, ../components/SaveButton, ../components/PermissionGate, ../contexts/AuthContext
 src/modules/crm/OpportunityDocumentsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
 src/modules/crm/OpportunityRequiredDocsPanel.tsx ← ../lib/utils, ../types, ../services/apiService
+src/modules/crm/ProgressCheckInModal.tsx ← ../lib/utils, ../types, ../services/apiService, constants
 src/modules/crm/ProposalsView.tsx ← ../lib/utils, ../types, helpers
 src/modules/CRMModule.tsx ← types, ProposalEditor, NegotiationModule, components/HandOffModal, services/apiService
 src/modules/dashboard/KpiDetailDrawer.tsx ← ../lib/format, crm/constants, project-mgmt/constants, DrawerShell
@@ -412,7 +415,6 @@ src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/for
 src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService
 src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, types, lib/format
 src/modules/Login.tsx ← constants, services/apiService, types
-src/modules/ManagementReportingModule.tsx ← services/apiService, contexts/AuthContext, types, reporting/helpers, reporting/AnalyticsTab
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
@@ -431,7 +433,6 @@ src/modules/ProjectManagementModule.tsx ← services/apiService, contexts/AuthCo
 src/modules/reporting/BottleneckPanel.tsx ← ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
-src/modules/reporting/OverviewTab.tsx ← ../types, ../constants, helpers, BottleneckPanel, MetricCard
 src/modules/SalesSupport.tsx ← services/apiService, contexts/AuthContext, contexts/AIGateContext, lib/format, lib/guaranteeText
 src/modules/ServiceTicketsModule.tsx ← services/apiService, types
 src/modules/SetupWizard.tsx ← services/apiService, types
@@ -444,6 +445,7 @@ src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
@@ -473,7 +475,6 @@ backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedg
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
-backend/src/services/schedulerLock.ts ← prismaClient
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
@@ -521,7 +522,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 4 hours ago)
+## changes (last 10 commits — 2 hours ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
@@ -620,18 +621,6 @@ keys: [lockfileVersion, settings, importers, packages, snapshots]
 ### backend/prisma/migrations/20260823213111_add_scheduler_lock/migration.sql
 ```
 TABLE SchedulerLock
-```
-
-### backend/prisma/migrations/20260823213343_add_scale_indexes/migration.sql
-```
-INDEX ContractWorkflow_tenantId_status_idx ON ContractWorkflow
-INDEX Notification_tenantId_userId_idx ON Notification
-INDEX Opportunity_tenantId_status_idx ON Opportunity
-INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
-INDEX Project_tenantId_status_idx ON Project
-INDEX PurchaseRequest_tenantId_status_idx ON PurchaseRequest
-INDEX TodoTask_tenantId_status_idx ON TodoTask
-INDEX TodoTask_tenantId_assignedToUserId_idx ON TodoTask
 ```
 
 ### backend/prisma/migrations/20260825131003_add_opportunity_tracking_code/migration.sql
@@ -738,11 +727,6 @@ export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 export const asyncHandler = (fn) =>  :9-11
 export const requireRole = (allowed) =>  :82-90
 export const requireEntitlement = (pluginKey) =>  :116-123
-```
-
-### backend/src/planCatalog.ts
-```
-export type PlanId  :5-5
 ```
 
 ### backend/src/prismaClient.ts
@@ -1213,12 +1197,6 @@ export async function stageStateRestore(restoreId) → Promise<  :286-286  # Sta
 export function defaultPermissionsForRole(role) → string[]  :64-66
 ```
 
-### backend/src/services/schedulerLock.ts
-```
-export async function acquireLock(name, ttlMs) → Promise<boolean>  :23-42  # Kilidi devralmayı dener
-export async function releaseLock(name) → Promise<void>  :45-50  # İş bitince kilidi hemen serbest bırakır (expiresAt'i geçmişe
-```
-
 ### backend/src/services/serviceTicketReminders.ts
 ```
 export async function sweepServiceTicketSla(tenantId) → Promise<void>  :13-55
@@ -1364,6 +1342,11 @@ export type AgentMode  :14-14
 
 ## install
 
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
 ### install/ILK_KURULUM_KILAVUZU.md
 ```
 h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
@@ -1391,40 +1374,6 @@ h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
 h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
 h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
-```
-
-### install/README.md
-```
-h1 Enflow — Kurulum Kılavuzu
-h2 Sistem Gereksinimleri
-h2 Hızlı Kurulum
-h3 Linux / macOS
-h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
-h1 B) Tek başına (sıfırdan — depoyu klonlar):
-h3 Windows
-h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
-h1 B) Tek başına:
-h3 Etkileşimsiz (CI / otomasyon)
-h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
-h2 Başlatma
-h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
-h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
-h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
-h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
-h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
-h3 Servis olarak çalıştırma (ADR-001)
-h2 Dağıtılabilir Kurulum Zip'i Üretme
-h1 Linux/macOS
-h1 Windows
-h2 PostgreSQL (Üretim) Notu
-h2 Sorun Giderme
-h2 Güvenlik
-h3 Veritabanı ve Prisma Studio Erişimi
-```
-
-### install/build-package.sh
-```
-# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
 ```
 
 ### install/lib/pg.mjs
@@ -1457,6 +1406,35 @@ h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
 h2 Kapasite teyidi (kurulum sihirbazı)
 h2 İlgili dosyalar
 h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/README.md
+```
+h1 Enflow — Kurulum Kılavuzu
+h2 Sistem Gereksinimleri
+h2 Hızlı Kurulum
+h3 Linux / macOS
+h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
+h1 B) Tek başına (sıfırdan — depoyu klonlar):
+h3 Windows
+h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
+h1 B) Tek başına:
+h3 Etkileşimsiz (CI / otomasyon)
+h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
+h2 Başlatma
+h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
+h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h3 Servis olarak çalıştırma (ADR-001)
+h2 Dağıtılabilir Kurulum Zip'i Üretme
+h1 Linux/macOS
+h1 Windows
+h2 PostgreSQL (Üretim) Notu
+h2 Sorun Giderme
+h2 Güvenlik
+h3 Veritabanı ve Prisma Studio Erişimi
 ```
 
 ### install/wizard.mjs
@@ -1502,6 +1480,16 @@ hook useState
 hook useRef
 hook useEffect
 handler onChange
+```
+
+### src/components/settings/ProductTaxonomyManagement.tsx
+```
+hook useState
+hook useEffect
+export ProductTaxonomyManagement
+handler onChange
+handler onKeyDown
+handler onClick
 ```
 
 ### src/components/settings/TenantSettings.tsx
@@ -1553,6 +1541,20 @@ export interface AbbreviatedBoMItem  :7-20
   categoryId?: string  :18-18
   source?: string  :19-19
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
+```
+
+### src/hooks/useEnflowQueries.ts
+```
+export const useOpportunities = (tenantId, options = {}) =>  :6-14
+export const useCustomers = (tenantId, options = {}) =>  :16-24
+export const useProjects = (tenantId, options = {}) =>  :26-34
+export const useContracts = (tenantId, options = {}) =>  :36-44
+export const useTasks = (tenantId, options = {}) =>  :46-54
+export const useUnits = (tenantId, options = {}) =>  :56-64
+export const useUsers = (tenantId, options = {}) =>  :66-74
+export const useDocuments = (tenantId, options = {}) =>  :76-84
+export const useProposals = (tenantId, options = {}) =>  :86-94
+export const useModuleSettings = (tenantId) =>  :96-103
 ```
 
 ### src/layout/Header.tsx
@@ -1861,6 +1863,15 @@ handler onClick
 handler onChange
 ```
 
+### src/modules/crm/ProgressCheckInModal.tsx
+```
+component ProgressCheckInModal
+hook useState
+hook useEffect
+handler onChange
+handler onClick
+```
+
 ### src/modules/crm/ProposalsView.tsx
 ```
 component ProposalsView
@@ -2018,21 +2029,6 @@ hook useState
 export Login
 handler onSubmit
 handler onChange
-```
-
-### src/modules/ManagementReportingModule.tsx
-```
-component ManagementReportingModule
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-handler onChange
-handler onClick
-handler onEdit
-handler onSubmit
-handler onDelete
-handler onReviewed
 ```
 
 ### src/modules/negotiation/AuctionBoard.tsx
@@ -2247,11 +2243,6 @@ export const pct = (n) =>  :4-6
 export const esc = (s) =>  :69-69
 ```
 
-### src/modules/reporting/OverviewTab.tsx
-```
-component OverviewTab
-```
-
 ### src/modules/SalesSupport.tsx
 ```
 component TenderList
@@ -2411,6 +2402,19 @@ handler onNavigate
 handler onToggleStatus
 handler onAssign
 handler onSubmit
+```
+
+### src/modules/VisitPlanModule.tsx
+```
+props VisitPlanModuleProps
+hook useAuth
+hook useState
+hook useCallback
+hook useEffect
+export VisitPlanModule
+handler onChange
+handler onClick
+handler onBlur
 ```
 
 ### src/modules/WorkflowBuilder.tsx
@@ -2727,22 +2731,6 @@ function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → tru
 function pgRlsInstalled(url)  :298-303
 ```
 
-### upgrade-tool/README.md
-```
-h1 Enflow Upgrade Tool
-h2 İlke
-h2 Sürüm kaynağı (kanal)
-h2 Çalıştırma
-h3 CLI (cron / otomasyon)
-h3 Web GUI (operatör)
-h2 Güvenlik
-h2 Üretilen dosyalar (commit edilmez)
-code-fence bash
-code-fence plain
-code-fence cron
-code-fence powershell
-```
-
 ### upgrade-tool/server.mjs
 ```
 function loadConfig()  :29-31
@@ -2782,5 +2770,21 @@ span#saved
 pre#log
 ```
 
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
+code-fence powershell
+```
 
-> **Not everything is here.** 210 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+
+> **Not everything is here.** 211 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

@@ -98,6 +98,10 @@ jobs:
           pnpm install --frozen-lockfile
           (cd backend && pnpm install --frozen-lockfile)
           (cd tests/rbac && pnpm install --frozen-lockfile)
+      # auth.setup.ts login'i tarayıcı sayfasından yapar → API süiti de Chromium ister
+      - name: Playwright Chromium
+        working-directory: tests/rbac
+        run: npx playwright install --with-deps chromium
       - name: Frontend build (backend aynı origin'den sunar)
         run: pnpm build
       - name: RBAC API + tenant izolasyonu
