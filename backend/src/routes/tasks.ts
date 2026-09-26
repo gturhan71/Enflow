@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware } from '../middleware';
@@ -33,6 +34,17 @@ const targetTab = (actionKey?: string | null, relatedModule?: string | null): st
 // (assignedToUserId) veya kendi oluşturduğu (assignedBy) görevleri görür.
 // Atanmamış (legacy/null) görevler için birim fallback'i: kendi biriminin
 // atanmamış görevlerini de görür. GM gözetim için tüm görevleri görür.
+// Mass-assignment koruması: sunucunun yönettiği alanlar istemci gövdesinden ASLA alınmaz (PUT'ta `tenantId` ile
+// görev başka kiracıya taşınabiliyordu; completedAt/escalatedAt/agentRunId köken ve SLA bütünlüğünü bozar).
+const SERVER_OWNED = ['id', 'tenantId', 'createdAt', 'updatedAt', 'completedAt', 'escalatedAt', 'agentRunId'] as const;
+type TaskCreateBody = Omit<Prisma.TodoTaskUncheckedCreateInput, 'tenantId' | 'dueDate' | 'progressNotes' | 'slaBusinessDays'> & { dueDate?: string; progressNotes?: unknown; slaBusinessDays?: number };
+type TaskUpdateBody = { dueDate?: string; progressNotes?: unknown; status?: string; assignedToUserId?: string | null } & Record<string, unknown>;
+function stripServerOwned<T extends Record<string, unknown>>(body: T): Omit<T, typeof SERVER_OWNED[number]> {
+  const out: Record<string, unknown> = { ...body };
+  for (const k of SERVER_OWNED) delete out[k];
+  return out as Omit<T, typeof SERVER_OWNED[number]>;
+}
+
 router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
   await sweepSlaEscalations(req.tenantId); // SLA aşımı eskalasyonu (non-throwing)
   const user = req.userId
@@ -53,7 +65,7 @@ router.get('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respons
 }));
 
 router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { dueDate, progressNotes, slaBusinessDays, ...rest } = req.body;
+  const { dueDate, progressNotes, slaBusinessDays, ...rest } = stripServerOwned(req.body as Record<string, unknown>) as TaskCreateBody;
   // slaBusinessDays verilmiş ama dueDate verilmemişse, iş günü bazlı otomatik hesapla.
   const resolvedDueDate = dueDate
     ? new Date(dueDate as string)
@@ -63,7 +75,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
     data: {
       ...rest,
       dueDate: resolvedDueDate,
-      slaBusinessDays: slaBusinessDays ?? null,
+      slaBusinessDays: (slaBusinessDays as number | undefined) ?? null,
       progressNotes: typeof progressNotes === 'string' ? progressNotes : JSON.stringify(progressNotes || []),
       tenantId: req.tenantId
     }
@@ -90,7 +102,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
 }));
 
 router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
-  const { dueDate, progressNotes, ...rest } = req.body;
+  const { dueDate, progressNotes, ...rest } = stripServerOwned(req.body as Record<string, unknown>) as TaskUpdateBody;
   const tenantId = req.tenantId;
   const id = req.params.id as string;
 

@@ -14,6 +14,7 @@ import NegotiationModule from './NegotiationModule';
 import { HandOffModal } from '../components/HandOffModal';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useCustomerHealth } from '../hooks/useEnflowQueries';
 import { useSearch, useForm } from '../hooks/useShared';
 import { CustomerImportWizard } from '../components/CustomerImportWizard';
 import { generateProposalPDF } from '../utils/generateProposalPDF';
@@ -77,9 +78,7 @@ const CRMModule = ({
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<Opportunity | null>(null);
   const [customerReportTarget, setCustomerReportTarget] = useState<Customer | null>(null);
-  const [customerHealth, setCustomerHealth] = useState<CustomerHealthReport | null>(null);
-
-  useEffect(() => { apiService.getCustomerHealth().then(setCustomerHealth).catch(() => {}); }, []);
+  const customerHealth = (useCustomerHealth(currentUser?.tenantId ?? '').data ?? null) as CustomerHealthReport | null;
 
   // Deep-link: bildirim/görev "Git" ile gelen fırsatı otomatik aç (teklif sekmesinde
   // teklif editörünü açar; diğer sekmelerde fırsatı seçili getirir).

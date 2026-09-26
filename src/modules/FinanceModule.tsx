@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   FileText, Wallet, ShieldCheck, ClipboardCheck, BarChart3, Plus, Trash2,
   X, AlertTriangle, CheckCircle2, XCircle, Hash, CreditCard, CalendarClock, Building2, Pencil,
@@ -7,6 +8,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import * as XLSX from 'xlsx';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useInvoices, useGuarantees, useCostApprovals, useFinanceSummary, useFinanceAging, useCustomers } from '../hooks/useEnflowQueries';
 import { Invoice, Payment, GuaranteeLetter, FinanceSummary, Opportunity, BoMItem, CostItem, AgingReport } from '../types';
 import { fmtCurrency as fmt } from '../lib/format';
 
@@ -59,31 +61,27 @@ const GUARANTEE_STATUS: Record<string, string> = {
 const FinanceModule = () => {
   const { currentUser } = useAuth();
   const [tab, setTab] = useState<TabKey>('invoices');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [guarantees, setGuarantees] = useState<GuaranteeLetter[]>([]);
-  const [costApprovals, setCostApprovals] = useState<CostApproval[]>([]);
-  const [summary, setSummary] = useState<FinanceSummary | null>(null);
-  const [aging, setAging] = useState<AgingReport | null>(null);
+  const tenantId = currentUser?.tenantId ?? '';
+  const queryClient = useQueryClient();
+  const invoicesQ = useInvoices(tenantId);
+  const guaranteesQ = useGuarantees(tenantId);
+  const costApprovalsQ = useCostApprovals(tenantId);
+  const summaryQ = useFinanceSummary(tenantId);
+  const agingQ = useFinanceAging(tenantId);
+  const invoices = (invoicesQ.data ?? []) as Invoice[];
+  const guarantees = (guaranteesQ.data ?? []) as GuaranteeLetter[];
+  const costApprovals = (costApprovalsQ.data ?? []) as CostApproval[];
+  const summary = (summaryQ.data ?? null) as FinanceSummary | null;
+  const aging = (agingQ.data ?? null) as AgingReport | null;
   const [showInvoiceForm, setShowInvoiceForm] = useState(false);
   const [showGuaranteeForm, setShowGuaranteeForm] = useState(false);
   const [payInvoice, setPayInvoice] = useState<Invoice | null>(null);
-  const [loading, setLoading] = useState(false);
+  const loading = invoicesQ.isFetching || guaranteesQ.isFetching || costApprovalsQ.isFetching || summaryQ.isFetching || agingQ.isFetching;
 
+  // Tüm finans önbelleğini geçersiz kıl (fatura/ödeme/teminat değişimi özet + yaşlandırmayı da etkiler)
   const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [inv, g, ca, s, ag] = await Promise.all([
-        apiService.getInvoices(), apiService.getGuarantees(),
-        apiService.getCostApprovals(), apiService.getFinanceSummary(),
-        apiService.getAging().catch(() => null),
-      ]);
-      setInvoices(inv as Invoice[]); setGuarantees(g as GuaranteeLetter[]);
-      setCostApprovals(ca as CostApproval[]); setSummary(s as FinanceSummary);
-      setAging(ag as AgingReport | null);
-    } finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+    await queryClient.invalidateQueries({ queryKey: ['finance'] });
+  }, [queryClient]);
 
   return (
     <div className="space-y-6">
@@ -698,10 +696,9 @@ const InvoiceForm = ({ userId, onClose, onSaved }: { userId?: string; onClose: (
   const [f, setF] = useState<Record<string, string>>({ type: 'SALES', status: 'ISSUED', currency: 'TRY' });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const [customers, setCustomers] = useState<{ id: string; name: string }[]>([]);
+  const { currentUser: formUser } = useAuth();
+  const customers = (useCustomers(formUser?.tenantId ?? '').data ?? []) as { id: string; name: string }[];
   const set = (k: string, v: string) => setF(p => ({ ...p, [k]: v }));
-
-  useEffect(() => { apiService.getCustomers().then((c) => setCustomers(c as { id: string; name: string }[])).catch(() => {}); }, []);
 
   const save = async () => {
     setSaving(true); setErr(null);

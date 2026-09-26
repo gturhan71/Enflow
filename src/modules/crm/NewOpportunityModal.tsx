@@ -1,10 +1,11 @@
-import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useState, type ChangeEvent, type FormEvent } from 'react';
 import { X, MapPin } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../../lib/utils';
 import { Customer, Opportunity } from '../../types';
 import { PROCUREMENT_METHODS } from '../../lib/procurementCosts';
-import { apiService } from '../../services/apiService';
+import { useAuth } from '../../contexts/AuthContext';
+import { useCustomerVisitSummary } from '../../hooks/useEnflowQueries';
 import MoneyInput from '../../components/MoneyInput';
 
 const CURRENCIES = [
@@ -24,16 +25,8 @@ export default function NewOpportunityModal({
   onSubmit: (e: FormEvent) => void;
   onClose: () => void;
 }) {
-  const [visitSummary, setVisitSummary] = useState<{ count: number; windowMonths: number } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    if (!values.customerId) { setVisitSummary(null); return; }
-    apiService.getCustomerVisitSummary(values.customerId, 3)
-      .then((data) => { if (!cancelled) setVisitSummary(data); })
-      .catch(() => { if (!cancelled) setVisitSummary(null); });
-    return () => { cancelled = true; };
-  }, [values.customerId]);
+  const { currentUser } = useAuth();
+  const visitSummary = (useCustomerVisitSummary(currentUser?.tenantId ?? '', values.customerId || undefined, 3).data ?? null) as { count: number; windowMonths: number } | null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
       <motion.div

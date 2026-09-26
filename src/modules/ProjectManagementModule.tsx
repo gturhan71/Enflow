@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo, type FC } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Plus, Search, RefreshCw, Layers, DollarSign, TrendingUp, AlertCircle } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { useProjects, useOpportunities, useProjectHealth } from '../hooks/useEnflowQueries';
 import { ProjectHealthCard } from '../components/HealthCards';
 import { fmtCurrencyExact as fmt } from '../lib/format';
 import {
@@ -28,9 +30,14 @@ interface ProjectManagementModuleProps {
 const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [], customers = [], initialItemId }) => {
   const { currentUser } = useAuth();
   const [view, setView] = useState<'dashboard' | 'list'>('dashboard');
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [wonOpportunities, setWonOpportunities] = useState<Opportunity[]>([]);
-  const [loading, setLoading] = useState(true);
+  const tenantId = currentUser?.tenantId ?? '';
+  const queryClient = useQueryClient();
+  // App'in kullandığı paylaşılan önbellekler (['projects'], ['opportunities']) — modül ayrı fetch yapmaz
+  const projectsQ = useProjects(tenantId);
+  const opportunitiesQ = useOpportunities(tenantId);
+  const projects = (projectsQ.data ?? []) as Project[];
+  const wonOpportunities = useMemo(() => ((opportunitiesQ.data ?? []) as Opportunity[]).filter(o => o.status === 'WON'), [opportunitiesQ.data]);
+  const loading = projectsQ.isFetching;
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterType, setFilterType] = useState('');
@@ -39,26 +46,18 @@ const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [],
   const [showProjectForm, setShowProjectForm] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [prefilledProject, setPrefilledProject] = useState<Partial<Project> & { opportunityId?: string } | undefined>(undefined);
-  const [projectHealth, setProjectHealth] = useState<ProjectHealthReport | null>(null);
+  const projectHealth = (useProjectHealth(tenantId).data ?? null) as ProjectHealthReport | null;
 
+  // Yenile = proje listesi + sağlık raporu önbelleğini geçersiz kıl (['projects'] öneki her ikisini kapsar)
   const loadProjects = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await apiService.getProjects() as Project[];
-      setProjects(data);
-      if (selectedProject) {
-        const upd = data.find(p => p.id === selectedProject.id);
-        if (upd) setSelectedProject(upd);
-      }
-    } finally { setLoading(false); }
-  }, [selectedProject?.id]);
+    await queryClient.invalidateQueries({ queryKey: ['projects'] });
+  }, [queryClient]);
 
-  const loadWonOpportunities = useCallback(async () => {
-    const data = await apiService.getOpportunities() as Opportunity[];
-    setWonOpportunities(data.filter(o => o.status === 'WON'));
-  }, []);
-
-  useEffect(() => { loadProjects(); loadWonOpportunities(); apiService.getProjectHealth().then(setProjectHealth).catch(() => {}); }, []);
+  // Açık proje ayrıntısı, yenilenen listedeki güncel kaydı göstermeli
+  // (eski loadProjects yalnız mount'ta çalışıyordu ve selectedProject'i yakalıyordu → bayat kalabiliyordu)
+  useEffect(() => {
+    setSelectedProject(prev => (prev ? projects.find(p => p.id === prev.id) ?? prev : prev));
+  }, [projects]);
 
   // Deep-link: bildirim/görev "Git" ile gelen projeyi otomatik aç.
   useEffect(() => {

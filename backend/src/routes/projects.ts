@@ -1,4 +1,4 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import path from 'path';
 import fs from 'fs';
@@ -19,6 +19,15 @@ const DELIVERY_NOTIFY_ROLES = ['PROJECT_MGR', 'PROCUREMENT_MGR', 'SALES_MGR', 'L
 
 const router: Router = Router();
 router.use(tenantMiddleware);
+
+// Proje yazma uçları (oluştur/değiştir/sil + milestone/maliyet/devir evrakı) yalnız proje yönetimi rollerine açık.
+// Katılım payı ve overhead uçlarının kendi (GM/FINANCE_MGR) kapısı var → burada atlanır. Okuma herkese (izin/tenant kapılı).
+const PROJECT_WRITE_ROLES = ['GENERAL_MANAGER', 'PROJECT_MGR', 'SALES_MGR', 'OPERATIONS_MGR'];
+const projectWriteGate = requireRole(PROJECT_WRITE_ROLES);
+router.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.method === 'GET' || /\/(participations|overhead)(\/|$)/.test(req.path)) return next();
+  return projectWriteGate(req, res, next);
+});
 
 // IDOR/tenant-izolasyon guard'ı: URL'deki proje bu tenant'a ait mi?
 // Alt-kaynak (milestone/cost/handover) işlemlerinden ÖNCE çağrılır.
@@ -191,6 +200,7 @@ router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {
 // ── MILESTONES ────────────────────────────────────────────────────────────────
 
 router.get('/:id/milestones', asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   const milestones = await prisma.projectMilestone.findMany({
     where: { projectId: String(req.params.id) },
     orderBy: { order: 'asc' },
@@ -311,6 +321,7 @@ router.delete('/:id/milestones/:msId', asyncHandler(async (req: Request, res: Re
 // ── COST ITEMS ────────────────────────────────────────────────────────────────
 
 router.get('/:id/costs', asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProject(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   res.json(await prisma.projectCostItem.findMany({
     where: { projectId: String(req.params.id) },
     orderBy: { createdAt: 'desc' },
@@ -551,6 +562,7 @@ router.post('/:id/participations', tenantMiddleware, partRoles, asyncHandler(asy
 }));
 
 router.delete('/:id/participations/:pid', tenantMiddleware, partRoles, asyncHandler(async (req: Request, res: Response) => {
+  if (!(await ownsProjectP(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   if (!(await ownsProjectP(req))) return res.status(404).json({ error: 'Proje bulunamadı.' });
   const del = await prisma.projectUnitParticipation.deleteMany({ where: { id: String(req.params.pid), projectId: String(req.params.id) } });
   if (del.count === 0) return res.status(404).json({ error: 'İştirak bulunamadı.' });

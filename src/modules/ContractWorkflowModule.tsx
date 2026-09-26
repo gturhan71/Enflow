@@ -17,6 +17,7 @@ import SigningTab from './contract-workflow/SigningTab';
 import TransferTab from './contract-workflow/TransferTab';
 import CancelModal from './contract-workflow/CancelModal';
 import LegalView from './contract-workflow/LegalView';
+import { authFetch } from '../services/apiClient';
 
 export function ContractWorkflowModule({ opportunities = [], proposals = [], initialItemId }: Props) {
   const { currentUser } = useAuth();
@@ -310,15 +311,8 @@ export function ContractWorkflowModule({ opportunities = [], proposals = [], ini
       const formData = new FormData();
       formData.append('file', file);
 
-      const effectiveTenantId = localStorage.getItem('enflow_active_tenant_id') || '';
-      const effectiveToken = localStorage.getItem('enflow_auth_token') || 'mock-token';
-
-      const res = await fetch(`/api/contract-workflows/${selected.id}/documents/${docId}/upload`, {
+      const res = await authFetch(`/api/contract-workflows/${selected.id}/documents/${docId}/upload`, {
         method: 'POST',
-        headers: {
-          'x-tenant-id': effectiveTenantId,
-          'Authorization': `Bearer ${effectiveToken}`,
-        },
         body: formData,
       });
 

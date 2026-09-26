@@ -48,6 +48,10 @@ const mapStep = (step: IncomingStep, index: number) => ({
 // bunların her biri ilgili modülde ÖZEL bir route'tan (kendi durum
 // ön-koşulları/yetki katmanıyla) advanceProcess çağırıyor. Jenerik tetikleme
 // ucu bunları asla tetikleyemez — o hassas ön-koşulları bypass eder.
+// Süreç tanımı (Tasarımcı) yazma uçları yalnız GM: tanım onay adımlarını/alıcıları belirler — rolsüz bir kullanıcı
+// adımları silip (ör. MANUAL onayı kaldırıp) onayı atlatabilir. Tetikleme (/:processKey/trigger) herkese açık kalır.
+const GM_ONLY = requireRole(['GENERAL_MANAGER']);
+
 const KNOWN_PROCESS_KEYS = new Set([
   'OPPORTUNITY_APPROVAL', 'CONTRACT_SIGNING', 'TENDER_SUBMIT_APPROVAL', 'TENDER_TO_CONTRACT',
   'CONTRACT_TO_PROJECT', 'CONTRACT_TO_PROCUREMENT', 'OPPORTUNITY_TO_PROJECT', 'PURCHASE_APPROVAL',
@@ -85,7 +89,7 @@ router.get('/by-process/:processKey', tenantMiddleware, asyncHandler(async (req:
   res.json(workflow);
 }));
 
-router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.post('/', tenantMiddleware, GM_ONLY, asyncHandler(async (req: Request, res: Response) => {
   const { name, description, steps, processKey, entityType } = req.body as { name: string; description?: string; steps: IncomingStep[]; processKey?: string | null; entityType?: string | null };
 
   if (processKey) {
@@ -117,7 +121,7 @@ router.post('/', tenantMiddleware, asyncHandler(async (req: Request, res: Respon
   res.json(workflow);
 }));
 
-router.put('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.put('/:id', tenantMiddleware, GM_ONLY, asyncHandler(async (req: Request, res: Response) => {
   const { name, description, steps, processKey, entityType } = req.body as { name: string; description?: string; steps: IncomingStep[]; processKey?: string | null; entityType?: string | null };
   const tenantId = req.tenantId;
   const id = req.params.id as string;
@@ -187,7 +191,7 @@ router.post('/:processKey/trigger', tenantMiddleware, asyncHandler(async (req: R
 // "oluştur/düzenle/sil" tam yaşam döngüsü talebi). Yarıda kalmış bir gerçek
 // onayı (PENDING ApprovalChain) olan bir süreç sessizce silinemez — o anda
 // devam eden bir işi kimseye görünmez hale getirir; önce çözülmeli.
-router.delete('/:id', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+router.delete('/:id', tenantMiddleware, GM_ONLY, asyncHandler(async (req: Request, res: Response) => {
   const tenantId = req.tenantId;
   const id = req.params.id as string;
   const record = await prisma.workflow.findFirst({ where: { id, tenantId } });
