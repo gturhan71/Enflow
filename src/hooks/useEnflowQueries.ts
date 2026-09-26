@@ -101,3 +101,21 @@ export const useModuleSettings = (tenantId: string) => {
     enabled: !!tenantId,
   });
 };
+
+export const usePurchaseRequests = (tenantId: string, params?: { status?: string; sourceType?: string }) => {
+  return useQuery({
+    queryKey: ['purchase-requests', tenantId, params?.status ?? '', params?.sourceType ?? ''],
+    queryFn: () => apiService.getPurchaseRequests(params),
+    staleTime: 60 * 1000,
+    enabled: !!tenantId,
+  });
+};
+
+export const useVendors = (tenantId: string) => {
+  return useQuery({
+    queryKey: ['vendors', tenantId],
+    queryFn: () => apiService.getVendors(),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
+  });
+};
