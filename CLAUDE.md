@@ -370,7 +370,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
-backend/src/services/uploadsGuard.ts ← prismaClient, utils/logger
+backend/src/lifecycle.ts ← services/periodic
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
@@ -448,7 +448,6 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, services/session, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
@@ -480,6 +479,7 @@ backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
+backend/src/services/uploadsGuard.ts ← prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
 upgrade-tool/cli.mjs ← core
@@ -524,59 +524,60 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 21 seconds ago)
+## changes (last 10 commits — 2 hours ago)
 ```
-backend/src/services/uploadsGuard.ts          +discoverRefFields  +ownersOfUpload  +cachedOwners  +uploadsTenantGuard
-src/App.tsx                                   +clearLocalSession
-src/lib/guaranteeText.ts                      ~uploadGuaranteeSampleFile
-src/lib/html.ts                               +escapeHtml
-src/modules/ContractWorkflowModule.tsx        ~ContractWorkflowModule
-src/modules/reporting/helpers.ts              ~prevRange  ~consolidationHtml  ~printOverview  ~printReportWindow
-src/modules/SalesSupport.tsx                  ~ChecklistTab
-src/services/apiClient.ts                     +notifyIfExpired  +authFetch  ~ApiClient
-src/services/apiService.ts                    ~profQuery  ~ApiService
-backend/scripts/db-migrate.mjs                +run
 backend/scripts/ensure-build.mjs              +needsBuild
-backend/scripts/sync-postgres-schema.mjs      +toPostgres
-backend/src/config/csp.ts                     +cspMode  +cspDirectives  +helmetCsp
-backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
-backend/src/middleware.ts                     ~bearerToken
+src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
+src/modules/todo/TaskList.tsx                 ~TaskRow
+backend/scripts/db-migrate.mjs                +run
+backend/scripts/sync-postgres-schema.mjs      +toPostgres
+backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
 backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
-backend/src/services/backupService.ts         +pgConnEnv  +PlatformScopeForbiddenError  +isMultiTenant  +assertScopeAllowed
-backend/src/services/backupTargets.ts         +restrictFile  ~LocalTarget  ~ensureDir
+backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
-backend/src/services/deploymentGuard.ts       +insecureSecretFiles  +checkSecretFilePermissions  ~checkDeploymentTopology
 backend/src/services/documentNumberService.ts ~incrementDocumentSequence
 backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
 backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/restoreService.ts        ~applyLogicalRestore
-backend/src/services/session.ts               +parseCookies  +getRequestToken  +allowedOrigins  +originHost
 backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
 backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
-upgrade-tool/public/index.html                +refresh  ~refresh  ~renderSettings
-upgrade-tool/server.mjs                       +saveConfig  +sanitizePatch  +loadOrCreateToken  ~saveConfig
+upgrade-tool/public/index.html                ~renderSettings  ~refresh
+upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
-install/lib/service.mjs                       +resolveRestartCommands  +resolveRestartCommand  +renderServiceFile  +planInstall
+install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
 install/POSTGRES_MIGRATION_PLAN.md            +Postgres
 install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
 ```
 
 ## backend
 
-### backend/src/services/uploadsGuard.ts
+### backend/scripts/ensure-build.mjs
 ```
-export function discoverRefFields(models = Prisma.dmmf.datamodel.models) → RefField[]  :16-27  # tenantId'li tablolarda dosya yolu tutabilecek String alanlar
-export async function ownersOfUpload(urlPath) → Promise<Set<string>>  :32-45  # Bu dosya yoluna bağlı kayıtların sahibi kiracılar (boş küme 
-export async function uploadsTenantGuard(req, res, next) → Promise<void>  :60-70  # tenantMiddleware'DEN SONRA çalışır (req
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/pnpm-lock.yaml
@@ -663,11 +664,6 @@ key provider
 function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
-### backend/scripts/ensure-build.mjs
-```
-export function needsBuild(backendDir)  :14-28  # dist/index
-```
-
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -694,21 +690,6 @@ export interface PrismaPaths  :5-9
   schema: string  :7-7
   migrationsPath: string  :8-8
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
-```
-
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :15-25
-  server: Pick<Server, 'close' | 'closeAllCon  :16-16
-  stops: StopFn[]  :17-17
-  disconnect: () => Promise<void>  :18-18
-  timeoutMs?: number  :19-19
-  graceMs?: number  :21-21
-  exit?: (code: number) => void  :22-22
-  log?: { info: (...a: unknown[]) => void  :23-23
-  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
-export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
-export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/src/middleware.ts
@@ -1311,6 +1292,13 @@ export function readUpdateStatus() → UpdateStatus | null  :41-47
 export function startUpdateNotifier() → StopFn  :124-127
 ```
 
+### backend/src/services/uploadsGuard.ts
+```
+export function discoverRefFields(models = Prisma.dmmf.datamodel.models) → RefField[]  :16-27  # tenantId'li tablolarda dosya yolu tutabilecek String alanlar
+export async function ownersOfUpload(urlPath) → Promise<Set<string>>  :32-45  # Bu dosya yoluna bağlı kayıtların sahibi kiracılar (boş küme 
+export async function uploadsTenantGuard(req, res, next) → Promise<void>  :60-70  # tenantMiddleware'DEN SONRA çalışır (req
+```
+
 ### backend/src/services/workflowTemplate.ts
 ```
 export interface ApplyTemplateResult  :152-156
@@ -1365,35 +1353,6 @@ export type AgentMode  :14-14
 ```
 
 ## install
-
-### install/README.md
-```
-h1 Enflow — Kurulum Kılavuzu
-h2 Sistem Gereksinimleri
-h2 Hızlı Kurulum
-h3 Linux / macOS
-h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
-h1 B) Tek başına (sıfırdan — depoyu klonlar):
-h3 Windows
-h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
-h1 B) Tek başına:
-h3 Etkileşimsiz (CI / otomasyon)
-h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
-h2 Başlatma
-h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
-h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
-h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
-h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
-h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
-h3 Servis olarak çalıştırma (ADR-001)
-h2 Dağıtılabilir Kurulum Zip'i Üretme
-h1 Linux/macOS
-h1 Windows
-h2 Ters proxy, HTTPS ve oturum çerezi (P0-3)
-h2 PostgreSQL (Üretim) Notu
-h2 Sorun Giderme
-h2 Güvenlik
-```
 
 ### install/build-package.sh
 ```
@@ -1460,6 +1419,35 @@ h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
 h2 Kapasite teyidi (kurulum sihirbazı)
 h2 İlgili dosyalar
 h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/README.md
+```
+h1 Enflow — Kurulum Kılavuzu
+h2 Sistem Gereksinimleri
+h2 Hızlı Kurulum
+h3 Linux / macOS
+h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
+h1 B) Tek başına (sıfırdan — depoyu klonlar):
+h3 Windows
+h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
+h1 B) Tek başına:
+h3 Etkileşimsiz (CI / otomasyon)
+h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
+h2 Başlatma
+h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
+h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h3 Servis olarak çalıştırma (ADR-001)
+h2 Dağıtılabilir Kurulum Zip'i Üretme
+h1 Linux/macOS
+h1 Windows
+h2 Ters proxy, HTTPS ve oturum çerezi (P0-3)
+h2 PostgreSQL (Üretim) Notu
+h2 Sorun Giderme
+h2 Güvenlik
 ```
 
 ### install/wizard.mjs
