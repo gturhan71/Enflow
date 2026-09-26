@@ -368,6 +368,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 install/wizard.mjs ← lib/pg
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/CustomerCombobox.tsx ← types, utils/textSimilarity
@@ -455,7 +456,6 @@ backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLo
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
 backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
@@ -464,7 +464,6 @@ backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
-backend/src/services/governance.ts ← prismaClient
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
@@ -483,9 +482,10 @@ backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/usageService.ts ← prismaClient, planCatalog
 backend/src/utils/fileUpload.ts ← logger, usageService
-backend/src/utils/secureUpload.ts ← usageService
+upgrade-tool/cli.mjs ← core
+upgrade-tool/core.mjs ← install/lib/service
+upgrade-tool/server.mjs ← core
 ```
 
 ## versions (installed direct deps)
@@ -529,7 +529,7 @@ backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
-backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
+backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
 backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
@@ -590,14 +590,33 @@ export interface PrismaPaths  :5-9
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
-### backend/src/routes/health.ts
+### backend/src/services/backupService.ts
 ```
-export interface HealthDeps  :9-13
-  pingDb: () => Promise<unknown>  :10-10
-  timeoutMs?: number  :11-11
-  version?: string  :12-12
-export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
-export function createHealthRouter(deps) → Router  :38-52
+export interface ModelMeta  :42-46
+  name: string  :43-43
+  delegateKey: string  :44-44
+  hasTenantId: boolean  :45-45
+export interface BackupModuleSettings  :113-122
+  enabled?: boolean  :114-114
+  intervalHours?: number  :115-115
+  scope?: BackupScope  :116-116
+  kind?: BackupKind  :117-117
+  targetType?: TargetType  :118-118
+  location?: string  :119-119
+  nextcloud?: { url?: string  :120-120
+  s3?: { endpoint?: string  :121-121
+export interface RunBackupOpts  :124-134
+  tenantId: string  :125-125
+  scope: BackupScope  :126-126
+  kind: BackupKind  :127-127
+  targetType: TargetType  :128-128
+  location?: string | null  :129-129
+  trigger?: 'MANUAL' | 'SCHEDULED'  :130-130
+  startedById?: string  :131-131
+  startedByName?: string  :132-132
+  settings: BackupModuleSettings | null  :133-133
+export type BackupScope  :32-32
+export type BackupKind  :33-33
 ```
 
 ### backend/src/services/tenantContext.ts
@@ -725,6 +744,16 @@ export type ManagedTx  :112-112
 export async function runManagedTransaction(callback, options?,) → Promise<T>  :121-135
 ```
 
+### backend/src/routes/health.ts
+```
+export interface HealthDeps  :9-13
+  pingDb: () => Promise<unknown>  :10-10
+  timeoutMs?: number  :11-11
+  version?: string  :12-12
+export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
+export function createHealthRouter(deps) → Router  :38-52
+```
+
 ### backend/src/services/activityLogArchiveScheduler.ts
 ```
 export function startActivityLogArchiveScheduler() → StopFn  :54-58
@@ -756,35 +785,6 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 ### backend/src/services/backupScheduler.ts
 ```
 export function startBackupScheduler() → StopFn  :67-70
-```
-
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :42-46
-  name: string  :43-43
-  delegateKey: string  :44-44
-  hasTenantId: boolean  :45-45
-export interface BackupModuleSettings  :113-122
-  enabled?: boolean  :114-114
-  intervalHours?: number  :115-115
-  scope?: BackupScope  :116-116
-  kind?: BackupKind  :117-117
-  targetType?: TargetType  :118-118
-  location?: string  :119-119
-  nextcloud?: { url?: string  :120-120
-  s3?: { endpoint?: string  :121-121
-export interface RunBackupOpts  :124-134
-  tenantId: string  :125-125
-  scope: BackupScope  :126-126
-  kind: BackupKind  :127-127
-  targetType: TargetType  :128-128
-  location?: string | null  :129-129
-  trigger?: 'MANUAL' | 'SCHEDULED'  :130-130
-  startedById?: string  :131-131
-  startedByName?: string  :132-132
-  settings: BackupModuleSettings | null  :133-133
-export type BackupScope  :32-32
-export type BackupKind  :33-33
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -896,17 +896,6 @@ export interface FinancingInstallmentInput  :80-80
 export function computeFinancingEffect(events, interestRates, referenceStart?,) → FinancingResult  :38-70
 export function paymentDate(referenceStart, termDays) → string  :73-76  # referans tarihten gün vade ile ödeme tarihi (ISO)
 export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :88-114  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
-```
-
-### backend/src/services/governance.ts
-```
-export interface ApprovalTier  :13-13
-maxAmount: number  :13-13
-export async function getApprovalMatrix  :15-25
-export async function resolveApproverRoles  :30-39
-export async function isSoDEnabled  :41-47
-export async function resolveEntityCreator  :50-66
-export async function sodViolation  :72-85
 ```
 
 ### backend/src/services/opportunityFolderService.ts
@@ -1291,13 +1280,6 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/usageService.ts
-```
-export async function checkLimit(tenantId, feature, amount = 1) → Promise<boolean>  :16-41
-export async function checkUserSeatLimit(tenantId) → Promise<  :46-46
-export async function incrementUsage(tenantId, feature, amount = 1)  :54-61
-```
-
 ### backend/src/utils/entityTypeTab.ts
 ```
 export function entityTypeToTab(entityType?) → string | undefined  :25-27
@@ -1309,12 +1291,6 @@ export function slugify(str) → string  :13-18
 export function getUploadDir(root, folderName) → string  :20-24
 export async function uploadToNextcloud(fileBuffer, fileName, remotePath, ncUrl, ncUser, ncPass,) → Promise<string>  :26-72
 export async function tryUploadToNextcloud(tenantId, fileBuffer, fileName, remotePath,) → Promise<string | null>  :82-115  # `uploadToNextcloud`'u env değişkenleri + INTEGRATION_SYNC ko
-```
-
-### backend/src/utils/secureUpload.ts
-```
-export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
-export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
 ```
 
 ## governance
@@ -1401,6 +1377,14 @@ h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
 h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
 h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
+```
+
+### install/lib/service.mjs
+```
+export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :29-47  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
+export const launchdDaemonPlist = () =>  :15-23
+export const launchdAgentPlist = () =>  :16-23
+export const winswExePath = (home) =>  :17-23
 ```
 
 ### install/POSTGRES_MIGRATION_PLAN.md
@@ -2358,11 +2342,6 @@ export const getPriorityLabel = (priority) =>  :115-120
 export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
 ```
 
-### src/modules/todo/icons.tsx
-```
-export ListTodo
-```
-
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
@@ -2730,27 +2709,72 @@ export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) 
 
 ## upgrade-tool
 
+### upgrade-tool/cli.mjs
+```
+async function main()  :16-51
+```
+
 ### upgrade-tool/core.mjs
 ```
-export function resolveHome()  :22-27  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
-export function currentVersion(home)  :40-47
-export async function latestVersion(home, channel = 'auto')  :68-94  # En son yayınlanan sürüm
-export function compare(home, current, latest)  :97-111  # Yerel ile uzak karşılaştır → güncelleme var mı
-export function statusPath(home)  :114-114
-export function writeStatus(home, status)  :116-122
-export function readStatus(home)  :123-125
-export async function checkAndWrite(home, channel = 'auto')  :128-146  # Kontrol et + durum dosyası yaz
-export async function runUpgrade(home, opts = {})  :198-265  # Güvenli yükseltme
-function git(home, args)  :14-16
-function gitSafe(home, args)  :17-19
-function parseSemver(tag)  :30-33  # semver "vX
-function cmpSemver(a, b)  :34-37
-function githubJson(path)  :50-62  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
-function dbProvider(home)  :149-159
-function backupDb(home, log)  :161-175
-function restoreDb(snap, log)  :176-181
-function run(home, cmd, args, log, opts = {})  :183-192
+export function resolveHome()  :23-28  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
+export function currentVersion(home)  :41-48
+export async function latestVersion(home, channel = 'auto')  :69-95  # En son yayınlanan sürüm
+export function compare(home, current, latest)  :98-112  # Yerel ile uzak karşılaştır → güncelleme var mı
+export function statusPath(home)  :115-115
+export function writeStatus(home, status)  :117-123
+export function readStatus(home)  :124-126
+export async function checkAndWrite(home, channel = 'auto')  :129-147  # Kontrol et + durum dosyası yaz
+export function toLibpqUrl(url)  :172-174
+export function redactUrl(url)  :176-178  # Log/ipucu için parola maskeleme
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :242-255  # /api/health 200 + db:ok gelene dek yoklar
+export async function runUpgrade(home, opts = {})  :287-375  # Güvenli yükseltme
+function git(home, args)  :15-17
+function gitSafe(home, args)  :18-20
+function parseSemver(tag)  :31-34  # semver "vX
+function cmpSemver(a, b)  :35-38
+function githubJson(path)  :51-63  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
+function readBackendEnv(home)  :150-159
+function dbProvider(home)  :161-168
+function backupDb(home, log, opts)  :183-213
+function restoreDb(snap, log)  :215-228
+function run(home, cmd, args, log, opts = {})  :230-239
+function restartBackend(home, opts, log)  :258-273  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
+function pgRlsInstalled(url)  :275-280
+```
+
+### upgrade-tool/public/index.html
+```
+title: Enflow Upgrade Tool
+span#home
+div#cur
+div#curDate
+div#lat
+div#latDate
+div#state
+div#notes
+button#btnCheck
+button#btnUpgrade
+select#channel
+input#autoCheckHours
+input#autoUpgrade
+input#maintenanceFrom
+input#maintenanceTo
+input#restartCommand
+input#migratorUrl
+input#skipPgBackup
+button#btnSave
+span#saved
+pre#log
+```
+
+### upgrade-tool/server.mjs
+```
+function loadConfig()  :29-31
+function saveConfig(c)  :32-32
+function inMaintenanceWindow()  :46-50
+async function performUpgrade()  :52-59
+async function tick()  :62-71
 ```
 
 
-> **Not everything is here.** 200 file(s) omitted, 1 collapsed to anchors to stay under the 19804-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 202 file(s) omitted to stay under the 19989-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
