@@ -7,7 +7,7 @@ import path from 'path';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { prisma } from '../prismaClient';
 import { logActivity } from '../services/activityLog';
-import { runBackup, getBackupSettings, BackupScope, BackupKind, TargetType, BackupModuleSettings } from '../services/backupService';
+import { runBackup, getBackupSettings, isMultiTenant, PlatformScopeForbiddenError, BackupScope, BackupKind, TargetType, BackupModuleSettings } from '../services/backupService';
 import { verifyBackup } from '../services/backupVerifyService';
 import { analyzeRestore, applyLogicalRestore, stageStateRestore } from '../services/restoreService';
 
@@ -17,6 +17,13 @@ const GATE = requireRole(['BACKUP_ADMIN', 'GENERAL_MANAGER']);
 router.use(GATE);
 
 const sid = (req: Request) => String(req.params.id);
+
+// PLATFORM kapsamlı bir yedek TÜM kiracıların verisini içerir — çok kiracılı kurulumda kimse
+// (indirme/geri yükleme dahil) bunu API'den kullanamaz. Önceden alınmış PLATFORM yedekleri için de geçerli.
+async function platformScopeBlocked(scope: string | null | undefined): Promise<boolean> {
+  return scope === 'PLATFORM' && (await isMultiTenant());
+}
+const PLATFORM_FORBIDDEN = { error: new PlatformScopeForbiddenError().message };
 
 async function actorName(req: Request): Promise<string | undefined> {
   if (!req.userId) return undefined;
@@ -33,17 +40,25 @@ router.get('/jobs', asyncHandler(async (req: Request, res: Response) => {
 router.post('/jobs', asyncHandler(async (req: Request, res: Response) => {
   const { scope, kind, targetType, location } = req.body as { scope?: BackupScope; kind?: BackupKind; targetType?: TargetType; location?: string };
   const settings = await getBackupSettings(req.tenantId);
-  const job = await runBackup({
-    tenantId: req.tenantId,
-    scope: scope || 'PLATFORM',
-    kind: kind || 'FULL',
-    targetType: targetType || 'LOCAL',
-    location: location || null,
-    trigger: 'MANUAL',
-    startedById: req.userId,
-    startedByName: await actorName(req),
-    settings,
-  });
+  // Varsayılan kapsam: tek kiracıda PLATFORM (eski davranış), çok kiracıda TENANT (izolasyon)
+  const effectiveScope: BackupScope = scope || ((await isMultiTenant()) ? 'TENANT' : 'PLATFORM');
+  let job: { id: string };
+  try {
+    job = await runBackup({
+      tenantId: req.tenantId,
+      scope: effectiveScope,
+      kind: kind || 'FULL',
+      targetType: targetType || 'LOCAL',
+      location: location || null,
+      trigger: 'MANUAL',
+      startedById: req.userId,
+      startedByName: await actorName(req),
+      settings,
+    });
+  } catch (e: unknown) {
+    if (e instanceof PlatformScopeForbiddenError) return res.status(403).json({ error: e.message });
+    throw e;
+  }
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'BACKUP_CREATE', entityType: 'BACKUP_JOB', entityId: job.id, details: { scope, kind, targetType } });
   const full = await prisma.backupJob.findUnique({ where: { id: job.id } });
   res.json(full);
@@ -67,6 +82,7 @@ router.get('/jobs/:id/download', asyncHandler(async (req: Request, res: Response
   const which = req.query.artifact === 'state' ? 'state' : 'data';
   const job = await prisma.backupJob.findFirst({ where: { id: sid(req), tenantId: req.tenantId } });
   if (!job) return res.status(404).json({ error: 'Yedek bulunamadı.' });
+  if (await platformScopeBlocked(job.scope)) return res.status(403).json(PLATFORM_FORBIDDEN);
   if (job.targetType !== 'LOCAL') return res.status(400).json({ error: 'İndirme yalnız LOCAL hedef için.' });
   const ref = which === 'state' ? job.stateRef : job.dataRef;
   if (!ref || !path.isAbsolute(ref) || !fs.existsSync(ref)) return res.status(404).json({ error: 'Artefakt bulunamadı.' });
@@ -79,6 +95,7 @@ router.post('/restore/analyze', asyncHandler(async (req: Request, res: Response)
   if (!backupId) return res.status(400).json({ error: 'backupId zorunlu.' });
   const job = await prisma.backupJob.findFirst({ where: { id: backupId, tenantId: req.tenantId } });
   if (!job) return res.status(404).json({ error: 'Yedek bulunamadı.' });
+  if (await platformScopeBlocked(job.scope)) return res.status(403).json(PLATFORM_FORBIDDEN);
   const result = await analyzeRestore(req.tenantId, backupId, { id: req.userId, name: await actorName(req) });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'RESTORE_ANALYZE', entityType: 'RESTORE_JOB', entityId: result.id, details: { backupId } });
   res.json(result);
@@ -99,6 +116,8 @@ router.post('/restore/:id/confirm', asyncHandler(async (req: Request, res: Respo
   const { mode } = req.body as { mode?: 'LOGICAL' | 'STATE' };
   const job = await prisma.restoreJob.findFirst({ where: { id: sid(req), tenantId: req.tenantId } });
   if (!job) return res.status(404).json({ error: 'Geri yükleme bulunamadı.' });
+  const source = await prisma.backupJob.findFirst({ where: { id: job.backupId, tenantId: req.tenantId }, select: { scope: true } });
+  if (await platformScopeBlocked(source?.scope)) return res.status(403).json(PLATFORM_FORBIDDEN);
   const actor = { id: req.userId, name: await actorName(req) };
   if (mode === 'STATE') {
     const r = await stageStateRestore(job.id);
@@ -132,6 +151,7 @@ router.get('/settings', asyncHandler(async (req: Request, res: Response) => {
 
 router.put('/settings', asyncHandler(async (req: Request, res: Response) => {
   const body = req.body as BackupModuleSettings;
+  if (await platformScopeBlocked(body.scope)) return res.status(400).json(PLATFORM_FORBIDDEN);
   const tenant = await prisma.tenant.findUnique({ where: { id: req.tenantId } });
   let ms: Record<string, unknown> = {};
   try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }

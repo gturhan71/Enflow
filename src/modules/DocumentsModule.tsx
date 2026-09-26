@@ -15,6 +15,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
 import { CorporateDocument } from '../types';
 import { apiService } from '../services/apiService';
+import { authFetch } from '../services/apiClient';
 
 interface DocumentsModuleProps {
   documents: CorporateDocument[];
@@ -55,11 +56,7 @@ const DocumentsModule = ({ documents, setDocuments }: DocumentsModuleProps) => {
       let fileUrl = saved.fileUrl;
       if (newDocFile) {
         const fd = new FormData(); fd.append('file', newDocFile);
-        const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-        const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-        const res = await fetch(`/api/documents/${saved.id}/upload`, {
-          method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
-        });
+        const res = await authFetch(`/api/documents/${saved.id}/upload`, { method: 'POST', body: fd });
         const data = await res.json();
         if (res.ok) fileUrl = data.doc?.fileUrl;
       }
