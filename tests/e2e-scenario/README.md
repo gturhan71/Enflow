@@ -34,7 +34,7 @@ cd tests/e2e-scenario && pnpm install && pnpm test
 
 ## Neden `pnpm verify`'ye dahil değil
 
-Her senaryo dosyası kendi backend sürecini + `prisma db push`'unu ayağa kaldırdığından tüm paket ~30-40 saniye sürüyor — `pnpm verify`'nin commit-öncesi hızlı geri bildirim amacına uymuyor (`tests/rbac` de aynı gerekçeyle ayrı tutulur). Bunun yerine: yeni bir süreç/agent davranışı eklerken veya bir "iddia"yı doğrulamadan önce elle çalıştırın; CI'a nightly/manuel bir adım olarak eklenmesi ayrı bir karar.
+Her senaryo dosyası kendi backend sürecini + `prisma db push`'unu ayağa kaldırdığından tüm paket ~30-40 saniye sürüyor — `pnpm verify`'nin commit-öncesi hızlı geri bildirim amacına uymuyor (`tests/rbac` de aynı gerekçeyle ayrı tutulur). Bunun yerine: yeni bir süreç/agent davranışı eklerken veya bir "iddia"yı doğrulamadan önce elle çalıştırın; CI'da ayrı `e2e-scenario` job'u olarak her PR'da koşar (P1-5).
 
 ## Senaryo → dosya haritası
 
