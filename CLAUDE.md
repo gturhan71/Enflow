@@ -380,7 +380,6 @@ src/components/MoneyInput.tsx ← lib/format
 src/components/ProcessTriggerButton.tsx ← lib/utils, services/apiService, types/workflow
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
-src/components/settings/UnitManagement.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
 src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
@@ -460,7 +459,6 @@ backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, service
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/agentProvenance.ts ← pluginCatalog
 backend/src/services/aiClient.ts ← prismaClient, tenantEncryption
-backend/src/services/approvalSlaEscalation.ts ← prismaClient, utils/businessDays
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
@@ -528,8 +526,9 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 35 seconds ago)
+## changes (last 10 commits — 39 seconds ago)
 ```
+backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
 backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
@@ -542,6 +541,11 @@ upgrade-tool/core.mjs                         ~runUpgrade
 ```
 
 ## backend
+
+### backend/scripts/sync-postgres-schema.mjs
+```
+export function toPostgres(schema)  :21-25
+```
 
 ### backend/src/lifecycle.ts
 ```
@@ -703,15 +707,53 @@ INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 key provider
 ```
 
+### backend/prisma/migrations-postgres/0000_baseline/migration.sql
+```
+TABLE Tenant
+TABLE Subscription
+TABLE UsageMetric
+TABLE Unit
+TABLE User
+TABLE Customer
+TABLE Contact
+TABLE Opportunity
+TABLE OpportunityRequiredDoc
+TABLE OpportunityProgressLog
+TABLE Proposal
+TABLE CostAnalysisVersion
+TABLE Brand
+TABLE ProductCategory
+TABLE BrandSource
+TABLE BoMItem
+TABLE BoMLineQuote
+TABLE CostItem
+TABLE WorkflowLog
+TABLE Project
+TABLE ServiceTicket
+TABLE PlatformTicket
+TABLE ProfitabilitySnapshot
+TABLE ProjectMilestone
+TABLE ProjectCostItem
+```
+
+### backend/prisma/migrations-postgres/migration_lock.toml
+```
+key provider
+```
+
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
 async function main()  :29-57
 ```
 
-### backend/scripts/sync-postgres-schema.mjs
+### backend/src/config/prismaPaths.ts
 ```
-export function toPostgres(schema)  :21-25
+export interface PrismaPaths  :5-9
+  provider: 'postgresql' | 'sqlite'  :6-6
+  schema: string  :7-7
+  migrationsPath: string  :8-8
+export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
 ```
 
 ### backend/src/middleware.ts
@@ -751,12 +793,6 @@ export async function getTenantAIConfig(tenantId) → Promise<TenantAIConfig | n
 export async function isAIConfigured(tenantId) → Promise<boolean>  :68-70
 export function assertSafeAiUrl(rawUrl) → void  :81-96  # SSRF azaltımı: YZ baseUrl yalnız http(s) olabilir ve bulut m
 export async function chatJSON(opts) → Promise<T | null>  :102-164  # Tenant YZ'sine OpenAI-uyumlu chat isteği gönderir ve JSON ya
-```
-
-### backend/src/services/approvalSlaEscalation.ts
-```
-export async function getApprovalSlaBusinessDays(tenantId) → Promise<number>  :17-25
-export async function sweepApprovalSlaEscalations(tenantId) → Promise<void>  :27-91
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -1360,11 +1396,6 @@ handler onClick
 handler onChange
 ```
 
-### src/components/InfoTooltip.tsx
-```
-component InfoTooltip
-```
-
 ### src/components/MoneyInput.tsx
 ```
 component MoneyInput
@@ -1396,16 +1427,6 @@ hook useCallback
 export TenantSettings
 handler onChange
 handler onClick
-```
-
-### src/components/settings/UnitManagement.tsx
-```
-props UnitManagementProps
-hook useState
-export UnitManagement
-handler onClick
-handler onSubmit
-handler onChange
 ```
 
 ### src/components/settings/UserManagement.tsx
@@ -2656,4 +2677,4 @@ function run(home, cmd, args, log, opts = {})  :183-192
 ```
 
 
-> **Not everything is here.** 196 file(s) omitted to stay under the 19184-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 199 file(s) omitted to stay under the 19320-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
