@@ -5,7 +5,7 @@
 // penceresinde yükseltir. Operatör GUI'den elle kontrol/yükseltme de yapabilir.
 // ⚠️ Yalnız operatörün makinesinde, 127.0.0.1'e bağlı. Yükseltme yıkıcıdır.
 import { createServer } from 'node:http';
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, chmodSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveHome, checkAndWrite, readStatus, runUpgrade, currentVersion } from './core.mjs';
@@ -29,7 +29,8 @@ const DEFAULTS = {
 function loadConfig() {
   try { return { ...DEFAULTS, ...JSON.parse(readFileSync(CONFIG, 'utf-8')) }; } catch { return { ...DEFAULTS }; }
 }
-function saveConfig(c) { writeFileSync(CONFIG, JSON.stringify(c, null, 2)); }
+// migratorUrl parola içerir → yalnız sahibi okuyabilsin (0600; Windows'ta NTFS ACL'e bırakılır)
+function saveConfig(c) { writeFileSync(CONFIG, JSON.stringify(c, null, 2), { mode: 0o600 }); try { chmodSync(CONFIG, 0o600); } catch { /* Windows */ } }
 // Parola içeren migratorUrl GUI/API yanıtlarına ASLA düz yazılmaz.
 const MASK = '********';
 const publicConfig = (c) => ({ ...c, migratorUrl: c.migratorUrl ? MASK : '' });
