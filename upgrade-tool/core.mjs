@@ -3,7 +3,7 @@
 // belirler (tag varsa semver tag, yoksa origin/main commit) ve istenirse
 // güvenli sıra ile yükseltir. UYGULAMANIN İÇİNDE DEĞİL — ayrı süreç.
 import { execFileSync, execFile } from 'node:child_process';
-import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, readdirSync, mkdirSync, rmSync, statSync, chmodSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { resolveRestartCommands, formatCommand } from '../install/lib/service.mjs';
@@ -206,7 +206,11 @@ function backupDb(home, log, opts) {
     const files = [];
     // WAL modunda son yazılanlar -wal'dadır → üçü birlikte kopyalanır
     for (const ext of ['', '-wal', '-shm']) {
-      if (existsSync(abs + ext)) { copyFileSync(abs + ext, `${abs}.pre-upgrade-${stamp}${ext}`); files.push(ext); }
+      if (existsSync(abs + ext)) {
+        const dest = `${abs}.pre-upgrade-${stamp}${ext}`;
+        copyFileSync(abs + ext, dest); files.push(ext);
+        try { chmodSync(dest, 0o600); } catch { /* Windows */ } // tüm veritabanı — yalnız sahibi okusun
+      }
     }
     log(`ön-yedek: SQLite → ${abs}.pre-upgrade-${stamp} (${files.map((e) => e || '.db').join(', ')})`);
     return { kind: 'sqlite', src: abs, stamp, files };
@@ -214,7 +218,8 @@ function backupDb(home, log, opts) {
   if (db.kind === 'postgres') {
     const dumpUrl = toLibpqUrl(opts.migratorUrl || db.url);
     const dir = join(home, 'backend', 'backups');
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(dir, { recursive: true, mode: 0o700 });
+    try { chmodSync(dir, 0o700); } catch { /* Windows */ }
     const file = join(dir, `pre-upgrade-${Date.now()}.dump`);
     try {
       execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', file], { stdio: ['ignore', 'ignore', 'pipe'], env: PG_RLS_ENV(dumpUrl) });
@@ -223,6 +228,7 @@ function backupDb(home, log, opts) {
       if (opts.skipPgBackup) { log(`UYARI: Postgres ön-yedeği alınamadı (${why}) — skipPgBackup ile devam.`); return null; }
       throw new Error(`Postgres ön-yedeği alınamadı (${why}). PostgreSQL istemci araçlarını kurun veya bilinçli olarak skipPgBackup ile atlayın.`);
     }
+    try { chmodSync(file, 0o600); } catch { /* Windows */ }
     log(`ön-yedek: Postgres → ${file}`);
     return { kind: 'postgres', backup: file, url: dumpUrl };
   }
@@ -251,6 +257,29 @@ export function describeRestore(snap, dbTouched) {
     lines.push('  (ön-yedekten sonra yazılan veriler bu adımda kaybolur)');
   }
   return lines;
+}
+
+/**
+ * Sır/yedek dosyalarını sahibine kısıtlar (POSIX): backend/.env (JWT + şifreleme anahtarı + DB parolası),
+ * backend/backups/ (0700) ve içindeki dump'lar, *.pre-upgrade-* SQLite kopyaları (0600). Eski sihirbaz
+ * .env'i 0644 yazıyordu — mevcut kurulumlar ilk yükseltmede kendiliğinden düzelir. Değişenleri döndürür.
+ */
+export function hardenSecretFiles(home) {
+  if (process.platform === 'win32') return [];
+  const fixed = [];
+  const tighten = (p, mode) => {
+    try {
+      const cur = statSync(p).mode & 0o777;
+      if ((cur & 0o077) !== 0) { chmodSync(p, mode); fixed.push(`${p} (${cur.toString(8)} → ${mode.toString(8)})`); }
+    } catch { /* yok */ }
+  };
+  const backend = join(home, 'backend');
+  tighten(join(backend, '.env'), 0o600);
+  tighten(join(backend, 'backups'), 0o700);
+  const sweep = (dir, re) => { try { for (const f of readdirSync(dir)) if (re.test(f)) tighten(join(dir, f), 0o600); } catch { /* yok */ } };
+  sweep(join(backend, 'backups'), /^pre-upgrade-.*\.dump$/);
+  sweep(backend, /\.pre-upgrade-\d+(-wal|-shm)?$/);
+  return fixed;
 }
 
 function run(home, cmd, args, log, opts = {}) {
@@ -350,6 +379,8 @@ export async function runUpgrade(home, opts = {}) {
   if (dirty && !opts.allowDirty) {
     return { ok: false, from, error: 'Çalışma ağacı kirli (git status). allowDirty ile zorla ya da temizle.\n' + dirty };
   }
+
+  for (const f of hardenSecretFiles(home)) log(`izin sıkılaştırıldı: ${f}`);
 
   // Postgres: şema DDL'i yalnız migrator rolüyle (runtime rolünde DDL yok) — değişiklikten ÖNCE kontrol
   const db = dbProvider(home);

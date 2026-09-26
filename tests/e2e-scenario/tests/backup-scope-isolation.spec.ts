@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync, rmSync, statSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createIsolatedTestDb, destroyTestDb } from '../helpers/testDb';
@@ -47,6 +48,13 @@ describe('BACKUP-PLATFORM-SCOPE-TENANT-ISOLATION', () => {
     expect(body.scope).toBe('PLATFORM');
     expect(body.status).toBe('COMPLETED');
     singleTenantPlatformJobId = body.id;
+  });
+
+  // Yedek dosyası tüm veritabanını (parola hash'leri dahil) içerir → yalnız sahibi okuyabilmeli
+  it.skipIf(process.platform === 'win32')('yedek dosyası 0600, kendi dizini 0700 (yerel kullanıcılar okuyamaz)', async () => {
+    const { body } = await api.post<{ dataRef: string }>('/backup/jobs', { kind: 'DATA', location: backupDir });
+    expect((statSync(body.dataRef).mode & 0o777).toString(8)).toBe('600');
+    expect((statSync(dirname(body.dataRef)).mode & 0o777).toString(8)).toBe('700');
   });
 
   describe('ÇOK kiracı (ikinci kiracı + verisi eklendi)', () => {
