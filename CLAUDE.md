@@ -325,7 +325,8 @@ Boş birim koltuğunu dolduran **deterministik (LLM'siz)** vekiller — `virtual
 | 12 | **Tenant verisi alan-bazlı şifreleme** — envelope encryption, tenant-başına DEK (`Tenant.dekWrapped`, `AUTH_JWT_SECRET` deseniyle aynı `DATA_ENCRYPTION_MASTER_KEY` env var). Kapsam: Tenant YZ `apiKey`, `Vendor.iban`/`bankName`, `Customer.taxNumber`/`taxOffice` (AES-256-GCM, `enc:v1:` önekli, arama/filtrede kullanılmadığı doğrulandı). Yeni `backend/src/services/tenantEncryption.ts` (`encryptForTenant`/`decryptForTenant`) + backfill script (`backfill-tenant-encryption.ts`, idempotent) + `install/wizard.mjs` otomatik key üretimi. Route-bazlı çağrı (genel Prisma `$extends` hot path'ine eklenmedi — bkz. gerekçe `docs/TENANT_DATA_ENCRYPTION_PLAN.md`). Yan-etki: `GET/POST/PUT /api/tenants` artık `dekWrapped`'i `omit` ediyor (önceden hiçbir alan şifrelenmediği için bu risk yoktu). Key rotation + `backend/uploads/` dosya şifrelemesi + gerçek KMS entegrasyonu bilinçli olarak kapsam dışı bırakıldı. | add_tenant_dek |
 | 13 | **Platform Ticket — talep/geri bildirim toplama** (`PlatformTicket` modeli). Enflow SaaS olarak tenant'lardan gelen ürün talebi/hata/iyileştirme/mimari-değişiklik taleplerini toplar; sınıflandırma/öncelik/timeline/sonuç **bu repo dışındaki** bir YZ triage aracının işi. Kullanıcı gönderirken `reportedType` (Hata\|İyileştirme\|Yorum) ile kendi ilk izlenimini bildirir — bu, dış aracın nihai `category`sinden (BUG\|IMPROVEMENT\|ARCHITECTURE_CHANGE) bağımsızdır (bir "yorum" değerlendirmede "mimari değişiklik" olarak sınıflandırılabilir). İki ayrı router: `/api/platform-tickets` (`tenantMiddleware`-only, her rol POST+GET, `title`+`description`+`reportedType` dışındaki alanlar istemciden yok sayılır) ve `/api/platform-tickets-admin` (yeni `platformApiKeyMiddleware` — `PLATFORM_TICKET_API_KEY` paylaşımlı-secret, `timingSafeEqual` uzunluk-kontrollü, **cross-tenant**, `tenantMiddleware` YOK — dış aracın tüm tenant'ları okuyup `category`/`priority`/`scope`(`TENANT_SPECIFIC`\|`PLATFORM_WIDE`)/`status`/`targetTimeline`/`resolutionNote` yazması için). `scope` alanı, tek-şema çok-kiracılı mimaride bir tenant'ın mimari talebinin diğerlerini etkileyip etkilemediğini işaretler — gerçek tenant-bazlı config-divergence mekanizması bu fazın kapsamı DIŞINDA, ileride ayrı bir iş. Durum değiştiğinde submitter'a `Notification` (`relatedModule: 'platform-tickets'`). Sidebar: `DASHBOARD_VIEW` (herkes, `help` emsali). | add_platform_ticket / add_platform_ticket_reported_type |
 | 14 | **Sözleşmeye bağlı teslim süresi takibi** (v2.5.0) — malın/işin fiili teslim tarihi (imza gününden başlar, sözleşmenin kendi `deadline`/geçerlilik süresinden BAĞIMSIZ, aşılması cezai şart doğurur) İhale→Sözleşme→Proje zinciri boyunca taşınır. Yeni `DeliveryTimelineStep` modeli (Tender/ContractWorkflow'a alt-kırılımlı tahmini takvim — Sipariş Onayı/Üretim/Sevkiyat/Teslim, `deliveryTimeline.ts` saf üretici) + `ContractWorkflow.deliveryPeriodDays/deliveryDueDate/penaltyDailyRatePct/penaltyCapPct` (otomatik ceza hesabı, `deliveryPenalty.ts`) + T4'te gerçek `ProjectMilestone(DELIVERY)` satırlarına dönüşüm (`processEngine.ts` `createProjectFromEntity`). `deliveryDeadlineReminders.ts` sweep'i (tenderReminders.ts deseni) PROJECT_MGR+PROCUREMENT_MGR+SALES_MGR+LEGAL_MGR+proje PM'ine 30/15/7/1 gün + süre-aşımı uyarısı düşürür; DELIVERY milestone'u COMPLETED işaretlenince aynı birimlere "teslimat teyit edildi" bildirimi (`DELIVERY_CONFIRMED` denetim izi). İhale aşamasında tedarikçi teslim teyidi olmadan teklif verilmesi engellenmez, yumuşak uyarı verir. Tek kaynak: `docs/TESLIM_SURESI_TAKIP_PLAN.md` | add_delivery_deadline_tracking |
-| 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı hiç çalıştırılmadı**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
+| 15 | **Veritabanı güvenliği — Adım 0 (Faz 1+2)** (2026-09-13) — harici bir güvenlik kontrol listesi (Prisma Studio/DB'ye yetkilendirme atlanarak erişim riski) Enflow'un gerçek bare-metal kurulum mimarisine (Docker/Traefik YOK, `install/wizard.mjs`) uyarlandı. **Faz 1 — ağ sertleştirmesi:** `wizard.mjs`'e uzak-Postgres tespiti + `nmap` doğrulama komutu + opt-in (varsayılan hayır, onaysız hiçbir şey değişmez) ufw/Windows Firewall kısıtlaması (`offerFirewallHardening`) eklendi; `install/README.md`+`ILK_KURULUM_KILAVUZU.md`+`docs/SYSTEM_REQUIREMENTS.md`'ye "DB portu/Prisma Studio ASLA internete açılmaz" uyarıları eklendi. **Faz 2 — en-az-yetki:** `provisionPostgresDb` artık **iki rol** oluşturuyor — `<kullanıcı>_migrator` (DB owner, DDL, yalnız kurulum/şema güncellemesinde, `.env`'e yazılmaz) + runtime `<kullanıcı>` (`NOSUPERUSER NOCREATEDB NOCREATEROLE`, `db push` sonrası `grantRuntimePrivileges` ile yalnız DML + `ALTER DEFAULT PRIVILEGES`). **Faz 3 (PostgreSQL Row-Level Security) — KOD TAMAM, Postgres'te DOĞRULANMADI:** `tenantContext.ts` (AsyncLocalStorage) + `prismaClient.ts` iki-katmanlı `$extends` (`basePrisma`/`prisma` ayrımı — tek katmanda `.$transaction` çağrısı TS7022 döngüsel tip hatası veriyordu) + `runManagedTransaction` (kod tabanındaki 12 mevcut `prisma.$transaction` çağrı yeri buna geçirildi) + 4 bypass yolu (login, bootstrapTenant, `POST /api/tenants`, platform-tickets-admin, restore) + 4 standalone scheduler'a `runWithTenant` sarmalaması + `apply-postgres-rls.ts`/`verify-postgres-rls.ts` (yeni scriptler, DMMF-bazlı 64 doğrudan+13 dolaylı+2 istisna=79 model haritası) + `wizard.mjs` opt-in uygulama adımı. `tsc` 0 hata, unit 176/176, SQLite canlı curl testi sorunsuz — **gerçek Postgres'e karşı Faz 16'da (2026-09-26) CI'da doğrulandı — o sırada PG+RLS'te login kırığı bulunup düzeltildi**, mimari değişiklik olduğundan (MINOR versiyon adayı v2.6.0) production öncesi Postgres doğrulaması + kullanıcı onayı bekliyor. Tek kaynak: `docs/VERITABANI_GUVENLIGI_PLAN.md`. | — (migration yok, SQLite şeması değişmedi) |
+| 16 | **Üretim çalışma zamanı + Postgres migration hattı** (2026-09-26, 3 yığılı PR; tek kaynak `.10x/specs/2026-09-26-production-runtime-and-postgres-pipeline-design.md`, ADR-001/002) — backend derlenir (`pnpm start` = `node dist/index.js`, `ts-node` yalnız `dev`); graceful shutdown (`lifecycle.ts`, SIGTERM ≤10 sn, `closeAllConnections`), `/api/health` DB ping (200/503); OS servisi (systemd/launchd/WinSW, wizard 8/8 opt-in, `install/lib/service.mjs` + `install/service/*`, WinSW v2.12.0 SHA256 sabit); **Postgres için ayrı migration hattı** (`prisma/postgres/schema.prisma` kanonikten üretilir, `prisma/migrations-postgres`, `prisma.config.ts` `DATABASE_URL`'e göre seçer; izlenen dosya artık hiç değişmez; `pnpm db:migrate <ad>` iki migration üretir); CI `postgres` job'u (`scripts/ci-postgres.sh`: migrate deploy → drift → RLS → HTTP → pg_dump → SIGTERM); upgrade-tool: migrator zorunlu, `pg_dump` ön-yedek, servis restart, health(uptime) doğrulama, otomatik kod rollback (PG verisi için maskeli `pg_restore` ipucu). Bulunup düzeltilen 5 hata: PG+RLS login kırığı, PG STATE yedeği hiç çalışmıyordu, servis ortamında `spawn('node')` backend'i çökertiyordu, upgrade health false-positive, pg parolası argv'de. RBAC 1027/1027 (izole kopya), e2e 12/12. Doğrulanmamış: Windows/WinSW, gerçek systemd/LaunchDaemon (`docs/RELEASE_CHECKLIST.md`). **Sürüm ARTIRILMADI** (v2.6.0 adayı, onay bekliyor). | — (migration yok; PG baseline `migrations-postgres/0000_baseline`) |
 
 Her faz sonunda RBAC süiti **69/69** geçti (Faz 14 hariç — bkz. plan dokümanındaki not, sonraki genel RBAC koşusuna dahil edilmeli; Faz 15: RBAC süiti artık 1027 test — SQLite'a karşı koşuldu, 1000 geçti/26 kaldı, `git stash` ile değişiklikler geri alınıp AYNI 26 test birebir aynı hatalarla yine başarısız olduğu doğrulandı → önceden var, Faz 15'ten bağımsız, sıfır regresyon; Postgres-özel Faz 2/3 değişikliği yerel bir Postgres örneğiyle henüz manuel doğrulanmadı). Detaylı tarihçe: `walkthrough.md` (§1–§27) + `memory/project_status.md`.
 ## Sonraki Adımlar (Planlanan)
@@ -369,7 +370,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
-install/wizard.mjs ← lib/pg
+install/wizard.mjs ← lib/pg, lib/service
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/server.mjs ← core
@@ -379,6 +380,7 @@ src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
+src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
@@ -420,7 +422,6 @@ src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
 src/modules/negotiation/ChatInfoPanel.tsx ← ../lib/utils, ../types
 src/modules/negotiation/ChatWindow.tsx ← ../lib/utils, types
 src/modules/NegotiationModule.tsx ← types, contexts/AuthContext, services/apiService, negotiation/types, negotiation/AccessDeniedPanel
-src/modules/PlatformTicketsModule.tsx ← services/apiService, types
 src/modules/PresalesModule.tsx ← types, SpecAnalysis, SpecComplianceMatrix, contexts/AuthContext, components/PermissionGate
 src/modules/procurement/PRDetailDrawer.tsx ← ../services/apiService, ../lib/format, ../types, constants, StatusBadge
 src/modules/ProcurementModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types, procurement/constants
@@ -523,76 +524,51 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 38 minutes ago)
+## changes (last 10 commits — 9 minutes ago)
 ```
-backend/scripts/db-migrate.mjs                +run
-backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
-backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  ~runWithTenant  ~runWithRlsBypass
-install/lib/service.mjs                       +resolveRestartCommand
-install/wizard.mjs                            ~setSchemaProvider  ~main  ~ensurePostgresServer
+backend/src/services/backupService.ts         +pgConnEnv  ~toLibpqUrl  ~runBackup
+install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
+install/wizard.mjs                            +offerServiceInstall  ~ensurePostgresServer  ~main
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
-upgrade-tool/server.mjs                       ~performUpgrade  ~loadConfig  ~saveConfig
+upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
 ```
 
 ## backend
 
-### backend/scripts/db-migrate.mjs
-```
-function run(cmd, cmdArgs, env = {})  :32-35
-```
-
-### backend/scripts/sync-postgres-schema.mjs
-```
-export function toPostgres(schema)  :25-29
-```
-
 ### backend/src/services/backupService.ts
 ```
-export interface ModelMeta  :42-46
-  name: string  :43-43
-  delegateKey: string  :44-44
-  hasTenantId: boolean  :45-45
-export interface BackupModuleSettings  :113-122
-  enabled?: boolean  :114-114
-  intervalHours?: number  :115-115
-  scope?: BackupScope  :116-116
-  kind?: BackupKind  :117-117
-  targetType?: TargetType  :118-118
-  location?: string  :119-119
-  nextcloud?: { url?: string  :120-120
-  s3?: { endpoint?: string  :121-121
-export interface RunBackupOpts  :124-134
-  tenantId: string  :125-125
-  scope: BackupScope  :126-126
-  kind: BackupKind  :127-127
-  targetType: TargetType  :128-128
-  location?: string | null  :129-129
-  trigger?: 'MANUAL' | 'SCHEDULED'  :130-130
-  startedById?: string  :131-131
-  startedByName?: string  :132-132
-  settings: BackupModuleSettings | null  :133-133
-export type BackupScope  :32-32
-export type BackupKind  :33-33
-```
-
-### backend/src/services/tenantContext.ts
-```
-export function getTenantContext() → TenantContext | undefined  :15-17
-export function runWithTenant(tenantId, fn) → T  :37-39
-export function runWithRlsBypass(fn) → T  :45-47
+export interface ModelMeta  :49-53
+  name: string  :50-50
+  delegateKey: string  :51-51
+  hasTenantId: boolean  :52-52
+export interface BackupModuleSettings  :120-129
+  enabled?: boolean  :121-121
+  intervalHours?: number  :122-122
+  scope?: BackupScope  :123-123
+  kind?: BackupKind  :124-124
+  targetType?: TargetType  :125-125
+  location?: string  :126-126
+  nextcloud?: { url?: string  :127-127
+  s3?: { endpoint?: string  :128-128
+export interface RunBackupOpts  :131-141
+  tenantId: string  :132-132
+  scope: BackupScope  :133-133
+  kind: BackupKind  :134-134
+  targetType: TargetType  :135-135
+  location?: string | null  :136-136
+  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
+  startedById?: string  :138-138
+  startedByName?: string  :139-139
+  settings: BackupModuleSettings | null  :140-140
+export type BackupScope  :39-39
+export type BackupKind  :40-40
 ```
 
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
-```
-TABLE new_PlatformTicket
-INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
 ```
 
 ### backend/prisma/migrations/20260819134722_add_customer_parent_hierarchy/migration.sql
@@ -692,6 +668,11 @@ TABLE ProjectCostItem
 key provider
 ```
 
+### backend/scripts/db-migrate.mjs
+```
+function run(cmd, cmdArgs, env = {})  :32-35
+```
+
 ### backend/scripts/ensure-build.mjs
 ```
 export function needsBuild(backendDir)  :14-28  # dist/index
@@ -701,6 +682,11 @@ export function needsBuild(backendDir)  :14-28  # dist/index
 ```
 async function login()  :18-27
 async function main()  :29-57
+```
+
+### backend/scripts/sync-postgres-schema.mjs
+```
+export function toPostgres(schema)  :25-29
 ```
 
 ### backend/src/config/prismaPaths.ts
@@ -1223,6 +1209,13 @@ export function mockDocuments() → AnalyzedDoc[]  :64-75
 export async function analyzeSpec(inputText, opts,) → Promise<  :105-108  # Şartname/sözleşme metnini analiz eder; tenant YZ'si yapıland
 ```
 
+### backend/src/services/tenantContext.ts
+```
+export function getTenantContext() → TenantContext | undefined  :15-17
+export function runWithTenant(tenantId, fn) → T  :37-39
+export function runWithRlsBypass(fn) → T  :45-47
+```
+
 ### backend/src/services/unitReportingService.ts
 ```
 export interface UnitDefinition  :6-10
@@ -1327,40 +1320,6 @@ export type AgentMode  :14-14
 
 ## install
 
-### install/lib/service.mjs
-```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :29-47  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export const launchdDaemonPlist = () =>  :15-23
-export const launchdAgentPlist = () =>  :16-23
-export const winswExePath = (home) =>  :17-23
-```
-
-### install/POSTGRES_MIGRATION_PLAN.md
-```
-h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
-h2 Durum (2026-09-26 — ADR-002, uygulandı)
-h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
-h2 Kapasite teyidi (kurulum sihirbazı)
-h2 İlgili dosyalar
-h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
-```
-
-### install/wizard.mjs
-```
-async function ask(q, def)  :38-42
-async function askYN(q, def = true)  :43-48
-function run(cmd, cmdArgs, cwd)  :49-54
-function capture(cmd, cmdArgs)  :55-58
-async function ensurePostgresServer(admin)  :70-83
-async function offerFirewallHardening(backendPort)  :90-122
-async function main()  :134-397
-```
-
-### install/build-package.sh
-```
-# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
-```
-
 ### install/ILK_KURULUM_KILAVUZU.md
 ```
 h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
@@ -1378,7 +1337,7 @@ h1 A) Depo zaten elinizdeyse:
 h1 B) Sıfırdan:
 h3 2.4 Sihirbaz Hangi Soruları Sorar?
 h3 2.5 Başlatma
-h1 ── ÜRETİM (önerilen) — derlenmiş sürüm, backend tek origin'den hem arayüzü hem API'yi sunar ──
+h1 ── ÜRETİM (önerilen) — servis kuruluysa kendiliğinden çalışır; değilse elle ──
 h1 ── GELİŞTİRME — canlı kaynak, iki ayrı süreç ──
 h3 2.5b Kurulumdan Sonra — Ağ Güvenliği
 h3 2.6 Sık Karşılaşılan Sorunlar
@@ -1390,12 +1349,28 @@ h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
 ```
 
-### install/lib/pg.mjs
+### install/lib/service.mjs
 ```
-export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
-export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
-export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
-export const pgReachable = (admin) =>  :26-28
+export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
+export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
+export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
+export function formatCommand(c)  :186-188  # İnsan-okur komut satırı (elle kurulum talimatı için)
+export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :195-215  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
+export const launchdDaemonPlist = () =>  :18-26
+export const launchdAgentPlist = () =>  :19-26
+export const winswExePath = (home) =>  :20-26
+```
+
+### install/POSTGRES_MIGRATION_PLAN.md
+```
+h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
+h2 Durum (2026-09-26 — ADR-002, uygulandı)
+h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+h2 Kapasite teyidi (kurulum sihirbazı)
+h2 İlgili dosyalar
+h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
 ```
 
 ### install/README.md
@@ -1412,9 +1387,12 @@ h1 B) Tek başına:
 h3 Etkileşimsiz (CI / otomasyon)
 h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
 h2 Başlatma
-h1 ── ÜRETİM (önerilen): `pnpm build` sonrası backend dist'i TEK ORIGIN sunar ──
+h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
 h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
 h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h3 Servis olarak çalıştırma (ADR-001)
 h2 Dağıtılabilir Kurulum Zip'i Üretme
 h1 Linux/macOS
 h1 Windows
@@ -1422,9 +1400,31 @@ h2 PostgreSQL (Üretim) Notu
 h2 Sorun Giderme
 h2 Güvenlik
 h3 Veritabanı ve Prisma Studio Erişimi
-code-fence bash
-code-fence plain
-code-fence powershell
+```
+
+### install/wizard.mjs
+```
+async function ask(q, def)  :40-44
+async function askYN(q, def = true)  :45-50
+function run(cmd, cmdArgs, cwd)  :51-56
+function capture(cmd, cmdArgs)  :57-60
+async function ensurePostgresServer(admin)  :72-85
+async function offerServiceInstall(backendPort)  :92-150
+async function offerFirewallHardening(backendPort)  :155-187
+async function main()  :199-469
+```
+
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
+### install/lib/pg.mjs
+```
+export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  :20-24
+export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
+export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
+export const pgReachable = (admin) =>  :26-28
 ```
 
 ## src
@@ -1514,6 +1514,14 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :184-184
+```
+
+### src/contexts/AuthContext.tsx
+```
+hook useState
+hook useEffect
+hook useContext
+export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -2072,18 +2080,6 @@ handler onWinner
 handler onNewAuction
 handler onSubmitRound
 handler onLog
-```
-
-### src/modules/PlatformTicketsModule.tsx
-```
-component PlatformTicketsModule
-hook useState
-hook useCallback
-hook useEffect
-export PlatformTicketsModule
-handler onClick
-handler onChange
-handler onSubmit
 ```
 
 ### src/modules/PresalesModule.tsx
@@ -2714,8 +2710,9 @@ export function readStatus(home)  :124-126
 export async function checkAndWrite(home, channel = 'auto')  :129-147  # Kontrol et + durum dosyası yaz
 export function toLibpqUrl(url)  :172-174
 export function redactUrl(url)  :176-178  # Log/ipucu için parola maskeleme
-export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :247-262  # /api/health 200 + db:ok gelene dek yoklar
-export async function runUpgrade(home, opts = {})  :294-384  # Güvenli yükseltme
+export function pgConnEnv(url)  :185-194  # Bağlantı URL'sini libpq ortam değişkenlerine çevirir
+export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_000, maxUptimeSec = null, fetchImpl = fetch, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), now = Date.now } = {})  :263-278  # /api/health 200 + db:ok gelene dek yoklar
+export async function runUpgrade(home, opts = {})  :310-400  # Güvenli yükseltme
 function git(home, args)  :15-17
 function gitSafe(home, args)  :18-20
 function parseSemver(tag)  :31-34  # semver "vX
@@ -2723,11 +2720,11 @@ function cmpSemver(a, b)  :35-38
 function githubJson(path)  :51-63  # GitHub API'den commit/release meta (best-effort; ağ yoksa nu
 function readBackendEnv(home)  :150-159
 function dbProvider(home)  :161-168
-function backupDb(home, log, opts)  :183-213
-function restoreDb(snap, log)  :215-228
-function run(home, cmd, args, log, opts = {})  :230-239
-function restartBackend(home, opts, log)  :265-280  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
-function pgRlsInstalled(url)  :282-287
+function backupDb(home, log, opts)  :199-229
+function restoreDb(snap, log)  :231-244
+function run(home, cmd, args, log, opts = {})  :246-255
+function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → true (health yoklanmalı) | false (mekaniz
+function pgRlsInstalled(url)  :298-303
 ```
 
 ### upgrade-tool/public/index.html
@@ -2755,15 +2752,6 @@ span#saved
 pre#log
 ```
 
-### upgrade-tool/server.mjs
-```
-function loadConfig()  :29-31
-function saveConfig(c)  :32-32
-function inMaintenanceWindow()  :46-50
-async function performUpgrade()  :52-59
-async function tick()  :62-71
-```
-
 ### upgrade-tool/README.md
 ```
 h1 Enflow Upgrade Tool
@@ -2780,5 +2768,14 @@ code-fence cron
 code-fence powershell
 ```
 
+### upgrade-tool/server.mjs
+```
+function loadConfig()  :29-31
+function saveConfig(c)  :33-33
+function inMaintenanceWindow()  :47-51
+async function performUpgrade()  :53-60
+async function tick()  :63-72
+```
 
-> **Not everything is here.** 204 file(s) omitted to stay under the 19988-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+
+> **Not everything is here.** 205 file(s) omitted to stay under the 20258-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

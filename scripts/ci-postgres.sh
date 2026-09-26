@@ -94,7 +94,9 @@ echo "✓ uygulama RLS yolu: setup → 2. setup 403 → login → yaz/oku (1 mü
 # backupService STATE yedeği ile AYNI pg_dump çağrısı — FORCE RLS altında varsayılan
 # pg_dump "row-level security policy" hatası verir; bayraklar bunu çözmeli.
 DUMP="$(mktemp -d)/state.dump"
-PGOPTIONS="-c app.bypass_rls=on" pg_dump -Fc --enable-row-security -f "$DUMP" "${APP_URL%%\?*}" || fail "pg_dump (RLS altında) başarısız"
+# Bağlantı bilgisi env'de (argv'de parola yok) — backupService.pgConnEnv ile aynı yol
+PGHOST="${PGHOST:-localhost}" PGPORT="${PGPORT:-5432}" PGUSER="$ENFLOW_APP_USER" PGPASSWORD="$ENFLOW_APP_PASS" PGDATABASE="$ENFLOW_DB" \
+  PGOPTIONS="-c app.bypass_rls=on" pg_dump -Fc --enable-row-security -f "$DUMP" || fail "pg_dump (RLS altında) başarısız"
 pg_restore -f - --data-only -t Customer "$DUMP" | grep -q "RLS Müşteri" || fail "pg_dump çıktısında tenant verisi yok (RLS dump'ı boşaltıyor)"
 echo "✓ pg_dump RLS altında tam veri aldı"
 

@@ -1,14 +1,13 @@
 import { describe, it, expect } from 'vitest';
-import { toLibpqUrl } from '../backupService';
+import { pgConnEnv } from '../backupService';
 
-describe('toLibpqUrl', () => {
-  it('Prisma-özel schema parametresini ayıklar', () => {
-    expect(toLibpqUrl('postgresql://u:p@h:5432/db?schema=public')).toBe('postgresql://u:p@h:5432/db');
+describe('pgConnEnv', () => {
+  it('URL parçalanır; parola yalnız env\'de, Prisma-özel parametre düşer', () => {
+    expect(pgConnEnv('postgresql://mig%40x:p%3Ass%2F@db.local:6543/enflow?schema=public&sslmode=require')).toEqual({
+      PGHOST: 'db.local', PGPORT: '6543', PGUSER: 'mig@x', PGPASSWORD: 'p:ss/', PGDATABASE: 'enflow', PGSSLMODE: 'require',
+    });
   });
-  it('libpq parametrelerini korur', () => {
-    expect(toLibpqUrl('postgresql://u:p@h/db?schema=public&sslmode=require&connection_limit=5')).toBe('postgresql://u:p@h/db?sslmode=require');
-  });
-  it('parametresiz URL aynı kalır', () => {
-    expect(toLibpqUrl('postgresql://u:p@h/db')).toBe('postgresql://u:p@h/db');
+  it('varsayılan port 5432', () => {
+    expect(pgConnEnv('postgresql://u:p@h/db').PGPORT).toBe('5432');
   });
 });

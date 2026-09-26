@@ -15,19 +15,26 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '../prismaClient';
 import { BackupTarget, LocalTarget, NextcloudTarget, S3Target, BACKUPS_ROOT, ensureDir } from './backupTargets';
 
+// Bağlantı URL'sini libpq ortam değişkenlerine çevirir (pg_dump/psql'e URL'yi argv ile
+// vermek parolayı `ps` çıktısında yerel kullanıcılara açar). Prisma-özel parametreler
+// (?schema=…) doğal olarak düşer; libpq'nun tanıdığı sslmode taşınır.
+export function pgConnEnv(url: string): Record<string, string> {
+  const u = new URL(url);
+  const env: Record<string, string> = {
+    PGHOST: u.hostname,
+    PGPORT: u.port || '5432',
+    PGUSER: decodeURIComponent(u.username),
+    PGPASSWORD: decodeURIComponent(u.password),
+    PGDATABASE: decodeURIComponent(u.pathname.replace(/^\//, '')),
+  };
+  const ssl = u.searchParams.get('sslmode');
+  if (ssl) env.PGSSLMODE = ssl;
+  return env;
+}
+
 // Prisma bağlantı URL'sindeki Prisma'ya özgü parametreler (ör. wizard'ın yazdığı
 // `?schema=public`) libpq araçlarında (pg_dump) "invalid URI query parameter" hatası
 // verir → pg_dump'a vermeden önce ayıklanır. libpq'nun tanıdıkları (sslmode vb.) kalır.
-const PRISMA_ONLY_PARAMS = ['schema', 'connection_limit', 'pool_timeout', 'pgbouncer', 'statement_cache_size', 'socket_timeout'];
-export function toLibpqUrl(url: string): string {
-  try {
-    const u = new URL(url);
-    for (const p of PRISMA_ONLY_PARAMS) u.searchParams.delete(p);
-    return u.toString();
-  } catch {
-    return url;
-  }
-}
 
 export type BackupScope = 'PLATFORM' | 'TENANT';
 export type BackupKind = 'FULL' | 'STATE' | 'DATA';
@@ -194,10 +201,10 @@ export async function runBackup(opts: RunBackupOpts): Promise<{ id: string }> {
         const dumpFile = path.join(tmpDir, `state-${stamp}.dump`);
         try {
           const { execFileSync } = await import('child_process');
-          const url = toLibpqUrl(process.env.DATABASE_URL as string);
-          execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', dumpFile, url], {
+          // Bağlantı bilgisi ARGV'de değil ortam değişkenlerinde (parola `ps` çıktısında görünmesin)
+          execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', dumpFile], {
             stdio: ['ignore', 'ignore', 'pipe'],
-            env: { ...process.env, PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() },
+            env: { ...process.env, ...pgConnEnv(process.env.DATABASE_URL as string), PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() },
           });
           totalSize += fs.statSync(dumpFile).size;
           stateRef = await target.put(dumpFile, `${job.id}/state-${stamp}.dump`);

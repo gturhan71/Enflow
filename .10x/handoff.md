@@ -1,5 +1,4 @@
-# Handoff
-M2 tamam (branch feat/m2-pg-upgrade, PR base=feat/prod-runtime-pg-pipeline). Kritik bulgu: PG STATE yedeği sessizce hiç alınmıyordu (düzeltildi 49fef93).
-Sıradaki M3 (branch M2 üstünden): T14 systemd/launchd şablonları + `install/lib/service.mjs` render · T15 WinSW (sabit sürüm+SHA256) · T16 wizard servis adımı · T17 dokümanlar · T18 release checklist · T19 RBAC+QA/Sec+sürüm kararı.
-`install/lib/service.mjs` SERVICE sabitleri (enflow / com.enflow.backend / enflow-service.exe) şablon adlarıyla eşleşmeli.
-Yerel PG: scratchpad/pgdata:55432 (LC_ALL=en_US.UTF-8, -k /private/tmp/claude-501/pgs). Upgrade deneme düzeneği: scratchpad/upg (remote.git, home, dev).
+# Handoff — İŞ TAMAM (inceleme bekliyor)
+3 yığılı PR: #4 (M1) ← #5 (M2) ← M3. Sırayla merge (her merge sonrası bir üstünün base'i main'e döner).
+Kullanıcı kararı bekleyenler: (1) sürüm v2.6.0 (Faz 15 RLS + bu iş) — CLAUDE.md kuralı gereği açık onay olmadan artırılmadı; (2) CI `postgres` job'unun GH'daki ilk koşusu; (3) Windows/systemd/LaunchDaemon manuel testi (docs/RELEASE_CHECKLIST.md).
+Takip işleri: tests/rbac artefakt untrack (spawn edildi); P0-3 CSP+JWT saklama; P0-4 RBAC'ı CI'a alma; PG için migrateToPostgres iki-rol uyarlaması.

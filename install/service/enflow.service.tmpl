@@ -1,0 +1,25 @@
+# Enflow backend — systemd birimi (ADR-001). Üreten: install/lib/service.mjs
+# Ayarlar backend/.env'den (WorkingDirectory=backend → uygulama dotenv ile okur).
+# Loglar journald'da: journalctl -u enflow -f
+[Unit]
+Description=Enflow backend
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User={{USER}}
+WorkingDirectory={{HOME}}/backend
+Environment=NODE_ENV=production
+ExecStart="{{NODE}}" dist/index.js
+Restart=on-failure
+RestartSec=5
+# Graceful shutdown en çok 10 sn (lifecycle.ts) — 15 sn sonra SIGKILL
+TimeoutStopSec=15
+KillSignal=SIGTERM
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target

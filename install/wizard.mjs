@@ -14,6 +14,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { stdin, stdout, platform, exit } from 'node:process';
 import { pgReachable, provisionPostgresDb, grantRuntimePrivileges } from './lib/pg.mjs';
+import { planInstall, executePlan, formatCommand, downloadWinsw, loadWinswLock, SERVICE } from './lib/service.mjs';
 
 const C = { r: '\x1b[0m', b: '\x1b[1m', g: '\x1b[32m', y: '\x1b[33m', red: '\x1b[31m', c: '\x1b[36m', dim: '\x1b[2m' };
 const log = (m = '') => console.log(m);
@@ -28,6 +29,7 @@ const getArg = (k, d) => { const i = args.indexOf(k); return i >= 0 && args[i + 
 const has = (k) => args.includes(k);
 const YES = has('--yes') || has('-y');
 const DRY = has('--dry-run');
+const WANT_SERVICE = has('--service'); // etkileşimsiz (--yes) kurulumda servis kurulumunu açıkça iste
 const RESET_DB = has('--reset-db'); // temiz kurulum: mevcut SQLite dev.db'yi sil
 const isWin = platform === 'win32';
 const SELF_DIR = dirname(fileURLToPath(import.meta.url));
@@ -84,6 +86,69 @@ async function ensurePostgresServer(admin) {
 
 // Postgres rol/DB provizyonu + runtime GRANT'leri → install/lib/pg.mjs (CI ile ortak).
 
+// Enflow'u OS servisi olarak kurar (systemd / launchd / WinSW) — yalnız operatör AÇIKÇA
+// onaylarsa (varsayılan HAYIR; --yes'te yalnız --service ile). Yönetici/sudo gerektirir.
+// Plan lib/service.mjs'te saf üretilir; burada onay + yürütme + sağlık doğrulaması var.
+async function offerServiceInstall(backendPort) {
+  if (!(YES ? WANT_SERVICE : await askYN(
+    'Enflow işletim sistemi servisi olarak kurulsun mu? (sunucu açılınca otomatik başlar, çökünce yeniden başlar; yönetici/sudo yetkisi gerekir)', false))) {
+    warn('Servis kurulmadı — elle başlatma: `cd backend && pnpm start` (kalıcı çalışma için servis önerilir).');
+    return null;
+  }
+  const { userInfo } = await import('node:os');
+  const isRoot = typeof process.getuid === 'function' && process.getuid() === 0;
+  const defUser = process.env.SUDO_USER || userInfo().username;
+  let user = defUser, mode = 'daemon';
+  if (platform === 'linux') {
+    user = await ask('Servis hangi kullanıcıyla çalışsın? (backend/.env ve uploads okunup yazılabilmeli)', defUser);
+    if (user === 'root') warn('Servisi root ile çalıştırmak önerilmez — ayrı, yetkisiz bir kullanıcı kullanın.');
+  } else if (platform === 'darwin') {
+    mode = (await askYN('Sistem servisi (LaunchDaemon — açılışta başlar, sudo gerekir) mi? Hayır = LaunchAgent (yalnız oturum açıkken)', true)) ? 'daemon' : 'agent';
+    user = defUser;
+  }
+  let plan;
+  try {
+    plan = planInstall({ platform, home: REPO, node: process.execPath, user, mode, uid: typeof process.getuid === 'function' ? process.getuid() : 0, isRoot });
+  } catch (e) { warn(`Servis planı üretilemedi: ${e.message}`); return null; }
+
+  if (plan.needsWinsw) {
+    const lock = loadWinswLock();
+    if (!(await askYN(`WinSW ${lock.version} (Windows servis sarmalayıcısı, MIT) indirilecek: ${lock.url} (~${Math.round(lock.size / 1048576)} MB, SHA256 doğrulanır). Devam?`, true))) {
+      warn('WinSW indirilmedi — servis kurulmadı.'); return null;
+    }
+    if (DRY) log(`${C.y}  [dry-run] WinSW indirme atlandı${C.r}`);
+    else { try { await downloadWinsw(plan.needsWinsw.exe, { lock }); ok(`WinSW ${lock.version} indirildi ve SHA256 doğrulandı.`); } catch (e) { err(e.message); return null; } }
+  }
+  if (plan.requiresAdmin && !DRY) {
+    const admin = spawnSync('net', ['session'], { stdio: 'ignore', shell: true }).status === 0;
+    if (!admin) {
+      warn('Windows servisi için `install`/`start` komutları YÖNETİCİ olarak açılmış PowerShell/CMD ister. Dosyalar hazırlandı; şu komutları yönetici olarak çalıştırın:');
+      executePlan({ ...plan, commands: [] }, { log: (m) => log(`${C.dim}  ${m}${C.r}`) });
+      log(plan.commands.map((cmd) => `  ${formatCommand(cmd)}`).join('\n'));
+      return null;
+    }
+  }
+  const r = executePlan(plan, { log: (m) => log(`${C.dim}  ${m}${C.r}`), dry: DRY });
+  if (!r.ok) {
+    warn(`Servis kurulumu tamamlanamadı (başarısız: ${r.failed}). Kalanı elle çalıştırın:`);
+    log(r.manual.map((m) => `  ${m}`).join('\n'));
+    return null;
+  }
+  ok(`Servis kuruldu: ${plan.service}`);
+  for (const n of plan.notes) log(`${C.dim}  ${n}${C.r}`);
+  if (!DRY) {
+    // Sağlık doğrulaması — servisin gerçekten ayağa kalktığını kanıtla
+    let healthy = false;
+    for (let i = 0; i < 30 && !healthy; i++) {
+      try { const res = await fetch(`http://127.0.0.1:${backendPort}/api/health`); healthy = res.ok; } catch { /* henüz değil */ }
+      if (!healthy) await new Promise((res) => setTimeout(res, 1000));
+    }
+    if (healthy) ok(`Backend servis olarak çalışıyor → http://localhost:${backendPort}`);
+    else warn('Servis kuruldu ama 30 sn içinde /api/health yanıt vermedi — logları kontrol edin (yukarıdaki not).');
+  }
+  return plan;
+}
+
 // Uygulama sunucusunun gelen trafiğini SSH + backend portuna kısıtlar — yalnız
 // operatör AÇIKÇA onaylarsa çalışır (varsayılan HAYIR), mevcut kuralları SİLMEZ,
 // yalnız ekler. Adım 0 madde 3: DB/Studio portu ASLA internete açık olmamalı.
@@ -133,7 +198,7 @@ log(`${C.b}${C.c}
 
 async function main() {
   // ── 1) Önkoşul denetimi ────────────────────────────────────────────────────
-  head('1/7 · Önkoşul denetimi');
+  head('1/8 · Önkoşul denetimi');
   const nodeV = process.versions.node;
   const major = Number(nodeV.split('.')[0]);
   if (major < 20) { err(`Node ${nodeV} — en az 20 gerekli (öneri: 22 LTS+).`); exit(1); }
@@ -160,7 +225,7 @@ async function main() {
   ok('Proje kökü doğrulandı');
 
   // ── 2) Yapılandırma ─────────────────────────────────────────────────────────
-  head('2/7 · Yapılandırma (boş bırakırsanız varsayılan)');
+  head('2/8 · Yapılandırma (boş bırakırsanız varsayılan)');
   const backendPort = await ask('Backend portu', '3002');
   const frontendPort = await ask('Frontend portu', '3000');
 
@@ -237,7 +302,7 @@ async function main() {
   const aiModel = aiBase ? await ask('YZ Model (ops.)', '') : '';
 
   // ── 3) .env yaz ─────────────────────────────────────────────────────────────
-  head('3/7 · Ortam dosyaları');
+  head('3/8 · Ortam dosyaları');
   const envLines = [
     `PORT=${backendPort}`,
     `DATABASE_URL="${dbUrl}"`,
@@ -264,13 +329,13 @@ async function main() {
   }
 
   // ── 4) Bağımlılıklar ─────────────────────────────────────────────────────────
-  head('4/7 · Bağımlılık kurulumu (pnpm)');
+  head('4/8 · Bağımlılık kurulumu (pnpm)');
   run('pnpm', ['install'], REPO);
   run('pnpm', ['install'], join(REPO, 'backend'));
   ok('Bağımlılıklar kuruldu (frontend + backend)');
 
   // ── 5) Veritabanı ─────────────────────────────────────────────────────────────
-  head('5/7 · Veritabanı (Prisma)');
+  head('5/8 · Veritabanı (Prisma)');
   // Postgres'te şema DDL'i (migrate deploy) migrator kimlik bilgileriyle çalışır — runtime
   // (appUser) rolünün DDL yetkisi yok (en az yetki, Adım 0 madde 5). SQLite'ta tek
   // rol kavramı olmadığı için dbUrl zaten doğrudan kullanılır.
@@ -340,7 +405,7 @@ async function main() {
   // (Yedek Yöneticisi gibi ek kullanıcılar sonradan Ayarlar → Kullanıcılar'dan eklenir.)
 
   // ── 6) Ağ sertleştirmesi (opsiyonel — Adım 0 madde 3) ──────────────────────────
-  head('6/7 · Ağ sertleştirmesi');
+  head('6/8 · Ağ sertleştirmesi');
   await offerFirewallHardening(backendPort);
   if (usePg) {
     log(`${C.dim}  Postgres portu (${globalThis.__pgSummary?.port}) yalnız uygulama sunucusunun private`
@@ -349,7 +414,7 @@ async function main() {
   warn('`npx prisma studio` bu sunucuda ASLA çalıştırılmamalı — yalnız yerel geliştirmede kullanın (uzaktan bakmak gerekiyorsa SSH tüneli kullanın).');
 
   // ── 7) Derleme (opsiyonel — üretim) ────────────────────────────────────────────
-  head('7/7 · Derleme');
+  head('7/8 · Derleme');
   // Backend derlemesi ZORUNLU — `pnpm start` artık derlenmiş `backend/dist/index.js`'i
   // çalıştırır (ADR-001; ts-node yalnız geliştirmede, `pnpm dev`).
   run('pnpm', ['build'], join(REPO, 'backend')); ok('Backend derlendi → backend/dist/');
@@ -357,13 +422,20 @@ async function main() {
   if (build) { run('pnpm', ['build'], REPO); ok('Frontend derlendi → dist/'); }
   else warn('Frontend derlemesi atlandı (geliştirme modunda `pnpm dev` kullanın).');
 
+  // ── 8) OS servisi (opsiyonel — ADR-001) ─────────────────────────────────────────
+  head('8/8 · İşletim sistemi servisi');
+  const svc = await offerServiceInstall(backendPort);
+
   // ── Özet ───────────────────────────────────────────────────────────────────
   head('Kurulum tamamlandı 🎉');
   const py = isWin ? 'pwsh/cmd' : 'bash';
   log(`
-${C.b}Başlatma:${C.r}
+${svc ? `${C.b}Servis:${C.r} ${svc.service} kuruldu (açılışta otomatik başlar). Yönetim: ${
+    platform === 'linux' ? `sudo systemctl status|restart|stop ${SERVICE.systemdUnit}`
+    : platform === 'darwin' ? `sudo launchctl kickstart -k system/${SERVICE.launchdLabel}`
+    : `service\\${SERVICE.winswId}-service.exe status|restart|stop`}\n` : ''}${C.b}Başlatma:${C.r}
   ${C.c}# Backend (port ${backendPort}) — derlenmiş çıktı; kod değişince önce: pnpm build${C.r}
-  cd "${join(REPO, 'backend')}" && pnpm start
+  cd "${join(REPO, 'backend')}" && pnpm start${svc ? `   ${C.dim}# servis kuruluysa gerekmez${C.r}` : ''}
 
   ${C.c}# Frontend — geliştirme (port ${frontendPort})${C.r}
   cd "${REPO}" && pnpm dev --port ${frontendPort}

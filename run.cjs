@@ -1,3 +1,5 @@
+// ⚠️ YALNIZ GELİŞTİRME aracı (portları öldürüp dev sunucuları başlatır). Üretimde KULLANMAYIN —
+// üretim: OS servisi (install/README.md § "Servis olarak çalıştırma").
 const { spawn, execSync } = require('child_process');
 const os = require('os');
 const path = require('path');

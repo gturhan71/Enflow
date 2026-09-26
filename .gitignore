@@ -59,3 +59,7 @@ tests/e2e-scenario/test-results/
 tests/e2e-scenario/dev.db
 tests/e2e-scenario/node_modules/
 tests/e2e-scenario/.tmp-db/
+
+# Üretilen OS servis dosyaları + servis logları (install/lib/service.mjs) — makineye özel
+/service/
+/logs/

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Enflow backend — launchd (ADR-001). Üreten: install/lib/service.mjs
+     Ayarlar backend/.env'den (WorkingDirectory=backend → uygulama dotenv ile okur).
+     Loglar: {{HOME}}/logs/backend.log (döndürme yok — newsyslog ile yönetin). -->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>{{LABEL}}</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>{{NODE}}</string>
+    <string>dist/index.js</string>
+  </array>
+  <key>WorkingDirectory</key><string>{{HOME}}/backend</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>NODE_ENV</key><string>production</string>
+    <!-- launchd'nin varsayılan PATH'i Homebrew'u içermez → pg_dump (yedek) bulunamazdı -->
+    <key>PATH</key><string>{{NODE_DIR}}:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+{{USERNAME_KEY}}  <key>RunAtLoad</key><true/>
+  <key>KeepAlive</key><true/>
+  <key>ThrottleInterval</key><integer>5</integer>
+  <key>ExitTimeOut</key><integer>15</integer>
+  <key>StandardOutPath</key><string>{{HOME}}/logs/backend.log</string>
+  <key>StandardErrorPath</key><string>{{HOME}}/logs/backend.log</string>
+</dict>
+</plist>

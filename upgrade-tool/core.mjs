@@ -177,8 +177,24 @@ export function redactUrl(url) {
   try { const u = new URL(url); if (u.password) u.password = '****'; return u.toString(); } catch { return '<url>'; }
 }
 
+/**
+ * Bağlantı URL'sini libpq ortam değişkenlerine çevirir. URL'yi (parola dahil) pg_dump/psql'e
+ * KOMUT SATIRI argümanı olarak vermek parolayı `ps` çıktısında aynı makinedeki herkese açar;
+ * ortam değişkenleri (PGPASSWORD…) ise yalnız süreç sahibine görünür.
+ */
+export function pgConnEnv(url) {
+  const u = new URL(url);
+  const env = {
+    PGHOST: u.hostname, PGPORT: u.port || '5432', PGUSER: decodeURIComponent(u.username),
+    PGPASSWORD: decodeURIComponent(u.password), PGDATABASE: decodeURIComponent(u.pathname.replace(/^\//, '')),
+  };
+  const ssl = u.searchParams.get('sslmode');
+  if (ssl) env.PGSSLMODE = ssl;
+  return env;
+}
+
 // FORCE RLS altında pg_dump varsayılan olarak durur → --enable-row-security + app.bypass_rls=on
-const PG_RLS_ENV = () => ({ ...process.env, PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() });
+const PG_RLS_ENV = (url) => ({ ...process.env, ...pgConnEnv(url), PGOPTIONS: `${process.env.PGOPTIONS ?? ''} -c app.bypass_rls=on`.trim() });
 
 function backupDb(home, log, opts) {
   const db = dbProvider(home);
@@ -200,7 +216,7 @@ function backupDb(home, log, opts) {
     mkdirSync(dir, { recursive: true });
     const file = join(dir, `pre-upgrade-${Date.now()}.dump`);
     try {
-      execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', file, dumpUrl], { stdio: ['ignore', 'ignore', 'pipe'], env: PG_RLS_ENV() });
+      execFileSync('pg_dump', ['-Fc', '--enable-row-security', '-f', file], { stdio: ['ignore', 'ignore', 'pipe'], env: PG_RLS_ENV(dumpUrl) });
     } catch (e) {
       const why = e.code === 'ENOENT' ? 'pg_dump bulunamadı' : String(e.stderr || e.message).trim().slice(0, 300);
       if (opts.skipPgBackup) { log(`UYARI: Postgres ön-yedeği alınamadı (${why}) — skipPgBackup ile devam.`); return null; }
@@ -281,7 +297,7 @@ function restartBackend(home, opts, log) {
 
 function pgRlsInstalled(url) {
   try {
-    const out = execFileSync('psql', [url, '-tAc', "SELECT count(*) FROM pg_policies WHERE policyname = 'tenant_isolation'"], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const out = execFileSync('psql', ['-tAc', "SELECT count(*) FROM pg_policies WHERE policyname = 'tenant_isolation'"], { encoding: 'utf-8', stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, ...pgConnEnv(url) } });
     return Number(out.trim()) > 0;
   } catch { return null; } // psql yok/erişim yok → bilinmiyor
 }

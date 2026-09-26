@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toLibpqUrl, redactUrl, waitForHealth } from './core.mjs';
+import { toLibpqUrl, redactUrl, waitForHealth, pgConnEnv } from './core.mjs';
 
 test('toLibpqUrl Prisma parametrelerini ayıklar, libpq olanları korur', () => {
   assert.equal(toLibpqUrl('postgresql://u:p@h:5432/db?schema=public&sslmode=require'), 'postgresql://u:p@h:5432/db?sslmode=require');
@@ -47,4 +47,11 @@ test('waitForHealth: hiç yeniden başlamazsa false', async () => {
 test('waitForHealth: uptimeSec yoksa (eski sürüm) uptime kontrolü atlanır', async () => {
   const c = clock();
   assert.equal(await waitForHealth('x', { fetchImpl: async () => res(true, { db: 'ok' }), ...c, maxUptimeSec: 10 }), true);
+});
+
+test('pgConnEnv: URL parçalanır, parola yalnız ortam değişkeninde (argv\'de değil)', () => {
+  assert.deepEqual(pgConnEnv('postgresql://mig%40x:p%3Ass%2F@db.local:6543/enflow?schema=public&sslmode=require'), {
+    PGHOST: 'db.local', PGPORT: '6543', PGUSER: 'mig@x', PGPASSWORD: 'p:ss/', PGDATABASE: 'enflow', PGSSLMODE: 'require',
+  });
+  assert.equal(pgConnEnv('postgresql://u:p@h/db').PGPORT, '5432');
 });
