@@ -12,6 +12,7 @@ import { fmtCurrency as fmt } from '../lib/format';
 import { sampleGuaranteeText, uploadGuaranteeSampleFile } from '../lib/guaranteeText';
 import DeliveryTimelinePanel from './DeliveryTimelinePanel';
 import type { Tender, TenderChecklistItem, GuaranteeLetter, Opportunity } from '../types';
+import { authFetch } from '../services/apiClient';
 
 interface SalesSupportProps {
   opportunities?: Opportunity[];
@@ -341,11 +342,7 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
     setAnalyzing(true); setInfo('');
     try {
       const fd = new FormData(); fd.append('file', file);
-      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-      const res = await fetch(`/api/tenders/${tender.id}/analyze`, {
-        method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
-      });
+      const res = await authFetch(`/api/tenders/${tender.id}/analyze`, { method: 'POST', body: fd });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || `HTTP ${res.status}`);
       setInfo(`${data.usedAI ? 'AI' : 'Standart liste'} ile döküman listesi oluşturuldu · ${data.autoMatched} otomatik eklendi.`);
@@ -397,11 +394,7 @@ function ChecklistTab({ tender, tenders, onSelectTender, onChanged, isGM, onWith
     setUploadingId(item.id);
     try {
       const fd = new FormData(); fd.append('file', file);
-      const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-      const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-      const res = await fetch(`/api/tenders/${tender.id}/checklist/${item.id}/upload`, {
-        method: 'POST', headers: { 'x-tenant-id': tid, 'Authorization': `Bearer ${token}` }, body: fd,
-      });
+      const res = await authFetch(`/api/tenders/${tender.id}/checklist/${item.id}/upload`, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       await load();
     } catch (e) { alert('Yükleme hatası: ' + (e instanceof Error ? e.message : '')); }

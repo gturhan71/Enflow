@@ -5,6 +5,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler } from '../middleware';
 import { bootstrapTenant } from '../services/bootstrapTenant';
+import { setSessionCookie, isWebClient } from '../services/session';
 
 const router: Router = Router();
 
@@ -27,7 +28,9 @@ router.post('/init', asyncHandler(async (req: Request, res: Response) => {
       admin: { name: admin?.name || '', email: admin?.email || '', password: admin?.password || '' },
       license: license || undefined,
     });
-    res.json(result);
+    // İlk kurulum = otomatik giriş: tarayıcıya httpOnly çerez; token gövdede yalnız API istemcisine (arayüz `web` → yok)
+    setSessionCookie(req, res, result.token);
+    res.json(isWebClient(req) ? { ...result, token: undefined } : result);
   } catch (e) {
     const err = e as { status?: number; message?: string };
     res.status(err.status || 500).json({ error: err.message || 'Kurulum başarısız.' });

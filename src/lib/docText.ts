@@ -9,9 +9,12 @@
 import * as mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import * as pdfjs from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
-// PDF.js worker — modern .mjs desteği olan güvenilir bir CDN.
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+// PDF.js worker — paketin İÇİNDEN (Vite `?url` → hash'li, aynı-origin asset). Eskiden cdnjs CDN'inden
+// yükleniyordu: internetsiz (on-prem/hava-boşluklu) kurulumda PDF çıkarımı çalışmıyordu ve sıkı CSP
+// (script/worker-src 'self') üçüncü-taraf CDN'e izin vermezdi.
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 /** Tek bir dosyadan düz metin çıkarır. Desteklenmeyen uzantı → boş string. */
 export const extractTextFromFile = async (file: File): Promise<string> => {

@@ -18,6 +18,7 @@ import StatusBadge from './StatusBadge';
 import MarginBadge from './MarginBadge';
 import OverheadPanel from './OverheadPanel';
 import CostForm from './CostForm';
+import { authFetch } from '../../services/apiClient';
 
 interface ProjectDetailProps {
   project: Project;
@@ -53,12 +54,8 @@ const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, curren
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const effectiveTenantId = localStorage.getItem('enflow_active_tenant_id') || '';
-      const effectiveToken = localStorage.getItem('enflow_auth_token') || 'mock-token';
-
-      const res = await fetch(`/api/projects/${project.id}/handover-docs/${docId}/upload`, {
+      const res = await authFetch(`/api/projects/${project.id}/handover-docs/${docId}/upload`, {
         method: 'POST',
-        headers: { 'x-tenant-id': effectiveTenantId, 'Authorization': `Bearer ${effectiveToken}` },
         body: formData,
       });
       if (!res.ok) {

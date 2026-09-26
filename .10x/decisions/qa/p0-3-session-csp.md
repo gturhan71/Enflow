@@ -1,0 +1,4 @@
+# QA — p0-3-session-csp
+Otomatik: backend 20 birim (session/CSP), e2e `session-cookie-auth` (9), node:test escapeHtml (2), `check-no-client-token` guard (ihlal probuyla doğrulandı), RBAC **1027/1027** (auth.setup çerez tabanlı + ui-access token'ın localStorage'da OLMADIĞINI assert eder), e2e-scenario **21/21**.
+Gerçek tarayıcı (zorunlu CSP): UI girişi, panel verisi çerezle, localStorage'da token yok / document.cookie boş, yenilemede oturum, 7 modülde 0 CSP ihlali, enjekte inline script+onerror engellendi, paketlenmiş pdf worker çalıştı, çıkış (CSRF'li POST), oturum iptali→401→girişe dönüş.
+**Doğrulanmadı:** ters proxy/HTTPS altında Secure çerez + Origin/Host davranışı (yalnız birim testli); Windows/proxy; gerçek PDF dosyası ayrıştırma (worker yalnız yüklenip çalıştırıldı, uçtan uca ayrıştırma denenmedi); yazdırma penceresinin gerçek `window.open` akışı (kaçışlama birim testli, popup elle denenmedi).

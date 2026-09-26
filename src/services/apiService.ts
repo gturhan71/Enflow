@@ -1,4 +1,4 @@
-import { apiClient } from './apiClient';
+import { apiClient, authFetch } from './apiClient';
 import { crmService } from './crmService';
 import { projectService } from './projectService';
 import { taskService } from './taskService';
@@ -22,8 +22,20 @@ function profQuery(params: Record<string, string | undefined>): string {
 }
 
 class ApiService {
-  setAuth(tenantId: string, token: string) {
-    apiClient.setAuth(tenantId, token);
+  setAuth(tenantId: string) {
+    apiClient.setAuth(tenantId);
+  }
+
+  /** Oturum çerezini doğrular (token JS'de olmadığından "girişli miyim?"nin tek cevabı). Oturum yok → null. */
+  async getSession(): Promise<{ user: { tenantId: string } & Record<string, unknown> } | null> {
+    const r = await fetch('/api/auth/session', { credentials: 'same-origin' });
+    if (!r.ok) throw new Error('Oturum kontrolü başarısız.');
+    const data = (await r.json()) as { user: ({ tenantId: string } & Record<string, unknown>) | null };
+    return data.user ? { user: data.user } : null;
+  }
+
+  async logout(): Promise<void> {
+    await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'X-Enflow-CSRF': '1' } }).catch(() => undefined);
   }
 
   async login(email: string, password: string) {
@@ -40,8 +52,8 @@ class ApiService {
     if (!r.ok) throw new Error('Kurulum durumu alınamadı.');
     return r.json();
   }
-  async runSetup(payload: { company: { name: string }; admin: { name: string; email: string; password: string }; license?: string }): Promise<{ tenantId: string; token: string; user: { id: string; name: string; email: string; role: string; tenantId: string; unitId: string | null; permissions: string[] } }> {
-    const r = await fetch('/api/setup/init', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  async runSetup(payload: { company: { name: string }; admin: { name: string; email: string; password: string }; license?: string }): Promise<{ tenantId: string; token?: string; user: { id: string; name: string; email: string; role: string; tenantId: string; unitId: string | null; permissions: string[] } }> {
+    const r = await fetch('/api/setup/init', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-Enflow-Client': 'web' }, body: JSON.stringify(payload) });
     const data = await r.json();
     if (!r.ok) throw new Error(data?.error || 'Kurulum başarısız.');
     return data;
@@ -95,11 +107,8 @@ class ApiService {
   async uploadOpportunityRequiredDoc(oppId: string, docId: string, file: File): Promise<{ doc: OpportunityRequiredDoc; localUrl: string; nextcloudUrl: string | null; folder: string; fileName: string }> {
     const formData = new FormData();
     formData.append('file', file);
-    const tenantId = localStorage.getItem('enflow_active_tenant_id') || '';
-    const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-    const res = await fetch(`/api/opportunity-docs/${oppId}/required-docs/${docId}/upload`, {
+    const res = await authFetch(`/api/opportunity-docs/${oppId}/required-docs/${docId}/upload`, {
       method: 'POST',
-      headers: { 'x-tenant-id': tenantId, 'Authorization': `Bearer ${token}` },
       body: formData,
     });
     const data = await res.json().catch(() => ({}));

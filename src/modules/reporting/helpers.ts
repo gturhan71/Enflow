@@ -55,7 +55,7 @@ export function prevRange(start: string, end: string): { start: string; end: str
 export function printReportWindow(title: string, body: string) {
   const w = window.open('', '_blank');
   if (!w) return;
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${title}</title>
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(title)}</title>
   <style>body{font-family:Arial,Helvetica,sans-serif;padding:40px;color:#1e293b;max-width:900px;margin:0 auto}
   h1{font-size:22px;margin-bottom:4px}h2{font-size:15px;margin:22px 0 6px;border-bottom:1px solid #e2e8f0;padding-bottom:4px}
   table{width:100%;border-collapse:collapse;font-size:12px;margin:6px 0}td,th{padding:6px 8px;border:1px solid #e2e8f0;text-align:left}
@@ -105,7 +105,7 @@ function consolidationHtml(c: ConsolidationResult): string {
        <tr><td>${vr.planned}</td><td>${vr.completed}</td><td>${vr.cancelled}</td><td>${vr.pending}</td><td><b>%${vr.coveragePct}</b></td></tr></table>` : '';
   const dt = (s: string) => s.slice(0, 10);
   const entryRows = (c.reportEntries || [])
-    .map(e => `<tr><td>${dt(e.date)}</td><td>${esc(e.userName)}</td><td>${MK_LABEL_PR[e.meetingKind] || e.meetingKind}</td><td>${LT_LABEL_PR[e.linkType] || e.linkType}${e.linkLabel ? ': ' + esc(e.linkLabel) : ''}</td><td>${esc(e.content)}</td></tr>`).join('');
+    .map(e => `<tr><td>${dt(e.date)}</td><td>${esc(e.userName)}</td><td>${esc(MK_LABEL_PR[e.meetingKind] || e.meetingKind)}</td><td>${esc(LT_LABEL_PR[e.linkType] || e.linkType)}${e.linkLabel ? ': ' + esc(e.linkLabel) : ''}</td><td>${esc(e.content)}</td></tr>`).join('');
   const visitRows = (c.visits || [])
     .map(v => `<tr><td>${dt(v.date)}</td><td>${esc(v.customerName || '')}</td><td>${esc(v.type)}</td><td>${esc(v.status)}</td><td>${esc(v.note || '')}</td></tr>`).join('');
   return `<h2>Konsolidasyon — Personel Günlük Raporları</h2>
@@ -145,7 +145,7 @@ export function printOverview(overview: ReportOverview, start: string, end: stri
     const rows = u.headline.map(m => `<tr><td>${esc(m.label)}</td><td>${fmtValue(m)}</td></tr>`).join('');
     return `<h2>${esc(u.label)}</h2><table><tr><th>Metrik</th><th>Değer</th></tr>${rows}</table>`;
   }).join('');
-  const bn = (overview.bottlenecks || []).map(b => `<tr><td>${ROLE_LABELS[b.role] || b.role}</td><td>${b.pendingCount}</td><td>${b.oldestWaitingDays} gün</td></tr>`).join('');
+  const bn = (overview.bottlenecks || []).map(b => `<tr><td>${esc(ROLE_LABELS[b.role] || b.role)}</td><td>${b.pendingCount}</td><td>${b.oldestWaitingDays} gün</td></tr>`).join('');
   const body = `<h1>Konsolide Yönetim Raporu</h1><p class="muted">${start} — ${end}</p>
   ${bn ? `<h2>İş Akışı Darboğazı</h2><table><tr><th>Birim/Rol</th><th>Bekleyen</th><th>En Eski Bekleyiş</th></tr>${bn}</table>` : ''}
   ${unitTables}`;
