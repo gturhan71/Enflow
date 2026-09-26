@@ -101,3 +101,26 @@ export const useModuleSettings = (tenantId: string) => {
     enabled: !!tenantId,
   });
 };
+
+// Ziyaret Planı — anahtarlar `['visit-plan', ...]` öneki altında (paylaşım sonrası tek invalidate).
+export const useVisitPlans = (tenantId: string) => useQuery({
+  queryKey: ['visit-plan', 'plans', tenantId], queryFn: () => apiService.getVisitPlans(), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+export const useDailyReports = (tenantId: string, userId: string) => useQuery({
+  queryKey: ['visit-plan', 'reports', tenantId, userId], queryFn: () => apiService.getDailyReports({ userId }), staleTime: 60 * 1000, enabled: !!tenantId && !!userId,
+});
+export const useVisitReportSettings = (tenantId: string) => useQuery({
+  queryKey: ['visit-plan', 'settings', tenantId],
+  queryFn: () => apiService.getReportSettings().catch(() => ({ shareIntervalDays: 7, visitTargetRate: 80 })),
+  staleTime: 5 * 60 * 1000, enabled: !!tenantId,
+});
+// Yönetici skor tablosu: hafta anahtarın parçası → hızlı hafta değiştirmede eski yanıt yenisini EZEMEZ
+// (önceki useEffect+then yarışına açıktı).
+export const useVisitScoreboard = (tenantId: string, weekStart: string, enabled: boolean) => useQuery({
+  queryKey: ['visit-plan', 'scoreboard', tenantId, weekStart],
+  queryFn: async () => {
+    const end = new Date(weekStart); end.setDate(end.getDate() + 6);
+    return apiService.getReportConsolidation('CRM', { start: weekStart, end: end.toISOString().slice(0, 10) });
+  },
+  staleTime: 60 * 1000, enabled: !!tenantId && enabled,
+});
