@@ -22,11 +22,14 @@ import presalesRouter from './routes/presales';
 import backupRouter from './routes/backup';
 import syncRouter from './routes/sync';
 import { enforceReadOnlyRoles, tenantMiddleware, requireEntitlement } from './middleware';
+import { uploadsTenantGuard } from './services/uploadsGuard';
 import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
 import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
-import { checkDeploymentTopology } from './services/deploymentGuard';
+import { checkDeploymentTopology, checkSecretFilePermissions } from './services/deploymentGuard';
+import { helmetCsp } from './config/csp';
+import cspReportRouter from './routes/cspReport';
 import { installShutdown } from './lifecycle';
 import { createHealthRouter } from './routes/health';
 import { prisma } from './prismaClient';
@@ -62,18 +65,26 @@ import dmoRouter from './routes/dmo';
 dotenv.config({ quiet: true });
 
 const app = express();
+// Ters proxy (nginx/Caddy) arkasında req.secure / Secure çerez doğru çalışsın: TRUST_PROXY=true|<hop sayısı>|<ip/CIDR>
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY;
+  app.set('trust proxy', /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? 1 : tp);
+}
 // PORT env override — varsayilan 3002 degismedi (yalniz izole test ortaminin
 // (tests/e2e-scenario) ayni makinede paralel bir backend process baslatabilmesi
 // icin eklendi, bkz. docs/UCTAN_UCA_TEST_ORTAMI_PLANI.md).
 const port = Number(process.env.PORT) || 3002;
 
 import path from 'path';
+import crypto from 'crypto';
 import fs from 'fs';
 import { logger } from './utils/logger';
+import { resolveRequestId, runWithRequestId, getRequestId } from './services/requestContext';
+import { observeHttp, renderPrometheus } from './services/metrics';
 
 // Güvenlik başlıkları (clickjacking, MIME-sniff, referrer sızıntısı vb.).
 // SPA'yı bozmamak için CSP ve COEP kapalı (API + inline dist için).
-app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: helmetCsp(), crossOriginEmbedderPolicy: false }));
 
 // Kiracı verisi arama motorlarında ASLA görünmemeli (uyum gereksinimi) — tüm
 // yanıtlar (API + uploads + /wiki yansıması + SPA dist) tek noktadan noindex.
@@ -84,18 +95,20 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// İstek-süresi log'u — çoklu replikada "hangi istek hangi replikada/adımda
-// yavaşladı" sorusuna cevap için minimum gözlemlenebilirlik (tam APM/tracing
-// kapsam dışı — bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz C / S-07).
+// İstek kimliği + süre + metrik (P1-7). X-Request-Id güvenli biçimdeyse taşınır, yoksa üretilir;
+// yanıta geri yazılır ve o isteğin tüm log satırlarına `reqId` olarak girer (requestContext).
+// Metrik `route` etiketi Express route kalıbıdır (kardinalite sınırlı) — bkz. services/metrics.ts.
 app.use((req: Request, res: Response, next: NextFunction) => {
+  const reqId = resolveRequestId(req.headers['x-request-id']);
+  res.setHeader('X-Request-Id', reqId);
   const startedAt = Date.now();
   res.on('finish', () => {
-    logger.info(`${req.method} ${req.originalUrl}`, {
-      status: res.statusCode,
-      durationMs: Date.now() - startedAt,
-    });
+    const ms = Date.now() - startedAt;
+    const route = req.route ? `${req.baseUrl}${req.route.path}` : 'unmatched';
+    observeHttp(req.method, route, res.statusCode, ms / 1000);
+    logger.info(`${req.method} ${req.originalUrl}`, { status: res.statusCode, durationMs: ms });
   });
-  next();
+  runWithRequestId(reqId, next);
 });
 
 // Gövde limiti makul düzeye çekildi (bellek tabanlı DoS azaltımı). Dosyalar
@@ -105,7 +118,7 @@ app.use(express.urlencoded({ limit: '5mb', extended: true }));
 
 // Yüklenen dosyalar tarayıcıda ÇALIŞTIRILMAZ: her zaman indirme olarak servis
 // edilir + nosniff → depolanmış XSS (yüklü .html/.svg) engellenir.
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', tenantMiddleware, uploadsTenantGuard, express.static(path.join(__dirname, '../uploads'), {
   setHeaders: (res) => {
     res.setHeader('Content-Disposition', 'attachment');
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -118,6 +131,15 @@ app.use('/wiki', express.static(path.join(__dirname, '../../wiki')));
 const corsOrigins = (process.env.CORS_ORIGINS || 'http://localhost:3000,http://localhost:5173,http://localhost:5174')
   .split(',').map(s => s.trim()).filter(Boolean);
 app.use(cors({ origin: corsOrigins, credentials: true }));
+
+// Prometheus metrikleri — yalnız METRICS_TOKEN tanımlıysa ve Bearer eşleşirse (aksi 404: uç hiç yokmuş gibi).
+app.get('/api/metrics', (req: Request, res: Response) => {
+  const token = process.env.METRICS_TOKEN;
+  const given = (req.headers.authorization || '').replace(/^Bearer /, '');
+  const a = Buffer.from(given), b = Buffer.from(token || '');
+  if (!token || a.length !== b.length || !crypto.timingSafeEqual(a, b)) return res.status(404).json({ error: 'Not found' });
+  res.type('text/plain; version=0.0.4').send(renderPrometheus());
+});
 
 app.use('/api/health', createHealthRouter({ pingDb: () => prisma.$queryRaw`SELECT 1` }));
 
@@ -154,6 +176,7 @@ const authLimiter = rateLimit({
   message: { error: 'Çok fazla başarısız deneme. Lütfen bir süre sonra tekrar deneyin.' },
 });
 app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/csp-report', cspReportRouter); // kimliksiz (tarayıcı çerez eklemez); kendi hız sınırı+küçük gövde
 app.use('/api/tenants', tenantsRouter);
 app.use('/api', subscriptionRouter);
 app.use('/api/units', unitsRouter);
@@ -216,6 +239,7 @@ app.use((err: { status?: number; message?: string; stack?: string }, _req: Reque
   logger.error('[API Error Detail]', err);
   res.status(err.status || 500).json({
     error: err.message || 'Dahili Sunucu Hatası',
+    requestId: getRequestId(),
     details: process.env.NODE_ENV === 'development' ? err.stack : undefined
   });
 });
@@ -224,6 +248,7 @@ const stops: StopFn[] = [];
 const server = app.listen(port, () => {
   logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
   checkDeploymentTopology();
+  checkSecretFilePermissions();
   stops.push(
     startBackupScheduler(),
     startActivityLogArchiveScheduler(),

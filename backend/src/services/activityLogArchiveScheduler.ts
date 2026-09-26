@@ -12,7 +12,7 @@ import { prisma } from '../prismaClient';
 import { runArchive, getArchiveSettings } from './activityLogArchiveService';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
-import { schedulePeriodic, type StopFn } from './periodic';
+import { schedulePeriodic, reportSchedulerError, type StopFn } from './periodic';
 
 const LOCK_NAME = 'activity-log-archive-scheduler';
 const LOCK_TTL_MS = 2 * 3_600_000; // 2sa — tick aralığından (1sa) büyük
@@ -42,10 +42,10 @@ async function tick(): Promise<void> {
 
         try {
           await runArchive({ tenantId: t.id, trigger: 'SCHEDULED', settings: s });
-        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+        } catch (e) { reportSchedulerError('activity-log-archive', e, { scope: 'tenant' }); } // tek tenant hatası diğerlerini durdurmaz
       });
     }
-  } catch { /* sweep ana akışı bozmaz */ } finally {
+  } catch (e) { reportSchedulerError('activity-log-archive', e); } finally {
     await releaseLock(LOCK_NAME);
     running = false;
   }
@@ -54,5 +54,5 @@ async function tick(): Promise<void> {
 export function startActivityLogArchiveScheduler(): StopFn {
   // İlk tarama 45sn sonra (boot yükünü backup scheduler'ın 30sn'lik ilk
   // taramasıyla çakıştırmamak için), sonra 1 saatte bir.
-  return schedulePeriodic(45_000, 3_600_000, () => { void tick(); });
+  return schedulePeriodic(45_000, 3_600_000, () => tick(), 'activity-log-archive');
 }

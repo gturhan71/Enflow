@@ -124,3 +124,38 @@ export const useVisitScoreboard = (tenantId: string, weekStart: string, enabled:
   },
   staleTime: 60 * 1000, enabled: !!tenantId && enabled,
 });
+// Finans — anahtarlar ortak `['finance', ...]` önekini taşır: mutasyon sonrası tek çağrıyla
+// (invalidateQueries({ queryKey: ['finance'] })) hepsi yenilenir.
+export const useInvoices = (tenantId: string) => useQuery({
+  queryKey: ['finance', 'invoices', tenantId], queryFn: () => apiService.getInvoices(), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+export const useGuarantees = (tenantId: string) => useQuery({
+  queryKey: ['finance', 'guarantees', tenantId], queryFn: () => apiService.getGuarantees(), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+export const useCostApprovals = (tenantId: string) => useQuery({
+  queryKey: ['finance', 'cost-approvals', tenantId], queryFn: () => apiService.getCostApprovals(), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+export const useFinanceSummary = (tenantId: string) => useQuery({
+  queryKey: ['finance', 'summary', tenantId], queryFn: () => apiService.getFinanceSummary(), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+// Yaşlandırma raporu isteğe bağlı (yetki/veri yoksa null) — eski davranış: hata → null.
+export const useFinanceAging = (tenantId: string) => useQuery({
+  queryKey: ['finance', 'aging', tenantId], queryFn: () => apiService.getAging().catch(() => null), staleTime: 60 * 1000, enabled: !!tenantId,
+});
+export const usePurchaseRequests = (tenantId: string, params?: { status?: string; sourceType?: string }) => {
+  return useQuery({
+    queryKey: ['purchase-requests', tenantId, params?.status ?? '', params?.sourceType ?? ''],
+    queryFn: () => apiService.getPurchaseRequests(params),
+    staleTime: 60 * 1000,
+    enabled: !!tenantId,
+  });
+};
+
+export const useVendors = (tenantId: string) => {
+  return useQuery({
+    queryKey: ['vendors', tenantId],
+    queryFn: () => apiService.getVendors(),
+    staleTime: 5 * 60 * 1000,
+    enabled: !!tenantId,
+  });
+};
