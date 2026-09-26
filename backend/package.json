@@ -19,7 +19,8 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "start:ts": "ts-node src/index.ts",
     "db:sync-pg": "node scripts/sync-postgres-schema.mjs",
-    "db:migrate": "node scripts/db-migrate.mjs"
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "seed:rbac": "ts-node --transpile-only src/scripts/seed-rbac-fixture.ts"
   },
   "keywords": [],
   "author": "",

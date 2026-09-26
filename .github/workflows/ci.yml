@@ -2,13 +2,10 @@ name: CI
 
 # Faz C / S-08 (docs/OLCEKLENDIRME_DUZELTME_PLANI.md) — tsc/no-mock/tenant-scope/
 # no-console guard'ları + backend vitest unit + frontend build tek komutta:
-# kök `pnpm verify` script'i (package.json). Bilinçli kapsam dışı: RBAC Playwright
-# süiti (tests/rbac) ve Postgres matrix testi — RBAC'ın çapraz-tenant izolasyon
-# testi, backend/prisma/seed.ts'in ürettiği deterministik veride OLMAYAN, elle
-# oluşturulmuş ikinci bir tenant'a (sabit cuid, tests/rbac/.env.example'daki
-# CROSS_TENANT_ID) bağımlı — taze bir CI ortamında bu fixture yok, süit güvenilir
-# çalışmaz. Bu, önce seed.ts'e reprodüklenebilir bir ikinci tenant eklenmeden
-# ayrı bir iş olarak bırakıldı.
+# kök `pnpm verify` script'i (package.json). RBAC Playwright süiti (P0-4) artık
+# deterministik fixture (`pnpm seed:rbac`: 20 rol + ikinci tenant + lisanslar) ile
+# taze SQLite DB'de koşar — `rbac-api` (hızlı) ve `rbac-ui` (~15 dk) ayrı job'lar.
+# Aynı script yerelde: scripts/ci-rbac.sh api|ui|all
 
 on:
   push:
@@ -84,3 +81,55 @@ jobs:
 
       - name: Postgres uçtan uca doğrulama
         run: ./scripts/ci-postgres.sh
+
+  rbac-api:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (kök + backend + rbac)
+        run: |
+          pnpm install --frozen-lockfile
+          (cd backend && pnpm install --frozen-lockfile)
+          (cd tests/rbac && pnpm install --frozen-lockfile)
+      - name: Frontend build (backend aynı origin'den sunar)
+        run: pnpm build
+      - name: RBAC API + tenant izolasyonu
+        run: ./scripts/ci-rbac.sh api
+
+  rbac-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install (kök + backend + rbac)
+        run: |
+          pnpm install --frozen-lockfile
+          (cd backend && pnpm install --frozen-lockfile)
+          (cd tests/rbac && pnpm install --frozen-lockfile)
+      - name: Playwright Chromium
+        working-directory: tests/rbac
+        run: npx playwright install --with-deps chromium
+      - name: Frontend build
+        run: pnpm build
+      - name: RBAC UI erişim matrisi
+        run: ./scripts/ci-rbac.sh ui
+      - name: Rapor
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbac-ui-report
+          path: tests/rbac/playwright-report
