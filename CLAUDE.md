@@ -371,7 +371,7 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 src/hooks/useEnflowQueries.ts ← services/apiService
-src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, hooks/useEnflowQueries, types, lib/format
+src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 backend/src/lifecycle.ts ← services/periodic
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 upgrade-tool/core.mjs ← install/lib/service
@@ -416,6 +416,7 @@ src/modules/dashboard/WidgetDetailDrawer.tsx ← ../types, ../lib/format, widget
 src/modules/Dashboard.tsx ← types, constants, types/workflow, lib/utils, lib/format
 src/modules/DmoModule.tsx ← services/apiService, contexts/AuthContext, lib/format, types
 src/modules/DocumentsModule.tsx ← lib/utils, types, services/apiService, services/apiClient
+src/modules/FinanceModule.tsx ← services/apiService, contexts/AuthContext, hooks/useEnflowQueries, types, lib/format
 src/modules/Login.tsx ← constants, services/apiService, types
 src/modules/negotiation/AuctionBoard.tsx ← ../lib/utils, types
 src/modules/negotiation/AuctionSidePanel.tsx ← ../lib/utils
@@ -447,7 +448,6 @@ src/modules/todo/ResolvedApprovals.tsx ← ../types, helpers
 src/modules/todo/TaskList.tsx ← ../types, helpers, dashboard/helpers, icons, ../components/AgentTag
 src/modules/todo/UnifiedWorkQueue.tsx ← ../types, dashboard/helpers, helpers
 src/modules/TodoModule.tsx ← types, services/apiService, contexts/AuthContext, todo/helpers, todo/PendingChainApprovals
-src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/AuthContext
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
@@ -461,7 +461,6 @@ backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, bac
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
-backend/src/services/dashboardStream.ts ← prismaClient
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
@@ -526,7 +525,6 @@ backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine
 
 ## changes (last 10 commits — 2 hours ago)
 ```
-src/modules/FinanceModule.tsx                 ~OverheadPoolTab
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
 backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
@@ -535,6 +533,7 @@ upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~perform
 src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
 src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
 src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
+src/modules/FinanceModule.tsx                 ~OverheadPoolTab
 src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
 src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
 src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
@@ -824,12 +823,6 @@ export async function sweepCorporateDocumentReminders(tenantId) → Promise<void
 ### backend/src/services/dashboardService.ts
 ```
 export async function computeDashboard(tenantId, userId?)  :15-150
-```
-
-### backend/src/services/dashboardStream.ts
-```
-export function pingDashboard  :15-17
-export async function getDashboardPingAt  :20-23
 ```
 
 ### backend/src/services/deliveryDeadlineReminders.ts
@@ -1491,38 +1484,35 @@ export const useUsers = (tenantId, options = {}) =>  :66-74
 export const useDocuments = (tenantId, options = {}) =>  :76-84
 export const useProposals = (tenantId, options = {}) =>  :86-94
 export const useModuleSettings = (tenantId) =>  :96-103
-export const useInvoices = (tenantId) =>  :107-109
-export const useGuarantees = (tenantId) =>  :110-112
-export const useCostApprovals = (tenantId) =>  :113-115
-export const useFinanceSummary = (tenantId) =>  :116-118
-export const useFinanceAging = (tenantId) =>  :120-122
-export const usePurchaseRequests = (tenantId, params?) =>  :123-130
-export const useVendors = (tenantId) =>  :132-139
+export const useVisitPlans = (tenantId) =>  :106-108
+export const useDailyReports = (tenantId, userId) =>  :109-111
+export const useVisitReportSettings = (tenantId) =>  :112-116
+export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :119-126
+export const useInvoices = (tenantId) =>  :129-131
+export const useGuarantees = (tenantId) =>  :132-134
+export const useCostApprovals = (tenantId) =>  :135-137
+export const useFinanceSummary = (tenantId) =>  :138-140
+export const useFinanceAging = (tenantId) =>  :142-144
+export const usePurchaseRequests = (tenantId, params?) =>  :145-152
+export const useVendors = (tenantId) =>  :154-161
 ```
 
-### src/modules/FinanceModule.tsx
+### src/modules/VisitPlanModule.tsx
 ```
-component OverheadPoolTab
+props VisitPlanModuleProps
 hook useAuth
-hook useState
 hook useQueryClient
-hook useInvoices
-hook useGuarantees
-hook useCostApprovals
-hook useFinanceSummary
-hook useFinanceAging
-hook useCallback
+hook useVisitPlans
+hook useDailyReports
+hook useVisitReportSettings
+hook useState
 hook useEffect
-hook useCustomers
-export FinanceModule
-handler onPay
-handler onDelete
-handler onChanged
-handler onDecide
-handler onClick
+hook useCallback
+hook useVisitScoreboard
+export VisitPlanModule
 handler onChange
+handler onClick
 handler onBlur
-handler onClose
 ```
 
 ### src/App.tsx
@@ -2069,6 +2059,31 @@ handler onChange
 handler onSubmit
 ```
 
+### src/modules/FinanceModule.tsx
+```
+component OverheadPoolTab
+hook useAuth
+hook useState
+hook useQueryClient
+hook useInvoices
+hook useGuarantees
+hook useCostApprovals
+hook useFinanceSummary
+hook useFinanceAging
+hook useCallback
+hook useEffect
+hook useCustomers
+export FinanceModule
+handler onPay
+handler onDelete
+handler onChanged
+handler onDecide
+handler onClick
+handler onChange
+handler onBlur
+handler onClose
+```
+
 ### src/modules/Login.tsx
 ```
 props LoginProps
@@ -2396,6 +2411,11 @@ export const getPriorityLabel = (priority) =>  :115-120
 export const composedTitle = (newTask, taskAction, ctx) =>  :128-139
 ```
 
+### src/modules/todo/icons.tsx
+```
+export ListTodo
+```
+
 ### src/modules/todo/PendingChainApprovals.tsx
 ```
 component PendingChainApprovals
@@ -2452,19 +2472,6 @@ handler onNavigate
 handler onToggleStatus
 handler onAssign
 handler onSubmit
-```
-
-### src/modules/VisitPlanModule.tsx
-```
-props VisitPlanModuleProps
-hook useAuth
-hook useState
-hook useCallback
-hook useEffect
-export VisitPlanModule
-handler onChange
-handler onClick
-handler onBlur
 ```
 
 ### src/modules/WorkflowBuilder.tsx
@@ -2842,4 +2849,4 @@ code-fence powershell
 ```
 
 
-> **Not everything is here.** 215 file(s) omitted, 1 collapsed to anchors to stay under the 21065-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 215 file(s) omitted to stay under the 21139-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
