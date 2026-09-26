@@ -19,8 +19,14 @@ export interface BackupTarget {
 // Yedek kök dizini — web kökü (uploads) DIŞINDA.
 export const BACKUPS_ROOT = path.join(__dirname, '../../backups');
 
+// Yedek/geçici dizinler yalnız süreç sahibine açık (0700): içinde tüm veritabanı (kullanıcı parola
+// hash'leri dahil) olabilir. (Windows'ta mode yok sayılır — NTFS ACL geçerli.)
 export function ensureDir(dir: string): void {
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
+}
+/** Yedek dosyasını yalnız sahibi okuyabilsin (0600). */
+export function restrictFile(file: string): void {
+  try { fs.chmodSync(file, 0o600); } catch { /* Windows / desteklenmeyen FS */ }
 }
 
 // ── LOCAL ───────────────────────────────────────────────────────────────────
@@ -31,9 +37,13 @@ export class LocalTarget implements BackupTarget {
   }
   async put(localPath: string, remoteName: string): Promise<string> {
     ensureDir(this.baseDir);
+    // Varsayılan yedek kökü BİZİM dizinimiz → eski (0755) kurulumlarda da sıkılaştır.
+    // Operatörün seçtiği özel konum (paylaşımlı disk vb.) dizin izinlerine dokunulmaz — dosya yine 0600.
+    if (this.baseDir === BACKUPS_ROOT) { try { fs.chmodSync(this.baseDir, 0o700); } catch { /* yut */ } }
     const dest = path.join(this.baseDir, remoteName);
     ensureDir(path.dirname(dest));
     await fs.promises.copyFile(localPath, dest);
+    restrictFile(dest);
     return dest;
   }
   async get(remoteName: string, localPath: string): Promise<void> {
