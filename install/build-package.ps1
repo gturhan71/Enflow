@@ -15,6 +15,7 @@ New-Item -ItemType Directory -Force -Path $Pkg | Out-Null
 foreach ($f in @("install.sh","install.ps1","wizard.mjs","README.md",".env.example")) {
   Copy-Item (Join-Path $Here $f) (Join-Path $Pkg $f)
 }
+Copy-Item -Recurse (Join-Path $Here "lib") (Join-Path $Pkg "lib")
 if (Test-Path $Zip) { Remove-Item $Zip }
 Compress-Archive -Path $Pkg -DestinationPath $Zip
 Remove-Item -Recurse -Force $Stage

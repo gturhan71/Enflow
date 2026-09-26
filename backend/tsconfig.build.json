@@ -1,0 +1,21 @@
+{
+  // Üretim derlemesi (ADR-001): src → dist, aynı derinlik (rootDir=src) — `__dirname`
+  // bazlı yollar (uploads, ../../dist, wiki, backups) derlenmiş çıktıda da aynı kalır.
+  // Bakım script'leri dahil (prod'da `node dist/scripts/<ad>.js`); governance/'ı import
+  // eden 3 script rootDir dışına çıktığından hariç — onlar ts-node'lu dev araçlarıdır.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "node_modules",
+    "src/generated/**",
+    "src/**/__tests__/**",
+    "src/**/*.test.ts",
+    "src/scripts/auditRoles.ts",
+    "src/scripts/syncRolePermissions.ts",
+    "src/scripts/backfill-profitability-view-permission.ts"
+  ]
+}

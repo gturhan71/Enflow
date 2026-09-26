@@ -9,6 +9,7 @@ import { prisma } from '../prismaClient';
 import { takeSnapshot, asOfKeyOf } from './profitabilitySnapshot';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
+import { schedulePeriodic, type StopFn } from './periodic';
 
 const LOCK_NAME = 'profitability-snapshot-scheduler';
 const LOCK_TTL_MS = 2 * 3_600_000;
@@ -43,7 +44,6 @@ async function tick(): Promise<void> {
   }
 }
 
-export function startProfitabilitySnapshotScheduler(): void {
-  setTimeout(() => { void tick(); }, 60_000);          // boot'tan 60sn sonra ilk tarama
-  setInterval(() => { void tick(); }, 6 * 3_600_000);  // 6 saatte bir
+export function startProfitabilitySnapshotScheduler(): StopFn {
+  return schedulePeriodic(60_000, 6 * 3_600_000, () => { void tick(); });  // 6 saatte bir
 }

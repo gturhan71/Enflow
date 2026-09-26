@@ -12,6 +12,7 @@ import { drainVerifyQueue } from './backupVerifyService';
 import { logActivity } from './activityLog';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
+import { schedulePeriodic, type StopFn } from './periodic';
 
 const LOCK_NAME = 'backup-scheduler';
 const LOCK_TTL_MS = 10 * 60_000; // 10dk — runBackup uzun sürebilir (VACUUM INTO)
@@ -63,8 +64,7 @@ async function tick(): Promise<void> {
   }
 }
 
-export function startBackupScheduler(): void {
+export function startBackupScheduler(): StopFn {
   // İlk tarama 30sn sonra (boot yükünü dağıt), sonra 60sn'de bir.
-  setTimeout(() => { void tick(); }, 30_000);
-  setInterval(() => { void tick(); }, 60_000);
+  return schedulePeriodic(30_000, 60_000, () => { void tick(); });
 }

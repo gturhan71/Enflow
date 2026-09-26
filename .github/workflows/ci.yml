@@ -43,3 +43,44 @@ jobs:
 
       - name: Doğrula (tsc kök+backend, guard'lar, vitest unit, build)
         run: pnpm verify
+
+  # ADR-002 (B5) — Postgres uçtan uca: migration'lar → şema drift → RLS uygula +
+  # doğrula → derlenmiş backend runtime rolüyle → setup/login/yaz-oku (uygulama RLS
+  # yolu) → SIGTERM temiz kapanış. Aynı script yerelde: scripts/ci-postgres.sh
+  postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: localhost
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install (backend)
+        working-directory: backend
+        run: pnpm install --frozen-lockfile
+
+      - name: Postgres uçtan uca doğrulama
+        run: ./scripts/ci-postgres.sh
