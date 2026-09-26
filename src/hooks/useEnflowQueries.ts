@@ -101,3 +101,10 @@ export const useModuleSettings = (tenantId: string) => {
     enabled: !!tenantId,
   });
 };
+
+export const useProjectHealth = (tenantId: string) => useQuery({
+  queryKey: ['projects', 'health', tenantId],
+  queryFn: () => apiService.getProjectHealth().catch(() => null),
+  staleTime: 60 * 1000,
+  enabled: !!tenantId,
+});
