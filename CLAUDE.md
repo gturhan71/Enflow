@@ -369,9 +369,8 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 
 ## deps
 ```
+backend/src/lifecycle.ts ← services/periodic
 backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
-install/wizard.mjs ← lib/pg, lib/service
-upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/server.mjs ← core
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
@@ -452,7 +451,6 @@ src/modules/VisitPlanModule.tsx ← lib/utils, services/apiService, contexts/Aut
 src/modules/WorkflowBuilder.tsx ← utils/logger, lib/utils, types, types/workflow, constants
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
-backend/src/lifecycle.ts ← services/periodic
 backend/src/middleware.ts ← prismaClient, services/auth, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
 backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
@@ -486,6 +484,8 @@ backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
+install/wizard.mjs ← lib/pg, lib/service
+upgrade-tool/cli.mjs ← core
 ```
 
 ## versions (installed direct deps)
@@ -524,18 +524,67 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 9 minutes ago)
+## changes (last 10 commits — 14 minutes ago)
 ```
-backend/src/services/backupService.ts         +pgConnEnv  ~toLibpqUrl  ~runBackup
-install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
-install/wizard.mjs                            +offerServiceInstall  ~ensurePostgresServer  ~main
-upgrade-tool/cli.mjs                          ~main
+backend/scripts/ensure-build.mjs              +needsBuild
+backend/src/lifecycle.ts                      +createShutdown  +installShutdown
+backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
-upgrade-tool/public/index.html                ~renderSettings  ~refresh
 upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
+src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
+src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
+src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
+src/modules/FinanceModule.tsx                 ~OverheadPoolTab
+src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
+src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
+src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
+src/modules/todo/TaskList.tsx                 ~TaskRow
+backend/scripts/db-migrate.mjs                +run
+backend/scripts/sync-postgres-schema.mjs      +toPostgres
+backend/src/config/prismaPaths.ts             +resolvePrismaPaths
+backend/src/prismaClient.ts                   +runManagedTransaction
+backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
+backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
+backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
+backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
+backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
+backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
+backend/src/services/documentNumberService.ts ~incrementDocumentSequence
+backend/src/services/periodic.ts              +schedulePeriodic
+backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
+backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
+backend/src/services/restoreService.ts        ~applyLogicalRestore
+backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
+backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
+install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
+install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
+install/POSTGRES_MIGRATION_PLAN.md            +Postgres
+install/wizard.mjs                            +offerServiceInstall  +offerFirewallHardening  ~setSchemaProvider  ~psql
+upgrade-tool/cli.mjs                          ~main
+upgrade-tool/public/index.html                ~renderSettings  ~refresh
 ```
 
 ## backend
+
+### backend/scripts/ensure-build.mjs
+```
+export function needsBuild(backendDir)  :14-28  # dist/index
+```
+
+### backend/src/lifecycle.ts
+```
+export interface ShutdownDeps  :15-25
+  server: Pick<Server, 'close' | 'closeAllCon  :16-16
+  stops: StopFn[]  :17-17
+  disconnect: () => Promise<void>  :18-18
+  timeoutMs?: number  :19-19
+  graceMs?: number  :21-21
+  exit?: (code: number) => void  :22-22
+  log?: { info: (...a: unknown[]) => void  :23-23
+  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
+export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
+export function installShutdown(deps) → void  :80-84
+```
 
 ### backend/src/services/backupService.ts
 ```
@@ -552,16 +601,16 @@ export interface BackupModuleSettings  :120-129
   location?: string  :126-126
   nextcloud?: { url?: string  :127-127
   s3?: { endpoint?: string  :128-128
-export interface RunBackupOpts  :131-141
-  tenantId: string  :132-132
-  scope: BackupScope  :133-133
-  kind: BackupKind  :134-134
-  targetType: TargetType  :135-135
-  location?: string | null  :136-136
-  trigger?: 'MANUAL' | 'SCHEDULED'  :137-137
-  startedById?: string  :138-138
-  startedByName?: string  :139-139
-  settings: BackupModuleSettings | null  :140-140
+export interface RunBackupOpts  :151-161
+  tenantId: string  :152-152
+  scope: BackupScope  :153-153
+  kind: BackupKind  :154-154
+  targetType: TargetType  :155-155
+  location?: string | null  :156-156
+  trigger?: 'MANUAL' | 'SCHEDULED'  :157-157
+  startedById?: string  :158-158
+  startedByName?: string  :159-159
+  settings: BackupModuleSettings | null  :160-160
 export type BackupScope  :39-39
 export type BackupKind  :40-40
 ```
@@ -673,11 +722,6 @@ key provider
 function run(cmd, cmdArgs, env = {})  :32-35
 ```
 
-### backend/scripts/ensure-build.mjs
-```
-export function needsBuild(backendDir)  :14-28  # dist/index
-```
-
 ### backend/scripts/loadtest/mixed-read.mjs
 ```
 async function login()  :18-27
@@ -696,21 +740,6 @@ export interface PrismaPaths  :5-9
   schema: string  :7-7
   migrationsPath: string  :8-8
 export function resolvePrismaPaths(databaseUrl?) → PrismaPaths  :11-14
-```
-
-### backend/src/lifecycle.ts
-```
-export interface ShutdownDeps  :15-25
-  server: Pick<Server, 'close' | 'closeAllCon  :16-16
-  stops: StopFn[]  :17-17
-  disconnect: () => Promise<void>  :18-18
-  timeoutMs?: number  :19-19
-  graceMs?: number  :21-21
-  exit?: (code: number) => void  :22-22
-  log?: { info: (...a: unknown[]) => void  :23-23
-  onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
-export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
-export function installShutdown(deps) → void  :80-84
 ```
 
 ### backend/src/middleware.ts
@@ -771,7 +800,7 @@ export async function resetApprovalChain(tenantId, entityType, entityId)  :338-3
 
 ### backend/src/services/backupScheduler.ts
 ```
-export function startBackupScheduler() → StopFn  :67-70
+export function startBackupScheduler() → StopFn  :78-81
 ```
 
 ### backend/src/services/backupVerifyService.ts
@@ -1349,30 +1378,6 @@ h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
 ```
 
-### install/lib/service.mjs
-```
-export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
-export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
-export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
-export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
-export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
-export function formatCommand(c)  :186-188  # İnsan-okur komut satırı (elle kurulum talimatı için)
-export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :195-215  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
-export const launchdDaemonPlist = () =>  :18-26
-export const launchdAgentPlist = () =>  :19-26
-export const winswExePath = (home) =>  :20-26
-```
-
-### install/POSTGRES_MIGRATION_PLAN.md
-```
-h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
-h2 Durum (2026-09-26 — ADR-002, uygulandı)
-h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
-h2 Kapasite teyidi (kurulum sihirbazı)
-h2 İlgili dosyalar
-h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
-```
-
 ### install/README.md
 ```
 h1 Enflow — Kurulum Kılavuzu
@@ -1402,18 +1407,6 @@ h2 Güvenlik
 h3 Veritabanı ve Prisma Studio Erişimi
 ```
 
-### install/wizard.mjs
-```
-async function ask(q, def)  :40-44
-async function askYN(q, def = true)  :45-50
-function run(cmd, cmdArgs, cwd)  :51-56
-function capture(cmd, cmdArgs)  :57-60
-async function ensurePostgresServer(admin)  :72-85
-async function offerServiceInstall(backendPort)  :92-150
-async function offerFirewallHardening(backendPort)  :155-187
-async function main()  :199-469
-```
-
 ### install/build-package.sh
 ```
 # Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
@@ -1425,6 +1418,42 @@ export function psql(admin, sqlOrDb, { db = 'postgres', command = null } = {})  
 export function provisionPostgresDb(admin, { db, appUser, appPass, migratorUser, migratorPass })  :28-41
 export function grantRuntimePrivileges(conn, { db, appUser, migratorUser })  :46-60
 export const pgReachable = (admin) =>  :26-28
+```
+
+### install/lib/service.mjs
+```
+export function resolveRestartCommand({ platform = process.platform, home, probe = defaultProbe } = {})  :32-50  # Kurulu Enflow servisinin yeniden başlatma komutu → { cmd, ar
+export function renderServiceFile(kind, vars, { templateDir = TEMPLATE_DIR } = {})  :68-90  # Şablonu doldurur
+export function planInstall({ platform = process.platform, home, node, user, mode = 'daemon', uid = 0, isRoot = false, templateDir } = {})  :97-156  # İşletim sistemine göre kurulum PLANI (saf — hiçbir şey çalış
+export function loadWinswLock({ lockPath = join(TEMPLATE_DIR, 'winsw.lock.json') } = {})  :159-161
+export async function downloadWinsw(exePath, { lock = loadWinswLock(), fetchImpl = fetch } = {})  :167-181  # WinSW exe'yi lock'taki URL'den indirir; boyut + SHA256 eşleş
+export function formatCommand(c)  :186-188  # İnsan-okur komut satırı (elle kurulum talimatı için)
+export function executePlan(plan, { run = (cmd, args) => spawnSync(cmd, args, { stdio: 'inherit' }).status, mkdir = (d) => mkdirSync(d, { recursive: true }), write = (f, c) => { mkdirSync(dirname(f), { recursive: true }); writeFileSync(f, c); }, log = () => {}, dry = false, } = {})  :195-215  # planInstall çıktısını uygular: dizinler → dosyalar → komutla
+export const launchdDaemonPlist = () =>  :18-26
+export const launchdAgentPlist = () =>  :19-26
+export const winswExePath = (home) =>  :20-26
+```
+
+### install/POSTGRES_MIGRATION_PLAN.md
+```
+h1 Enflow — PostgreSQL Migration Seti (Plan · sonra üretilecek)
+h2 Durum (2026-09-26 — ADR-002, uygulandı)
+h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
+h2 Kapasite teyidi (kurulum sihirbazı)
+h2 İlgili dosyalar
+h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/wizard.mjs
+```
+async function ask(q, def)  :40-44
+async function askYN(q, def = true)  :45-50
+function run(cmd, cmdArgs, cwd)  :51-56
+function capture(cmd, cmdArgs)  :57-60
+async function ensurePostgresServer(admin)  :72-85
+async function offerServiceInstall(backendPort)  :92-150
+async function offerFirewallHardening(backendPort)  :155-187
+async function main()  :199-469
 ```
 
 ## src
@@ -2693,11 +2722,6 @@ export function similarityRatio(a, b) → number  :42-46  # 0 (tamamen farklı) 
 
 ## upgrade-tool
 
-### upgrade-tool/cli.mjs
-```
-async function main()  :16-51
-```
-
 ### upgrade-tool/core.mjs
 ```
 export function resolveHome()  :23-28  # ENFLOW_HOME: env > aracın üst dizini (repo kökü, license-too
@@ -2727,31 +2751,6 @@ function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → tru
 function pgRlsInstalled(url)  :298-303
 ```
 
-### upgrade-tool/public/index.html
-```
-title: Enflow Upgrade Tool
-span#home
-div#cur
-div#curDate
-div#lat
-div#latDate
-div#state
-div#notes
-button#btnCheck
-button#btnUpgrade
-select#channel
-input#autoCheckHours
-input#autoUpgrade
-input#maintenanceFrom
-input#maintenanceTo
-input#restartCommand
-input#migratorUrl
-input#skipPgBackup
-button#btnSave
-span#saved
-pre#log
-```
-
 ### upgrade-tool/README.md
 ```
 h1 Enflow Upgrade Tool
@@ -2775,6 +2774,36 @@ function saveConfig(c)  :33-33
 function inMaintenanceWindow()  :47-51
 async function performUpgrade()  :53-60
 async function tick()  :63-72
+```
+
+### upgrade-tool/cli.mjs
+```
+async function main()  :16-51
+```
+
+### upgrade-tool/public/index.html
+```
+title: Enflow Upgrade Tool
+span#home
+div#cur
+div#curDate
+div#lat
+div#latDate
+div#state
+div#notes
+button#btnCheck
+button#btnUpgrade
+select#channel
+input#autoCheckHours
+input#autoUpgrade
+input#maintenanceFrom
+input#maintenanceTo
+input#restartCommand
+input#migratorUrl
+input#skipPgBackup
+button#btnSave
+span#saved
+pre#log
 ```
 
 
