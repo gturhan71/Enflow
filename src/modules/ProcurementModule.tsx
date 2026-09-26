@@ -1,10 +1,12 @@
 import { useState, useEffect, useCallback, type FC } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ShoppingCart, Building2, BarChart3, Plus, RefreshCw, Truck, Clock, TrendingUp,
 } from 'lucide-react';
 import { AnimatePresence } from 'motion/react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
+import { usePurchaseRequests, useVendors } from '../hooks/useEnflowQueries';
 import { fmtCurrencyOrDash as formatCurrency } from '../lib/format';
 import {
   Vendor, PurchaseRequest, PurchaseStatus, PurchaseUrgency, Project, Unit,
@@ -26,33 +28,32 @@ interface ProcurementModuleProps {
 export const ProcurementModule: FC<ProcurementModuleProps> = ({ projects = [], units = [], initialItemId }) => {
   const { currentUser } = useAuth();
   const [mainTab, setMainTab] = useState<'requests' | 'vendors' | 'summary'>('requests');
-  const [requests, setRequests] = useState<PurchaseRequest[]>([]);
-  const [vendors, setVendors] = useState<Vendor[]>([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('');
+  const tenantId = currentUser?.tenantId ?? '';
+  const queryClient = useQueryClient();
+  const requestsQuery = usePurchaseRequests(tenantId, filterStatus ? { status: filterStatus } : undefined);
+  const vendorsQuery = useVendors(tenantId);
+  const requests = (requestsQuery.data ?? []) as PurchaseRequest[];
+  const vendors = (vendorsQuery.data ?? []) as Vendor[];
+  const loading = requestsQuery.isLoading || vendorsQuery.isLoading || requestsQuery.isFetching;
   const [selectedPR, setSelectedPR] = useState<PurchaseRequest | null>(null);
   const [showPRForm, setShowPRForm] = useState(false);
   const [showVendorForm, setShowVendorForm] = useState(false);
   const [editVendor, setEditVendor] = useState<Vendor | null>(null);
 
+  // Mutasyon/yenile sonrası her iki önbelleği geçersiz kıl (başka sekmeler de taze veriyi görür)
   const loadData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [reqs, vends] = await Promise.all([
-        apiService.getPurchaseRequests(filterStatus ? { status: filterStatus } : undefined),
-        apiService.getVendors(),
-      ]);
-      setRequests(reqs as PurchaseRequest[]);
-      setVendors(vends as Vendor[]);
-      if (selectedPR) {
-        const updated = (reqs as PurchaseRequest[]).find(r => r.id === selectedPR.id);
-        if (updated) setSelectedPR(updated);
-      }
-    } finally { setLoading(false); }
-  }, [filterStatus, selectedPR?.id]);
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['purchase-requests'] }),
+      queryClient.invalidateQueries({ queryKey: ['vendors'] }),
+    ]);
+  }, [queryClient]);
 
-  useEffect(() => { loadData(); }, [filterStatus]);
+  // Açık çekmece, yenilenen listedeki güncel kaydı göstermeli (eski kapanım bug'ı: filtre dışında yenilenmiyordu)
+  useEffect(() => {
+    setSelectedPR(prev => (prev ? requests.find(r => r.id === prev.id) ?? prev : prev));
+  }, [requests]);
 
   // Deep-link: bildirim/görev "Git" ile gelen satınalma talebini otomatik aç.
   useEffect(() => {

@@ -3,6 +3,7 @@ import { ScrollText, RefreshCw, Search, ChevronDown, Archive, Download, PlayCirc
 import { apiService } from '../services/apiService';
 import { isAgentActor, agentDisplayLabel } from '../lib/agentProvenance';
 import type { ActivityLog, ActivityLogArchive } from '../types';
+import { authFetch } from '../services/apiClient';
 
 const ENTITY_TYPES = [
   'OPPORTUNITY', 'PROPOSAL', 'PROJECT', 'CONTRACT_WORKFLOW', 'CONTRACT', 'TENDER',
@@ -41,14 +42,10 @@ const archiveStatusBadge = (s: string) => {
   return <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${tone}`}>{s}</span>;
 };
 
-// Yetki header'lı indirme — tarayıcı navigasyonu x-tenant-id/Authorization gönderemez,
+// Kimlikli indirme — tarayıcı navigasyonu x-tenant-id başlığı gönderemez,
 // bu yüzden blob'u fetch ile çekip client-side indir (BackupModule ile aynı desen).
 const downloadArchive = async (id: string) => {
-  const tid = localStorage.getItem('enflow_active_tenant_id') || '';
-  const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-  const res = await fetch(`/api/activity-logs/archives/${id}/download`, {
-    headers: { 'x-tenant-id': tid, Authorization: `Bearer ${token}` },
-  });
+  const res = await authFetch(`/api/activity-logs/archives/${id}/download`);
   if (!res.ok) { alert('İndirme başarısız: ' + res.status); return; }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);

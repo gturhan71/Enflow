@@ -9,7 +9,7 @@ import path from 'path';
 import { prisma } from '../prismaClient';
 import { acquireLock, releaseLock } from './schedulerLock';
 import { runWithTenant } from './tenantContext';
-import { schedulePeriodic, type StopFn } from './periodic';
+import { schedulePeriodic, reportSchedulerError, type StopFn } from './periodic';
 
 // Çoklu-replika: schedulerLock.ts ile korunur — yalnız bir replika tick çalıştırır
 // (bkz. docs/OLCEKLENDIRME_DUZELTME_PLANI.md Faz A / S-01).
@@ -112,10 +112,10 @@ async function tick(): Promise<void> {
             );
             await writeMarker(t.id, { lastNotifiedRef: u.ref || u.target });
           }
-        } catch { /* tek tenant hatası diğerlerini durdurmaz */ }
+        } catch (e) { reportSchedulerError('update-notifier', e, { scope: 'tenant' }); } // tek tenant hatası diğerlerini durdurmaz
       });
     }
-  } catch { /* sweep ana akışı bozmaz */ } finally {
+  } catch (e) { reportSchedulerError('update-notifier', e); } finally {
     await releaseLock(LOCK_NAME);
     running = false;
   }
@@ -123,5 +123,5 @@ async function tick(): Promise<void> {
 
 export function startUpdateNotifier(): StopFn {
   // İlk tarama 20sn sonra (boot yükünü dağıt), sonra 10 dakikada bir.
-  return schedulePeriodic(20_000, 10 * 60_000, () => { void tick(); });
+  return schedulePeriodic(20_000, 10 * 60_000, () => tick(), 'update-notifier');
 }
