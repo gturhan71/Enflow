@@ -5,15 +5,15 @@
 //
 // Akış: kaynağın SQLite olduğunu doğrula → hedef Postgres bilgisi al (+ opsiyonel
 // otomatik rol/DB provizyon) → güvenlik snapshot (runBackup) → tüm platformu
-// belleğe export et (exportLogicalData) → schema.prisma provider'ı postgresql'e
-// çevir + `prisma db push` (boş şema) → ayrı bir PrismaClient ile hedefe yükle
+// belleğe export et (exportLogicalData) → hedefe `prisma migrate deploy` (boş şema;
+// prisma.config.ts DATABASE_URL'den PG şeması + migrations-postgres'i seçer, ADR-002)
+// → ayrı bir PrismaClient ile hedefe yükle
 // (loadModelsIntoTarget — restoreService.ts, döngüsel FK'ları Postgres-güvenli
 // null+geri-yazma ile halleder) → model-bazlı satır sayısı doğrulaması →
 // yalnız DOĞRULAMA geçerse backend/.env DATABASE_URL güncellenir.
 //
 // Güvenlik: kaynak `dev.db` hiçbir adımda değiştirilmez (yalnız okunur). Herhangi
-// bir adım başarısız olursa schema.prisma sqlite'a geri alınır + yeniden generate
-// edilir — repo her zaman çalışır SQLite durumuna döner, .env'e asla yarım-başarılı
+// bir adım başarısız olursa Prisma client SQLite için yeniden generate edilir — repo her zaman çalışır SQLite durumuna döner, .env'e asla yarım-başarılı
 // durumda dokunulmaz. `backend/uploads/` fiziksel dosyaları DB dışında yaşar,
 // bu araçtan etkilenmez.
 
@@ -27,7 +27,6 @@ import { detectProvider, exportLogicalData, runBackup } from '../services/backup
 
 const REPO_ROOT = resolve(__dirname, '../../..');
 const BACKEND_DIR = join(REPO_ROOT, 'backend');
-const SCHEMA_PATH = join(BACKEND_DIR, 'prisma', 'schema.prisma');
 const ENV_PATH = join(BACKEND_DIR, '.env');
 const isWin = process.platform === 'win32';
 
@@ -47,14 +46,6 @@ async function askYN(q: string, def = false): Promise<boolean> {
   return ['e', 'y', 'evet', 'yes'].includes(a);
 }
 
-// ── schema.prisma provider anahtarlama (install/wizard.mjs ile aynı desen —
-// install/ düz Node ESM, backend/ ts-node; iki farklı çalışma zamanı arasında
-// paylaşılan modül kurmanın karmaşıklığı bu ~10 satırı ortak modüle çıkarmaya değmez) ──
-function setSchemaProvider(provider: 'sqlite' | 'postgresql') {
-  const s = readFileSync(SCHEMA_PATH, 'utf-8');
-  const next = s.replace(/(datasource\s+db\s*\{[^}]*?provider\s*=\s*")(sqlite|postgresql)(")/s, `$1${provider}$3`);
-  if (next !== s) writeFileSync(SCHEMA_PATH, next);
-}
 function prismaCli(args: string[], databaseUrl: string) {
   const r = spawnSync('pnpm', ['prisma', ...args], {
     cwd: BACKEND_DIR, stdio: 'inherit', shell: isWin,
@@ -98,7 +89,7 @@ async function main() {
   }
 
   const stopped = await askYN('Devam etmeden önce backend sürecini (pnpm dev / nodemon) DURDURDUNUZ mu?', false);
-  if (!stopped) { warn('Önce backend\'i durdurun, sonra tekrar çalıştırın. (Şema geçici olarak değişecek — çalışan süreç eski client\'ı tutabilir.)'); return; }
+  if (!stopped) { warn('Önce backend\'i durdurun, sonra tekrar çalıştırın. (Prisma client Postgres için yeniden üretilecek — çalışan süreç eski client\'ı tutabilir.)'); return; }
 
   const firstTenant = await sourcePrisma.tenant.findFirst();
   if (!firstTenant) { warn('Veritabanı boş (hiç tenant yok) — taşınacak veri yok.'); return; }
@@ -140,13 +131,12 @@ async function main() {
   const totalRows = Object.values(counts).reduce((a, b) => a + b, 0);
   ok(`${Object.keys(counts).length} model, ${totalRows} satır belleğe alındı.`);
 
-  let switchedSchema = false;
+  let regenerated = false;
   try {
-    head('3/5 · Hedef şema (prisma db push)');
-    setSchemaProvider('postgresql');
-    switchedSchema = true;
+    head('3/5 · Hedef şema (prisma migrate deploy)');
+    regenerated = true;
     prismaCli(['generate'], targetUrl);
-    prismaCli(['db', 'push', '--accept-data-loss'], targetUrl);
+    prismaCli(['migrate', 'deploy'], targetUrl);
     ok('Hedef şema Postgres\'e kuruldu.');
 
     head('4/5 · Hedefe yükleme');
@@ -184,9 +174,8 @@ Geçiş tamamlandı 🎉
   backend/.env güncellendi. Şimdi backend'i başlatın: cd backend && pnpm start (veya pnpm dev)
   backend/dev.db SİLİNMEDİ — rollback için elde tutuluyor, artık kullanılmıyor.`);
   } catch (e) {
-    if (switchedSchema) {
-      warn('Hata nedeniyle schema.prisma SQLite\'a geri alınıyor (backend/.env DOKUNULMADI, dev.db değişmedi)…');
-      setSchemaProvider('sqlite');
+    if (regenerated) {
+      warn('Hata nedeniyle Prisma client SQLite için yeniden üretiliyor (backend/.env DOKUNULMADI, dev.db değişmedi)…');
       try { prismaCli(['generate'], sourceUrl); } catch { /* generate hatası ikincil — asıl hata zaten fırlatılacak */ }
     }
     throw e;

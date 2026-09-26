@@ -525,7 +525,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 2 minutes ago)
+## changes (last 10 commits — 60 seconds ago)
 ```
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
@@ -539,7 +539,7 @@ backend/src/services/tenantContext.ts         +runInContext  ~getTenantContext  
 backend/src/services/updateNotifier.ts        +startUpdateNotifier  ~startUpdateNotifier  ~tick
 upgrade-tool/core.mjs                         ~runUpgrade
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
-install/wizard.mjs                            ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges  ~setSchemaProvider
+install/wizard.mjs                            ~setSchemaProvider  ~psql  ~provisionPostgresDb  ~grantRuntimePrivileges
 ```
 
 ## backend
