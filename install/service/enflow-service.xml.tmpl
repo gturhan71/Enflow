@@ -1,0 +1,23 @@
+<!-- Enflow backend — WinSW (Windows servisi, ADR-001). Üreten: install/lib/service.mjs
+     Ayarlar backend/.env'den (workingdirectory=backend → uygulama dotenv ile okur).
+     Servis yönetimi: enflow-service.exe install|start|stop|restart|status|uninstall (Yönetici). -->
+<service>
+  <id>{{ID}}</id>
+  <name>Enflow</name>
+  <description>Enflow backend</description>
+  <executable>{{NODE}}</executable>
+  <arguments>dist/index.js</arguments>
+  <workingdirectory>{{HOME}}\backend</workingdirectory>
+  <env name="NODE_ENV" value="production" />
+  <logpath>{{HOME}}\logs</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10240</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+  <onfailure action="restart" delay="5 sec" />
+  <onfailure action="restart" delay="20 sec" />
+  <onfailure action="restart" delay="60 sec" />
+  <resetfailure>1 hour</resetfailure>
+  <stoptimeout>15 sec</stoptimeout>
+  <startmode>Automatic</startmode>
+</service>
