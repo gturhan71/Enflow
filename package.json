@@ -15,7 +15,7 @@
     "check:no-mock": "node scripts/check-no-mock.mjs",
     "check:tenant-scope": "node scripts/check-tenant-scope.mjs",
     "check:no-console": "node scripts/check-no-console.mjs",
-    "verify": "tsc --noEmit && (cd backend && pnpm exec tsc --noEmit) && node scripts/check-no-mock.mjs && node scripts/check-tenant-scope.mjs && node scripts/check-no-console.mjs && node backend/scripts/sync-postgres-schema.mjs --check && node --test backend/scripts/ensure-build.test.mjs install/lib/service.test.mjs upgrade-tool/core.test.mjs && (cd backend && pnpm test:unit && pnpm build) && vite build"
+    "verify": "tsc --noEmit && (cd backend && pnpm exec tsc --noEmit) && node scripts/check-no-mock.mjs && node scripts/check-tenant-scope.mjs && node scripts/check-no-console.mjs && node backend/scripts/sync-postgres-schema.mjs --check && node --test backend/scripts/ensure-build.test.mjs install/lib/service.test.mjs upgrade-tool/core.test.mjs upgrade-tool/upgrade.integration.test.mjs && (cd backend && pnpm test:unit && pnpm build) && vite build"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.0",

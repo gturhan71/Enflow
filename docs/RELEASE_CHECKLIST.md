@@ -20,7 +20,8 @@
 7. [ ] Postgres kurulumu: `pg_dump` PATH'te → yedek (STATE) dosyası oluşuyor (`backend/backups`)
 8. [ ] **Upgrade (SQLite):** yeni migration içeren bir sürüme yükselt → `upgrade-tool` servisi yeniden başlatır → health
 9. [ ] **Upgrade (Postgres, RLS açık):** `ENFLOW_MIGRATOR_URL` ile; ön-yedek `.dump` oluştu, `migrate deploy` migrator ile, RLS yeniden uygulandı
-10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra otomatik geri alma + önceki sürüm sağlıklı; log'da maskeli `pg_restore` komutu
+10. [ ] **Bozuk sürüm:** açılışta çöken commit → 60 sn sonra kod otomatik geri alma + önceki sürüm sağlıklı; **veritabanı geri yüklenmez** (yükseltme sırasında yazılan veri korunur), log'da hazır geri yükleme komutu (SQLite `cp`, Postgres maskeli `pg_restore`)
+11. [ ] **Normal kullanıcıyla upgrade-tool (Linux):** `systemctl restart` yetki isterse `sudo -n` denenir; sudoers'ta parolasız kural yoksa yükseltme geri ALINMAZ, çıkış kodu 3 + elle komut. (Bu senaryo yalnız birim/entegrasyon testli — gerçek systemd'de doğrulayın.)
 
 ## 2. macOS (launchd)
 1. [ ] Sihirbaz → servis **evet** → LaunchDaemon (sudo) — `sudo launchctl print system/com.enflow.backend`

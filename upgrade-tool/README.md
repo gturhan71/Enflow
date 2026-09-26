@@ -74,10 +74,20 @@ node upgrade-tool/server.mjs         # → http://127.0.0.1:7071
 - Yükseltme **yıkıcıdır**: önce DB ön-yedeği alınır — SQLite: `.db` + `-wal` + `-shm` kopyası;
   Postgres: `pg_dump -Fc` (`backend/backups/pre-upgrade-<ts>.dump`; RLS bayraklarıyla). `pg_dump`
   yoksa/başarısızsa yükseltme **başlamaz** (`ENFLOW_SKIP_PG_BACKUP=1` ile bilinçli atlanır).
-- Herhangi bir adım hata verirse **otomatik rollback**: `git reset --hard` + `generate` + build +
-  önceki sürümü yeniden başlat + sağlık kontrolü. SQLite veritabanı otomatik geri yüklenir.
-  **Postgres verisi otomatik geri yüklenmez** (riskli): araç, log'a parolası maskeli hazır
-  `pg_restore --clean --if-exists …` komutunu yazar; servis durdurulmuşken siz çalıştırırsınız.
+- **Adım sırası:** ön-yedek → git → install → `prisma generate` → **build (backend + frontend)** →
+  **`migrate deploy`** → (RLS) → restart → sağlık. Build migration'dan ÖNCE: derleme/tip hataları
+  veritabanına hiç dokunulmadan yakalanır.
+- Adım hatası ya da sağlıksız açılışta **kod otomatik geri alınır**: `git reset --hard` + `generate` +
+  build + önceki sürümü yeniden başlat + sağlık kontrolü.
+- **Veritabanı (SQLite dahil) KENDİLİĞİNDEN geri yüklenmez.** Servis yükseltme boyunca çalışır ve
+  kullanıcılar yazar; ön-yedek yükseltmenin başında alındığından otomatik geri yükleme, o andan sonra
+  yazılan tüm veriyi silerdi (denemede 58 satırdan 23'ü kayboldu). Migration hiç başlamadıysa (ör. build
+  hatası) geri yükleme zaten gerekmez ve log bunu söyler. Migration başladıysa log'a parolası maskeli
+  hazır komut yazılır (SQLite: `cp <ön-yedek> <db>` + `-wal/-shm`; Postgres: `pg_restore --clean --if-exists …`);
+  servis durdurulmuşken, bilinçli karar olarak siz çalıştırırsınız.
+- **Yeniden başlatma başarısızsa** (yetki, servis hatası) yükseltme **geri alınmaz** — kod, build ve şema
+  tamamdır. Araç `ok:true, restartFailed` döner, CLI **çıkış kodu 3** verir ve elle komutu yazar (Linux/macOS'ta
+  önce doğrudan, olmazsa parolasız `sudo -n` denenir; ikisi de olmazsa `sudo systemctl restart enflow` gibi).
 - **Sağlık doğrulaması:** yeniden başlatmadan sonra `http://127.0.0.1:<PORT>/api/health`
   60 sn boyunca yoklanır; `db: ok` **ve** sürecin gerçekten yeniden başlamış olması (yanıttaki
   `uptimeSec`) beklenir — eski sürecin sağlıklı yanıtı yükseltmeyi "başarılı" göstermez.

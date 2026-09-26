@@ -6,7 +6,7 @@ import { execFileSync, execFile } from 'node:child_process';
 import { readFileSync, writeFileSync, renameSync, existsSync, copyFileSync, readdirSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { resolveRestartCommand } from '../install/lib/service.mjs';
+import { resolveRestartCommands, formatCommand } from '../install/lib/service.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO = 'gturhan71/Enflow'; // GitHub owner/repo (API best-effort)
@@ -49,6 +49,7 @@ export function currentVersion(home) {
 
 /** GitHub API'den commit/release meta (best-effort; ağ yoksa null). */
 function githubJson(path) {
+  if (process.env.ENFLOW_OFFLINE === '1') return Promise.resolve(null); // testler/hava-boşluklu kurulum: ağ çağrısı yok
   return new Promise((res) => {
     import('node:https').then(({ request }) => {
       const req = request(
@@ -228,19 +229,28 @@ function backupDb(home, log, opts) {
   return null;
 }
 
-function restoreDb(snap, log) {
-  if (snap?.kind === 'sqlite') {
-    for (const ext of ['', '-wal', '-shm']) {
-      const bak = `${snap.src}.pre-upgrade-${snap.stamp}${ext}`;
-      if (snap.files.includes(ext)) copyFileSync(bak, snap.src + ext);
-      else if (ext && existsSync(snap.src + ext)) rmSync(snap.src + ext); // yedekte yoksa yeni sürümün WAL'ı kalmasın
-    }
-    log(`geri yükleme: SQLite ← ${snap.src}.pre-upgrade-${snap.stamp}`);
-  } else if (snap?.kind === 'postgres') {
-    // Postgres otomatik geri yüklenmez (ADR-002) — operatöre hazır komut
-    log('Postgres VERİTABANI OTOMATİK GERİ YÜKLENMEDİ. Gerekirse (servis durdurulmuşken, migrator/superuser ile):');
-    log(`  PGOPTIONS="-c app.bypass_rls=on" pg_restore --clean --if-exists --no-owner -d "${redactUrl(snap.url)}" "${snap.backup}"`);
+/**
+ * Rollback'te veritabanı KENDİLİĞİNDEN geri yüklenmez (SQLite dahil). Neden: servis yükseltme boyunca
+ * çalışmaya devam eder (kullanıcılar yazar); ön-yedek yükseltmenin BAŞINDA alındığından otomatik geri
+ * yükleme, o andan sonra yazılan her veriyi siler (10x avı 2026-09-26: 58 satırdan 23'ü kayboldu —
+ * veritabanına hiç dokunulmamış bir build hatasında bile). Bunun yerine:
+ *  - dbTouched=false (migration hiç başlamadı) → geri yükleme GEREKMEZ, veri olduğu gibi kalır;
+ *  - dbTouched=true → operatöre hazır komut (servis durdurulmuşken, bilinçli karar).
+ */
+export function describeRestore(snap, dbTouched) {
+  if (!snap) return [];
+  if (!dbTouched) return [`Veritabanına DOKUNULMADI (migration başlamadan durdu) → geri yükleme gerekmez; yükseltme sırasında yazılan veriler korundu.`];
+  const lines = ['Veritabanı OTOMATİK GERİ YÜKLENMEDİ (yükseltme sırasında yazılan kullanıcı verisi silinmesin diye). Migration çalışmış olabilir; gerekirse SERVİS DURDURULMUŞKEN:'];
+  if (snap.kind === 'sqlite') {
+    const bak = `${snap.src}.pre-upgrade-${snap.stamp}`;
+    lines.push(`  cp "${bak}" "${snap.src}"`);
+    for (const ext of ['-wal', '-shm']) lines.push(snap.files.includes(ext) ? `  cp "${bak}${ext}" "${snap.src}${ext}"` : `  rm -f "${snap.src}${ext}"`);
+    lines.push('  (ön-yedekten sonra yazılan veriler bu adımda kaybolur — geri yüklemeden önce mevcut dosyanın kopyasını alın)');
+  } else if (snap.kind === 'postgres') {
+    lines.push(`  PGOPTIONS="-c app.bypass_rls=on" pg_restore --clean --if-exists --no-owner -d "${redactUrl(snap.url)}" "${snap.backup}"`);
+    lines.push('  (ön-yedekten sonra yazılan veriler bu adımda kaybolur)');
   }
+  return lines;
 }
 
 function run(home, cmd, args, log, opts = {}) {
@@ -277,19 +287,36 @@ export async function waitForHealth(url, { timeoutMs = 60_000, intervalMs = 2_00
   return false;
 }
 
-/** Yeniden başlatır → true (health yoklanmalı) | false (mekanizma yok, elle). Hata fırlatır. */
+/** Yeniden başlatma yapılamadı (yetki/servis hatası). Yükseltme KENDİSİ başarılıdır → rollback nedeni DEĞİL. */
+export class RestartError extends Error {
+  constructor(message, manual) { super(message); this.name = 'RestartError'; this.manual = manual; }
+}
+
+/**
+ * Yeniden başlatır → true (health yoklanmalı) | false (mekanizma yok, elle). Başarısızsa RestartError.
+ * restartCommand verilmişse tek deneme; yoksa kurulu servisin adayları sırayla (doğrudan → sudo -n).
+ */
 function restartBackend(home, opts, log) {
   if (opts.restartCommand) {
     log(`restart: ${opts.restartCommand}`);
-    if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', opts.restartCommand], { stdio: 'inherit' });
-    else execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' });
-    return true;
+    try {
+      if (process.platform === 'win32') execFileSync('cmd.exe', ['/d', '/s', '/c', opts.restartCommand], { stdio: 'inherit' });
+      else execFileSync('sh', ['-c', opts.restartCommand], { stdio: 'inherit' });
+      return true;
+    } catch (e) {
+      throw new RestartError(`restart komutu başarısız: ${e.message}`, [opts.restartCommand]);
+    }
   }
-  const svc = resolveRestartCommand({ home });
-  if (svc) {
-    log(`restart (servis): ${svc.cmd} ${svc.args.join(' ')}`);
-    execFileSync(svc.cmd, svc.args, { stdio: 'inherit' });
-    return true;
+  const candidates = resolveRestartCommands({ home });
+  if (candidates.length) {
+    let lastErr;
+    for (const c of candidates) {
+      const shown = formatCommand({ ...c, sudo: false });
+      log(`restart (servis): ${shown}`);
+      try { execFileSync(c.cmd, c.args, { stdio: 'inherit' }); return true; } catch (e) { lastErr = e; log(`  → başarısız: ${String(e.message).split('\n')[0]}`); }
+    }
+    // Elle çalıştırılacak komut: sudo'suz aday (operatör yetkili kabuktan çalıştırır)
+    throw new RestartError(`servis yeniden başlatılamadı (${lastErr?.message?.split('\n')[0] ?? 'yetki?'})`, [formatCommand({ ...candidates[0], sudo: process.platform !== 'win32' && candidates.length > 1 })]);
   }
   log('NOT: kurulu servis bulunamadı ve restartCommand ayarlı değil — backend\'i elle yeniden başlatın (sağlık kontrolü atlandı).');
   return false;
@@ -304,8 +331,12 @@ function pgRlsInstalled(url) {
 
 /**
  * Güvenli yükseltme. opts: { channel, log, allowDirty, restartCommand, migratorUrl,
- * skipPgBackup, healthTimeoutMs }. Hata (sağlıksız açılış dahil) → kod geri alınır,
- * SQLite geri yüklenir, Postgres için pg_restore komutu loglanır. Döner: { ok, from, to, error? }.
+ * skipPgBackup, healthTimeoutMs }.
+ *  - Adım hatası / sağlıksız açılış → KOD geri alınır (git reset + build + yeniden başlat); veritabanı
+ *    OTOMATİK geri yüklenmez (describeRestore: dokunulmadıysa gerekmez, dokunulduysa hazır komut).
+ *  - Yeniden başlatma başarısızsa (yetki vb.) yükseltme BAŞARILIDIR: geri alınmaz, ok:true +
+ *    restartFailed:true + manual (elle komut) döner.
+ * Döner: { ok, from, to, error?, restartFailed?, manual? }.
  */
 export async function runUpgrade(home, opts = {}) {
   const log = opts.log || (() => {});
@@ -336,6 +367,7 @@ export async function runUpgrade(home, opts = {}) {
   if (!cmp.available) { log('Zaten güncel.'); return { ok: true, from, to: from, noop: true }; }
 
   let snap = null;
+  let dbTouched = false; // migrate deploy başladıysa şema/veri değişmiş olabilir
   try {
     // 2b) ön-yedek
     snap = backupDb(home, log, { migratorUrl, skipPgBackup: opts.skipPgBackup });
@@ -349,24 +381,40 @@ export async function runUpgrade(home, opts = {}) {
     await run(home, 'pnpm', ['install'], log);
     await run(home, 'pnpm', ['install'], log, { cwd: backend });
 
-    // 5) DB şeması — prisma.config.ts DATABASE_URL'den sağlayıcıya göre şema/migration klasörü seçer
+    // 5) Prisma client — prisma.config.ts DATABASE_URL'den sağlayıcıya göre şema klasörü seçer
     await run(home, 'pnpm', ['prisma', 'generate'], log, { cwd: backend, env: prismaEnv });
-    await run(home, 'pnpm', ['prisma', 'migrate', 'deploy'], log, { cwd: backend, env: prismaEnv });
 
-    // 6) build — backend (`pnpm start` = derlenmiş dist, ADR-001) + frontend
+    // 6) build — backend (`pnpm start` = derlenmiş dist, ADR-001) + frontend. MIGRATION'DAN ÖNCE:
+    //    derleme/tip hataları veritabanına HİÇ dokunulmadan yakalanır (rollback'te geri yükleme gerekmez).
     await run(home, 'pnpm', ['build'], log, { cwd: backend });
     await run(home, 'pnpm', ['build'], log);
 
-    // 6b) Postgres RLS kuruluysa yeni tablolar için politikaları yeniden uygula (idempotent)
+    // 7) DB şeması (migrate deploy) — buradan sonra veritabanı değişmiş sayılır (dbTouched)
+    dbTouched = true;
+    await run(home, 'pnpm', ['prisma', 'migrate', 'deploy'], log, { cwd: backend, env: prismaEnv });
+
+    // 7b) Postgres RLS kuruluysa yeni tablolar için politikaları yeniden uygula (idempotent)
     if (db.kind === 'postgres') {
       const rls = pgRlsInstalled(toLibpqUrl(migratorUrl));
       if (rls) await run(home, 'node', ['dist/scripts/apply-postgres-rls.js'], log, { cwd: backend, env: prismaEnv });
       else if (rls === null) log('UYARI: RLS durumu okunamadı (psql?) — RLS kullanıyorsanız elle: DATABASE_URL=<migrator> node dist/scripts/apply-postgres-rls.js');
     }
 
-    // 7) restart + sağlık doğrulaması
+    // 8) restart + sağlık doğrulaması
     const restartedAt = Date.now();
-    if (restartBackend(home, opts, log)) {
+    let restarted;
+    try {
+      restarted = restartBackend(home, opts, log);
+    } catch (e) {
+      if (!(e instanceof RestartError)) throw e;
+      // Kod + şema + build tamam; yalnız yeniden başlatılamadı → GERİ ALMA (geri almak veri kaybettirirdi)
+      const to = currentVersion(home);
+      log(`UYARI: yükseltme TAMAMLANDI ama ${e.message}`);
+      log('Servisi elle yeniden başlatın: ' + e.manual.join('  |  '));
+      writeStatus(home, { checkedAt: new Date().toISOString(), current: to, update: { available: false, applied: true, needsRestart: true, from: prevRef?.slice(0, 7), to: to.shortSha, appliedAt: new Date().toISOString() } });
+      return { ok: true, from, to, restartFailed: true, warning: e.message, manual: e.manual };
+    }
+    if (restarted) {
       log(`sağlık kontrolü: ${healthUrl} (en fazla ${Math.round(healthOpts.timeoutMs / 1000)} sn; süreç yeniden başlamış olmalı)`);
       if (!(await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - restartedAt) / 1000) + 3 }))) {
         throw new Error(`Yükseltme sonrası backend ${Math.round(healthOpts.timeoutMs / 1000)} sn içinde sağlıklı açılmadı (${healthUrl}).`);
@@ -381,7 +429,7 @@ export async function runUpgrade(home, opts = {}) {
     log('HATA: ' + e.message);
     log('↩ ROLLBACK başlıyor...');
     try { if (prevRef) await run(home, 'git', ['reset', '--hard', prevRef], log); } catch (er) { log('git reset hata: ' + er.message); }
-    restoreDb(snap, log);
+    for (const line of describeRestore(snap, dbTouched)) log(line);
     try {
       await run(home, 'pnpm', ['install'], log);
       await run(home, 'pnpm', ['install'], log, { cwd: backend });
@@ -390,8 +438,12 @@ export async function runUpgrade(home, opts = {}) {
       await run(home, 'pnpm', ['build'], log, { cwd: backend });
       await run(home, 'pnpm', ['build'], log);
       const rbAt = Date.now();
-      if (restartBackend(home, opts, log)) {
-        log((await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - rbAt) / 1000) + 3 })) ? '✓ önceki sürüm sağlıklı açıldı.' : 'UYARI: önceki sürüm de sağlıklı açılmadı — elle müdahale gerekli.');
+      try {
+        if (restartBackend(home, opts, log)) {
+          log((await waitForHealth(healthUrl, { ...healthOpts, maxUptimeSec: Math.ceil((Date.now() - rbAt) / 1000) + 3 })) ? '✓ önceki sürüm sağlıklı açıldı.' : 'UYARI: önceki sürüm de sağlıklı açılmadı — elle müdahale gerekli.');
+        }
+      } catch (er) {
+        log(`UYARI: önceki sürüm yeniden başlatılamadı (${er.message}). Servisi elle yeniden başlatın${er.manual ? ': ' + er.manual.join('  |  ') : ''}`);
       }
     } catch (er) { log('rollback adımı hata: ' + er.message); }
     writeStatus(home, { checkedAt: new Date().toISOString(), current: currentVersion(home), update: { available: true, failed: true, error: e.message, ref: latest.ref, target: latest.target } });
