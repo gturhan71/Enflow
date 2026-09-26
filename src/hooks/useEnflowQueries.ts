@@ -102,6 +102,14 @@ export const useModuleSettings = (tenantId: string) => {
   });
 };
 
+// Bekleyen Onaylarım — kullanıcının rolüne sırası gelmiş onay zincirleri. Opsiyonel katman: hata → boş liste.
+export const usePendingApprovalChains = (tenantId: string, role: string | undefined) => useQuery({
+  queryKey: ['approval-chains', 'pending', tenantId, role ?? ''],
+  queryFn: () => apiService.getPendingApprovalChainsForRole(role as string).catch(() => []),
+  staleTime: 30 * 1000,
+  refetchOnMount: 'always',   // başka ekranlardan (süreç butonları) verilen onaylar önbelleği geçersiz kılmaz → her açılışta taze
+  enabled: !!tenantId && !!role,
+});
 // Ziyaret Planı — anahtarlar `['visit-plan', ...]` öneki altında (paylaşım sonrası tek invalidate).
 export const useVisitPlans = (tenantId: string) => useQuery({
   queryKey: ['visit-plan', 'plans', tenantId], queryFn: () => apiService.getVisitPlans(), staleTime: 60 * 1000, enabled: !!tenantId,
