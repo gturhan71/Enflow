@@ -7,8 +7,9 @@ hiçbir npm bağımlılığı yoktur (yalnız Node built-in + git + pnpm).
 
 ## İlke
 
-- **Beyin araçta:** uzak sürüm kontrolü ve yükseltme (git pull/checkout → pnpm install →
-  prisma migrate deploy → build → restart) tamamen bu araçta.
+- **Beyin araçta:** uzak sürüm kontrolü ve yükseltme (ön-yedek → git pull/checkout → pnpm install →
+  prisma generate + migrate deploy → backend+frontend build → restart → **sağlık doğrulaması**)
+  tamamen bu araçta.
 - **Uygulama yalnız yansıtır:** araç repo köküne atomik `update-status.json` yazar; uygulama
   bunu okuyup GM'lere zil bildirimi düşürür (versiyon/yükseltme mantığı uygulamada yoktur).
 
@@ -29,7 +30,10 @@ node upgrade-tool/cli.mjs upgrade    # güvenli yükseltme (ön-yedek + rollback
 ```
 
 Çevre değişkenleri: `ENFLOW_HOME` (varsayılan: aracın üst dizini = repo kökü),
-`ENFLOW_CHANNEL` (auto|tag|commit), `ENFLOW_RESTART_CMD`, `ENFLOW_ALLOW_DIRTY=1`.
+`ENFLOW_CHANNEL` (auto|tag|commit), `ENFLOW_ALLOW_DIRTY=1`,
+`ENFLOW_RESTART_CMD` (boşsa **kurulu OS servisi otomatik bulunur**: systemd / launchd / WinSW),
+`ENFLOW_MIGRATOR_URL` (**Postgres'te zorunlu** — DDL yetkili migrator rolü, aşağıya bakın),
+`ENFLOW_SKIP_PG_BACKUP=1` (pg_dump ön-yedeğini bilerek atla — önerilmez).
 
 **Cron örneği (her 6 saatte kontrol):**
 ```cron
@@ -58,21 +62,35 @@ node upgrade-tool/server.mjs         # → http://127.0.0.1:7071
 
 - Yerel vs en-son sürüm kartları, **Şimdi Kontrol Et** / **Şimdi Yükselt** (canlı log).
 - Ayarlar: kanal, otomatik-kontrol aralığı, **bakım penceresinde otomatik yükselt**,
-  bakım penceresi saatleri, restart komutu → `upgrade-tool/config.json` (commit edilmez).
+  bakım penceresi saatleri, restart komutu (boş = kurulu servis), **Postgres migrator
+  bağlantısı** (`migratorUrl` — parola içerir; API/GUI yanıtlarında `********` maskeli),
+  pg_dump atlama → `upgrade-tool/config.json` (commit edilmez).
 - Sunucu periyodik kontrol yapar; `autoUpgrade` açık ve bakım penceresindeyse otomatik yükseltir.
 
 ## Güvenlik
 
 - Sunucu yalnız `127.0.0.1`'e bağlanır — dışa açmayın.
 - Aracı **install'ın sahibi OS kullanıcısı** ile çalıştırın (git + pnpm + restart yetkisi gerekir).
-- Yükseltme **yıkıcıdır**: önce DB ön-yedeği (SQLite kopya; Postgres'te `pg_dump` operatör
-  sorumluluğunda) alınır; herhangi bir adım hata verirse `git reset --hard` + DB geri yükleme
-  ile **otomatik rollback** yapılır.
-- `.env` (JWT/PLUGIN_LICENSE_SECRET) git-ignore olduğundan yükseltmede korunur.
-- `restartCommand` ayarlı değilse araç süreçleri yeniden başlatmaz; elle restart gerekir.
+- Yükseltme **yıkıcıdır**: önce DB ön-yedeği alınır — SQLite: `.db` + `-wal` + `-shm` kopyası;
+  Postgres: `pg_dump -Fc` (`backend/backups/pre-upgrade-<ts>.dump`; RLS bayraklarıyla). `pg_dump`
+  yoksa/başarısızsa yükseltme **başlamaz** (`ENFLOW_SKIP_PG_BACKUP=1` ile bilinçli atlanır).
+- Herhangi bir adım hata verirse **otomatik rollback**: `git reset --hard` + `generate` + build +
+  önceki sürümü yeniden başlat + sağlık kontrolü. SQLite veritabanı otomatik geri yüklenir.
+  **Postgres verisi otomatik geri yüklenmez** (riskli): araç, log'a parolası maskeli hazır
+  `pg_restore --clean --if-exists …` komutunu yazar; servis durdurulmuşken siz çalıştırırsınız.
+- **Sağlık doğrulaması:** yeniden başlatmadan sonra `http://127.0.0.1:<PORT>/api/health`
+  60 sn boyunca yoklanır; `db: ok` **ve** sürecin gerçekten yeniden başlamış olması (yanıttaki
+  `uptimeSec`) beklenir — eski sürecin sağlıklı yanıtı yükseltmeyi "başarılı" göstermez.
+- **Postgres migrator:** şema DDL'i runtime rolüyle yapılamaz. `ENFLOW_MIGRATOR_URL` (veya
+  `config.json → migratorUrl`) yoksa yükseltme **hiçbir şeye dokunmadan** durur. RLS kuruluysa
+  yeni tablolar için politikalar otomatik yeniden uygulanır (`apply-postgres-rls`, idempotent).
+- `.env` (JWT/şifreleme anahtarları) git-ignore olduğundan yükseltmede korunur.
+- Restart: `restartCommand` verilmişse o; yoksa kurulu servis (systemd `systemctl restart enflow`,
+  launchd `launchctl kickstart -k`, WinSW `enflow-service.exe restart`). Hiçbiri yoksa araç
+  yeniden başlatmaz ve sağlık kontrolünü atlar — elle restart gerekir.
 
 ## Üretilen dosyalar (commit edilmez)
 
 - `upgrade-tool/config.json` — operatör ayarları
 - `update-status.json` (repo kökünde) — uygulama köprüsü
-- `backend/*.pre-upgrade-*` — yükseltme öncesi DB ön-yedekleri
+- `backend/*.pre-upgrade-*` — yükseltme öncesi SQLite ön-yedekleri · `backend/backups/pre-upgrade-*.dump` — Postgres ön-yedekleri (`backend/backups/` git-ignore)

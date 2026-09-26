@@ -68,11 +68,13 @@ PowerShell ile elle:
 3. **Ortam dosyaları** — `backend/.env` yazılır (runtime DB rolüyle — migrator kimlik
    bilgileri `.env`'e yazılmaz, yalnız kurulum özetinde bir kez gösterilir).
 4. **Bağımlılıklar** — `pnpm install` (frontend + backend).
-5. **Veritabanı** — `prisma generate` + `prisma migrate deploy` (SQLite) /
-   `prisma db push` (Postgres, migrator kimlik bilgileriyle) + runtime rolüne DML-only GRANT.
+5. **Veritabanı** — `prisma generate` + `prisma migrate deploy` (SQLite: `prisma/migrations`;
+   Postgres: `prisma/migrations-postgres`, migrator kimlik bilgileriyle — şema seçimi
+   `prisma.config.ts`'te `DATABASE_URL`'den) + runtime rolüne DML-only GRANT.
 6. **Ağ sertleştirmesi** — DB/Studio port maruziyeti uyarısı + opsiyonel (onaylı) ufw/Windows
    Firewall kısıtlaması.
-7. **Derleme** — opsiyonel `pnpm build` (üretim için `dist/`).
+7. **Derleme** — backend (`backend/dist/`, zorunlu) + opsiyonel frontend (`dist/`).
+8. **İşletim sistemi servisi** (opsiyonel, varsayılan HAYIR) — bkz. aşağıdaki "Servis olarak çalıştırma".
 
 Bittiğinde başlatma komutlarını ekrana yazar.
 
@@ -81,15 +83,36 @@ Bittiğinde başlatma komutlarını ekrana yazar.
 ## Başlatma
 
 ```bash
-# ── ÜRETİM (önerilen): `pnpm build` sonrası backend dist'i TEK ORIGIN sunar ──
-cd backend && pnpm start        # → http://localhost:3002 (hem UI hem API)
-#   Ayrı frontend süreci / preview / proxy GEREKMEZ.
+# ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+cd backend && pnpm build && pnpm start   # derlenmiş `node dist/index.js` → http://localhost:3002 (UI + API tek origin)
+#   Ayrı frontend süreci / preview / proxy GEREKMEZ. Kod değişince önce `pnpm build`.
 
 # ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
-cd backend && pnpm start        # backend (3002)
+cd backend && pnpm dev          # nodemon + ts-node (3002)
 pnpm dev --port 3000            # frontend (3000) — ayrı terminal  (ya da: run.bat / ./run.sh)
 ```
 Üretim → `http://localhost:3002` · Geliştirme → `http://localhost:3000`
+
+### Servis olarak çalıştırma (ADR-001)
+
+Sihirbazın 8/8 adımı (ya da `--service` bayrağı) Enflow'u işletim sistemi servisi kurar —
+**açılışta otomatik başlar, çökünce yeniden başlar, durdurulunca temiz kapanır** (≤10 sn).
+Yönetici/sudo yetkisi ister; onay vermezseniz hiçbir şey kurulmaz.
+
+| OS | Mekanizma | Yönetim | Loglar |
+|---|---|---|---|
+| Linux | systemd (`enflow.service`) | `sudo systemctl status\|restart\|stop enflow` | `journalctl -u enflow -f` |
+| macOS | launchd (`com.enflow.backend`; sistem **LaunchDaemon** veya oturum **LaunchAgent**) | `sudo launchctl kickstart -k system/com.enflow.backend` | `logs/backend.log` (döndürme yok — `newsyslog`) |
+| Windows | WinSW v2.12.0 (SHA256 doğrulamalı indirme) | `service\enflow-service.exe status\|restart\|stop` (Yönetici) | `logs\` (boyuta göre döner) |
+
+- Servis dosyaları `service/` altında üretilir (git'e girmez), şablonlar `install/service/`.
+- Ayarlar `backend/.env`'den okunur (servis `backend/` çalışma dizininde başlar).
+- **Linux:** servis kullanıcısı `backend/.env` + `backend/uploads` + `backend/backups` üzerinde
+  okuma/yazma yetkisine sahip olmalı; mümkünse yetkisiz ayrı bir kullanıcı kullanın.
+- **Yükseltme:** upgrade-tool kurulu servisi otomatik bulup yeniden başlatır ve `/api/health`
+  ile doğrular; sağlıksız açılışta kodu geri alır (bkz. `upgrade-tool/README.md`).
+- **Windows notu:** Node, Windows'ta SIGTERM almaz; WinSW durdururken süreci sonlandırır —
+  temiz kapanış (graceful shutdown) Windows'ta **doğrulanmamıştır** (bkz. `docs/RELEASE_CHECKLIST.md`).
 
 ---
 
@@ -113,12 +136,13 @@ içinde `install.sh`, `install.ps1`, `wizard.mjs`, `README.md`, `.env.example`.
 
 Varsayılan SQLite'tır. PostgreSQL için sihirbazda "PostgreSQL kullanılsın mı?" → Evet
 seçin (kapasite eşiği aşıldığında sihirbaz bunu zaten varsayılan öneri yapar) —
-`schema.prisma` provider'ı ve rol/DB provizyonu **otomatik** yapılır, elle düzenleme
-gerekmez. Sihirbaz **iki rol** oluşturur: `<kullanıcı>_migrator` (DB owner, DDL —
+rol/DB provizyonu ve şema kurulumu (`migrate deploy`, Postgres'e özel migration hattı)
+**otomatik** yapılır; izlenen hiçbir dosya değiştirilmez, elle düzenleme gerekmez. Sihirbaz **iki rol** oluşturur: `<kullanıcı>_migrator` (DB owner, DDL —
 yalnız kurulum/şema güncellemesinde kullanılır) ve asıl `DATABASE_URL`'in kullandığı
 **runtime rolü** (yalnız DML — SELECT/INSERT/UPDATE/DELETE, DROP/ALTER/CREATE ROLE
 yok). Migrator şifresi yalnız kurulum özetinde bir kez gösterilir, güvenle saklayın —
-gelecekteki bir şema güncellemesinde (bkz. aşağıdaki not) yeniden gerekecek. Mevcut
+**her Postgres yükseltmesinde zorunludur** (`ENFLOW_MIGRATOR_URL` veya
+`upgrade-tool/config.json → migratorUrl`; bkz. `upgrade-tool/README.md`). Mevcut
 bir SQLite kurulumunu sonradan taşımak için: `cd backend && pnpm
 migrate:to-postgres` (bkz. [`POSTGRES_MIGRATION_PLAN.md`](POSTGRES_MIGRATION_PLAN.md)).
 
@@ -133,7 +157,9 @@ migrate:to-postgres` (bkz. [`POSTGRES_MIGRATION_PLAN.md`](POSTGRES_MIGRATION_PLA
 | Windows `... betik çalıştırılamıyor` | `Set-ExecutionPolicy -Scope Process Bypass`. |
 | Port kullanımda | Sihirbazda farklı port girin; backend portu değişirse `vite.config.ts` proxy hedefini de güncelleyin. |
 | `prisma migrate` hatası | `backend/.env` `DATABASE_URL` doğru mu? |
-| Migration sonrası backend çöküyor | `cd backend && pnpm prisma generate` + yeniden başlat. |
+| Migration sonrası backend çöküyor | `cd backend && pnpm prisma generate && pnpm build` + yeniden başlat. |
+| Servis açılmıyor (`/api/health` yok) | Linux: `journalctl -u enflow -e` · macOS: `logs/backend.log` · Windows: `logs\`. `backend/dist/` var mı (`pnpm build`)? Servis kullanıcısı `.env`'i okuyabiliyor mu? |
+| `/api/health` 503 (`db: down`) | Süreç ayakta ama veritabanına erişemiyor — `DATABASE_URL`, Postgres servisi, ağ. |
 | `git clone` reddedildi | HTTPS URL kullanın (varsayılan); SSH anahtarı gerekmez. |
 
 ---

@@ -35,7 +35,10 @@ satır-sayısı doğrulaması geçmeden yapılandırmayı değiştirmeden Postgr
 | Bileşen | Minimum | Önerilen |
 |---|---|---|
 | İşletim sistemi | Windows 10 / Ubuntu 20.04 / macOS 12 | Windows 11 / Ubuntu 22.04+ / macOS 14 |
-| Node.js | 20 LTS (sihirbaz yoksa **otomatik kurar**) | 22 LTS veya 24 |
+| Node.js | 20 LTS (sihirbaz yoksa **otomatik kurar**) — graceful shutdown `closeAllConnections` (≥18.2) kullanır | 22 LTS veya 24 |
+| Servis yöneticisi (üretim) | Linux systemd · macOS launchd · Windows WinSW (sihirbaz kurar; bkz. `install/README.md`) | çökünce yeniden başlatma + açılışta başlatma için **zorunlu öneri** |
+| PostgreSQL istemci araçları (`pg_dump`, `psql`) | Postgres kurulumlarında **zorunlu**: yedek (STATE) ve upgrade ön-yedeği `pg_dump` kullanır; bulunamazsa yedek atlanır (log'lanır), upgrade durur | sunucu ile aynı ana sürüm |
+| Postgres yükseltmeleri için | `ENFLOW_MIGRATOR_URL` (DDL rolü; `.env`'de **yok**, operatörün ortamında/`upgrade-tool/config.json`'da) | — |
 | pnpm | 10 (sihirbaz `corepack` ile kurar) | 10.33+ |
 | git | 2.30+ | güncel |
 | Tarayıcı (frontend — React 19) | Chrome/Edge/Firefox/Safari son 2 sürüm | aynı, güncel tutulan |

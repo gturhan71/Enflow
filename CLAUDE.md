@@ -379,7 +379,6 @@ src/components/MoneyInput.tsx ← lib/format
 src/components/settings/SubscriptionSettings.tsx ← ../types
 src/components/settings/TenantSettings.tsx ← ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← ../types, ../constants, ../services/apiService, PersonnelTransferModal
-src/contexts/AuthContext.tsx ← types, services/apiService
 src/hooks/useBoM.ts ← services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← lib/utils, contexts/AuthContext, contexts/ThemeContext, types, services/apiService
 src/layout/Sidebar.tsx ← lib/utils, contexts/UnsavedChangesContext, constants, contexts/AuthContext, services/apiService
@@ -524,12 +523,12 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 3 minutes ago)
+## changes (last 10 commits — 2 minutes ago)
 ```
 backend/scripts/db-migrate.mjs                +run
 backend/src/services/backupService.ts         +toLibpqUrl  ~runBackup
 install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
-install/wizard.mjs                            ~setSchemaProvider  ~main  ~ensurePostgresServer
+install/wizard.mjs                            +offerServiceInstall  ~setSchemaProvider  ~ensurePostgresServer  ~main
 upgrade-tool/cli.mjs                          ~main
 upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
@@ -580,12 +579,6 @@ export type BackupKind  :33-33
 ### backend/pnpm-lock.yaml
 ```
 keys: [lockfileVersion, settings, importers, packages, snapshots]
-```
-
-### backend/prisma/migrations/20260816195438_add_platform_ticket_reported_type/migration.sql
-```
-TABLE new_PlatformTicket
-INDEX PlatformTicket_tenantId_status_idx ON PlatformTicket
 ```
 
 ### backend/prisma/migrations/20260819134722_add_customer_parent_hierarchy/migration.sql
@@ -1379,7 +1372,7 @@ h1 A) Depo zaten elinizdeyse:
 h1 B) Sıfırdan:
 h3 2.4 Sihirbaz Hangi Soruları Sorar?
 h3 2.5 Başlatma
-h1 ── ÜRETİM (önerilen) — derlenmiş sürüm, backend tek origin'den hem arayüzü hem API'yi sunar ──
+h1 ── ÜRETİM (önerilen) — servis kuruluysa kendiliğinden çalışır; değilse elle ──
 h1 ── GELİŞTİRME — canlı kaynak, iki ayrı süreç ──
 h3 2.5b Kurulumdan Sonra — Ağ Güvenliği
 h3 2.6 Sık Karşılaşılan Sorunlar
@@ -1413,9 +1406,10 @@ h1 B) Tek başına:
 h3 Etkileşimsiz (CI / otomasyon)
 h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
 h2 Başlatma
-h1 ── ÜRETİM (önerilen): `pnpm build` sonrası backend dist'i TEK ORIGIN sunar ──
-h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
+h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ. Kod değişince önce `pnpm build`.
 h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h3 Servis olarak çalıştırma (ADR-001)
 h2 Dağıtılabilir Kurulum Zip'i Üretme
 h1 Linux/macOS
 h1 Windows
@@ -1425,7 +1419,6 @@ h2 Güvenlik
 h3 Veritabanı ve Prisma Studio Erişimi
 code-fence bash
 code-fence plain
-code-fence powershell
 ```
 
 ## src
@@ -1515,14 +1508,6 @@ export interface HelpArticle  :13-18
   audience: string  :16-16
   sections: HelpArticleSection[]  :17-17
 export const getHelpArticle = (moduleId) =>  :184-184
-```
-
-### src/contexts/AuthContext.tsx
-```
-hook useState
-hook useEffect
-hook useContext
-export AuthProvider
 ```
 
 ### src/hooks/useBoM.ts
@@ -2773,5 +2758,21 @@ async function performUpgrade()  :52-59
 async function tick()  :62-71
 ```
 
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
+code-fence powershell
+```
 
-> **Not everything is here.** 203 file(s) omitted to stay under the 20187-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+
+> **Not everything is here.** 204 file(s) omitted to stay under the 20192-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.

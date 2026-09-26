@@ -124,7 +124,12 @@ Hangi işletim sisteminde olursanız olun, kurulum betiği aynı soruları sıra
    olmadan sistem yeni bir Enflow sürümü çıktığında bunu **hiç fark etmez** — bildirim zili
    tetiklenmez (bkz. `upgrade-tool/README.md`). Linux/macOS'ta bunun karşılığı bir `cron`
    girdisidir, kurulum betiği kendisi eklemez (elle: `upgrade-tool/README.md`).
-6. **Ağ sertleştirmesi (opsiyonel)** — kurulumun sonunda betik, bu sunucuda yalnız SSH(22)
+6. **İşletim sistemi servisi (opsiyonel)** — sihirbazın son adımı, Enflow'u sunucu açılınca
+   otomatik başlayan, çökünce yeniden başlayan bir servis (Linux systemd / macOS launchd /
+   Windows WinSW) olarak kurmayı **onayınızla** önerir (varsayılan HAYIR; yönetici/sudo
+   yetkisi ister). Üretim sunucuları için önerilir — ayrıntı: [`install/README.md`](README.md)
+   § "Servis olarak çalıştırma".
+7. **Ağ sertleştirmesi (opsiyonel)** — kurulumun sonunda betik, bu sunucuda yalnız SSH(22)
    ve backend portuna gelen trafiğe izin verecek şekilde güvenlik duvarını (ufw/Windows
    Firewall) kısıtlamayı **açıkça onayınızı isteyerek** önerir (varsayılan HAYIR — siz
    onaylamadan hiçbir şey değişmez). Bu, veritabanı portunun ve Prisma Studio'nun yanlışlıkla
@@ -145,11 +150,11 @@ gerekmez.
 Kurulum bittiğinde ekrana başlatma komutlarını yazar:
 
 ```bash
-# ── ÜRETİM (önerilen) — derlenmiş sürüm, backend tek origin'den hem arayüzü hem API'yi sunar ──
-cd backend && pnpm start        # → http://localhost:3002
+# ── ÜRETİM (önerilen) — servis kuruluysa kendiliğinden çalışır; değilse elle ──
+cd backend && pnpm start        # derlenmiş `node dist/index.js` → http://localhost:3002 (kod değişince önce: pnpm build)
 
 # ── GELİŞTİRME — canlı kaynak, iki ayrı süreç ──
-cd backend && pnpm start        # backend → :3002 (bir terminal)
+cd backend && pnpm dev          # backend → :3002 (nodemon + ts-node; bir terminal)
 pnpm dev --port 3000            # frontend → :3000 (ayrı terminal)
 ```
 

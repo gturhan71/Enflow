@@ -1,4 +1,6 @@
 #!/bin/bash
+# ⚠️ YALNIZ GELİŞTİRME aracı (ts-node + pkill). Üretimde KULLANMAYIN — üretim: OS servisi
+# (systemd/launchd/WinSW; install/README.md § "Servis olarak çalıştırma") + `pnpm build` → `node dist/index.js`.
 # Enflow — macOS/Linux tek-komut başlangıç scripti.
 # Backend (3002) + Frontend (3000) başlatır, health-check ile ayakta
 # olduklarını doğrular ve sonucu raporlar. restarter.cjs bu scripti
