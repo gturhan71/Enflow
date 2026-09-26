@@ -521,7 +521,7 @@ xlsx@0.18.5
 backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine (slaEscalation.ts) girebilmeli: aynı
 ```
 
-## changes (last 10 commits — 4 hours ago)
+## changes (last 10 commits — 4 minutes ago)
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
@@ -1364,6 +1364,11 @@ export type AgentMode  :14-14
 
 ## install
 
+### install/build-package.sh
+```
+# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
+```
+
 ### install/ILK_KURULUM_KILAVUZU.md
 ```
 h1 Enflow — İlk Kurulum ve Yönetici Başlangıç Kılavuzu
@@ -1391,40 +1396,6 @@ h3 4.1 Abonelik / Plan Lisansı (asıl lisans)
 h3 4.2 Sanal Agent / Eklenti Lisansları (opsiyonel, ayrı)
 h2 5. Birim (Unit) Oluşturma
 h3 5.1 Hızlı yol (önerilen — çoğu kurulum için yeterli)
-```
-
-### install/README.md
-```
-h1 Enflow — Kurulum Kılavuzu
-h2 Sistem Gereksinimleri
-h2 Hızlı Kurulum
-h3 Linux / macOS
-h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
-h1 B) Tek başına (sıfırdan — depoyu klonlar):
-h3 Windows
-h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
-h1 B) Tek başına:
-h3 Etkileşimsiz (CI / otomasyon)
-h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
-h2 Başlatma
-h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
-h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
-h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
-h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
-h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
-h3 Servis olarak çalıştırma (ADR-001)
-h2 Dağıtılabilir Kurulum Zip'i Üretme
-h1 Linux/macOS
-h1 Windows
-h2 PostgreSQL (Üretim) Notu
-h2 Sorun Giderme
-h2 Güvenlik
-h3 Veritabanı ve Prisma Studio Erişimi
-```
-
-### install/build-package.sh
-```
-# Enflow — dağıtılabilir kurulum zip'i üretir (install/ bootstrap'ları).
 ```
 
 ### install/lib/pg.mjs
@@ -1457,6 +1428,35 @@ h2 En-az-yetki: iki-rol ayrımı (2026-09-13, Adım 0 madde 5)
 h2 Kapasite teyidi (kurulum sihirbazı)
 h2 İlgili dosyalar
 h2 Taban-katman şifreleme (öneri, kod değişikliği gerektirmez)
+```
+
+### install/README.md
+```
+h1 Enflow — Kurulum Kılavuzu
+h2 Sistem Gereksinimleri
+h2 Hızlı Kurulum
+h3 Linux / macOS
+h1 A) Depo zaten elinizdeyse (en son sürüme güncelleyip kurar):
+h1 B) Tek başına (sıfırdan — depoyu klonlar):
+h3 Windows
+h1 A) Depo elinizdeyse: (gerekirse: Set-ExecutionPolicy -Scope Process Bypass)
+h1 B) Tek başına:
+h3 Etkileşimsiz (CI / otomasyon)
+h2 Kurulum Sihirbazı Ne Yapar (`wizard.mjs`)
+h2 Başlatma
+h1 ── ÜRETİM (önerilen): servis olarak (aşağıya bakın) ya da elle ──
+h1 `prestart` dist/ yoksa ya da src/'den eskiyse otomatik derler. Servisler `node dist/index.js`'i doğrudan
+h1 çalıştırır (prestart'tan geçmez) — derleme kurulum/upgrade adımındadır.
+h1 Ayrı frontend süreci / preview / proxy GEREKMEZ.
+h1 ── GELİŞTİRME (canlı kaynak, derleme gerekmez) ──
+h3 Servis olarak çalıştırma (ADR-001)
+h2 Dağıtılabilir Kurulum Zip'i Üretme
+h1 Linux/macOS
+h1 Windows
+h2 PostgreSQL (Üretim) Notu
+h2 Sorun Giderme
+h2 Güvenlik
+h3 Veritabanı ve Prisma Studio Erişimi
 ```
 
 ### install/wizard.mjs
@@ -2727,22 +2727,6 @@ function restartBackend(home, opts, log)  :281-296  # Yeniden başlatır → tru
 function pgRlsInstalled(url)  :298-303
 ```
 
-### upgrade-tool/README.md
-```
-h1 Enflow Upgrade Tool
-h2 İlke
-h2 Sürüm kaynağı (kanal)
-h2 Çalıştırma
-h3 CLI (cron / otomasyon)
-h3 Web GUI (operatör)
-h2 Güvenlik
-h2 Üretilen dosyalar (commit edilmez)
-code-fence bash
-code-fence plain
-code-fence cron
-code-fence powershell
-```
-
 ### upgrade-tool/server.mjs
 ```
 function loadConfig()  :29-31
@@ -2780,6 +2764,22 @@ input#skipPgBackup
 button#btnSave
 span#saved
 pre#log
+```
+
+### upgrade-tool/README.md
+```
+h1 Enflow Upgrade Tool
+h2 İlke
+h2 Sürüm kaynağı (kanal)
+h2 Çalıştırma
+h3 CLI (cron / otomasyon)
+h3 Web GUI (operatör)
+h2 Güvenlik
+h2 Üretilen dosyalar (commit edilmez)
+code-fence bash
+code-fence plain
+code-fence cron
+code-fence powershell
 ```
 
 
