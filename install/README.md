@@ -134,6 +134,26 @@ içinde `install.sh`, `install.ps1`, `wizard.mjs`, `README.md`, `.env.example`.
 
 ---
 
+## Ters proxy, HTTPS ve oturum çerezi (P0-3)
+
+Tarayıcı oturumu `enflow_session` **httpOnly çerezindedir** (JavaScript göremez); sıkı bir **İçerik Güvenlik
+Politikası** (CSP) tüm yanıtlarda zorunludur. Üretimde önerilen dizilim: ters proxy (nginx/Caddy) + TLS → backend.
+
+| Ayar (`backend/.env`) | Ne zaman |
+|---|---|
+| `TRUST_PROXY=true` | Ters proxy arkasında — `req.secure`/`Secure` çerez doğru çalışsın |
+| `COOKIE_SECURE=auto\|true\|false` | Varsayılan `auto` (yalnız HTTPS'te Secure). Düz HTTP on-prem'de çerez Secure olmaz |
+| `CORS_ORIGINS=https://enflow.sirket.com` | Proxy `Host` başlığını **korumuyorsa** dış adresi ekleyin (çerezli POST/PUT/DELETE'te Origin aynı-host ya da bu listede olmalı) |
+| `CSP_MODE=enforce\|report-only\|off` | Varsayılan `enforce`. Beklenmedik bir engellemede geçici olarak `report-only` |
+| `CSP_EXTRA_CONNECT` / `CSP_EXTRA_IMG` | Şirket içi CDN/uzak depo gibi ek origin'ler |
+
+nginx örneği: `proxy_set_header Host $host; proxy_set_header X-Forwarded-Proto $scheme;`
+CSP ihlalleri sunucu log'unda `[csp] ihlal` satırı olarak görünür (`/api/csp-report`).
+**Güncelleme notu:** yükseltmeden sonra her kullanıcı **bir kez yeniden giriş yapar** (eski localStorage token'ı kullanılmaz).
+API istemcileri/entegrasyonlar `Authorization: Bearer <token>` kullanmaya devam eder (CSRF başlığı gerekmez).
+
+---
+
 ## PostgreSQL (Üretim) Notu
 
 Varsayılan SQLite'tır. PostgreSQL için sihirbazda "PostgreSQL kullanılsın mı?" → Evet

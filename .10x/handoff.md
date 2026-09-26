@@ -1,4 +1,3 @@
-# Handoff — İŞ TAMAM (inceleme bekliyor)
-3 yığılı PR: #4 (M1) ← #5 (M2) ← M3. Sırayla merge (her merge sonrası bir üstünün base'i main'e döner).
-Kullanıcı kararı bekleyenler: (1) sürüm v2.6.0 (Faz 15 RLS + bu iş) — CLAUDE.md kuralı gereği açık onay olmadan artırılmadı; (2) CI `postgres` job'unun GH'daki ilk koşusu; (3) Windows/systemd/LaunchDaemon manuel testi (docs/RELEASE_CHECKLIST.md).
-Takip işleri: tests/rbac artefakt untrack (spawn edildi); P0-3 CSP+JWT saklama; P0-4 RBAC'ı CI'a alma; PG için migrateToPostgres iki-rol uyarlaması.
+# Handoff
+P0-3 tamam (branch feat/p0-3-session-csp → PR). Bekleyen: PR #8 (10x hata avı düzeltmeleri) merge; bu PR #8'den bağımsız (main tabanlı) — merge sırasında CLAUDE.md/copilot-instructions otomatik bölümü çakışırsa 'bizim sürüm' + kanca yeniden üretir.
+Sıradaki P0: P0-4 (RBAC süitini CI'a alma: deterministik ikinci tenant seed'i). Ayrı bulgular: `/uploads` kimliksiz statik servis; sunucu-taraflı oturum iptali; LOCAL yedek `location` yolu.
