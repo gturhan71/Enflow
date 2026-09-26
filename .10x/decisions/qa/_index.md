@@ -1,4 +1,5 @@
-# QA — [DISCOVERED]
-- Backend unit: 19 dosya / ~176 test (ağırlık kârlılık saf fonksiyonlarında). E2E oracle: 7 dosya/12 test — 3 gerçek bug buldu (değerli).
-- RBAC Playwright: ~1027 test, CI dışı. Frontend unit test: 0.
-- Route/entegrasyon test katmanı neredeyse yok (43 router'a karşı).
+# QA — indeks
+## Genel [DISCOVERED]
+Backend unit ~176→200+; E2E oracle 12 test (3 gerçek bug); RBAC ~1027 (CI dışı); FE unit testi yok; route/entegrasyon katmanı zayıf.
+## Aktif işler
+- [prod-runtime-pg-pipeline](prod-runtime-pg-pipeline.md) — koşullu onay
