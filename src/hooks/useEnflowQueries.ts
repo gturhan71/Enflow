@@ -101,3 +101,20 @@ export const useModuleSettings = (tenantId: string) => {
     enabled: !!tenantId,
   });
 };
+
+// CRM — salt-okunur yan sorgular (müşteri sağlığı, ziyaret özeti, fırsat ilerleme geçmişi)
+export const useCustomerHealth = (tenantId: string) => useQuery({
+  queryKey: ['crm', 'customer-health', tenantId],
+  queryFn: () => apiService.getCustomerHealth().catch(() => null),
+  staleTime: 5 * 60 * 1000, enabled: !!tenantId,
+});
+export const useCustomerVisitSummary = (tenantId: string, customerId: string | undefined, windowMonths = 3) => useQuery({
+  queryKey: ['crm', 'visit-summary', tenantId, customerId ?? '', windowMonths],
+  queryFn: () => apiService.getCustomerVisitSummary(customerId as string, windowMonths).catch(() => null),
+  staleTime: 5 * 60 * 1000, enabled: !!tenantId && !!customerId,
+});
+export const useOpportunityProgressLog = (tenantId: string, opportunityId: string) => useQuery({
+  queryKey: ['crm', 'progress-log', tenantId, opportunityId],
+  queryFn: () => apiService.getOpportunityProgressLog(opportunityId),
+  staleTime: 30 * 1000, enabled: !!tenantId && !!opportunityId,
+});
