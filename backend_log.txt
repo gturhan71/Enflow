@@ -1,3 +1,0 @@
-◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
-◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
-[Enflow Backend] Server is running at http://localhost:3002

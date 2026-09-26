@@ -371,14 +371,6 @@ Always run `sigmap ask` (or `sigmap --query`) before searching for files relevan
 ## deps
 ```
 backend/src/lifecycle.ts ← services/periodic
-backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
-backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
-backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
-backend/src/services/periodic.ts ← utils/logger, metrics
-backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
-backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
-upgrade-tool/core.mjs ← install/lib/service
-upgrade-tool/server.mjs ← core
 src/App.tsx ← utils/logger, types, layout/Sidebar, layout/Header, modules/Dashboard
 src/components/MoneyInput.tsx ← lib/format
 src/components/settings/ProductTaxonomyManagement.tsx ← ../lib/utils, ../types, ../services/apiService
@@ -458,7 +450,10 @@ src/services/apiService.ts ← apiClient, crmService, projectService, taskServic
 src/types/crm.ts ← auth, presales
 backend/src/middleware.ts ← prismaClient, services/auth, services/session, utils/logger, services/tenantContext
 backend/src/prismaClient.ts ← services/moneyRounding, services/tenantContext
+backend/src/services/activityLogArchiveScheduler.ts ← prismaClient, activityLogArchiveService, schedulerLock, tenantContext, periodic
 backend/src/services/approvalChainService.ts ← prismaClient, pluginCatalog, agentProvenance, governance, approvalSlaEscalation
+backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupVerifyService, activityLog, schedulerLock
+backend/src/services/backupService.ts ← utils/logger, prismaClient, backupTargets
 backend/src/services/backupTargets.ts ← utils/fileUpload
 backend/src/services/backupVerifyService.ts ← prismaClient, backupTargets, backupService, tenantContext
 backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
@@ -468,6 +463,7 @@ backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStr
 backend/src/services/deploymentGuard.ts ← utils/logger
 backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/opportunityFolderService.ts ← prismaClient, utils/fileUpload
+backend/src/services/periodic.ts ← utils/logger, metrics
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← prismaClient, activityLog, approvalSlaEscalation, utils/businessDays, approvalChainService
 backend/src/services/profitabilityCashflow.ts ← profitabilityLedger
@@ -476,15 +472,19 @@ backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profit
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
+backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← prismaClient, tenantContext, backupTargets, backupService
 backend/src/services/serviceTicketReminders.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
+backend/src/services/updateNotifier.ts ← prismaClient, schedulerLock, tenantContext, periodic
 backend/src/services/uploadsGuard.ts ← prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
 backend/src/utils/fileUpload.ts ← logger, usageService
 upgrade-tool/cli.mjs ← core
+upgrade-tool/core.mjs ← install/lib/service
+upgrade-tool/server.mjs ← core
 install/wizard.mjs ← lib/pg, lib/service
 ```
 
@@ -528,38 +528,30 @@ backend/src/services/processEngine.ts:978  # TODO: Task SLA eskalasyon sweep'ine
 ```
 backend/scripts/ensure-build.mjs              +needsBuild
 backend/src/lifecycle.ts                      +createShutdown  +installShutdown
-backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
-backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
-backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
-backend/src/services/metrics.ts               +observeHttp  +recordSchedulerRun  +recordSchedulerError  +renderPrometheus
-backend/src/services/periodic.ts              +reportSchedulerError  +schedulePeriodic
-backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
-backend/src/services/requestContext.ts        +resolveRequestId  +runWithRequestId  +getRequestId
-backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
-upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
-upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
-src/modules/ActivityLogModule.tsx             ~ActivityLogModule  ~actionTone
-src/modules/contract-workflow/LegalCaseForm.tsx ~LegalCaseForm
-src/modules/DmoModule.tsx                     ~CatalogTab  ~AgreementsTab  ~AgreementForm  ~DmoModule
-src/modules/FinanceModule.tsx                 ~OverheadPoolTab
-src/modules/reporting/ConsolidationView.tsx   ~ConsolidationView
 src/modules/SalesSupport.tsx                  +TenderList  +ChecklistTab  ~TenderList  ~ChecklistTab
-src/modules/todo/PendingProposalApprovals.tsx ~PendingProposalApprovals
 src/modules/todo/TaskList.tsx                 ~TaskRow
 backend/scripts/db-migrate.mjs                +run
 backend/scripts/sync-postgres-schema.mjs      +toPostgres
 backend/src/config/prismaPaths.ts             +resolvePrismaPaths
 backend/src/prismaClient.ts                   +runManagedTransaction
 backend/src/routes/health.ts                  +readVersion  +checkDb  +createHealthRouter
+backend/src/services/activityLogArchiveScheduler.ts +startActivityLogArchiveScheduler  ~startActivityLogArchiveScheduler  ~tick
 backend/src/services/approvalChainService.ts  ~autoSkipOrphanStages
+backend/src/services/backupScheduler.ts       +startBackupScheduler  ~startBackupScheduler  ~tick
+backend/src/services/backupService.ts         +pgConnEnv  ~runBackup
 backend/src/services/backupVerifyService.ts   ~verifyBackup  ~sha256File  ~drainVerifyQueue
 backend/src/services/bootstrapTenant.ts       ~bootstrapTenant
 backend/src/services/documentNumberService.ts ~incrementDocumentSequence
+backend/src/services/periodic.ts              +schedulePeriodic
 backend/src/services/personnelTransferService.ts ~transferOwnership  ~deactivateUser
+backend/src/services/profitabilitySnapshotScheduler.ts +startProfitabilitySnapshotScheduler  ~startProfitabilitySnapshotScheduler  ~tick
 backend/src/services/restoreService.ts        ~applyLogicalRestore
 backend/src/services/tenantContext.ts         +getTenantContext  +runInContext  +runWithTenant  +runWithRlsBypass
+backend/src/services/updateNotifier.ts        +baz  +ref  +startUpdateNotifier  ~baz
 upgrade-tool/cli.mjs                          ~main
+upgrade-tool/core.mjs                         +readBackendEnv  +dbProvider  +toLibpqUrl  +redactUrl
 upgrade-tool/public/index.html                ~renderSettings  ~refresh
+upgrade-tool/server.mjs                       +saveConfig  ~saveConfig  ~performUpgrade  ~loadConfig
 install/lib/pg.mjs                            +psql  +provisionPostgresDb  +grantRuntimePrivileges
 install/lib/service.mjs                       +resolveRestartCommand  +renderServiceFile  +planInstall  +loadWinswLock
 install/POSTGRES_MIGRATION_PLAN.md            +Postgres
@@ -586,93 +578,6 @@ export interface ShutdownDeps  :15-25
   onSignal?: (signal: NodeJS.Signals, handler: (  :24-24
 export function createShutdown(deps) → (signal: string) => Promise<vo  :27-78
 export function installShutdown(deps) → void  :80-84
-```
-
-### backend/src/services/activityLogArchiveScheduler.ts
-```
-export function startActivityLogArchiveScheduler() → StopFn  :54-58
-```
-
-### backend/src/services/backupScheduler.ts
-```
-export function startBackupScheduler() → StopFn  :78-81
-```
-
-### backend/src/services/backupService.ts
-```
-export interface ModelMeta  :49-53
-  name: string  :50-50
-  delegateKey: string  :51-51
-  hasTenantId: boolean  :52-52
-export interface BackupModuleSettings  :120-129
-  enabled?: boolean  :121-121
-  intervalHours?: number  :122-122
-  scope?: BackupScope  :123-123
-  kind?: BackupKind  :124-124
-  targetType?: TargetType  :125-125
-  location?: string  :126-126
-  nextcloud?: { url?: string  :127-127
-  s3?: { endpoint?: string  :128-128
-export interface RunBackupOpts  :151-161
-  tenantId: string  :152-152
-  scope: BackupScope  :153-153
-  kind: BackupKind  :154-154
-  targetType: TargetType  :155-155
-  location?: string | null  :156-156
-  trigger?: 'MANUAL' | 'SCHEDULED'  :157-157
-  startedById?: string  :158-158
-  startedByName?: string  :159-159
-  settings: BackupModuleSettings | null  :160-160
-export type BackupScope  :39-39
-export type BackupKind  :40-40
-```
-
-### backend/src/services/metrics.ts
-```
-export function observeHttp(method, route, status, seconds) → void  :20-28
-export function recordSchedulerRun(name, ok, seconds) → void  :30-34
-export function recordSchedulerError(name) → void  :36-38
-export function renderPrometheus() → string  :40-86
-export function resetMetricsForTest() → void  :88-91
-```
-
-### backend/src/services/periodic.ts
-```
-export type StopFn  :11-11
-export function reportSchedulerError(name, err, ctx?) → void  :14-17  # Zamanlayıcı içinde YUTULAN bir hatayı görünür kılar (log + s
-export function schedulePeriodic(firstDelayMs, intervalMs, tick, name?,) → StopFn  :19-46
-```
-
-### backend/src/services/profitabilitySnapshotScheduler.ts
-```
-export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
-```
-
-### backend/src/services/requestContext.ts
-```
-export function resolveRequestId(inbound) → string  :11-13
-export function runWithRequestId(reqId, fn) → T  :15-17
-export function getRequestId() → string | undefined  :19-21
-```
-
-### backend/src/services/updateNotifier.ts
-```
-export interface UpdateStatus  :19-34
-  checkedAt?: string  :20-20
-  current?: { shortSha?: string | null  :21-21
-  update?: { available?: boolean  :22-23
-  applied?: boolean  :24-24
-  failed?: boolean  :25-25
-  kind?: 'tag' | 'commit'  :26-26
-  target?: string | null  :27-27
-  ref?: string | null  :28-28
-  notes?: string | null  :29-29
-  publishedAt?: string | null  :30-30
-  to?: string | null  :31-31
-  error?: string | null  :32-32
-export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
-export function readUpdateStatus() → UpdateStatus | null  :41-47
-export function startUpdateNotifier() → StopFn  :124-127
 ```
 
 ### backend/pnpm-lock.yaml
@@ -810,6 +715,11 @@ export async function checkDb(pingDb, timeoutMs) → Promise<boolean>  :25-36
 export function createHealthRouter(deps) → Router  :38-52
 ```
 
+### backend/src/services/activityLogArchiveScheduler.ts
+```
+export function startActivityLogArchiveScheduler() → StopFn  :54-58
+```
+
 ### backend/src/services/approvalChainService.ts
 ```
 export async function ensureApprovalChain(tenantId, entityType, entityId, roles?, amount?,)  :25-61  # Mevcut PENDING bir zincir varsa onu döner; yoksa şablona gör
@@ -818,6 +728,40 @@ export async function getDelegatedRoles(tenantId, userId) → Promise<string[]> 
 export async function resolveEffectiveApprover(tenantId, stage, userId,) → Promise<boolean>  :250-268  # Bir kullanıcı bir onay aşamasını çözümleyebilir mi
 export async function resolveGroupAfterDecision(tenantId, chainId)  :278-335  # Bir onay kararından (approve/reject) sonra aynı `order`'ı pa
 export async function resetApprovalChain(tenantId, entityType, entityId)  :338-351  # Onay geri çekildiğinde (revert-approval) en güncel zinciri P
+```
+
+### backend/src/services/backupScheduler.ts
+```
+export function startBackupScheduler() → StopFn  :78-81
+```
+
+### backend/src/services/backupService.ts
+```
+export interface ModelMeta  :49-53
+  name: string  :50-50
+  delegateKey: string  :51-51
+  hasTenantId: boolean  :52-52
+export interface BackupModuleSettings  :120-129
+  enabled?: boolean  :121-121
+  intervalHours?: number  :122-122
+  scope?: BackupScope  :123-123
+  kind?: BackupKind  :124-124
+  targetType?: TargetType  :125-125
+  location?: string  :126-126
+  nextcloud?: { url?: string  :127-127
+  s3?: { endpoint?: string  :128-128
+export interface RunBackupOpts  :151-161
+  tenantId: string  :152-152
+  scope: BackupScope  :153-153
+  kind: BackupKind  :154-154
+  targetType: TargetType  :155-155
+  location?: string | null  :156-156
+  trigger?: 'MANUAL' | 'SCHEDULED'  :157-157
+  startedById?: string  :158-158
+  startedByName?: string  :159-159
+  settings: BackupModuleSettings | null  :160-160
+export type BackupScope  :39-39
+export type BackupKind  :40-40
 ```
 
 ### backend/src/services/backupTargets.ts
@@ -952,6 +896,15 @@ export function paymentDate(referenceStart, termDays) → string  :73-76  # refe
 export function buildFinancingEvents(boms, costs, installments, referenceStart?,) → CashEvent[]  :88-114  # BoM kalemleri (ödeme çıkışı) + CostItem'lar (ödeme çıkışı, F
 ```
 
+### backend/src/services/metrics.ts
+```
+export function observeHttp(method, route, status, seconds) → void  :20-28
+export function recordSchedulerRun(name, ok, seconds) → void  :30-34
+export function recordSchedulerError(name) → void  :36-38
+export function renderPrometheus() → string  :40-86
+export function resetMetricsForTest() → void  :88-91
+```
+
 ### backend/src/services/opportunityFolderService.ts
 ```
 export type OpportunityEntityType  :28-28
@@ -959,6 +912,13 @@ export function resolveOpportunityUploadDir(trackingCode, subfolder)  :14-14  # 
 export function opportunityLocalUrl(trackingCode, subfolder, fileName) → string  :20-22
 export function opportunityRemotePath(trackingCode, subfolder) → string  :24-26
 export async function resolveOpportunityForEntity(entityType, entity, tenantId) → Promise<  :36-40  # Bir modül kaydının ait olduğu Fırsat'ı (varsa) çözer
+```
+
+### backend/src/services/periodic.ts
+```
+export type StopFn  :11-11
+export function reportSchedulerError(name, err, ctx?) → void  :14-17  # Zamanlayıcı içinde YUTULAN bir hatayı görünür kılar (log + s
+export function schedulePeriodic(firstDelayMs, intervalMs, tick, name?,) → StopFn  :19-46
 ```
 
 ### backend/src/services/personnelTransferService.ts
@@ -1211,6 +1171,18 @@ export function asOfKeyOf(d) → string  :13-15
 export async function takeSnapshot(tenantId, opts = {}) → Promise<SnapshotResult>  :29-65  # Bir tenant için planlı aylık `PeriodRow`'ların anlık görüntü
 ```
 
+### backend/src/services/profitabilitySnapshotScheduler.ts
+```
+export function startProfitabilitySnapshotScheduler() → StopFn  :47-49
+```
+
+### backend/src/services/requestContext.ts
+```
+export function resolveRequestId(inbound) → string  :11-13
+export function runWithRequestId(reqId, fn) → T  :15-17
+export function getRequestId() → string | undefined  :19-21
+```
+
 ### backend/src/services/restoreService.ts
 ```
 export type LogicalPayloadData  :20-20
@@ -1309,6 +1281,26 @@ export interface UnitMetricsResult  :90-97
   metrics: Metric[]  :95-95
   charts: ChartSeries[]  :96-96
 export interface WorkflowBottleneck  :457-461
+```
+
+### backend/src/services/updateNotifier.ts
+```
+export interface UpdateStatus  :19-34
+  checkedAt?: string  :20-20
+  current?: { shortSha?: string | null  :21-21
+  update?: { available?: boolean  :22-23
+  applied?: boolean  :24-24
+  failed?: boolean  :25-25
+  kind?: 'tag' | 'commit'  :26-26
+  target?: string | null  :27-27
+  ref?: string | null  :28-28
+  notes?: string | null  :29-29
+  publishedAt?: string | null  :30-30
+  to?: string | null  :31-31
+  error?: string | null  :32-32
+export function enflowHome() → string  :37-39  # Repo kökü: ENFLOW_HOME ya da backend/src/services'ten üç üst
+export function readUpdateStatus() → UpdateStatus | null  :41-47
+export function startUpdateNotifier() → StopFn  :124-127
 ```
 
 ### backend/src/services/uploadsGuard.ts
@@ -2742,6 +2734,11 @@ export interface ApprovalStage  :160-174
 
 ## upgrade-tool
 
+### upgrade-tool/cli.mjs
+```
+async function main()  :16-56
+```
+
 ### upgrade-tool/core.mjs
 ```
 export class RestartError  :320-322
@@ -2769,22 +2766,6 @@ function githubJson(path)  :51-64  # GitHub API'den commit/release meta (best-ef
 function readBackendEnv(home)  :151-160
 function dbProvider(home)  :162-169
 function backupDb(home, log, opts)  :200-236
-```
-
-### upgrade-tool/server.mjs
-```
-export function sanitizePatch(patch)  :47-54
-function loadConfig()  :37-39
-function saveConfig(c)  :41-41
-function loadOrCreateToken()  :56-65
-function inMaintenanceWindow()  :90-94
-async function performUpgrade()  :96-103
-async function tick()  :106-115
-```
-
-### upgrade-tool/cli.mjs
-```
-async function main()  :16-56
 ```
 
 ### upgrade-tool/public/index.html
@@ -2826,6 +2807,17 @@ code-fence bash
 code-fence plain
 code-fence cron
 code-fence powershell
+```
+
+### upgrade-tool/server.mjs
+```
+export function sanitizePatch(patch)  :47-54
+function loadConfig()  :37-39
+function saveConfig(c)  :41-41
+function loadOrCreateToken()  :56-65
+function inMaintenanceWindow()  :90-94
+async function performUpgrade()  :96-103
+async function tick()  :106-115
 ```
 
 
