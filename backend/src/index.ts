@@ -27,7 +27,7 @@ import { startBackupScheduler } from './services/backupScheduler';
 import { startActivityLogArchiveScheduler } from './services/activityLogArchiveScheduler';
 import { startProfitabilitySnapshotScheduler } from './services/profitabilitySnapshotScheduler';
 import { startUpdateNotifier, readUpdateStatus } from './services/updateNotifier';
-import { checkDeploymentTopology } from './services/deploymentGuard';
+import { checkDeploymentTopology, checkSecretFilePermissions } from './services/deploymentGuard';
 import { helmetCsp } from './config/csp';
 import cspReportRouter from './routes/cspReport';
 import { installShutdown } from './lifecycle';
@@ -233,6 +233,7 @@ const stops: StopFn[] = [];
 const server = app.listen(port, () => {
   logger.info(`[Enflow Backend] Server is running at http://localhost:${port}`);
   checkDeploymentTopology();
+  checkSecretFilePermissions();
   stops.push(
     startBackupScheduler(),
     startActivityLogArchiveScheduler(),
