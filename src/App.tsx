@@ -64,6 +64,7 @@ import { AIGateProvider } from './contexts/AIGateContext';
 import { apiService } from './services/apiService';
 import { ThemeProvider } from './contexts/ThemeContext';
 
+import { SESSION_EXPIRED_EVENT, resetSessionExpiredNotice } from './services/apiClient';
 import {
   useOpportunities,
   useCustomers,
@@ -192,8 +193,7 @@ const TenantAppInner = ({
 
   
   useEffect(() => {
-    const token = localStorage.getItem('enflow_auth_token') || 'mock-token';
-    apiService.setAuth(tenantId, token);
+    apiService.setAuth(tenantId);
   }, [tenantId]);
 
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
@@ -412,9 +412,18 @@ const TenantAppInner = ({
   );
 };
 
+/** Sır olmayan oturum işaretlerini temizler (çerezi yalnız sunucu silebilir → apiService.logout). */
+function clearLocalSession(tenantId: string | null = localStorage.getItem('enflow_active_tenant_id')) {
+  if (tenantId) localStorage.removeItem(`enflow_current_user_${tenantId}`);
+  localStorage.removeItem('enflow_active_tenant_id');
+  localStorage.removeItem('enflow_auth_token'); // eski sürüm artığı
+}
+
 const App = () => {
   const [activeTenantId, setActiveTenantId] = useState<string | null>(() => localStorage.getItem('enflow_active_tenant_id'));
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => !!localStorage.getItem('enflow_auth_token'));
+  // Oturum httpOnly çerezde (JS göremez) → "girişli miyim?" boot'ta GET /api/auth/session ile doğrulanır.
+  // Doğrulanana dek false; `initialized === null` süresince zaten "Yükleniyor…" gösterilir (flaş yok).
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [companyLogo, setCompanyLogoState] = useState<string | null>(null);
   // İlk-çalıştırma kurulumu: null = kontrol ediliyor, true/false = kurulu mu.
   const [initialized, setInitialized] = useState<boolean | null>(null);
@@ -441,13 +450,29 @@ const App = () => {
         try {
           const s = await apiService.getSetupStatus();
           if (cancelled) return;
-          if (!s.initialized && (localStorage.getItem('enflow_auth_token') || localStorage.getItem('enflow_active_tenant_id'))) {
-            const stale = localStorage.getItem('enflow_active_tenant_id');
-            if (stale) localStorage.removeItem(`enflow_current_user_${stale}`);
-            localStorage.removeItem('enflow_auth_token');
-            localStorage.removeItem('enflow_active_tenant_id');
+          // Eski sürümlerin localStorage'da bıraktığı token (artık kullanılmaz; XSS ile okunabilirdi) → sil
+          localStorage.removeItem('enflow_auth_token');
+          if (!s.initialized) {
+            clearLocalSession();
             setIsAuthenticated(false);
             setActiveTenantId(null);
+          } else {
+            try {
+              const sess = await apiService.getSession();
+              if (cancelled) return;
+              if (sess) {
+                const u = sess.user;
+                localStorage.setItem('enflow_active_tenant_id', u.tenantId);
+                // Sunucudaki GERÇEK kullanıcı/izinler (localStorage'daki kopya bayat olabilir)
+                localStorage.setItem(`enflow_current_user_${u.tenantId}`, JSON.stringify(u));
+                setActiveTenantId(u.tenantId);
+                setIsAuthenticated(true);
+              } else {
+                clearLocalSession();
+                setIsAuthenticated(false);
+                setActiveTenantId(null);
+              }
+            } catch { /* backend geçici erişilemez → giriş ekranı; kullanıcı yenileyebilir */ }
           }
           setInitialized(s.initialized);
           return; // backend yanıt verdi → bitti
@@ -462,22 +487,34 @@ const App = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleLogin = (tenantId: string, token: string, user: User) => {
+  // Token YOK — oturum httpOnly çerezde (giriş yanıtıyla sunucu koydu). Burada yalnız sır olmayan
+  // işaretler (tenant id + kullanıcı profili) saklanır.
+  const handleLogin = (tenantId: string, user: User) => {
     localStorage.setItem('enflow_active_tenant_id', tenantId);
-    localStorage.setItem('enflow_auth_token', token);
     // Giriş yapan GERÇEK kullanıcıyı yaz → AuthProvider bunu okur, GM'e düşmez.
     localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(user));
+    resetSessionExpiredNotice();
     setActiveTenantId(tenantId);
     setIsAuthenticated(true);
   };
 
   const handleLogout = () => {
-    if (activeTenantId) localStorage.removeItem(`enflow_current_user_${activeTenantId}`);
-    localStorage.removeItem('enflow_active_tenant_id');
-    localStorage.removeItem('enflow_auth_token');
+    void apiService.logout(); // sunucu çerezi temizler (JS silemez: httpOnly)
+    clearLocalSession(activeTenantId);
     setActiveTenantId(null);
     setIsAuthenticated(false);
   };
+
+  // Herhangi bir API çağrısı 401 alırsa (oturum süresi doldu/iptal) → girişe dön
+  useEffect(() => {
+    const onExpired = () => {
+      clearLocalSession(localStorage.getItem('enflow_active_tenant_id'));
+      setActiveTenantId(null);
+      setIsAuthenticated(false);
+    };
+    window.addEventListener(SESSION_EXPIRED_EVENT, onExpired);
+    return () => window.removeEventListener(SESSION_EXPIRED_EVENT, onExpired);
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
