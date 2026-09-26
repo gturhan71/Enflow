@@ -1,3 +1,4 @@
+import { authFetch } from '../services/apiClient';
 // Teminat mektubu için örnek metin şablonu — İhale (SalesSupport) ve Sözleşme
 // Yönetimi (ContractWorkflow) modüllerinin ikisi de Finans'a teminat talep ederken
 // aynı şablonu kullanır.
@@ -26,11 +27,8 @@ export async function uploadGuaranteeSampleFile(guaranteeId: string, file: File)
   const formData = new FormData();
   formData.append('file', file);
   formData.append('target', 'sample');
-  const effectiveTenantId = localStorage.getItem('enflow_active_tenant_id') || '';
-  const effectiveToken = localStorage.getItem('enflow_auth_token') || 'mock-token';
-  const res = await fetch(`/api/finance/guarantees/${guaranteeId}/upload`, {
+  const res = await authFetch(`/api/finance/guarantees/${guaranteeId}/upload`, {
     method: 'POST',
-    headers: { 'x-tenant-id': effectiveTenantId, Authorization: `Bearer ${effectiveToken}` },
     body: formData,
   });
   if (!res.ok) {

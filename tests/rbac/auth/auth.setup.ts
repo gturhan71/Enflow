@@ -1,11 +1,14 @@
 // ============================================================================
 // auth.setup.ts — Enflow'a özel
-// Her rol için bir kez login olur. Backend mock-JWT tabanlı (şifresiz).
-// localStorage ayarlanarak oturum auth/<rol>.json + auth/<rol>.token olarak kaydedilir.
+// Her rol için bir kez login olur (imzalı JWT — parola doğrulamalı).
+// P0-3: tarayıcı oturumu httpOnly ÇEREZDE (localStorage'da token YOK). Login uygulamanın kendi
+// origin'inden (vite /api proxy'si) yapılır → Set-Cookie tarayıcı bağlamına yerleşir ve
+// storageState ile auth/<rol>.json'a (cookie + localStorage işaretleri) kaydedilir.
+// API testleri için token yine gövdeden alınıp auth/<rol>.token'a yazılır (Bearer kullanılır).
 // ============================================================================
 
 import { test as setup, type Page } from "@playwright/test";
-import { roles, crossTenantUser, ROLE_NAMES, baseURL, apiBaseURL, testPassword } from "../rbac.config";
+import { roles, crossTenantUser, ROLE_NAMES, baseURL, testPassword } from "../rbac.config";
 import fs from "fs";
 import path from "path";
 
@@ -17,32 +20,33 @@ async function loginAndSave(
   saveName: string,
   page: Page
 ) {
-  // Backend'den token al (imzalı JWT — parola doğrulamalı).
+  // Aynı-origin login (credentials: same-origin) → oturum çerezi tarayıcı bağlamına yazılır.
+  // X-Enflow-Client GÖNDERİLMEZ → gövdede token de döner (API testleri Bearer için kullanır).
   const loginRes = await page.evaluate(
-    async ({ email, password, apiUrl }: { email: string; password: string; apiUrl: string }) => {
-      const res = await fetch(`${apiUrl}/api/auth/login`, {
+    async ({ email, password }: { email: string; password: string }) => {
+      const res = await fetch(`/api/auth/login`, {
         method: "POST",
+        credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
       if (!res.ok) throw new Error(`Login HTTP ${res.status}`);
       return res.json() as Promise<{ user: Record<string, unknown>; token: string }>;
     },
-    { email, password: testPassword, apiUrl: apiBaseURL }
+    { email, password: testPassword }
   );
 
   const token = loginRes.token;
   const user  = loginRes.user;
   const effectiveTenantId = (user.tenantId as string) ?? tenantId;
 
-  // localStorage'a Enflow'un beklediği key'leri yaz
+  // localStorage'a yalnız SIR OLMAYAN işaretler (token YOK — çerezde)
   await page.evaluate(
-    ({ token, tenantId, user }: { token: string; tenantId: string; user: Record<string, unknown> }) => {
-      localStorage.setItem("enflow_auth_token", token);
+    ({ tenantId, user }: { tenantId: string; user: Record<string, unknown> }) => {
       localStorage.setItem("enflow_active_tenant_id", tenantId);
       localStorage.setItem(`enflow_current_user_${tenantId}`, JSON.stringify(user));
     },
-    { token, tenantId: effectiveTenantId, user }
+    { tenantId: effectiveTenantId, user }
   );
 
   // Oturumu kaydet (cookie + localStorage)

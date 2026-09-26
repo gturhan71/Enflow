@@ -74,3 +74,5 @@ tests/rbac/test-results/
 # Kökteki geçici log çıktıları (*.log zaten yukarıda; .txt olanlar da)
 /*_log.txt
 /*_logs.txt
+# upgrade-tool GUI token (0600, makineye özel)
+upgrade-tool/.gui-token
