@@ -5,7 +5,10 @@
 #   ./scripts/ci-rbac.sh all   → hepsi
 # Taze SQLite DB → migrate deploy → deterministik fixture (pnpm seed:rbac) → derlenmiş backend
 # (frontend dist'i de aynı origin'den sunar) → Playwright. Yerel dev.db'ye DOKUNMAZ.
-# Varsayım: kök + backend + tests/rbac `pnpm install` yapılmış, kök `pnpm build` (dist/) hazır.
+# Kök `pnpm build` (dist/) bu script İÇİNDE her koşuda tazelenir (2026-10-11 — eski dist/
+# "Profesyonel Hizmetler" menüsünü hiç içermediği için GM dahil her rolde sahte "gizli"
+# ui-access hatası vermişti; artık script kendi tazeliğinden sorumlu, elle build gerekmez).
+# Varsayım: kök + backend + tests/rbac `pnpm install` yapılmış.
 set -euo pipefail
 
 MODE="${1:-all}"
@@ -28,6 +31,9 @@ esac
 PID=""
 cleanup() { [ -n "$PID" ] && kill "$PID" 2>/dev/null || true; rm -rf "$WORK"; }
 trap cleanup EXIT
+
+cd "$ROOT"
+pnpm build >/dev/null
 
 cd "$ROOT/backend"
 npx prisma generate >/dev/null
