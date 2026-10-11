@@ -53,9 +53,14 @@ export const UserManagement = ({
     const email = formData.get('email') as string;
     const role = formData.get('role') as string;
     const unitId = formData.get('unitId') as string;
+    const password = formData.get('password') as string;
 
     if (!name || !email || !role || !activeTenantId) {
       alert('Lütfen tüm zorunlu alanları doldurun.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      alert('Şifre en az 6 karakter olmalıdır.');
       return;
     }
 
@@ -63,6 +68,7 @@ export const UserManagement = ({
       name,
       email,
       role,
+      password,
       unitId: unitId === '' ? undefined : unitId,
       tenantId: activeTenantId,
       // permissions kasıtlı olarak gönderilmiyor — backend seçilen role göre
@@ -323,14 +329,23 @@ export const UserManagement = ({
                   required 
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500" 
                 />
-                <input 
-                  name="email" 
-                  type="email" 
-                  placeholder="Kurumsal E-posta" 
-                  required 
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500" 
+                <input
+                  name="email"
+                  type="email"
+                  placeholder="Kurumsal E-posta"
+                  required
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
                 />
-                <select 
+                <input
+                  name="password"
+                  type="password"
+                  placeholder="Şifre (en az 6 karakter)"
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+                />
+                <select
                   name="role" 
                   required 
                   className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"

@@ -54,7 +54,7 @@ export const settingsService = {
 
   // permissions opsiyonel — gönderilmezse backend seçilen role göre
   // ROLE_DEFAULT_PERMISSIONS'tan başlangıç seti atar (bkz. roleDefaultPermissions.ts).
-  async createUser(userData: Omit<User, 'id' | 'permissions'> & { permissions?: string[] }) {
+  async createUser(userData: Omit<User, 'id' | 'permissions'> & { permissions?: string[]; password?: string }) {
     return apiClient.fetchWithAuth('/users', {
       method: 'POST',
       body: JSON.stringify(userData)

@@ -383,6 +383,7 @@ src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../t
 src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../types, ../services/apiService
 src/hooks/useEnflowQueries.ts ← @tanstack/react-query, services/apiService
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
+src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
 src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/project-mgmt/ProjectDetail.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
@@ -436,7 +437,6 @@ src/modules/NegotiationModule.tsx ← react, lucide-react, types, contexts/AuthC
 src/modules/PresalesModule.tsx ← react, @tanstack/react-query, lucide-react, motion, @/src
 src/modules/procurement/PRDetailDrawer.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
 src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
-src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
 src/modules/project-mgmt/CostForm.tsx ← react, lucide-react, motion, ../types, constants
@@ -614,6 +614,13 @@ export async function bootstrapTenant(input) → Promise<BootstrapResult>  :59-1
 ### backend/src/services/roleDefaultPermissions.ts
 ```
 export function defaultPermissionsForRole(role) → string[]  :69-71
+```
+
+### backend/src/utils/businessDays.ts
+```
+export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
+export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
+export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan
 ```
 
 ### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
@@ -1214,13 +1221,6 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/utils/businessDays.ts
-```
-export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
-export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
-export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan
-```
-
 ## governance
 
 ### governance/role-matrix.ts
@@ -1505,6 +1505,15 @@ hook useState
 export MaterialRequestsPanel
 handler onChange
 handler onClick
+```
+
+### src/modules/professional-services/UtilizationReport.tsx
+```
+component UtilizationReport
+hook useState
+hook useCallback
+hook useEffect
+export UtilizationReport
 ```
 
 ### src/modules/professional-services/WeeklyPlanView.tsx
@@ -2329,15 +2338,6 @@ handler onRefresh
 handler onSave
 ```
 
-### src/modules/professional-services/UtilizationReport.tsx
-```
-component UtilizationReport
-hook useState
-hook useCallback
-hook useEffect
-export UtilizationReport
-```
-
 ### src/modules/profitability/DmoChannelTab.tsx
 ```
 component DmoChannelTab
@@ -2908,12 +2908,14 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 > **Not everything is here.** 222 file(s) omitted to stay under the 21735-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@e4938c9)
+## recent changes (main@0b070fb)
 ```
 src/modules/professional-services/MaterialRequestsPanel.tsx +MaterialRequestsPanel
+src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
 src/modules/professional-services/WeeklyPlanView.tsx +mondayOf  +WeeklyPlanView
 src/modules/ProfessionalServicesModule.tsx    +ProfessionalServicesModule  +tarih
 src/services/apiService.ts                    ~ApiService
+backend/src/utils/businessDays.ts             +countBusinessDaysInRange  ~computeSlaDueDate
 src/modules/DmoModule.tsx                     ~CatalogForm
 src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 ```
