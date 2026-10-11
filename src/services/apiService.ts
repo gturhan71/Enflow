@@ -131,6 +131,9 @@ class ApiService {
   async saveDashboardLayout(layout: { widgets: { key: string; enabled: boolean }[]; order: string[] }): Promise<{ dashboardLayout: string }> {
     return apiClient.fetchWithAuth('/users/me/dashboard-layout', { method: 'PUT', body: JSON.stringify(layout) });
   }
+  async changeMyPassword(currentPassword: string, newPassword: string): Promise<{ message: string }> {
+    return apiClient.fetchWithAuth('/users/me/password', { method: 'PUT', body: JSON.stringify({ currentPassword, newPassword }) });
+  }
   async getDashboardRoleTemplates(): Promise<Record<string, string[]>> {
     return apiClient.fetchWithAuth('/tenants/dashboard-role-templates');
   }

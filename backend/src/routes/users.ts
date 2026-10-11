@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
-import { hashPassword } from '../services/auth';
+import { hashPassword, verifyPassword } from '../services/auth';
 import { getOwnedItems, transferOwnership, deactivateUser, hardDeleteUser } from '../services/personnelTransferService';
 import { checkUserSeatLimit } from '../usageService';
 import { defaultPermissionsForRole } from '../services/roleDefaultPermissions';
@@ -118,6 +118,29 @@ router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Re
   // savunma-derinliği: bir yerde req.userId/req.tenantId eşleşmezse no-op'a düşer.
   await prisma.user.update({ where: { id: req.userId, tenantId: req.tenantId }, data: { dashboardLayout } });
   res.json({ dashboardLayout });
+}));
+
+// Kendi şifresini değiştirme — herhangi bir rol kapısı yok (herkes kendi
+// şifresini değiştirebilmeli), PUT /:id (GM-only, başkasının şifresini sıfırlar)
+// ile KARIŞTIRILMAMALI. id her zaman req.userId (attacker-controlled değil).
+router.put('/me/password', tenantMiddleware, asyncHandler(async (req: Request, res: Response) => {
+  const { currentPassword, newPassword } = req.body as { currentPassword?: string; newPassword?: string };
+  if (typeof newPassword !== 'string' || newPassword.length < 6) {
+    return res.status(400).json({ error: 'Yeni şifre en az 6 karakter olmalıdır.' });
+  }
+  const record = await prisma.user.findFirst({ where: { id: req.userId, tenantId: req.tenantId } });
+  if (!record) return res.status(404).json({ error: 'Kullanıcı bulunamadı.' });
+
+  // Mevcut şifre varsa doğrulanması zorunlu — yoksa (ör. eski/elle oluşturulmuş
+  // kayıt) yalnız yeni şifre talep edilir, kilitli kalmasın diye.
+  if (record.password) {
+    const ok = await verifyPassword(currentPassword || '', record.password);
+    if (!ok) return res.status(400).json({ error: 'Mevcut şifre yanlış.' });
+  }
+
+  await prisma.user.update({ where: { id: req.userId }, data: { password: await hashPassword(newPassword) } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'UPDATE', entityType: 'USER', entityId: req.userId, details: { selfServicePasswordChange: true } });
+  res.json({ message: 'Şifre güncellendi.' });
 }));
 
 router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {

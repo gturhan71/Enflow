@@ -3,6 +3,9 @@ import {
   Zap,
   ChevronRight,
   LogOut,
+  KeyRound,
+  X,
+  Loader2,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../lib/utils';
@@ -31,6 +34,29 @@ const Sidebar = ({
   const { handleNavigate } = useUnsavedChanges();
   const { currentUser, hasPermission } = useAuth();
   const [expandedMenus, setExpandedMenus] = useState<string[]>([]);
+  // Kendi şifresini değiştirme — herhangi bir rol kapısı yok, her kullanıcı
+  // kendi hesabı için erişebilmeli (bkz. backend PUT /users/me/password).
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [pwForm, setPwForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [pwSaving, setPwSaving] = useState(false);
+  const [pwError, setPwError] = useState('');
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError('');
+    if (pwForm.newPassword.length < 6) { setPwError('Yeni şifre en az 6 karakter olmalıdır.'); return; }
+    if (pwForm.newPassword !== pwForm.confirmPassword) { setPwError('Yeni şifreler eşleşmiyor.'); return; }
+    setPwSaving(true);
+    try {
+      await apiService.changeMyPassword(pwForm.currentPassword, pwForm.newPassword);
+      setShowPasswordModal(false);
+      setPwForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+      alert('Şifreniz güncellendi.');
+    } catch (err) {
+      setPwError(err instanceof Error ? err.message : 'Şifre güncellenemedi.');
+    } finally {
+      setPwSaving(false);
+    }
+  };
   // Ayrı lisanslı modüller (PLUGIN_CATALOG) — aktif entitlement seti. Lisans = ticari hak,
   // izinden bağımsız kapı (GM superuser bile lisanssız görmez).
   const [entitled, setEntitled] = useState<Set<string>>(new Set());
@@ -185,8 +211,15 @@ const Sidebar = ({
             <p className="text-xs font-black text-slate-900 truncate tracking-tighter uppercase leading-tight">{currentUser?.name || 'Kullanıcı'}</p>
             <p className="text-[10px] text-slate-400 truncate uppercase tracking-widest font-black mt-0.5">{currentUser?.role?.replace('_', ' ') || 'GÖREV TANIMSIZ'}</p>
           </div>
-          <button 
-            onClick={() => handleNavigate(onLogout)} 
+          <button
+            onClick={() => setShowPasswordModal(true)}
+            title="Şifre Değiştir"
+            className="p-2.5 hover:bg-white/50 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90"
+          >
+            <KeyRound size={18} />
+          </button>
+          <button
+            onClick={() => handleNavigate(onLogout)}
             className="p-2.5 hover:bg-white/50 rounded-xl text-slate-400 hover:text-primary transition-all active:scale-90"
           >
             <LogOut size={18} />
@@ -194,6 +227,65 @@ const Sidebar = ({
         </div>
       </div>
     </div>
+
+    <AnimatePresence>
+      {showPasswordModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="glass-panel w-full max-w-sm rounded-3xl shadow-2xl overflow-hidden bg-white p-8"
+          >
+            <div className="flex items-center justify-between mb-6">
+              <h4 className="text-xl font-bold text-slate-900">Şifre Değiştir</h4>
+              <button onClick={() => { setShowPasswordModal(false); setPwError(''); }} className="p-1 text-slate-400 hover:text-slate-600"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleChangePassword} className="space-y-4">
+              <input
+                type="password"
+                placeholder="Mevcut Şifre"
+                required
+                value={pwForm.currentPassword}
+                onChange={e => setPwForm(f => ({ ...f, currentPassword: e.target.value }))}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+              />
+              <input
+                type="password"
+                placeholder="Yeni Şifre (en az 6 karakter)"
+                required
+                minLength={6}
+                value={pwForm.newPassword}
+                onChange={e => setPwForm(f => ({ ...f, newPassword: e.target.value }))}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+              />
+              <input
+                type="password"
+                placeholder="Yeni Şifre (Tekrar)"
+                required
+                minLength={6}
+                value={pwForm.confirmPassword}
+                onChange={e => setPwForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl outline-none focus:border-indigo-500"
+              />
+              {pwError && <p className="text-xs font-bold text-red-600">{pwError}</p>}
+              <div className="flex justify-end gap-3 pt-2">
+                <button type="button" onClick={() => { setShowPasswordModal(false); setPwError(''); }} className="px-6 py-2 text-sm font-bold text-slate-500">
+                  Vazgeç
+                </button>
+                <button
+                  type="submit"
+                  disabled={pwSaving}
+                  className="bg-primary text-white px-8 py-2 rounded-xl text-sm font-bold shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all flex items-center gap-2"
+                >
+                  {pwSaving ? <Loader2 size={16} className="animate-spin" /> : 'Kaydet'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
     </>
   );
 };

@@ -1122,7 +1122,7 @@ export const isWebClient = (req) =>  :114-114  # Tarayıcı arayüzü mü
 
 ### backend/src/services/slaEscalation.ts
 ```
-export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
+export async function sweepSlaEscalations  :14-69
 ```
 
 ### backend/src/services/specAnalysis.ts
@@ -1627,7 +1627,7 @@ export const composedTitle = (newTask, taskAction, ctx) =>  :129-140
 
 ### src/services/apiService.ts
 ```
-class ApiService  :26-902
+class ApiService  :26-905
   setAuth(tenantId)  :27-29
   async getSession() → Promise<  :32-32
   async logout() → Promise<void>  :39-41
@@ -1823,6 +1823,8 @@ hook useState
 hook useEffect
 export Sidebar
 handler onClick
+handler onSubmit
+handler onChange
 ```
 
 ### src/lib/guaranteeText.ts
@@ -2905,10 +2907,10 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 ```
 
 
-> **Not everything is here.** 222 file(s) omitted to stay under the 21735-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21742-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@0b070fb)
+## recent changes (main@9c149bc)
 ```
 src/modules/professional-services/MaterialRequestsPanel.tsx +MaterialRequestsPanel
 src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
