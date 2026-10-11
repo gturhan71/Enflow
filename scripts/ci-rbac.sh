@@ -51,7 +51,11 @@ done
 cd "$ROOT/tests/rbac"
 export ENFLOW_API_URL="http://localhost:$PORT" ENFLOW_FRONTEND_URL="http://localhost:$PORT"
 set +e
-npx playwright test "${SPECS[@]}"
+if [ "${#SPECS[@]}" -eq 0 ]; then
+  npx playwright test
+else
+  npx playwright test "${SPECS[@]}"
+fi
 RC=$?
 set -e
 [ "$RC" -eq 0 ] || { echo "--- backend log (son 40) ---" >&2; tail -40 "$WORK/backend.log" >&2; }
