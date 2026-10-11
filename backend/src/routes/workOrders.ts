@@ -11,6 +11,7 @@ import { logActivity } from '../services/activityLog';
 import { nextDocumentNumber } from '../services/documentNumberService';
 import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { slugify, getUploadDir } from '../utils/fileUpload';
+import { countBusinessDaysInRange } from '../utils/businessDays';
 
 const router: Router = Router();
 router.use(tenantMiddleware, requireRole(['GENERAL_MANAGER', 'OPERATIONS_MGR', 'PROJECT_MGR', 'PS_TECH']));
@@ -197,6 +198,73 @@ router.get('/technicians', asyncHandler(async (req: Request, res: Response) => {
     specialties: t.workSpecialties.map((s) => s.specialty),
     ...(showCost ? { costRate: t.costRate, costRateUnit: t.costRateUnit, costCurrency: t.costCurrency } : {}),
   })));
+}));
+
+// Faz 5 — Ekip Utilizasyonu. Kapasite = dönemdeki iş günü (hafta sonu hariç,
+// resmi tatil listesi YOK — bilinçli basitleştirme) × 8 saat; içinde bulunulan
+// ay için kapasite bugüne kadar PRORATE edilir (ayın tamamı değil), geçmiş
+// aylar için tam ay. Maliyet yalnız GM/OPERATIONS_MGR'a döner (Faz 4 ile aynı kural).
+router.get('/utilization', asyncHandler(async (req: Request, res: Response) => {
+  if (!isManager(req)) return res.status(403).json({ error: 'Bu raporu görme yetkiniz yok.' });
+  const monthParam = String(req.query.month || '');
+  const match = /^(\d{4})-(\d{2})$/.exec(monthParam);
+  const now = new Date();
+  const year = match ? Number(match[1]) : now.getFullYear();
+  const monthIdx = match ? Number(match[2]) - 1 : now.getMonth();
+
+  const periodStart = new Date(year, monthIdx, 1);
+  const lastDayOfMonth = new Date(year, monthIdx + 1, 0);
+  const isCurrentOrFuture = lastDayOfMonth.getTime() >= new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() && periodStart.getTime() <= now.getTime();
+  const periodEnd = isCurrentOrFuture && lastDayOfMonth > now ? now : lastDayOfMonth;
+  const capacityDays = periodEnd >= periodStart ? countBusinessDaysInRange(periodStart, periodEnd) : 0;
+  const capacityHours = capacityDays * 8;
+
+  const openStatuses = ['DRAFT', 'PENDING_SCHEDULE', 'SCHEDULED', 'IN_PROGRESS', 'WAITING_PART'];
+  const technicians = await prisma.user.findMany({
+    where: { tenantId: req.tenantId, role: 'PS_TECH', status: 'ACTIVE' },
+    select: {
+      id: true, name: true, costRate: true, costRateUnit: true,
+      workSpecialties: { select: { specialty: { select: { id: true, name: true } } } },
+    },
+    orderBy: { name: 'asc' },
+  });
+  const showCost = canSeeCost(req);
+
+  const result = [];
+  for (const t of technicians) {
+    const openCount = await prisma.workOrder.count({ where: { tenantId: req.tenantId, assignedTechnicianId: t.id, status: { in: openStatuses } } });
+    const completedInPeriod = await prisma.workOrder.findMany({
+      where: {
+        tenantId: req.tenantId, assignedTechnicianId: t.id, status: { in: ['COMPLETED', 'CLOSED'] },
+        actualEndAt: { gte: periodStart, lte: lastDayOfMonth },
+      },
+      select: { actualStartAt: true, actualEndAt: true, dueAt: true },
+    });
+    let totalHours = 0;
+    let onTimeCount = 0;
+    let lateCount = 0;
+    for (const o of completedInPeriod) {
+      if (o.actualStartAt && o.actualEndAt) totalHours += (o.actualEndAt.getTime() - o.actualStartAt.getTime()) / 3_600_000;
+      if (o.dueAt && o.actualEndAt) { if (o.actualEndAt.getTime() <= o.dueAt.getTime()) onTimeCount++; else lateCount++; }
+    }
+    totalHours = Math.round(totalHours * 10) / 10;
+    const slaTotal = onTimeCount + lateCount;
+    result.push({
+      id: t.id,
+      name: t.name,
+      specialties: t.workSpecialties.map((s) => s.specialty),
+      openCount,
+      completedCount: completedInPeriod.length,
+      totalHours,
+      capacityHours,
+      utilizationPct: capacityHours > 0 ? Math.round((totalHours / capacityHours) * 1000) / 10 : null,
+      onTimeCount, lateCount,
+      slaPerformancePct: slaTotal > 0 ? Math.round((onTimeCount / slaTotal) * 1000) / 10 : null,
+      ...(showCost ? { estimatedLaborCost: t.costRate != null ? Math.round(totalHours * (t.costRateUnit === 'DAILY' ? t.costRate / 8 : t.costRate) * 100) / 100 : null } : {}),
+    });
+  }
+
+  res.json({ month: `${year}-${String(monthIdx + 1).padStart(2, '0')}`, capacityDays, capacityHours, technicians: result });
 }));
 
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {

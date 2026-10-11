@@ -240,6 +240,28 @@ export interface WorkOrderTechnician {
   costRateUnit?: string | null;
   costCurrency?: string | null;
 }
+// Faz 5 — Ekip Utilizasyonu (aylık). %doluluk = 8 saat/iş günü varsayımıyla;
+// estimatedLaborCost yalnız GM/OPERATIONS_MGR'a döner. Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+export interface UtilizationRow {
+  id: string;
+  name: string;
+  specialties: { id: string; name: string }[];
+  openCount: number;
+  completedCount: number;
+  totalHours: number;
+  capacityHours: number;
+  utilizationPct: number | null;
+  onTimeCount: number;
+  lateCount: number;
+  slaPerformancePct: number | null;
+  estimatedLaborCost?: number | null;
+}
+export interface UtilizationReportData {
+  month: string;
+  capacityDays: number;
+  capacityHours: number;
+  technicians: UtilizationRow[];
+}
 // Profesyonel Hizmetler — haftalık teknisyen dağıtım planı (Faz 2). WorkOrder'a
 // bağlanması opsiyonel gruplamadır — bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
 export type ServiceWorkPlanStatus = 'DRAFT' | 'APPROVED' | 'COMPLETED';

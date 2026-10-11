@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, CalendarClock, ShoppingCart, Kanban, CalendarDays, List,
+  HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, CalendarClock, ShoppingCart, Kanban, CalendarDays, List, Gauge,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
 import { useWorkSpecialties } from '../hooks/useEnflowQueries';
 import { WeeklyPlanView } from './professional-services/WeeklyPlanView';
+import { UtilizationReport } from './professional-services/UtilizationReport';
 import { MaterialRequestsPanel } from './professional-services/MaterialRequestsPanel';
 import {
   Project, WorkOrder, WorkOrderType, WorkOrderPriority, WorkOrderStatus,
@@ -46,7 +47,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [summary, setSummary] = useState<WorkOrderSummary | null>(null);
   const [technicians, setTechnicians] = useState<WorkOrderTechnician[]>([]);
-  const [view, setView] = useState<'list' | 'calendar'>('list'); // Faz 2 — haftalık takvim
+  const [view, setView] = useState<'list' | 'calendar' | 'utilization'>('list'); // Faz 2/5 — haftalık takvim + ekip utilizasyonu
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -245,11 +246,16 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
           <button onClick={() => setView('calendar')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${view === 'calendar' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
             <CalendarDays size={13} /> Haftalık Takvim
           </button>
+          <button onClick={() => setView('utilization')} className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${view === 'utilization' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500'}`}>
+            <Gauge size={13} /> Ekip Utilizasyonu
+          </button>
         </div>
       )}
 
       {view === 'calendar' && isManager ? (
         <WeeklyPlanView technicians={technicians} preparedByName={currentUser?.name} />
+      ) : view === 'utilization' && isManager ? (
+        <UtilizationReport />
       ) : (
         <>
           <div className="flex items-center gap-3 flex-wrap">

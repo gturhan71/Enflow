@@ -1,5 +1,5 @@
 import { apiClient, authFetch } from './apiClient';
-import { WorkOrder, WorkOrderTechnician } from '../types';
+import { WorkOrder, WorkOrderTechnician, UtilizationReportData } from '../types';
 
 export const workOrderService = {
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) {
@@ -17,6 +17,10 @@ export const workOrderService = {
 
   async getTechnicians(): Promise<WorkOrderTechnician[]> {
     return apiClient.fetchWithAuth('/work-orders/technicians');
+  },
+
+  async getUtilization(month?: string): Promise<UtilizationReportData> {
+    return apiClient.fetchWithAuth(`/work-orders/utilization${month ? `?month=${month}` : ''}`);
   },
 
   async getWorkOrder(id: string) {

@@ -13,6 +13,20 @@
 - **Frontend:** `ProfessionalServicesModule` sevkiyat formuna SLA (süre/tarih + sözleşmeden kopyala) + bilgi amaçlı maliyet bloğu + SLA aşım rozeti eklendi; teknisyen dropdown'u artık `getTechnicians()` kullanıyor (uzmanlık+ücret). `WeeklyPlanView` satırına kompakt "SLA (saat)" girişi eklendi. `UserManagement.tsx` PS_TECH düzenleme formuna maliyet alanları eklendi (GM-only ekran).
 - Uçtan uca hem curl hem tarayıcıda doğrulandı: teknisyene ücret ata → `/technicians`'ta GM görür, teknisyen kendisi 403 alır → iş emri slaHours=4 ile sevk edilir, `dueAt` doğru hesaplanır → iş tamamlanınca `estimatedLaborCost` hesaplanır, `costAmount` boş kalır → UI'da SLA rozeti + maliyet bloğu + teknisyen dropdown'unda ücret doğru görünür. `pnpm audit:roles` 0 ERROR, RBAC `api` süiti 587/587, prod build temiz.
 
+**Faz 5 UYGULANDI (2026-10-11, aynı gün — devam).** Ekip Utilizasyonu Dashboard'u. Kullanıcı kararları:
+
+- **Konum:** `ProfessionalServicesModule`'de 3. görünüm sekmesi — "Liste" / "Haftalık Takvim" / **"Ekip Utilizasyonu"** (yalnız yönetici rolleri görür; maliyet sütunu yalnız GM+OPERATIONS_MGR).
+- **Dönem:** Aylık, önceki/sonraki ay gezinme (`WeeklyPlanView`'daki `shiftWeek` deseninin aylık karşılığı), varsayılan bu ay.
+- **Doluluk oranı (%):** Evet — **8 saat/iş günü** varsayımıyla. Kapasite = dönemdeki iş günü sayısı (hafta sonu hariç, resmi tatil listesi YOK) × 8. `%doluluk = toplam çalışma saati / kapasite`. Bilinçli basitleştirme: tüm teknisyenler tam zamanlı/8-saat varsayılır, yarı-zamanlı/vardiyalı farklılaşma kapsam dışı.
+- **SLA performansı:** Evet — dönemde tamamlanan işlerden `actualEndAt <= dueAt` olanların oranı (`dueAt`'i olmayan işler sayıma girmez).
+- **Görselleştirme:** Teknisyen başına %doluluk için basit bar grafik (recharts, profitability/visitPerformance widget'larıyla aynı görsel dil) + altında detay tablosu.
+
+**Uygulama:**
+- Backend: `utils/businessDays.ts`'e `countBusinessDaysInRange(start, end)` eklendi (saf fonksiyon, `addBusinessDays` ailesi). `GET /work-orders/utilization?month=YYYY-MM` (manager-only) — içinde bulunulan ay için kapasite **bugüne kadar prorate edilir** (ayın tamamı değil; geçmiş aylarda tam ay). Tenant'taki her `PS_TECH` için: `openCount` (güncel, dönemden bağımsız), `completedCount`/`totalHours` (dönemde tamamlanan — `status IN (COMPLETED,CLOSED)` + `actualEndAt` dönem içinde), `capacityHours`, `utilizationPct`, `onTimeCount`/`lateCount`/`slaPerformancePct` (yalnız `dueAt` dolu işlerden), `estimatedLaborCost` (yalnız GM/OPERATIONS_MGR'a — Faz 4'teki `canSeeCost` kuralı aynen kullanıldı).
+- Frontend: `src/modules/professional-services/UtilizationReport.tsx` — ay gezinme header (kapasite özetiyle) + recharts bar grafik (%doluluk) + detay tablosu (Teknisyen/Uzmanlık | Açık İş | Tamamlanan | Çalışma Saati | %Doluluk (renk kodlu rozet) | SLA Performansı | [GM/PS Müdürü] Maliyet). `ProfessionalServicesModule`'e 3. görünüm sekmesi olarak eklendi (`Gauge` ikonu).
+- Uçtan uca hem curl hem tarayıcıda doğrulandı: teknisyene ücret atandı → iş emri oluşturulup tamamlandı → `completedCount`/`onTimeCount`/`slaPerformancePct` doğru hesaplandı, kapasite "7 iş günü × 8 saat = 56 saat" doğru gösterildi, bar grafik + tablo render edildi. `pnpm audit:roles` 0 ERROR, RBAC `api` süiti 587/587, prod build temiz.
+- **Kapsam dışı (bilinçli):** yarı-zamanlı/vardiyalı kapasite farklılaştırması, resmi tatil listesi, PDF/export çıktısı.
+
 Versiyon artışı (v2.5.0→v2.6.0 adayı — 5 yeni model: `WorkOrder`+`WorkSpecialty`+`UserWorkSpecialty`+`ServiceWorkPlan`+`WorkOrderMaterialRequest`, yeni rol `PS_TECH`, yeni birim "Operasyon", `User`'a maliyet alanları) kullanıcı onayı bekliyor.
 
 ## Context

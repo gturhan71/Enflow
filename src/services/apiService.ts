@@ -284,6 +284,7 @@ class ApiService {
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) { return workOrderService.getWorkOrders(filters); }
   async getWorkOrderSummary() { return workOrderService.getWorkOrderSummary(); }
   async getTechnicians() { return workOrderService.getTechnicians(); }
+  async getWorkOrderUtilization(month?: string) { return workOrderService.getUtilization(month); }
   async getWorkOrder(id: string) { return workOrderService.getWorkOrder(id); }
   async createWorkOrder(data: Partial<import('../types').WorkOrder>) { return workOrderService.createWorkOrder(data); }
   async updateWorkOrder(id: string, data: Partial<import('../types').WorkOrder>) { return workOrderService.updateWorkOrder(id, data); }

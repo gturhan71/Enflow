@@ -26,3 +26,21 @@ export function computeSlaDueDate(slaBusinessDays?: number | null, from: Date = 
   if (!slaBusinessDays || slaBusinessDays <= 0) return null;
   return addBusinessDays(from, slaBusinessDays);
 }
+
+/** [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan gün sayısı — Faz 5
+ * Ekip Utilizasyonu kapasite hesabı için (resmi tatil listesi yok, bilinçli basitleştirme). */
+export function countBusinessDaysInRange(start: Date, end: Date, holidays: string[] = []): number {
+  const holidaySet = new Set(holidays);
+  let count = 0;
+  const cursor = new Date(start);
+  cursor.setHours(0, 0, 0, 0);
+  const last = new Date(end);
+  last.setHours(0, 0, 0, 0);
+  while (cursor.getTime() <= last.getTime()) {
+    const dayOfWeek = cursor.getDay();
+    const isoDate = cursor.toISOString().slice(0, 10);
+    if (dayOfWeek !== 0 && dayOfWeek !== 6 && !holidaySet.has(isoDate)) count += 1;
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return count;
+}
