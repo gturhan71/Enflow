@@ -31,7 +31,8 @@ import {
   Wrench,
   HelpCircle,
   MessageSquarePlus,
-  TrendingUp
+  TrendingUp,
+  HardHat
 } from 'lucide-react';
 
 export const APP_VERSION = 'v2.5.0';
@@ -46,7 +47,8 @@ export const ROLE_LABELS: Record<string, string> = {
   PRESALES_ENG: 'Presales Mühendisi',
   TECHNICAL_SPEC: 'Teknik Uzman',
   PROJECT_MGR: 'Proje Yöneticisi',
-  OPERATIONS_MGR: 'Operasyon Müdürü',
+  OPERATIONS_MGR: 'Profesyonel Hizmetler Müdürü',
+  PS_TECH: 'Profesyonel Hizmetler Teknisyeni',
   PROCUREMENT_MGR: 'Satın Alma Müdürü',
   FINANCE_MGR: 'Finans Müdürü',
   HR_MGR: 'İnsan Kaynakları Müdürü',
@@ -94,6 +96,7 @@ export const NAV_ITEMS = [
   { id: 'project-mgmt',      label: 'Proje Yönetimi',      icon: Kanban,        requiredPermission: 'PROJECT_MGMT_VIEW' },
   { id: 'procurement',       label: 'Satın Alma',          icon: ShoppingCart,  requiredPermission: 'PROCUREMENT_VIEW' },
   { id: 'service-tickets',   label: 'Garanti & Servis',    icon: Wrench,        requiredPermission: 'SERVICE_TICKETS_VIEW' },
+  { id: 'professional-services', label: 'Profesyonel Hizmetler', icon: HardHat, requiredPermission: 'WORK_ORDERS_VIEW' },
   { id: 'finance',           label: 'Finans',              icon: Banknote,      requiredPermission: 'FINANCE_VIEW' },
   { id: 'profitability',     label: 'Kârlılık',            icon: TrendingUp,    requiredPermission: 'PROFITABILITY_VIEW' },
   { id: 'dmo',               label: 'DMO Kataloğu',        icon: Package,       requiredPermission: 'DMO_VIEW', requiredEntitlement: 'DMO_MODULE' },
@@ -132,6 +135,7 @@ export const NAV_ITEMS = [
       { id: 'settings-modules',          label: 'Modüller',                   requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-dashboard-templates', label: 'Kokpit Şablonları',       requiredPermission: 'GENERAL_MANAGER' },
       { id: 'settings-product-taxonomy', label: 'Marka & Ürün Grubu',         requiredPermission: 'GENERAL_MANAGER' },
+      { id: 'settings-work-specialties', label: 'Uzmanlık Alanları',          requiredPermission: 'GENERAL_MANAGER' },
       // Eskiden Sidebar'daki ayrı "Test Ortamı" GM-only bloğundaydı (2026-08-19'da kaldırıldı) —
       // artık normal Ayarlar alt-öğeleri, aynı GM-only kısıtı (GENERAL_MANAGER permission-superuser) korunuyor.
       { id: 'security-test',  label: 'Güvenlik Testi', requiredPermission: 'GENERAL_MANAGER' },

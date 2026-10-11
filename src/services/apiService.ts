@@ -3,6 +3,8 @@ import { crmService } from './crmService';
 import { projectService } from './projectService';
 import { taskService } from './taskService';
 import { serviceTicketService } from './serviceTicketService';
+import { workOrderService } from './workOrderService';
+import { serviceWorkPlanService } from './serviceWorkPlanService';
 import { platformTicketService } from './platformTicketService';
 import { documentService } from './documentService';
 import { settingsService } from './settingsService';
@@ -277,6 +279,45 @@ class ApiService {
   async updateServiceTicket(id: string, data: Partial<ServiceTicket>) { return serviceTicketService.updateServiceTicket(id, data); }
   async resolveServiceTicket(id: string, resolutionNotes?: string, costAmount?: number, costCurrency?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes, costAmount, costCurrency); }
   async deleteServiceTicket(id: string) { return serviceTicketService.deleteServiceTicket(id); }
+
+  // --- PROFESYONEL HİZMETLER: İş Emri (WorkOrder) ---
+  async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) { return workOrderService.getWorkOrders(filters); }
+  async getWorkOrderSummary() { return workOrderService.getWorkOrderSummary(); }
+  async getWorkOrder(id: string) { return workOrderService.getWorkOrder(id); }
+  async createWorkOrder(data: Partial<import('../types').WorkOrder>) { return workOrderService.createWorkOrder(data); }
+  async updateWorkOrder(id: string, data: Partial<import('../types').WorkOrder>) { return workOrderService.updateWorkOrder(id, data); }
+  async scheduleWorkOrder(id: string, assignedTechnicianId: string, scheduledDate: string) { return workOrderService.scheduleWorkOrder(id, assignedTechnicianId, scheduledDate); }
+  async startWorkOrder(id: string) { return workOrderService.startWorkOrder(id); }
+  async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) { return workOrderService.completeWorkOrder(id, data); }
+  async uploadWorkOrderSignOff(id: string, file: File) { return workOrderService.uploadSignOff(id, file); }
+  async deleteWorkOrder(id: string) { return workOrderService.deleteWorkOrder(id); }
+  async createMaterialRequest(workOrderId: string, data: Parameters<typeof workOrderService.createMaterialRequest>[1]) { return workOrderService.createMaterialRequest(workOrderId, data); }
+  async updateMaterialRequest(workOrderId: string, matId: string, data: Parameters<typeof workOrderService.updateMaterialRequest>[2]) { return workOrderService.updateMaterialRequest(workOrderId, matId, data); }
+  async approveMaterialRequest(workOrderId: string, matId: string) { return workOrderService.approveMaterialRequest(workOrderId, matId); }
+  async rejectMaterialRequest(workOrderId: string, matId: string, rejectionNote?: string) { return workOrderService.rejectMaterialRequest(workOrderId, matId, rejectionNote); }
+  async deleteMaterialRequest(workOrderId: string, matId: string) { return workOrderService.deleteMaterialRequest(workOrderId, matId); }
+
+  // --- PROFESYONEL HİZMETLER: Haftalık Plan (Faz 2) ---
+  async getServiceWorkPlans(filters?: { weekOf?: string; unitId?: string }) { return serviceWorkPlanService.getServiceWorkPlans(filters); }
+  async createServiceWorkPlan(data: Partial<import('../types').ServiceWorkPlan>) { return serviceWorkPlanService.createServiceWorkPlan(data); }
+  async updateServiceWorkPlan(id: string, data: Partial<import('../types').ServiceWorkPlan>) { return serviceWorkPlanService.updateServiceWorkPlan(id, data); }
+  async deleteServiceWorkPlan(id: string) { return serviceWorkPlanService.deleteServiceWorkPlan(id); }
+
+  // --- PROFESYONEL HİZMETLER: Uzmanlık Alanı Taksonomisi (tenant bazlı) ---
+  async getWorkSpecialties(): Promise<import('../types').WorkSpecialty[]> { return apiClient.fetchWithAuth('/work-specialties'); }
+  async createWorkSpecialty(data: { name: string }): Promise<import('../types').WorkSpecialty> {
+    return apiClient.fetchWithAuth('/work-specialties', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async updateWorkSpecialty(id: string, data: { name?: string; isActive?: boolean }): Promise<import('../types').WorkSpecialty> {
+    return apiClient.fetchWithAuth(`/work-specialties/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+  }
+  async deleteWorkSpecialty(id: string) {
+    return apiClient.fetchWithAuth(`/work-specialties/${id}`, { method: 'DELETE' });
+  }
+  async getUserWorkSpecialties(userId: string): Promise<string[]> { return apiClient.fetchWithAuth(`/work-specialties/users/${userId}`); }
+  async setUserWorkSpecialties(userId: string, specialtyIds: string[]): Promise<string[]> {
+    return apiClient.fetchWithAuth(`/work-specialties/users/${userId}`, { method: 'PUT', body: JSON.stringify({ specialtyIds }) });
+  }
 
   // --- PLATFORM TICKET: Talep & Geri Bildirim ---
   async getPlatformTickets(filters?: { status?: string }) { return platformTicketService.getPlatformTickets(filters); }

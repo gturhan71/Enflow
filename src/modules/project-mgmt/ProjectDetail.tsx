@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo, type FC } from 'react';
 import {
   X, Printer, AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp,
-  RefreshCw, Plus, Trash2, Upload, Loader2,
+  RefreshCw, Plus, Trash2, Upload, Loader2, HardHat,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { apiService } from '../../services/apiService';
 import { fmtCurrencyExact as fmt } from '../../lib/format';
 import {
   Project, ProjectMilestone, MilestoneStatus, CostCategory, User,
+  WORK_ORDER_TYPE_LABEL, WORK_ORDER_STATUS_LABEL,
 } from '../../types';
 import {
   PROJECT_TYPE_LABEL, PROJECT_TYPE_COLOR, MS_STATUS_CONFIG, COST_CAT_LABEL, COST_CAT_COLOR,
@@ -28,11 +29,12 @@ interface ProjectDetailProps {
   onClose: () => void;
   onRefresh: () => void;
   onPrintReport: (p: Project) => void;
+  onNavigate?: (tab: string) => void;
 }
 
-const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, currentUserRole, onClose, onRefresh, onPrintReport }) => {
+const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, currentUserRole, onClose, onRefresh, onPrintReport, onNavigate }) => {
   const [project, setProject] = useState(initialProject);
-  const [tab, setTab] = useState<'overview' | 'milestones' | 'costs' | 'profitability' | 'handover'>('overview');
+  const [tab, setTab] = useState<'overview' | 'milestones' | 'costs' | 'profitability' | 'handover' | 'work-orders'>('overview');
   const [loading, setLoading] = useState(false);
   const [showCostForm, setShowCostForm] = useState(false);
   const [expandedMs, setExpandedMs] = useState<string | null>(null);
@@ -123,6 +125,7 @@ const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, curren
     { key: 'costs',         label: `Maliyetler (${project.projectCostItems.length})` },
     { key: 'profitability', label: 'Karlılık' },
     { key: 'handover',      label: 'Devir Paketi' },
+    { key: 'work-orders',   label: `Profesyonel Hizmetler (${project.workOrders?.length ?? 0})` },
   ] as const;
 
   return (
@@ -423,6 +426,40 @@ const ProjectDetail: FC<ProjectDetailProps> = ({ project: initialProject, curren
                   </div>
                 ))}
               </div>
+            )}
+          </div>
+        )}
+
+        {/* PROFESYONEL HİZMETLER — salt-okunur özet; asıl CRUD yüzeyi ayrı modülde */}
+        {tab === 'work-orders' && (
+          <div className="space-y-3">
+            {(!project.workOrders || project.workOrders.length === 0) ? (
+              <p className="text-sm text-slate-400 text-center py-6">Bu projeye bağlı iş emri yok.</p>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  {project.workOrders.map(wo => (
+                    <div key={wo.id} className="bg-white/5 rounded-xl p-3 flex items-center justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{wo.title}</p>
+                        <p className="text-[11px] text-slate-400">
+                          {wo.workOrderNo ? `${wo.workOrderNo} · ` : ''}{WORK_ORDER_TYPE_LABEL[wo.type]}
+                          {wo.assignedTechnician && <> · {wo.assignedTechnician.name}</>}
+                          {wo.scheduledDate && <> · {fmtShort(wo.scheduledDate)}</>}
+                        </p>
+                      </div>
+                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 bg-indigo-900/30 text-indigo-300">
+                        {WORK_ORDER_STATUS_LABEL[wo.status]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {onNavigate && (
+                  <button onClick={() => onNavigate('professional-services')} className="w-full flex items-center justify-center gap-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 py-2">
+                    <HardHat size={13} /> Profesyonel Hizmetler modülünde görüntüle
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}

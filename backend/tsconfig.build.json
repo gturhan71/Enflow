@@ -17,6 +17,7 @@
     "src/scripts/auditRoles.ts",
     "src/scripts/syncRolePermissions.ts",
     "src/scripts/backfill-profitability-view-permission.ts",
+    "src/scripts/backfill-work-orders-view-permission.ts",
     "src/scripts/seed-rbac-fixture.ts"
   ]
 }

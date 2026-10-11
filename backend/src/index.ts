@@ -36,6 +36,9 @@ import { prisma } from './prismaClient';
 import type { StopFn } from './services/periodic';
 import projectsRouter from './routes/projects';
 import serviceTicketsRouter from './routes/serviceTickets';
+import workOrdersRouter from './routes/workOrders';
+import workSpecialtiesRouter from './routes/workSpecialties';
+import serviceWorkPlansRouter from './routes/serviceWorkPlans';
 import platformTicketsRouter from './routes/platformTickets';
 import platformTicketsAdminRouter from './routes/platformTicketsAdmin';
 import tasksRouter from './routes/tasks';
@@ -191,6 +194,9 @@ app.use('/api/backup', backupRouter);
 app.use('/api/sync', syncRouter);
 app.use('/api/projects', projectsRouter);
 app.use('/api/service-tickets', serviceTicketsRouter);
+app.use('/api/work-orders', workOrdersRouter);
+app.use('/api/work-specialties', workSpecialtiesRouter);
+app.use('/api/service-work-plans', serviceWorkPlansRouter);
 app.use('/api/platform-tickets', platformTicketsRouter);
 // Tenant-çapraz (cross-tenant), dış triage aracı için — kendi paylaşımlı-secret
 // auth'unu kullanır (platformApiKeyMiddleware), tenantMiddleware YOK.

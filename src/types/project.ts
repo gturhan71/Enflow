@@ -78,6 +78,13 @@ export interface Project {
   procurementNotes?: string | null;
   milestones: ProjectMilestone[];
   projectCostItems: ProjectCostItem[];
+  // Profesyonel Hizmetler — salt-okunur özet (bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md).
+  // Asıl CRUD yüzeyi ProfessionalServicesModule/work-orders'ta.
+  workOrders?: {
+    id: string; workOrderNo?: string | null; title: string; type: WorkOrderType;
+    status: WorkOrderStatus; priority: WorkOrderPriority; scheduledDate?: string | null;
+    assignedTechnician?: { id: string; name: string } | null;
+  }[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -120,6 +127,118 @@ export interface ServiceTicket {
   brand?: { id: string; name: string } | null;
   productCategoryId?: string | null;
   productCategory?: { id: string; name: string } | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// Profesyonel Hizmetler (post-sales) — iş emri. ServiceTicket'tan FARKLI:
+// ServiceTicket müşteri arıza/garanti BİLDİRİMİ, WorkOrder sahaya giden
+// teknisyenin YÜRÜTME kaydı (dispatch/takvim/kapanış kanıtı). Bkz.
+// docs/PROFESYONEL_HIZMETLER_PLAN.md.
+export type WorkOrderType = 'INSTALLATION' | 'REPAIR' | 'MAINTENANCE' | 'OTHER';
+export type WorkOrderPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+export type WorkOrderStatus = 'DRAFT' | 'PENDING_SCHEDULE' | 'SCHEDULED' | 'IN_PROGRESS' | 'WAITING_PART' | 'COMPLETED' | 'CLOSED' | 'CANCELLED';
+export const WORK_ORDER_TYPE_LABEL: Record<WorkOrderType, string> = {
+  INSTALLATION: 'Kurulum', REPAIR: 'Arıza', MAINTENANCE: 'Bakım', OTHER: 'Diğer',
+};
+export const WORK_ORDER_PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
+  LOW: 'Düşük', NORMAL: 'Normal', HIGH: 'Yüksek', URGENT: 'Acil',
+};
+export const WORK_ORDER_STATUS_LABEL: Record<WorkOrderStatus, string> = {
+  DRAFT: 'Taslak', PENDING_SCHEDULE: 'Sevk Bekliyor', SCHEDULED: 'Planlandı', IN_PROGRESS: 'Sahada',
+  WAITING_PART: 'Parça Bekliyor', COMPLETED: 'Tamamlandı', CLOSED: 'Kapandı', CANCELLED: 'İptal',
+};
+export interface WorkOrder {
+  id: string;
+  tenantId?: string;
+  workOrderNo?: string | null;
+  type: WorkOrderType;
+  title: string;
+  description?: string | null;
+  priority: WorkOrderPriority;
+  status: WorkOrderStatus;
+  customerId?: string | null;
+  customer?: { id: string; name: string } | null;
+  customerName?: string | null;
+  projectId?: string | null;
+  project?: { id: string; name: string; code?: string | null; status?: ProjectStatus; progress?: number } | null;
+  openPurchaseRequestCount?: number | null; // yalnız GET /work-orders/:id detayında dolu
+  serviceTicketId?: string | null;
+  unitId?: string | null;
+  unit?: { id: string; name: string } | null;
+  requiredSpecialtyId?: string | null;
+  requiredSpecialty?: { id: string; name: string } | null;
+  assignedTechnicianId?: string | null;
+  assignedTechnician?: { id: string; name: string } | null;
+  scheduledDate?: string | null;
+  actualStartAt?: string | null;
+  actualEndAt?: string | null;
+  completionNotes?: string | null;
+  customerSignOffAt?: string | null;
+  customerSignOffName?: string | null;
+  customerSignOffFileUrl?: string | null;
+  costAmount?: number | null;
+  costCurrency?: string | null;
+  servicePlanId?: string | null; // Faz 2 — ServiceWorkPlan'a opsiyonel bağlanma
+  materialRequests?: WorkOrderMaterialRequest[]; // Faz 3 — yalnız GET /work-orders/:id detayında dolu
+  createdAt?: string;
+  updatedAt?: string;
+}
+// Profesyonel Hizmetler — Faz 3: dış kaynak malzeme/hizmet talebi. PurchaseRequest'in
+// 9 statülü tam onay zincirinin KASITLI DIŞINDA, hafif/tek-adımlı (yalnız birim
+// yöneticisi onayı). Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md Kullanıcı Kararı 4.
+export type WorkOrderMaterialStatus = 'REQUESTED' | 'APPROVED' | 'ORDERED' | 'RECEIVED' | 'REJECTED';
+export const WORK_ORDER_MATERIAL_STATUS_LABEL: Record<WorkOrderMaterialStatus, string> = {
+  REQUESTED: 'Onay Bekliyor', APPROVED: 'Onaylandı', ORDERED: 'Sipariş Edildi', RECEIVED: 'Teslim Alındı', REJECTED: 'Reddedildi',
+};
+export interface WorkOrderMaterialRequest {
+  id: string;
+  tenantId?: string;
+  workOrderId: string;
+  description: string;
+  vendorId?: string | null;
+  vendor?: { id: string; name: string } | null;
+  vendorName?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  currency: string;
+  status: WorkOrderMaterialStatus;
+  requestedById?: string | null;
+  requestedByName?: string | null;
+  approvedByUnitManagerId?: string | null;
+  rejectionNote?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+export interface WorkOrderSummary {
+  total: number;
+  open: number;
+  completed: number;
+  avgResolutionDays: number | null;
+  byTechnician: { userId: string; name: string; open: number; completed: number }[];
+}
+// Profesyonel Hizmetler — haftalık teknisyen dağıtım planı (Faz 2). WorkOrder'a
+// bağlanması opsiyonel gruplamadır — bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+export type ServiceWorkPlanStatus = 'DRAFT' | 'APPROVED' | 'COMPLETED';
+export const SERVICE_WORK_PLAN_STATUS_LABEL: Record<ServiceWorkPlanStatus, string> = {
+  DRAFT: 'Taslak', APPROVED: 'Onaylandı', COMPLETED: 'Tamamlandı',
+};
+export interface ServiceWorkPlanWorkOrder {
+  id: string; workOrderNo?: string | null; title: string; type: WorkOrderType; status: WorkOrderStatus;
+  priority: WorkOrderPriority; scheduledDate?: string | null; customerName?: string | null;
+  assignedTechnician?: { id: string; name: string } | null;
+}
+export interface ServiceWorkPlan {
+  id: string;
+  tenantId?: string;
+  weekOf: string;
+  unitId?: string | null;
+  preparedById: string;
+  preparedByName?: string | null;
+  status: ServiceWorkPlanStatus;
+  notes?: string | null;
+  workOrders: ServiceWorkPlanWorkOrder[];
   createdAt?: string;
   updatedAt?: string;
 }

@@ -115,6 +115,11 @@ export const useBrandSources = (tenantId: string, brandId: string | undefined) =
   queryFn: () => apiService.getBrandSources(brandId as string).catch(() => []),
   staleTime: 5 * 60 * 1000, enabled: !!tenantId && !!brandId,
 });
+// Profesyonel Hizmetler — uzmanlık alanı taksonomisi (tenant bazlı, Ayarlar'daki
+// değişiklikler ['taxonomy'] önekini geçersiz kılar — Brand/ProductCategory ile aynı desen).
+export const useWorkSpecialties = (tenantId: string) => useQuery({
+  queryKey: ['taxonomy', 'work-specialties', tenantId], queryFn: () => apiService.getWorkSpecialties().catch(() => []), staleTime: 5 * 60 * 1000, enabled: !!tenantId,
+});
 
 // Presales — devredilen BoM'lar + kalem teklifleri
 export const useBomHandoffs = (tenantId: string) => useQuery({

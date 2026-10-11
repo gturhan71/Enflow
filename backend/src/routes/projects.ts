@@ -39,6 +39,16 @@ async function ownsProject(req: Request): Promise<boolean> {
 const PROJECT_INCLUDE = {
   milestones: { orderBy: { order: 'asc' as const } },
   projectCostItems: { orderBy: { createdAt: 'desc' as const } },
+  // Profesyonel Hizmetler — salt-okunur geriye bağlantı (bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md).
+  // WorkOrder'ın asıl CRUD yüzeyi /api/work-orders'ta; burada yalnız proje
+  // tarafında özet görünürlük için okunur, yazma yolu yok.
+  workOrders: {
+    select: {
+      id: true, workOrderNo: true, title: true, type: true, status: true, priority: true,
+      scheduledDate: true, assignedTechnician: { select: { id: true, name: true } },
+    },
+    orderBy: { createdAt: 'desc' as const },
+  },
 };
 
 // ── LIST ──────────────────────────────────────────────────────────────────────

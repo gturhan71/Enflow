@@ -27,7 +27,7 @@ interface ProjectManagementModuleProps {
   initialItemId?: string | null;
 }
 
-const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [], customers = [], initialItemId }) => {
+const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [], customers = [], initialItemId, setActiveTab }) => {
   const { currentUser } = useAuth();
   const [view, setView] = useState<'dashboard' | 'list'>('dashboard');
   const tenantId = currentUser?.tenantId ?? '';
@@ -250,6 +250,7 @@ const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [],
               onClose={() => setSelectedProject(null)}
               onRefresh={loadProjects}
               onPrintReport={printProjectReport}
+              onNavigate={setActiveTab}
             />
           </>
         )}

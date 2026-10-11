@@ -30,3 +30,15 @@ export interface BrandSource {
   createdAt: string;
   updatedAt: string;
 }
+
+// ── Profesyonel Hizmetler — Uzmanlık Alanı Taksonomisi (tenant bazlı) ────────
+// Brand/ProductCategory ile aynı desen; tenant'lar arası paylaşılan/global
+// bir katalog YOK (bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md).
+export interface WorkSpecialty {
+  id: string;
+  tenantId: string;
+  name: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

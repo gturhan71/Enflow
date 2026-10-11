@@ -23,6 +23,10 @@ export const DEFAULT_UNITS: { key: string; name: string; description: string }[]
   { key: 'procurement', name: 'Satın Alma', description: 'Tedarikçi teklifleri ve satınalma talebi yönetimi.' },
   { key: 'project', name: 'Proje Yönetimi', description: 'Sözleşme sonrası proje devri ve yürütme.' },
   { key: 'legal', name: 'Hukuk', description: 'Sözleşme hukuki incelemesi.' },
+  // Profesyonel Hizmetler (post-sales) — kurulum/arıza müdahale saha ekibi
+  // (bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md). OPERATIONS_MGR rolü bu birimin
+  // yöneticisi; önceden bu birim DEFAULT_UNITS'te yoktu.
+  { key: 'operations', name: 'Operasyon', description: 'Profesyonel hizmetler — kurulum ve arıza müdahale saha ekibi.' },
 ];
 
 // İlk GM kullanıcısı için geniş görünüm izinleri (GM zaten superuser; tutarlılık için).

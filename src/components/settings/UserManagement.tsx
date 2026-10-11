@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserPlus, Building2, Trash2, Loader2, UserCog, Edit3, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { User, Unit, Tenant } from '../../types';
+import { User, Unit, Tenant, WorkSpecialty } from '../../types';
 import { ROLE_LABELS } from '../../constants';
 import { apiService } from '../../services/apiService';
+import { useWorkSpecialties } from '../../hooks/useEnflowQueries';
 import { PersonnelTransferModal, PersonnelTransferPayload } from './PersonnelTransferModal';
 
 interface UserManagementProps {
@@ -31,6 +32,18 @@ export const UserManagement = ({
   const [editSaving, setEditSaving] = useState(false);
   const [transferTarget, setTransferTarget] = useState<{ user: User; mode: 'optional' | 'mandatory' } | null>(null);
   const [transferSaving, setTransferSaving] = useState(false);
+  // Profesyonel Hizmetler Teknisyeni (PS_TECH) uzmanlık alanı ataması —
+  // bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+  const [specialtyIds, setSpecialtyIds] = useState<string[]>([]);
+  const workSpecialties = (useWorkSpecialties(currentUser?.tenantId ?? '').data ?? []) as WorkSpecialty[];
+
+  useEffect(() => {
+    if (editingUser?.role === 'PS_TECH') {
+      apiService.getUserWorkSpecialties(editingUser.id).then(setSpecialtyIds).catch(() => setSpecialtyIds([]));
+    } else {
+      setSpecialtyIds([]);
+    }
+  }, [editingUser]);
 
   const handleSaveUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,6 +125,9 @@ export const UserManagement = ({
     setEditSaving(true);
     try {
       const updated = await apiService.updateUser(targetId, { role, unitId: unitId || undefined });
+      if (editingUser.role === 'PS_TECH') {
+        await apiService.setUserWorkSpecialties(targetId, specialtyIds).catch(() => {});
+      }
       setUsers(prev => prev.map(u => u.id === targetId ? { ...u, ...updated } : u));
       setEditingUser(null);
       // Rol gerçekten değiştiyse (terfi/görev değişikliği): sahip olduğu aktif
@@ -326,7 +342,8 @@ export const UserManagement = ({
                   </optgroup>
                   <optgroup label="Proje & Operasyon">
                     <option value="PROJECT_MGR">Proje Yöneticisi</option>
-                    <option value="OPERATIONS_MGR">Operasyon Müdürü</option>
+                    <option value="OPERATIONS_MGR">Profesyonel Hizmetler Müdürü</option>
+                    <option value="PS_TECH">Profesyonel Hizmetler Teknisyeni</option>
                     <option value="PROCUREMENT_MGR">Satın Alma Müdürü</option>
                   </optgroup>
                   <optgroup label="Destek Birimleri">
@@ -457,6 +474,30 @@ export const UserManagement = ({
                   <option value="">Birim (Opsiyonel)</option>
                   {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+                {editingUser.role === 'PS_TECH' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Uzmanlık Alanları</label>
+                    {workSpecialties.length === 0 ? (
+                      <p className="text-[10px] text-slate-400">Henüz uzmanlık alanı tanımlanmadı — Ayarlar → Uzmanlık Alanları'ndan ekleyin.</p>
+                    ) : (
+                      <div className="flex flex-wrap gap-2">
+                        {workSpecialties.map(s => {
+                          const checked = specialtyIds.includes(s.id);
+                          return (
+                            <button
+                              type="button"
+                              key={s.id}
+                              onClick={() => setSpecialtyIds(prev => checked ? prev.filter(id => id !== s.id) : [...prev, s.id])}
+                              className={`px-3 py-1.5 rounded-full text-xs font-bold border transition-colors ${checked ? 'bg-primary text-white border-primary' : 'bg-slate-50 text-slate-500 border-slate-200 hover:border-primary/50'}`}
+                            >
+                              {s.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
                 <p className="text-[10px] text-slate-400">
                   Rol değişirse, sahip olduğu aktif kayıtlar varsa kaydettikten sonra bir devir öneri ekranı açılır.
                 </p>

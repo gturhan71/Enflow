@@ -26,6 +26,7 @@ const MODULE_TARGET: Record<string, string> = {
   CONTRACT: 'contract-workflow', LEGAL: 'contract-workflow',
   CONTRACT_WORKFLOW_SIGNING: 'contract-workflow', PURCHASE_REQUEST: 'procurement', TENDER: 'sales-support',
   PROJECT_COST: 'finance', LEGAL_CASE: 'contract-workflow', PROPOSAL: 'crm-proposals',
+  WORK_ORDER: 'professional-services',
 };
 const targetTab = (actionKey?: string | null, relatedModule?: string | null): string | null =>
   (actionKey ? ACTION_TARGET[actionKey] : undefined) || (relatedModule ? MODULE_TARGET[relatedModule] : undefined) || null;

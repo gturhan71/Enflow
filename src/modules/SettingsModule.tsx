@@ -10,6 +10,7 @@ import { PermissionSettings } from '../components/settings/PermissionSettings';
 import LicenseTypesModule from './LicenseTypesModule';
 import RoleTemplateEditor from './dashboard/RoleTemplateEditor';
 import ProductTaxonomyManagement from '../components/settings/ProductTaxonomyManagement';
+import WorkSpecialtyManagement from '../components/settings/WorkSpecialtyManagement';
 import { useAuth } from '../contexts/AuthContext';
 import { apiService } from '../services/apiService';
 import { useModuleSettings } from '../hooks/useEnflowQueries';
@@ -416,6 +417,8 @@ const SettingsModule = ({
         return <RoleTemplateEditor />;
       case 'product-taxonomy':
         return <ProductTaxonomyManagement />;
+      case 'work-specialties':
+        return <WorkSpecialtyManagement />;
       default:
         return null;
     }

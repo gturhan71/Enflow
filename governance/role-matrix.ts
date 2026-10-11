@@ -171,15 +171,31 @@ export const ROLE_MATRIX: RoleSpec[] = [
     notes: 'Proje birim yöneticisi — milestone/devir/maliyet. requiresApproval milestone geçişleri GM onayına gider. DB personeli yok; Project agent doldurur (devir/milestone).',
   },
   {
+    // "Profesyonel Hizmetler Müdürü" (görünen ad, ROLE_LABELS) — rol kodu aynı
+    // kaldı, bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md (2026-10-11).
     role: 'OPERATIONS_MGR', unit: 'Operasyon', kind: 'MANAGER', staffing: 'HUMAN',
-    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'PROCUREMENT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'TODO_VIEW'],
-    endpointDomains: ['serviceTickets'],
+    modules: ['DASHBOARD_VIEW', 'PROJECT_MGMT_VIEW', 'SERVICE_TICKETS_VIEW', 'WORK_ORDERS_VIEW', 'PROCUREMENT_VIEW', 'MANAGEMENT_REPORTS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['serviceTickets', 'workOrders', 'workSpecialties', 'serviceWorkPlans'],
     decisionRights: [
       { decision: 'Garanti/servis talebi yönetimi (B-22)', via: 'endpoint:service-tickets' },
+      { decision: 'İş emri sevkiyatı (teknisyen+takvim ataması)', via: 'endpoint:work-orders/:id/schedule' },
+      { decision: 'İş emri malzeme/hizmet talebi onayı', via: 'endpoint:work-orders/:id/materials/:matId/approve' },
     ],
     tasks: [], approvalIn: [],
     reviewed: 'DONE',
-    notes: 'Operasyon yöneticisi — garanti/servis taleplerinin (ServiceTicket) birincil sahibi.',
+    notes: 'Profesyonel Hizmetler/Operasyon yöneticisi — garanti/servis taleplerinin (ServiceTicket) VE iş emirlerinin (WorkOrder) birincil sahibi.',
+  },
+  {
+    role: 'PS_TECH', unit: 'Operasyon', kind: 'STAFF', staffing: 'HUMAN',
+    modules: ['DASHBOARD_VIEW', 'WORK_ORDERS_VIEW', 'TODO_VIEW'],
+    endpointDomains: ['workOrders'],
+    decisionRights: [],
+    tasks: [
+      { task: 'Atanan iş emrini saha yerinde yürütme (kurulum/arıza/bakım)', raci: 'R', via: 'endpoint:work-orders/:id/start + /complete' },
+    ],
+    approvalIn: [],
+    reviewed: 'DONE',
+    notes: 'Profesyonel Hizmetler teknisyeni — yalnız kendi atandığı iş emirlerini görür/yürütür. DB personeli yok (tanımlı, atanmamış).',
   },
   {
     role: 'PROCUREMENT_MGR', unit: 'Satın Alma', kind: 'MANAGER', staffing: 'HUMAN',

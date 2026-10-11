@@ -71,6 +71,10 @@ model Tenant {
   opportunityProgressLogs OpportunityProgressLog[]
   costAnalysisVersions    CostAnalysisVersion[]
   profitabilitySnapshots  ProfitabilitySnapshot[]
+  workOrders              WorkOrder[]
+  workSpecialties         WorkSpecialty[]
+  serviceWorkPlans        ServiceWorkPlan[]
+  workOrderMaterialRequests WorkOrderMaterialRequest[]
 }
 
 enum SubscriptionPlan {
@@ -123,6 +127,8 @@ model Unit {
   steps                 WorkflowStep[]
   budgets               UnitBudget[]
   projectParticipations ProjectUnitParticipation[]
+  workOrders            WorkOrder[]
+  serviceWorkPlans      ServiceWorkPlan[]
 }
 
 model User {
@@ -147,6 +153,8 @@ model User {
   tenant           Tenant        @relation(fields: [tenantId], references: [id])
   delegateTo       User?         @relation("UserDelegate", fields: [delegateToUserId], references: [id], onDelete: SetNull)
   delegatedFrom    User[]        @relation("UserDelegate")
+  assignedWorkOrders WorkOrder[]        @relation("WorkOrderTechnician")
+  workSpecialties    UserWorkSpecialty[]
 }
 
 model Customer {
@@ -184,6 +192,7 @@ model Customer {
   opportunities     Opportunity[]
   contacts          Contact[]
   invoices          Invoice[]
+  workOrders        WorkOrder[]
 
   @@index([tenantId, parentId])
 }
@@ -510,6 +519,7 @@ model Project {
   handoverDocs       ProjectHandoverDoc[]
   unitParticipations ProjectUnitParticipation[]
   serviceTickets     ServiceTicket[]
+  workOrders         WorkOrder[]
 
   @@index([tenantId, status])
 }
@@ -546,9 +556,141 @@ model ServiceTicket {
   productCategory     ProductCategory? @relation(fields: [productCategoryId], references: [id], onDelete: SetNull)
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
+  workOrders          WorkOrder[]
 
   @@index([tenantId, status])
   @@index([tenantId, projectId])
+}
+
+// Profesyonel Hizmetler (post-sales) — kurulum/arıza/bakım için teknisyen
+// sevkiyle yürütülen iş emri. ServiceTicket'tan FARKLI: ServiceTicket müşteri
+// arıza/garanti BİLDİRİMİ (intake), WorkOrder ise sahaya giden teknisyenin
+// YÜRÜTME kaydı (dispatch/takvim/uzmanlık/kapanış kanıtı). Project'e bağlı
+// olmak ZORUNDA değil (garanti dışı ücretli servis de açılabilir) — bkz.
+// docs/PROFESYONEL_HIZMETLER_PLAN.md.
+model WorkOrder {
+  id                     String          @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrderNo            String? // documentNumberService.nextDocumentNumber — tenant kategori kodu tanımlamadıysa null
+  type                   String          @default("INSTALLATION") // INSTALLATION|REPAIR|MAINTENANCE|OTHER
+  title                  String
+  description            String?
+  priority               String          @default("NORMAL") // LOW|NORMAL|HIGH|URGENT
+  status                 String          @default("DRAFT")
+  // DRAFT→PENDING_SCHEDULE→SCHEDULED→IN_PROGRESS→WAITING_PART→COMPLETED→CLOSED (+CANCELLED herhangi aşamada)
+  customerId             String?
+  customer               Customer?       @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName           String? // Customer yoksa/silinmişse görünürlük için denormalize
+  projectId              String?
+  project                Project?        @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  serviceTicketId        String? // opsiyonel geri-bağlantı — bir ServiceTicket'tan "Teknisyen Sevk Et" ile açıldıysa
+  serviceTicket          ServiceTicket?  @relation(fields: [serviceTicketId], references: [id], onDelete: SetNull)
+  unitId                 String? // Profesyonel Hizmetler (Operasyon) birimi
+  unit                   Unit?           @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  requiredSpecialtyId    String? // WorkSpecialty — sert kısıt değil, atama sırasında öneri/filtre
+  requiredSpecialty      WorkSpecialty?  @relation(fields: [requiredSpecialtyId], references: [id], onDelete: SetNull)
+  assignedTechnicianId   String? // User.id — planlanana kadar null
+  assignedTechnician     User?           @relation("WorkOrderTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
+  scheduledDate          DateTime?
+  actualStartAt          DateTime?
+  actualEndAt            DateTime?
+  servicePlanId          String? // opsiyonel — ServiceWorkPlan'a bağlıysa (Faz 2, haftalık dağıtım)
+  servicePlan            ServiceWorkPlan? @relation(fields: [servicePlanId], references: [id], onDelete: SetNull)
+  completionNotes        String?
+  customerSignOffAt      DateTime?
+  customerSignOffName    String?
+  customerSignOffFileUrl String? // ZORUNLU — COMPLETED'a geçiş bu alan doluymadan reddedilir (bkz. routes/workOrders.ts)
+  costAmount             Float? // işçilik + malzeme toplamı (elle girilir — materyal talebi tutarları otomatik toplanmaz, bkz. WorkOrderMaterialRequest)
+  costCurrency           String?
+  materialRequests       WorkOrderMaterialRequest[]
+  createdAt              DateTime        @default(now())
+  updatedAt              DateTime        @updatedAt
+
+  @@index([tenantId, status])
+  @@index([tenantId, assignedTechnicianId])
+  @@index([tenantId, projectId])
+}
+
+// Profesyonel Hizmetler — Faz 3: iş emrinin yürütülmesi için dış kaynaktan
+// (tedarikçi/alt yüklenici) malzeme/hizmet alımı. PurchaseRequest'in 9 statülü
+// tam onay zincirinin (Birim→Satınalma→GM) KASITLI DIŞINDA — hafif, tek-adımlı
+// (yalnız birim yöneticisi onayı), saha müdahalesinin hızını korumak için.
+// Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md Kullanıcı Kararı 4.
+model WorkOrderMaterialRequest {
+  id                     String    @id @default(cuid())
+  tenantId               String
+  tenant                 Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrderId            String
+  workOrder              WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  description            String
+  vendorId               String?
+  vendor                 Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  vendorName             String?
+  estimatedCost          Float?
+  actualCost             Float?
+  currency               String    @default("TRY")
+  status                 String    @default("REQUESTED") // REQUESTED|APPROVED|ORDERED|RECEIVED|REJECTED
+  requestedById          String?
+  requestedByName        String?
+  approvedByUnitManagerId String?
+  rejectionNote          String?
+  notes                  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@index([tenantId, workOrderId])
+}
+
+// Profesyonel Hizmetler — haftalık teknisyen dağıtım planı (Faz 2, VisitPlan
+// paterni). WorkOrder'a bağlanması OPSİYONEL gruplamadır — acil işler plan
+// beklemeden de doğrudan bir teknisyene/tarihe sevk edilebilir (WorkOrder
+// /schedule ucu). Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+model ServiceWorkPlan {
+  id             String      @id @default(cuid())
+  tenantId       String
+  tenant         Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  weekOf         DateTime // haftanın Pazartesi'si
+  unitId         String?
+  unit           Unit?       @relation(fields: [unitId], references: [id], onDelete: SetNull)
+  preparedById   String
+  preparedByName String?
+  status         String      @default("DRAFT") // DRAFT | APPROVED | COMPLETED
+  notes          String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  workOrders     WorkOrder[]
+
+  @@index([tenantId, weekOf])
+}
+
+// Profesyonel Hizmetler teknisyen uzmanlık taksonomisi — tenant bazlı (Brand/
+// ProductCategory paterni). Tenant'lar arası PAYLAŞILAN/global bir katalog YOK.
+model WorkSpecialty {
+  id        String              @id @default(cuid())
+  tenantId  String
+  tenant    Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean             @default(true)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  workOrders WorkOrder[]
+  users     UserWorkSpecialty[]
+
+  @@unique([tenantId, name])
+}
+
+// Teknisyen ↔ uzmanlık (çoklu) — ProjectUnitParticipation paterninde kendi
+// tenantId'si yok, izolasyon userId/specialtyId üzerinden zaten tenant-scoped.
+model UserWorkSpecialty {
+  id          String        @id @default(cuid())
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  specialtyId String
+  specialty   WorkSpecialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+  createdAt   DateTime      @default(now())
+
+  @@unique([userId, specialtyId])
 }
 
 // Enflow SaaS'ı kullanan tenant'ların ürün geri bildirimi/hata/iyileştirme/mimari
@@ -958,6 +1100,7 @@ model Vendor {
   updatedAt   DateTime        @updatedAt
   quotes      PurchaseQuote[]
   brands      Brand[] // taşıdığı/yetkili satıcısı olduğu markalar (2026-08-08, Faz 2) — teklif ekranında marka-uyumlu tedarikçi vurgusu
+  workOrderMaterialRequests WorkOrderMaterialRequest[]
 }
 
 model PurchaseRequest {
