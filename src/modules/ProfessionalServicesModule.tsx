@@ -10,7 +10,7 @@ import { MaterialRequestsPanel } from './professional-services/MaterialRequestsP
 import {
   Project, WorkOrder, WorkOrderType, WorkOrderPriority, WorkOrderStatus,
   WORK_ORDER_TYPE_LABEL, WORK_ORDER_PRIORITY_LABEL, WORK_ORDER_STATUS_LABEL,
-  WorkSpecialty, User, WorkOrderSummary,
+  WorkSpecialty, WorkOrderSummary, WorkOrderTechnician,
 } from '../types';
 
 const STATUS_BADGE: Record<WorkOrderStatus, string> = {
@@ -45,7 +45,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
 
   const [orders, setOrders] = useState<WorkOrder[]>([]);
   const [summary, setSummary] = useState<WorkOrderSummary | null>(null);
-  const [technicians, setTechnicians] = useState<User[]>([]);
+  const [technicians, setTechnicians] = useState<WorkOrderTechnician[]>([]);
   const [view, setView] = useState<'list' | 'calendar'>('list'); // Faz 2 — haftalık takvim
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
@@ -60,7 +60,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
     type: 'INSTALLATION' as WorkOrderType, title: '', description: '', priority: 'NORMAL' as WorkOrderPriority,
     customerId: '', projectId: '', requiredSpecialtyId: '',
   });
-  const [scheduleForm, setScheduleForm] = useState({ assignedTechnicianId: '', scheduledDate: '' });
+  const [scheduleForm, setScheduleForm] = useState({ assignedTechnicianId: '', scheduledDate: '', slaHours: '', dueAt: '' });
   const [completeForm, setCompleteForm] = useState({ completionNotes: '', customerSignOffName: '', costAmount: '', costCurrency: 'TRY' });
 
   const resetForm = () => setForm({ type: 'INSTALLATION', title: '', description: '', priority: 'NORMAL', customerId: '', projectId: '', requiredSpecialtyId: '' });
@@ -85,12 +85,15 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
 
   useEffect(() => {
     if (!isManager) return;
-    apiService.getUsersByRole('PS_TECH').then((us) => setTechnicians(us as User[])).catch(() => setTechnicians([]));
+    apiService.getTechnicians().then((us) => setTechnicians(us as WorkOrderTechnician[])).catch(() => setTechnicians([]));
   }, [isManager]);
 
   const applyDetail = (o: WorkOrder) => {
     setDetailOrder(o);
-    setScheduleForm({ assignedTechnicianId: o.assignedTechnicianId || '', scheduledDate: o.scheduledDate ? o.scheduledDate.slice(0, 10) : '' });
+    setScheduleForm({
+      assignedTechnicianId: o.assignedTechnicianId || '', scheduledDate: o.scheduledDate ? o.scheduledDate.slice(0, 10) : '',
+      slaHours: o.slaHours ? String(o.slaHours) : '', dueAt: o.dueAt ? o.dueAt.slice(0, 10) : '',
+    });
     setCompleteForm({ completionNotes: o.completionNotes || '', customerSignOffName: o.customerSignOffName || '', costAmount: o.costAmount ? String(o.costAmount) : '', costCurrency: o.costCurrency || 'TRY' });
   };
 
@@ -131,7 +134,10 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
     if (!detailOrder || !scheduleForm.assignedTechnicianId || !scheduleForm.scheduledDate) return;
     setSaving(true);
     try {
-      const updated = await apiService.scheduleWorkOrder(detailOrder.id, scheduleForm.assignedTechnicianId, scheduleForm.scheduledDate) as WorkOrder;
+      const sla = scheduleForm.dueAt
+        ? { dueAt: new Date(scheduleForm.dueAt).toISOString() }
+        : scheduleForm.slaHours ? { slaHours: Number(scheduleForm.slaHours) } : undefined;
+      const updated = await apiService.scheduleWorkOrder(detailOrder.id, scheduleForm.assignedTechnicianId, scheduleForm.scheduledDate, sla) as WorkOrder;
       setDetailOrder(updated);
       load();
     } catch (err) {
@@ -361,8 +367,30 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${PRIORITY_BADGE[detailOrder.priority]}`}>{WORK_ORDER_PRIORITY_LABEL[detailOrder.priority]}</span>
                 <span className="text-[10px] font-black uppercase text-slate-400">{WORK_ORDER_TYPE_LABEL[detailOrder.type]}</span>
                 {detailOrder.requiredSpecialty && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">{detailOrder.requiredSpecialty.name}</span>}
+                {detailOrder.dueAt && !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(detailOrder.status) && (
+                  new Date(detailOrder.dueAt).getTime() < Date.now() ? (
+                    <span className="text-[10px] font-black uppercase text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">SLA Aşıldı — {new Date(detailOrder.dueAt).toLocaleDateString('tr-TR')}</span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-slate-500">SLA: {new Date(detailOrder.dueAt).toLocaleDateString('tr-TR')}</span>
+                  )
+                )}
               </div>
               {detailOrder.description && <p className="text-sm text-slate-600">{detailOrder.description}</p>}
+
+              {(detailOrder.estimatedLaborCost != null || detailOrder.estimatedMaterialCost != null) && (
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tahmini Maliyet (bilgi amaçlı — otomatik işlenmez)</p>
+                  <div className="text-xs text-slate-600 space-y-0.5">
+                    {detailOrder.estimatedLaborCost != null && (
+                      <p>İşçilik: {detailOrder.estimatedLaborCost.toLocaleString('tr-TR')} {detailOrder.costCurrency || 'TRY'}
+                        {detailOrder.technicianCostRate != null && ` (${detailOrder.technicianCostRate}${detailOrder.costCurrency || ''}/${detailOrder.technicianCostRateUnit === 'DAILY' ? 'gün' : 'saat'})`}
+                      </p>
+                    )}
+                    {detailOrder.estimatedMaterialCost != null && <p>Malzeme: {detailOrder.estimatedMaterialCost.toLocaleString('tr-TR')} {detailOrder.costCurrency || 'TRY'}</p>}
+                    {detailOrder.estimatedTotalCost != null && <p className="font-bold text-slate-800">Toplam: {detailOrder.estimatedTotalCost.toLocaleString('tr-TR')} {detailOrder.costCurrency || 'TRY'}</p>}
+                  </div>
+                </div>
+              )}
 
               {detailOrder.project && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl flex items-center justify-between gap-3">
@@ -394,9 +422,34 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                   <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><CalendarClock size={12} /> Sevkiyat</p>
                   <select value={scheduleForm.assignedTechnicianId} onChange={e => setScheduleForm(f => ({ ...f, assignedTechnicianId: e.target.value }))} className="input-glass w-full text-sm">
                     <option value="">Teknisyen seçin</option>
-                    {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    {technicians.map(t => {
+                      const specNames = t.specialties.map(s => s.name).join(', ');
+                      const costLabel = t.costRate != null ? ` — ${t.costRate}${t.costCurrency || ''}/${t.costRateUnit === 'DAILY' ? 'gün' : 'saat'}` : '';
+                      return <option key={t.id} value={t.id}>{t.name}{specNames ? ` — ${specNames}` : ''}{costLabel}</option>;
+                    })}
                   </select>
                   <input type="date" value={scheduleForm.scheduledDate} onChange={e => setScheduleForm(f => ({ ...f, scheduledDate: e.target.value }))} className="input-glass w-full text-sm" />
+
+                  <div className="pt-1 border-t border-slate-200/60 space-y-1.5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SLA — Tamamlanma Hedefi</p>
+                    <div className="flex gap-2">
+                      <input type="number" min="1" placeholder="Süre (saat)" value={scheduleForm.slaHours}
+                        onChange={e => setScheduleForm(f => ({ ...f, slaHours: e.target.value, dueAt: e.target.value ? '' : f.dueAt }))}
+                        className="input-glass flex-1 text-sm" />
+                      <input type="date" value={scheduleForm.dueAt}
+                        onChange={e => setScheduleForm(f => ({ ...f, dueAt: e.target.value, slaHours: e.target.value ? '' : f.slaHours }))}
+                        className="input-glass flex-1 text-sm" title="Özel/sözleşmeden kopyalanan hedef tarih" />
+                    </div>
+                    {detailOrder.contractDeliverySla?.dueAt && (
+                      <button type="button"
+                        onClick={() => setScheduleForm(f => ({ ...f, dueAt: detailOrder.contractDeliverySla!.dueAt!.slice(0, 10), slaHours: '' }))}
+                        className="text-[10px] font-bold text-indigo-600 hover:text-indigo-700">
+                        Sözleşmeden Kopyala — {new Date(detailOrder.contractDeliverySla.dueAt).toLocaleDateString('tr-TR')}
+                        {detailOrder.contractDeliverySla.penaltyDailyRatePct != null && ` (günlük %${detailOrder.contractDeliverySla.penaltyDailyRatePct} ceza riski)`}
+                      </button>
+                    )}
+                  </div>
+
                   <button onClick={handleSchedule} disabled={saving || !scheduleForm.assignedTechnicianId || !scheduleForm.scheduledDate} className="btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                     {saving ? <Loader2 size={14} className="animate-spin" /> : null} Sevk Et
                   </button>

@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Plus, Loader2, X, Save } from 'lucide-react'
 import { apiService } from '../../services/apiService';
 import {
   WorkOrder, WorkOrderStatus, WORK_ORDER_TYPE_LABEL, WORK_ORDER_STATUS_LABEL,
-  ServiceWorkPlan, ServiceWorkPlanStatus, SERVICE_WORK_PLAN_STATUS_LABEL, User,
+  ServiceWorkPlan, ServiceWorkPlanStatus, SERVICE_WORK_PLAN_STATUS_LABEL, WorkOrderTechnician,
 } from '../../types';
 
 // O haftanın Pazartesi tarihini ISO (YYYY-MM-DD) olarak döner — VisitPlanModule.tsx
@@ -19,7 +19,7 @@ function mondayOf(date: Date): string {
 const OPEN_STATUSES: WorkOrderStatus[] = ['DRAFT', 'PENDING_SCHEDULE', 'SCHEDULED', 'WAITING_PART'];
 
 interface Props {
-  technicians: User[];
+  technicians: WorkOrderTechnician[];
   preparedByName?: string;
 }
 
@@ -30,7 +30,7 @@ export function WeeklyPlanView({ technicians, preparedByName }: Props) {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addingId, setAddingId] = useState('');
-  const [rowForm, setRowForm] = useState<Record<string, { assignedTechnicianId: string; scheduledDate: string }>>({});
+  const [rowForm, setRowForm] = useState<Record<string, { assignedTechnicianId: string; scheduledDate: string; slaHours: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -46,11 +46,12 @@ export function WeeklyPlanView({ technicians, preparedByName }: Props) {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
-    const next: Record<string, { assignedTechnicianId: string; scheduledDate: string }> = {};
+    const next: Record<string, { assignedTechnicianId: string; scheduledDate: string; slaHours: string }> = {};
     for (const wo of plan?.workOrders || []) {
       next[wo.id] = {
         assignedTechnicianId: wo.assignedTechnician?.id || '',
         scheduledDate: wo.scheduledDate ? wo.scheduledDate.slice(0, 10) : selectedWeek,
+        slaHours: '',
       };
     }
     setRowForm(next);
@@ -99,7 +100,7 @@ export function WeeklyPlanView({ technicians, preparedByName }: Props) {
     if (!f?.assignedTechnicianId || !f?.scheduledDate) return;
     setSaving(true);
     try {
-      await apiService.scheduleWorkOrder(workOrderId, f.assignedTechnicianId, f.scheduledDate);
+      await apiService.scheduleWorkOrder(workOrderId, f.assignedTechnicianId, f.scheduledDate, f.slaHours ? { slaHours: Number(f.slaHours) } : undefined);
       await load();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Sevkiyat başarısız.');
@@ -165,9 +166,10 @@ export function WeeklyPlanView({ technicians, preparedByName }: Props) {
                 </div>
                 <select value={rowForm[wo.id]?.assignedTechnicianId || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], assignedTechnicianId: e.target.value } }))} className="input-glass text-xs w-40">
                   <option value="">Teknisyen</option>
-                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}{t.costRate != null ? ` — ${t.costRate}${t.costCurrency || ''}/${t.costRateUnit === 'DAILY' ? 'gün' : 'saat'}` : ''}</option>)}
                 </select>
                 <input type="date" value={rowForm[wo.id]?.scheduledDate || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], scheduledDate: e.target.value } }))} className="input-glass text-xs w-36" />
+                <input type="number" min="1" placeholder="SLA (saat)" value={rowForm[wo.id]?.slaHours || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], slaHours: e.target.value } }))} className="input-glass text-xs w-24" />
                 <button onClick={() => handleRowSchedule(wo.id)} disabled={saving} className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg disabled:opacity-50" title="Sevk Et">
                   <Save size={14} />
                 </button>

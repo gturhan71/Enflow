@@ -121,7 +121,7 @@ router.put('/me/dashboard-layout', tenantMiddleware, asyncHandler(async (req: Re
 }));
 
 router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: Response) => {
-  const { name, email, role, unitId, permissions, status, password, delegateToUserId, delegateUntil } = req.body;
+  const { name, email, role, unitId, permissions, status, password, delegateToUserId, delegateUntil, costRate, costRateUnit, costCurrency } = req.body;
   const tenantId = req.tenantId;
   const id = req.params.id as string;
 
@@ -134,6 +134,11 @@ router.put('/:id', tenantMiddleware, GM, asyncHandler(async (req: Request, res: 
   const data: Record<string, unknown> = { name, email, role, unitId, status };
   if (delegateToUserId !== undefined) data.delegateToUserId = delegateToUserId || null;
   if (delegateUntil !== undefined) data.delegateUntil = delegateUntil ? new Date(delegateUntil) : null;
+  // Teknisyen maliyeti — yalnız GM yazabilir (bu route zaten GM-only); görünürlük
+  // GET tarafında GM+OPERATIONS_MGR ile sınırlanır (bkz. routes/workOrders.ts /technicians).
+  if (costRate !== undefined) data.costRate = costRate != null ? Number(costRate) : null;
+  if (costRateUnit !== undefined) data.costRateUnit = costRateUnit || null;
+  if (costCurrency !== undefined) data.costCurrency = costCurrency || null;
   if (permissions) {
     data.permissions = typeof permissions === 'string' ? permissions : JSON.stringify(permissions);
   }

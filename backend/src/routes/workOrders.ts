@@ -40,6 +40,58 @@ async function openPurchaseRequestCount(tenantId: string, projectId: string | nu
   return prisma.purchaseRequest.count({ where: { tenantId, projectId, status: { notIn: ['CLOSED', 'REJECTED'] } } });
 }
 
+// Teknisyen maliyeti (saat/günlük ücret) yalnız GM + Profesyonel Hizmetler
+// Müdürü'ne görünür — kullanıcının kendisi "işe göre personel atama" kararı
+// verirken görür, PROJECT_MGR/PS_TECH görmez. Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+const COST_VISIBLE_ROLES = new Set(['GENERAL_MANAGER', 'OPERATIONS_MGR']);
+const canSeeCost = (req: Request) => COST_VISIBLE_ROLES.has(req.userRole || '');
+
+// Proje bağlı bir iş emrinde, sözleşmenin teslim tarihi/ceza oranı salt-okunur
+// öneri olarak sunulur (Faz 4 — "proje geneli SLA sözleşmede bellidir"). Yeni
+// bir alan değil — WorkOrder.dueAt'e UI'dan kopyalanabilir, tek kaynak sözleşme kalır.
+async function contractDeliverySla(tenantId: string, projectId: string | null): Promise<{ dueAt: string | null; penaltyDailyRatePct: number | null } | null> {
+  if (!projectId) return null;
+  const wf = await prisma.contractWorkflow.findFirst({
+    where: { tenantId, projectId },
+    select: { deliveryDueDate: true, penaltyDailyRatePct: true },
+  });
+  if (!wf || !wf.deliveryDueDate) return null;
+  return { dueAt: wf.deliveryDueDate.toISOString(), penaltyDailyRatePct: wf.penaltyDailyRatePct };
+}
+
+// Bilgi amaçlı maliyet tahmini (işçilik + malzeme) — WorkOrder.costAmount'a
+// OTOMATİK YAZILMAZ (kullanıcı kararı: yalnız bilgi amaçlı gösterilsin). İşçilik
+// = (actualEndAt-actualStartAt) × teknisyenin ücreti; ikisi de yoksa null.
+async function estimatedCosts(tenantId: string, order: { id: string; assignedTechnicianId: string | null; actualStartAt: Date | null; actualEndAt: Date | null }): Promise<{ estimatedLaborCost: number | null; estimatedMaterialCost: number | null; estimatedTotalCost: number | null; technicianCostRate: number | null; technicianCostRateUnit: string | null }> {
+  let estimatedLaborCost: number | null = null;
+  let technicianCostRate: number | null = null;
+  let technicianCostRateUnit: string | null = null;
+  if (order.assignedTechnicianId) {
+    const tech = await prisma.user.findFirst({
+      where: { id: order.assignedTechnicianId, tenantId },
+      select: { costRate: true, costRateUnit: true },
+    });
+    technicianCostRate = tech?.costRate ?? null;
+    technicianCostRateUnit = tech?.costRateUnit ?? null;
+    if (tech?.costRate != null && order.actualStartAt && order.actualEndAt) {
+      const hours = Math.max(0, (order.actualEndAt.getTime() - order.actualStartAt.getTime()) / 3_600_000);
+      estimatedLaborCost = tech.costRateUnit === 'DAILY' ? Math.ceil(hours / 24 || 1) * tech.costRate : hours * tech.costRate;
+      estimatedLaborCost = Math.round(estimatedLaborCost * 100) / 100;
+    }
+  }
+  const materials = await prisma.workOrderMaterialRequest.aggregate({
+    where: { tenantId, workOrderId: order.id, status: { not: 'REJECTED' } },
+    _sum: { actualCost: true, estimatedCost: true },
+  }).catch(() => null);
+  const estimatedMaterialCost = materials
+    ? (materials._sum.actualCost ?? materials._sum.estimatedCost ?? null)
+    : null;
+  const estimatedTotalCost = estimatedLaborCost != null || estimatedMaterialCost != null
+    ? Math.round(((estimatedLaborCost || 0) + (estimatedMaterialCost || 0)) * 100) / 100
+    : null;
+  return { estimatedLaborCost, estimatedMaterialCost, estimatedTotalCost, technicianCostRate, technicianCostRateUnit };
+}
+
 // Profesyonel Hizmetler Müdürü'ne (OPERATIONS_MGR) aktif bildirim — önceden
 // (ServiceTicket'ta da) bu yoktu, birim yöneticisi modülü kendi kontrol etmek
 // zorundaydı. Role-wide (deliveryDeadlineReminders.ts paterni), oluşturan kişi
@@ -122,6 +174,31 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
   res.json(orders);
 }));
 
+// Sevkiyat için teknisyen listesi — "işe göre personel atama" (uzmanlık +
+// maliyet görerek karar) ihtiyacını karşılar. /users/lookup (herkese açık,
+// yalnız id/name) KASITLI olarak kullanılmadı — maliyet burada yalnız
+// GM/OPERATIONS_MGR'a döner, /users/lookup'a eklense tüm roller görürdü.
+router.get('/technicians', asyncHandler(async (req: Request, res: Response) => {
+  if (!isManager(req)) return res.status(403).json({ error: 'Teknisyen listesini görme yetkiniz yok.' });
+  const technicians = await prisma.user.findMany({
+    where: { tenantId: req.tenantId, role: 'PS_TECH', status: 'ACTIVE' },
+    select: {
+      id: true, name: true, unitId: true,
+      costRate: true, costRateUnit: true, costCurrency: true,
+      workSpecialties: { select: { specialty: { select: { id: true, name: true } } } },
+    },
+    orderBy: { name: 'asc' },
+  });
+  const showCost = canSeeCost(req);
+  res.json(technicians.map((t) => ({
+    id: t.id,
+    name: t.name,
+    unitId: t.unitId,
+    specialties: t.workSpecialties.map((s) => s.specialty),
+    ...(showCost ? { costRate: t.costRate, costRateUnit: t.costRateUnit, costCurrency: t.costCurrency } : {}),
+  })));
+}));
+
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const order = await prisma.workOrder.findFirst({ where: { id: String(req.params.id), tenantId: req.tenantId }, include: INCLUDE });
   if (!order) return res.status(404).json({ error: 'İş emri bulunamadı.' });
@@ -132,7 +209,19 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
     include: { vendor: { select: { id: true, name: true } } },
     orderBy: { createdAt: 'desc' },
   });
-  res.json({ ...order, openPurchaseRequestCount: openPrCount, materialRequests });
+  const contractSla = await contractDeliverySla(req.tenantId, order.projectId);
+  // Maliyet tahmini yalnız yönetici rollerine hesaplanır — ham teknisyen ücreti
+  // (technicianCostRate) yalnız GM/OPERATIONS_MGR'a döner, PROJECT_MGR yalnız toplamı görür.
+  const costs = isManager(req) ? await estimatedCosts(req.tenantId, order) : null;
+  const { technicianCostRate, technicianCostRateUnit, ...publicCosts } = costs || {};
+  res.json({
+    ...order,
+    openPurchaseRequestCount: openPrCount,
+    materialRequests,
+    contractDeliverySla: contractSla,
+    ...(costs ? publicCosts : {}),
+    ...(costs && canSeeCost(req) ? { technicianCostRate, technicianCostRateUnit } : {}),
+  });
 }));
 
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
@@ -230,7 +319,8 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 router.post('/:id/schedule', asyncHandler(async (req: Request, res: Response) => {
   if (!isManager(req)) return res.status(403).json({ error: 'Sevkiyat yetkiniz yok.' });
   const id = String(req.params.id);
-  const { assignedTechnicianId, scheduledDate } = req.body as { assignedTechnicianId?: string; scheduledDate?: string };
+  const { assignedTechnicianId, scheduledDate, slaHours, dueAt } = req.body as
+    { assignedTechnicianId?: string; scheduledDate?: string; slaHours?: number; dueAt?: string };
   if (!assignedTechnicianId || !scheduledDate) return res.status(400).json({ error: 'Teknisyen ve tarih zorunludur.' });
 
   const record = await prisma.workOrder.findFirst({ where: { id, tenantId: req.tenantId } });
@@ -242,12 +332,28 @@ router.post('/:id/schedule', asyncHandler(async (req: Request, res: Response) =>
   const technician = await prisma.user.findFirst({ where: { id: assignedTechnicianId, tenantId: req.tenantId }, select: { id: true } });
   if (!technician) return res.status(404).json({ error: 'Teknisyen bulunamadı.' });
 
+  // SLA — sevk edilirken girilir (münferit: slaHours girilip şimdiden hesaplanır;
+  // proje bağlı: UI sözleşmeden kopyaladığı tarihi doğrudan dueAt olarak gönderir).
+  // dueAt açıkça verilmişse o esas alınır, yoksa slaHours'tan hesaplanır.
+  let resolvedDueAt: Date | null = record.dueAt;
+  let resolvedSlaHours: number | null = record.slaHours;
+  if (dueAt !== undefined) {
+    resolvedDueAt = dueAt ? new Date(dueAt) : null;
+    resolvedSlaHours = dueAt ? resolvedSlaHours : null;
+  } else if (slaHours !== undefined) {
+    resolvedSlaHours = slaHours != null ? Number(slaHours) : null;
+    resolvedDueAt = resolvedSlaHours != null ? new Date(Date.now() + resolvedSlaHours * 3_600_000) : null;
+  }
+
   const order = await prisma.workOrder.update({
     where: { id },
-    data: { assignedTechnicianId, scheduledDate: new Date(scheduledDate), status: 'SCHEDULED' },
+    data: {
+      assignedTechnicianId, scheduledDate: new Date(scheduledDate), status: 'SCHEDULED',
+      dueAt: resolvedDueAt, slaHours: resolvedSlaHours,
+    },
     include: INCLUDE,
   });
-  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SCHEDULE', entityType: 'WORK_ORDER', entityId: id, details: { assignedTechnicianId, scheduledDate } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SCHEDULE', entityType: 'WORK_ORDER', entityId: id, details: { assignedTechnicianId, scheduledDate, dueAt: resolvedDueAt } });
   res.json(order);
 }));
 

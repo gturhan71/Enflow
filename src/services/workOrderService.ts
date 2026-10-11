@@ -1,5 +1,5 @@
 import { apiClient, authFetch } from './apiClient';
-import { WorkOrder } from '../types';
+import { WorkOrder, WorkOrderTechnician } from '../types';
 
 export const workOrderService = {
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) {
@@ -15,6 +15,10 @@ export const workOrderService = {
     return apiClient.fetchWithAuth('/work-orders/summary/all');
   },
 
+  async getTechnicians(): Promise<WorkOrderTechnician[]> {
+    return apiClient.fetchWithAuth('/work-orders/technicians');
+  },
+
   async getWorkOrder(id: string) {
     return apiClient.fetchWithAuth(`/work-orders/${id}`);
   },
@@ -27,8 +31,8 @@ export const workOrderService = {
     return apiClient.fetchWithAuth(`/work-orders/${id}`, { method: 'PUT', body: JSON.stringify(data) });
   },
 
-  async scheduleWorkOrder(id: string, assignedTechnicianId: string, scheduledDate: string) {
-    return apiClient.fetchWithAuth(`/work-orders/${id}/schedule`, { method: 'POST', body: JSON.stringify({ assignedTechnicianId, scheduledDate }) });
+  async scheduleWorkOrder(id: string, assignedTechnicianId: string, scheduledDate: string, sla?: { slaHours?: number | null; dueAt?: string | null }) {
+    return apiClient.fetchWithAuth(`/work-orders/${id}/schedule`, { method: 'POST', body: JSON.stringify({ assignedTechnicianId, scheduledDate, ...sla }) });
   },
 
   async startWorkOrder(id: string) {

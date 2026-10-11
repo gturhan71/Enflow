@@ -283,10 +283,11 @@ class ApiService {
   // --- PROFESYONEL HİZMETLER: İş Emri (WorkOrder) ---
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) { return workOrderService.getWorkOrders(filters); }
   async getWorkOrderSummary() { return workOrderService.getWorkOrderSummary(); }
+  async getTechnicians() { return workOrderService.getTechnicians(); }
   async getWorkOrder(id: string) { return workOrderService.getWorkOrder(id); }
   async createWorkOrder(data: Partial<import('../types').WorkOrder>) { return workOrderService.createWorkOrder(data); }
   async updateWorkOrder(id: string, data: Partial<import('../types').WorkOrder>) { return workOrderService.updateWorkOrder(id, data); }
-  async scheduleWorkOrder(id: string, assignedTechnicianId: string, scheduledDate: string) { return workOrderService.scheduleWorkOrder(id, assignedTechnicianId, scheduledDate); }
+  async scheduleWorkOrder(id: string, assignedTechnicianId: string, scheduledDate: string, sla?: { slaHours?: number | null; dueAt?: string | null }) { return workOrderService.scheduleWorkOrder(id, assignedTechnicianId, scheduledDate, sla); }
   async startWorkOrder(id: string) { return workOrderService.startWorkOrder(id); }
   async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) { return workOrderService.completeWorkOrder(id, data); }
   async uploadWorkOrderSignOff(id: string, file: File) { return workOrderService.uploadSignOff(id, file); }

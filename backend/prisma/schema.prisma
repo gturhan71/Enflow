@@ -144,6 +144,12 @@ model User {
   delegateToUserId String? // onay vekaleti — bu kullanıcı izinliyken yerine onay verebilecek kişi
   delegateUntil    DateTime? // null = süresiz vekalet
   dashboardLayout  String? // JSON: kişiselleştirilmiş Dashboard widget seçimi/sıralaması — null ise rol varsayılanı kullanılır
+  // Profesyonel Hizmetler — teknisyen maliyeti (expert/junior farkı projeye yansısın
+  // diye, bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md). Yalnız PUT /:id (GM-only) ile
+  // yazılır; görünürlük GM + OPERATIONS_MGR ile sınırlı (routes/workOrders.ts /technicians).
+  costRate         Float? // saatlik ya da günlük ücret — costRateUnit'e göre yorumlanır
+  costRateUnit     String? // HOURLY | DAILY
+  costCurrency     String? // costRate girildiyse zorunlu anlamda kullanılır
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
   createdOpps      Opportunity[] @relation("CreatedBy")
@@ -593,6 +599,12 @@ model WorkOrder {
   assignedTechnicianId   String? // User.id — planlanana kadar null
   assignedTechnician     User?           @relation("WorkOrderTechnician", fields: [assignedTechnicianId], references: [id], onDelete: SetNull)
   scheduledDate          DateTime?
+  // SLA — sevk edilirken girilir. Proje bağlı bir işte sözleşmenin teslim tarihi
+  // (ContractWorkflow.deliveryDueDate) salt-okunur öneri olarak UI'da sunulur ve
+  // kopyalanabilir, ama birim yöneticisi münferit/özel bir tarih de girebilir —
+  // tek kaynak her zaman bu alan (dueAt). Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+  slaHours               Int? // süre-bazlı giriş yapıldıysa (saat) — dueAt'ten otomatik hesaplanır
+  dueAt                  DateTime?
   actualStartAt          DateTime?
   actualEndAt            DateTime?
   servicePlanId          String? // opsiyonel — ServiceWorkPlan'a bağlıysa (Faz 2, haftalık dağıtım)

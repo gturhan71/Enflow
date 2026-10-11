@@ -171,8 +171,20 @@ export interface WorkOrder {
   assignedTechnicianId?: string | null;
   assignedTechnician?: { id: string; name: string } | null;
   scheduledDate?: string | null;
+  // SLA (Faz 4) — sevk edilirken girilir; proje bağlı işte sözleşmeden kopyalanabilir
+  // ya da münferit girilebilir, tek kaynak her zaman dueAt. Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
+  slaHours?: number | null;
+  dueAt?: string | null;
+  contractDeliverySla?: { dueAt: string | null; penaltyDailyRatePct: number | null } | null; // yalnız GET /:id — salt-okunur öneri
   actualStartAt?: string | null;
   actualEndAt?: string | null;
+  // Bilgi amaçlı maliyet tahmini (işçilik+malzeme) — costAmount'a otomatik yazılmaz,
+  // yalnız GET /:id'de ve yöneticiye döner. technicianCostRate yalnız GM/OPERATIONS_MGR'a.
+  estimatedLaborCost?: number | null;
+  estimatedMaterialCost?: number | null;
+  estimatedTotalCost?: number | null;
+  technicianCostRate?: number | null;
+  technicianCostRateUnit?: string | null;
   completionNotes?: string | null;
   customerSignOffAt?: string | null;
   customerSignOffName?: string | null;
@@ -217,6 +229,16 @@ export interface WorkOrderSummary {
   completed: number;
   avgResolutionDays: number | null;
   byTechnician: { userId: string; name: string; open: number; completed: number }[];
+}
+// Sevkiyat için teknisyen listesi — uzmanlık + (yalnız GM/OPERATIONS_MGR'a) maliyet.
+export interface WorkOrderTechnician {
+  id: string;
+  name: string;
+  unitId?: string | null;
+  specialties: { id: string; name: string }[];
+  costRate?: number | null;
+  costRateUnit?: string | null;
+  costCurrency?: string | null;
 }
 // Profesyonel Hizmetler — haftalık teknisyen dağıtım planı (Faz 2). WorkOrder'a
 // bağlanması opsiyonel gruplamadır — bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.

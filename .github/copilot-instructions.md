@@ -28,12 +28,21 @@ reading the same files costs thousands. `:425-425` means line 425: read that ran
 ## deps
 ```
 src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
-src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../lib/utils, ../types
-src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
 src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../types, ../services/apiService
-src/hooks/useBoM.ts ← react, services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← @tanstack/react-query, services/apiService
+src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
+src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
+src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
+src/modules/project-mgmt/ProjectDetail.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
+src/modules/ProjectManagementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
+src/modules/SettingsModule.tsx ← react, @tanstack/react-query, lucide-react, types, IntegrationWizard
+src/modules/todo/helpers.ts ← ../types
+src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
+src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../lib/utils, ../types
+src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
+src/hooks/useBoM.ts ← react, services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← react, lucide-react, motion, lib/utils, contexts/AuthContext
 src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/lib/guaranteeText.ts ← services/apiClient
@@ -76,26 +85,19 @@ src/modules/NegotiationModule.tsx ← react, lucide-react, types, contexts/AuthC
 src/modules/PresalesModule.tsx ← react, @tanstack/react-query, lucide-react, motion, @/src
 src/modules/procurement/PRDetailDrawer.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
 src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
-src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
-src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
-src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
 src/modules/project-mgmt/CostForm.tsx ← react, lucide-react, motion, ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants, ../lib/html
 src/modules/project-mgmt/KanbanView.tsx ← lucide-react, ../types, constants, helpers, MarginBadge
-src/modules/project-mgmt/ProjectDetail.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
-src/modules/ProjectManagementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
 src/modules/reporting/BottleneckPanel.tsx ← lucide-react, ../types, ../constants, ../components/InfoTooltip
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
 src/modules/SalesSupport.tsx ← react, lucide-react, motion, services/apiService, contexts/AuthContext
 src/modules/ServiceTicketsModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
-src/modules/SettingsModule.tsx ← react, @tanstack/react-query, lucide-react, types, IntegrationWizard
 src/modules/SetupWizard.tsx ← react, lucide-react, services/apiService, types
 src/modules/SpecAnalysis.tsx ← react, lucide-react, motion, jspdf, jspdf-autotable
 src/modules/SpecComplianceMatrix.tsx ← react, lucide-react, motion, xlsx, lib/utils
-src/modules/todo/helpers.ts ← ../types
 src/modules/todo/PendingChainApprovals.tsx ← react, lucide-react, motion, ../types, ../components/AgentTag
 src/modules/todo/PendingProposalApprovals.tsx ← lucide-react, motion, @/src, ../types, helpers
 src/modules/todo/ResolvedApprovals.tsx ← react, lucide-react, motion, @/src, ../types
@@ -104,7 +106,6 @@ src/modules/todo/UnifiedWorkQueue.tsx ← react, lucide-react, @/src, ../types, 
 src/modules/TodoModule.tsx ← react, @tanstack/react-query, lucide-react, types, services/apiService
 src/modules/VisitPlanModule.tsx ← react, @tanstack/react-query, lucide-react, xlsx, motion
 src/modules/WorkflowBuilder.tsx ← react, motion, lucide-react, utils/logger, lib/utils
-src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 src/types/crm.ts ← auth, presales
 backend/src/lifecycle.ts ← http, services/periodic
 backend/src/middleware.ts ← express, crypto, prismaClient, services/auth, services/session
@@ -116,7 +117,6 @@ backend/src/services/backupScheduler.ts ← prismaClient, backupService, backupV
 backend/src/services/backupService.ts ← fs, os, path, crypto, @prisma/client
 backend/src/services/backupTargets.ts ← fs, path, @aws-sdk/client-s3, utils/fileUpload
 backend/src/services/backupVerifyService.ts ← fs, os, path, crypto, @libsql/client
-backend/src/services/bootstrapTenant.ts ← prismaClient, licenseVerify, auth, planCatalog, tenantContext
 backend/src/services/corporateDocumentReminders.ts ← prismaClient, dashboardStream
 backend/src/services/dashboardService.ts ← prismaClient, unitReportingService
 backend/src/services/deliveryDeadlineReminders.ts ← prismaClient, dashboardStream, utils/entityTypeTab
@@ -125,7 +125,6 @@ backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/periodic.ts ← utils/logger, metrics
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← @prisma/client, prismaClient, activityLog, approvalSlaEscalation, utils/businessDays
-backend/src/services/profitabilityDmo.ts ← prismaClient, profitabilityRollup
 backend/src/services/profitabilityInstruments.ts ← profitabilityLedger, profitabilityCashflow
 backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
@@ -133,6 +132,7 @@ backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilitySer
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← fs, os, path, crypto, @prisma/client
 backend/src/services/session.ts ← express, jsonwebtoken
+backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← fs, path, prismaClient, schedulerLock, tenantContext
@@ -193,23 +193,6 @@ pg@^8.22.0
 
 ## backend
 
-### backend/prisma/migrations/20260913092634_add_delivery_deadline_tracking/migration.sql
-```
-TABLE DeliveryTimelineStep
-TABLE new_Customer
-TABLE new_Opportunity
-TABLE new_Tender
-TABLE new_WorkflowStep
-INDEX Customer_tenantId_parentId_idx ON Customer
-INDEX Opportunity_tenantId_status_idx ON Opportunity
-INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
-INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
-INDEX Tender_tenantId_status_idx ON Tender
-INDEX DeliveryTimelineStep_tenantId_tenderId_idx ON DeliveryTimelineStep
-INDEX DeliveryTimelineStep_tenantId_contractWorkflowId_idx ON DeliveryTimelineStep
-INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
-```
-
 ### backend/prisma/migrations/20261011125636_add_professional_services/migration.sql
 ```
 TABLE WorkOrder
@@ -236,6 +219,67 @@ INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
 ```
 TABLE WorkOrderMaterialRequest
 INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
+```
+
+### backend/prisma/migrations-postgres/20261011125636_add_professional_services/migration.sql
+```
+TABLE WorkOrder
+TABLE WorkSpecialty
+TABLE UserWorkSpecialty
+INDEX WorkOrder_tenantId_status_idx ON WorkOrder
+INDEX WorkOrder_tenantId_assignedTechnicianId_idx ON WorkOrder
+INDEX WorkOrder_tenantId_projectId_idx ON WorkOrder
+INDEX WorkSpecialty_tenantId_name_key ON WorkSpecialty
+INDEX UserWorkSpecialty_userId_specialtyId_key ON UserWorkSpecialty
+```
+
+### backend/prisma/migrations-postgres/20261011132923_add_service_work_plan/migration.sql
+```
+TABLE ServiceWorkPlan
+INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
+```
+
+### backend/prisma/migrations-postgres/20261011133852_add_work_order_material_request/migration.sql
+```
+TABLE WorkOrderMaterialRequest
+INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
+```
+
+### backend/src/services/bootstrapTenant.ts
+```
+export interface BootstrapInput  :44-51
+  companyName: string  :45-45
+  admin: { name: string  :46-46
+  license?: string  :48-48
+  tenantId?: string  :50-50
+export interface BootstrapResult  :52-57
+  tenantId: string  :53-53
+  token: string  :54-54
+  user: { id: string  :55-55
+  subscription: { plan: string  :56-56
+export async function bootstrapTenant(input) → Promise<BootstrapResult>  :59-139
+```
+
+### backend/src/services/roleDefaultPermissions.ts
+```
+export function defaultPermissionsForRole(role) → string[]  :69-71
+```
+
+### backend/prisma/migrations/20260913092634_add_delivery_deadline_tracking/migration.sql
+```
+TABLE DeliveryTimelineStep
+TABLE new_Customer
+TABLE new_Opportunity
+TABLE new_Tender
+TABLE new_WorkflowStep
+INDEX Customer_tenantId_parentId_idx ON Customer
+INDEX Opportunity_tenantId_status_idx ON Opportunity
+INDEX Opportunity_tenantId_assignedToId_idx ON Opportunity
+INDEX Opportunity_tenantId_trackingCode_key ON Opportunity
+INDEX Tender_tenantId_status_idx ON Tender
+INDEX DeliveryTimelineStep_tenantId_tenderId_idx ON DeliveryTimelineStep
+INDEX DeliveryTimelineStep_tenantId_contractWorkflowId_idx ON DeliveryTimelineStep
+INDEX ContractWorkflow_tenantId_projectId_idx ON ContractWorkflow
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -270,30 +314,6 @@ TABLE PlatformTicket
 TABLE ProfitabilitySnapshot
 TABLE ProjectMilestone
 TABLE ProjectCostItem
-```
-
-### backend/prisma/migrations-postgres/20261011125636_add_professional_services/migration.sql
-```
-TABLE WorkOrder
-TABLE WorkSpecialty
-TABLE UserWorkSpecialty
-INDEX WorkOrder_tenantId_status_idx ON WorkOrder
-INDEX WorkOrder_tenantId_assignedTechnicianId_idx ON WorkOrder
-INDEX WorkOrder_tenantId_projectId_idx ON WorkOrder
-INDEX WorkSpecialty_tenantId_name_key ON WorkSpecialty
-INDEX UserWorkSpecialty_userId_specialtyId_key ON UserWorkSpecialty
-```
-
-### backend/prisma/migrations-postgres/20261011132923_add_service_work_plan/migration.sql
-```
-TABLE ServiceWorkPlan
-INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
-```
-
-### backend/prisma/migrations-postgres/20261011133852_add_work_order_material_request/migration.sql
-```
-TABLE WorkOrderMaterialRequest
-INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
 ```
 
 ### backend/prisma/migrations-postgres/migration_lock.toml
@@ -451,21 +471,6 @@ export async function verifyBackup(jobId) → Promise<  :47-47
 export async function drainVerifyQueue(limit = 5) → Promise<number>  :126-140  # verifyStatus=PENDING + COMPLETED yedekleri sırayla doğrular 
 ```
 
-### backend/src/services/bootstrapTenant.ts
-```
-export interface BootstrapInput  :44-51
-  companyName: string  :45-45
-  admin: { name: string  :46-46
-  license?: string  :48-48
-  tenantId?: string  :50-50
-export interface BootstrapResult  :52-57
-  tenantId: string  :53-53
-  token: string  :54-54
-  user: { id: string  :55-55
-  subscription: { plan: string  :56-56
-export async function bootstrapTenant(input) → Promise<BootstrapResult>  :59-139
-```
-
 ### backend/src/services/corporateDocumentReminders.ts
 ```
 export async function sweepCorporateDocumentReminders(tenantId) → Promise<void>  :26-74
@@ -595,32 +600,6 @@ export interface AdvanceProcessResult  :740-744
   advancedToOrder: number | null  :742-742
   actionsInvoked: string[]  :743-743
 export class ProcessNotConfiguredError  :28-33
-```
-
-### backend/src/services/profitabilityDmo.ts
-```
-export interface DmoPeriodRow  :24-36
-  periodKey: string  :25-25
-  label: string  :26-26
-  orderCount: number  :27-27
-  revenue: number  :28-28
-  cost: number  :29-29
-  grossProfit: number  :30-30
-  risturn: number  :31-31
-  commission: number  :32-32
-  netProfit: number  :33-33
-  netMarginPct: number  :34-34
-  unprofitableCount: number  :35-35
-export interface DmoProfitResult  :38-46
-  grain: DmoGrain  :39-39
-  year: number | null  :40-40
-  asOf: string  :41-41
-  rows: DmoPeriodRow[]  :42-42
-  totals: Omit<DmoPeriodRow, 'periodKey' | 'l  :43-43
-  pipeline: { evaluationCount: number  :44-44
-  currency: string  :45-45
-export type DmoGrain  :16-16
-export async function getDmoProfitability(tenantId, opts = {},) → Promise<DmoProfitResult>  :70-141
 ```
 
 ### backend/src/services/profitabilityInstruments.ts
@@ -784,11 +763,6 @@ export async function applyLogicalRestore(restoreId, actor?) → Promise<  :246-
 export async function stageStateRestore(restoreId) → Promise<  :286-286  # State dosyasını stage eder (kontrollü-restart ile uygulanır)
 ```
 
-### backend/src/services/roleDefaultPermissions.ts
-```
-export function defaultPermissionsForRole(role) → string[]  :69-71
-```
-
 ### backend/src/services/session.ts
 ```
 export interface RequestToken  :36-36
@@ -803,6 +777,11 @@ export function tokenRemainingSeconds(token) → number  :94-97  # Token'ın kal
 export function setSessionCookie(req, res, token) → void  :99-107
 export function clearSessionCookie(req, res) → void  :109-111
 export const isWebClient = (req) =>  :114-114  # Tarayıcı arayüzü mü
+```
+
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations(tenantId) → Promise<void>  :14-69
 ```
 
 ### backend/src/services/specAnalysis.ts
@@ -901,31 +880,7 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/utils/entityTypeTab.ts
-```
-export function entityTypeToTab  :25-27
-```
-
 ## governance
-
-### governance/FINDINGS.md
-```
-h1 Enflow — Rol/Birim Uygunluk Denetimi: Bulgular & Karar Kütüğü
-h2 Faz 0 — İskele temel çizgisi (2026-06-21)
-h2 Faz 1 — Personel turları
-h3 Tur 1 — GM / Admin (Üst Yönetim · Sistem) — 2026-06-21
-h3 Tur 2 — Satış (SALES_MGR · SALES_REP · SALES_SUPPORT) — 2026-06-21
-h3 Tur 3 — Presales (PRESALES_MGR · PRESALES_ENG · TECHNICAL_SPEC) — 2026-06-21
-h3 Tur 4 — İSAB/İhale (ISAB_MGR) · Satın Alma (PROCUREMENT_MGR) — 2026-06-21
-h3 Tur 5 — Finans (FINANCE_MGR) · İGPD (IGPD_MGR) — 2026-06-21
-h3 Tur 6 — KSU/Sözleşme · KGD/Kalite · Proje (PROJECT_MGR) — 2026-06-21
-h3 Tur 7 — Hukuk (LEGAL_MGR) + kalan roller (ADMIN/OPERATIONS_MGR/HR_MGR/AUDITOR) — 2026-06-21
-h2 Faz 1 Kapanış — Kalan 3 INFO (ACCEPTED, kapsam dışı)
-h2 Faz 2 — RBAC süiti rol kapsamı genişletme (2026-06-21)
-h2 Faz 3 — Eksik roller için kalıcı kullanıcı oluşturma (2026-06-21)
-h2 Faz 4 — RBAC tüm 19 role + seed kaldırma (2026-06-21)
-h2 DURUM — Birim & Rol Yönetişimi TAMAM
-```
 
 ### governance/role-matrix.ts
 ```
@@ -954,6 +909,25 @@ export type RoleKind  :11-11
 export type Staffing  :12-12
 export type RACI  :13-13
 export type AgentMode  :14-14
+```
+
+### governance/FINDINGS.md
+```
+h1 Enflow — Rol/Birim Uygunluk Denetimi: Bulgular & Karar Kütüğü
+h2 Faz 0 — İskele temel çizgisi (2026-06-21)
+h2 Faz 1 — Personel turları
+h3 Tur 1 — GM / Admin (Üst Yönetim · Sistem) — 2026-06-21
+h3 Tur 2 — Satış (SALES_MGR · SALES_REP · SALES_SUPPORT) — 2026-06-21
+h3 Tur 3 — Presales (PRESALES_MGR · PRESALES_ENG · TECHNICAL_SPEC) — 2026-06-21
+h3 Tur 4 — İSAB/İhale (ISAB_MGR) · Satın Alma (PROCUREMENT_MGR) — 2026-06-21
+h3 Tur 5 — Finans (FINANCE_MGR) · İGPD (IGPD_MGR) — 2026-06-21
+h3 Tur 6 — KSU/Sözleşme · KGD/Kalite · Proje (PROJECT_MGR) — 2026-06-21
+h3 Tur 7 — Hukuk (LEGAL_MGR) + kalan roller (ADMIN/OPERATIONS_MGR/HR_MGR/AUDITOR) — 2026-06-21
+h2 Faz 1 Kapanış — Kalan 3 INFO (ACCEPTED, kapsam dışı)
+h2 Faz 2 — RBAC süiti rol kapsamı genişletme (2026-06-21)
+h2 Faz 3 — Eksik roller için kalıcı kullanıcı oluşturma (2026-06-21)
+h2 Faz 4 — RBAC tüm 19 role + seed kaldırma (2026-06-21)
+h2 DURUM — Birim & Rol Yönetişimi TAMAM
 ```
 
 ## install
@@ -1130,6 +1104,264 @@ handler onComplete
 handler onLogin
 ```
 
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+hook useWorkSpecialties
+hook useEffect
+export UserManagement
+handler onSubmit
+handler onConfirm
+```
+
+### src/components/settings/WorkSpecialtyManagement.tsx
+```
+hook useAuth
+hook useQueryClient
+hook useWorkSpecialties
+hook useState
+export WorkSpecialtyManagement
+handler onChange
+handler onKeyDown
+handler onClick
+```
+
+### src/hooks/useEnflowQueries.ts
+```
+export const useOpportunities = (tenantId, options = {}) =>  :6-14
+export const useCustomers = (tenantId, options = {}) =>  :16-24
+export const useProjects = (tenantId, options = {}) =>  :26-34
+export const useContracts = (tenantId, options = {}) =>  :36-44
+export const useTasks = (tenantId, options = {}) =>  :46-54
+export const useUnits = (tenantId, options = {}) =>  :56-64
+export const useUsers = (tenantId, options = {}) =>  :66-74
+export const useDocuments = (tenantId, options = {}) =>  :76-84
+export const useProposals = (tenantId, options = {}) =>  :86-94
+export const useModuleSettings = (tenantId) =>  :96-103
+export const useBrands = (tenantId) =>  :107-109
+export const useProductCategories = (tenantId) =>  :110-112
+export const useBrandSources = (tenantId, brandId) =>  :113-117
+export const useWorkSpecialties = (tenantId) =>  :120-122
+export const useBomHandoffs = (tenantId) =>  :125-127
+export const useBomQuotes = (tenantId, opportunityId) =>  :128-130
+export const useCustomerHealth = (tenantId) =>  :132-136
+export const useCustomerVisitSummary = (tenantId, customerId, windowMonths = 3) =>  :137-141
+export const useOpportunityProgressLog = (tenantId, opportunityId) =>  :142-146
+export const useProjectHealth = (tenantId) =>  :147-152
+export const usePendingApprovalChains = (tenantId, role) =>  :154-160
+export const useVisitPlans = (tenantId) =>  :162-164
+export const useDailyReports = (tenantId, userId) =>  :165-167
+export const useVisitReportSettings = (tenantId) =>  :168-172
+export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :175-182
+```
+
+### src/modules/professional-services/MaterialRequestsPanel.tsx
+```
+component MaterialRequestsPanel
+props Props
+hook useState
+export MaterialRequestsPanel
+handler onChange
+handler onClick
+```
+
+### src/modules/professional-services/WeeklyPlanView.tsx
+```
+component WeeklyPlanView
+props Props
+hook useState
+hook useCallback
+hook useEffect
+export WeeklyPlanView
+handler onChange
+handler onClick
+```
+
+### src/modules/ProfessionalServicesModule.tsx
+```
+component ProfessionalServicesModule
+props Props
+hook useAuth
+hook useWorkSpecialties
+hook useState
+hook useRef
+hook useCallback
+hook useEffect
+export ProfessionalServicesModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
+### src/modules/project-mgmt/ProjectDetail.tsx
+```
+props ProjectDetailProps
+hook useState
+hook useEffect
+hook useMemo
+export ProjectDetail
+handler onClick
+handler onChange
+handler onApplied
+handler onSave
+```
+
+### src/modules/ProjectManagementModule.tsx
+```
+props ProjectManagementModuleProps
+hook useAuth
+hook useState
+hook useQueryClient
+hook useProjects
+hook useOpportunities
+hook useMemo
+hook useProjectHealth
+hook useCallback
+hook useEffect
+export ProjectManagementModule
+handler onOpportunities
+handler onClick
+handler onChange
+handler onSelect
+handler onEdit
+handler onDelete
+handler onRefresh
+handler onPrintReport
+handler onNavigate
+handler onSave
+```
+
+### src/modules/SettingsModule.tsx
+```
+props SettingsModuleProps
+hook useQueryClient
+hook useModuleSettings
+hook useState
+hook useEffect
+hook useAuth
+export SettingsModule
+handler onChange
+handler onClick
+handler onData
+```
+
+### src/modules/todo/helpers.ts
+```
+export interface ProposalDetailItem  :178-189
+  partNumber: string  :179-179
+  description: string  :180-180
+  quantity: number  :181-181
+  purchaseCost?: number  :182-182
+  purchaseCostBase?: number  :185-185
+  unitSalePrice?: number  :186-186
+  totalSalePrice?: number  :187-187
+  marginPercentage?: number  :188-188
+export interface ProposalDetail  :191-200
+  price: string  :192-192
+  totalPrice: number  :193-193
+  totalCost: number  :194-194
+  items: ProposalDetailItem[]  :195-195
+  description: string  :196-196
+  terms: string  :197-197
+  version: number  :198-198
+  opportunityTitle: string  :199-199
+export const taskTargetTab = (t) =>  :57-66
+export const fmtCompletedAt = (d?) =>  :77-78
+export const daysUntil = (iso?) =>  :84-89
+export const fmtDueDate = (iso?) =>  :92-98
+export const getPriorityColor = (priority) =>  :106-113
+export const getPriorityLabel = (priority) =>  :116-121
+export const composedTitle = (newTask, taskAction, ctx) =>  :129-140
+```
+
+### src/services/apiService.ts
+```
+class ApiService  :26-901
+  setAuth(tenantId)  :27-29
+  async getSession() → Promise<  :32-32
+  async logout() → Promise<void>  :39-41
+  async login(email, password)  :43-45
+  async forgotPassword(email)  :47-49
+  async getSetupStatus() → Promise<  :52-52
+  async runSetup(payload) → Promise<  :57-57
+  async getCustomers()  :65-65
+  async createCustomer(data)  :66-66
+  async updateCustomer(id, data)  :67-67
+  async deleteCustomer(id)  :68-68
+  async getContacts(customerId)  :69-69
+  async createContact(customerId, data)  :70-70
+  async updateContact(customerId, contactId, data)  :71-71
+  async deleteContact(customerId, contactId)  :72-72
+  async getOpportunities()  :75-75
+  async createOpportunity(data)  :76-76
+  async updateOpportunity(id, data)  :77-77
+  async deleteOpportunity(id)  :78-78
+  async checkInOpportunityProgress(id, data)  :79-79
+  async getOpportunityProgressLog(id)  :80-80
+  async saveBoMItems(oppId, items, opts?)  :81-81
+  async saveCostItems(oppId, items)  :82-82
+  async saveCostAnalysis(oppId, data)  :83-83
+```
+
+### src/types/productTaxonomy.ts
+```
+export interface Brand  :5-12
+  id: string  :6-6
+  tenantId: string  :7-7
+  name: string  :8-8
+  isActive: boolean  :9-9
+  createdAt: string  :10-10
+  updatedAt: string  :11-11
+export interface ProductCategory  :14-21
+  id: string  :15-15
+  tenantId: string  :16-16
+  name: string  :17-17
+  isActive: boolean  :18-18
+  createdAt: string  :19-19
+  updatedAt: string  :20-20
+export interface BrandSource  :23-32
+  id: string  :24-24
+  tenantId: string  :25-25
+  brandId: string  :26-26
+  name: string  :27-27
+  notes?: string | null  :28-28
+  isActive: boolean  :29-29
+  createdAt: string  :30-30
+  updatedAt: string  :31-31
+export interface WorkSpecialty  :37-44
+  id: string  :38-38
+```
+
+### src/types/project.ts
+```
+export interface ProjectMilestone  :9-34
+  id: string  :10-10
+  projectId: string  :11-11
+  title: string  :12-12
+  description?: string | null  :13-13
+  milestoneType: MilestoneType  :14-14
+  status: MilestoneStatus  :15-15
+  progress: number  :16-16
+  assignedToId?: string | null  :17-17
+  assignedToName?: string | null  :18-18
+  plannedStart?: string | null  :19-19
+  plannedEnd?: string | null  :20-20
+  actualStart?: string | null  :21-21
+  actualEnd?: string | null  :22-22
+  budgetAmount?: number | null  :23-23
+  actualCost?: number | null  :24-24
+  currency: string  :25-25
+  isParallel: boolean  :26-26
+  requiresApproval: boolean  :27-27
+  approvedById?: string | null  :28-28
+  approvedAt?: string | null  :29-29
+  order: number  :30-30
+  notes?: string | null  :31-31
+  createdAt: string  :32-32
+  updatedAt: string  :33-33
+```
+
 ### src/components/settings/ProductTaxonomyManagement.tsx
 ```
 hook useState
@@ -1151,29 +1383,6 @@ hook useEffect
 hook useCallback
 export TenantSettings
 handler onChange
-handler onClick
-```
-
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-hook useWorkSpecialties
-hook useEffect
-export UserManagement
-handler onSubmit
-handler onConfirm
-```
-
-### src/components/settings/WorkSpecialtyManagement.tsx
-```
-hook useAuth
-hook useQueryClient
-hook useWorkSpecialties
-hook useState
-export WorkSpecialtyManagement
-handler onChange
-handler onKeyDown
 handler onClick
 ```
 
@@ -1206,35 +1415,6 @@ export interface AbbreviatedBoMItem  :7-20
   categoryId?: string  :18-18
   source?: string  :19-19
 export const useBoM = (selectedOppId, setOpportunities, opportunities?) =>  :25-120
-```
-
-### src/hooks/useEnflowQueries.ts
-```
-export const useOpportunities = (tenantId, options = {}) =>  :6-14
-export const useCustomers = (tenantId, options = {}) =>  :16-24
-export const useProjects = (tenantId, options = {}) =>  :26-34
-export const useContracts = (tenantId, options = {}) =>  :36-44
-export const useTasks = (tenantId, options = {}) =>  :46-54
-export const useUnits = (tenantId, options = {}) =>  :56-64
-export const useUsers = (tenantId, options = {}) =>  :66-74
-export const useDocuments = (tenantId, options = {}) =>  :76-84
-export const useProposals = (tenantId, options = {}) =>  :86-94
-export const useModuleSettings = (tenantId) =>  :96-103
-export const useBrands = (tenantId) =>  :107-109
-export const useProductCategories = (tenantId) =>  :110-112
-export const useBrandSources = (tenantId, brandId) =>  :113-117
-export const useWorkSpecialties = (tenantId) =>  :120-122
-export const useBomHandoffs = (tenantId) =>  :125-127
-export const useBomQuotes = (tenantId, opportunityId) =>  :128-130
-export const useCustomerHealth = (tenantId) =>  :132-136
-export const useCustomerVisitSummary = (tenantId, customerId, windowMonths = 3) =>  :137-141
-export const useOpportunityProgressLog = (tenantId, opportunityId) =>  :142-146
-export const useProjectHealth = (tenantId) =>  :147-152
-export const usePendingApprovalChains = (tenantId, role) =>  :154-160
-export const useVisitPlans = (tenantId) =>  :162-164
-export const useDailyReports = (tenantId, userId) =>  :165-167
-export const useVisitReportSettings = (tenantId) =>  :168-172
-export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :175-182
 ```
 
 ### src/layout/Header.tsx
@@ -1779,44 +1959,6 @@ handler onRefresh
 handler onSave
 ```
 
-### src/modules/professional-services/MaterialRequestsPanel.tsx
-```
-component MaterialRequestsPanel
-props Props
-hook useState
-export MaterialRequestsPanel
-handler onChange
-handler onClick
-```
-
-### src/modules/professional-services/WeeklyPlanView.tsx
-```
-component WeeklyPlanView
-props Props
-hook useState
-hook useCallback
-hook useEffect
-export WeeklyPlanView
-handler onChange
-handler onClick
-```
-
-### src/modules/ProfessionalServicesModule.tsx
-```
-component ProfessionalServicesModule
-props Props
-hook useAuth
-hook useWorkSpecialties
-hook useState
-hook useRef
-hook useCallback
-hook useEffect
-export ProfessionalServicesModule
-handler onClick
-handler onChange
-handler onSubmit
-```
-
 ### src/modules/profitability/DmoChannelTab.tsx
 ```
 component DmoChannelTab
@@ -1864,44 +2006,6 @@ export const printProjectReport = (project, forCustomer = false) =>  :35-81
 ### src/modules/project-mgmt/KanbanView.tsx
 ```
 component KanbanView
-```
-
-### src/modules/project-mgmt/ProjectDetail.tsx
-```
-props ProjectDetailProps
-hook useState
-hook useEffect
-hook useMemo
-export ProjectDetail
-handler onClick
-handler onChange
-handler onApplied
-handler onSave
-```
-
-### src/modules/ProjectManagementModule.tsx
-```
-props ProjectManagementModuleProps
-hook useAuth
-hook useState
-hook useQueryClient
-hook useProjects
-hook useOpportunities
-hook useMemo
-hook useProjectHealth
-hook useCallback
-hook useEffect
-export ProjectManagementModule
-handler onOpportunities
-handler onClick
-handler onChange
-handler onSelect
-handler onEdit
-handler onDelete
-handler onRefresh
-handler onPrintReport
-handler onNavigate
-handler onSave
 ```
 
 ### src/modules/reporting/BottleneckPanel.tsx
@@ -1984,20 +2088,6 @@ handler onChange
 handler onSubmit
 ```
 
-### src/modules/SettingsModule.tsx
-```
-props SettingsModuleProps
-hook useQueryClient
-hook useModuleSettings
-hook useState
-hook useEffect
-hook useAuth
-export SettingsModule
-handler onChange
-handler onClick
-handler onData
-```
-
 ### src/modules/SetupWizard.tsx
 ```
 props SetupWizardProps
@@ -2028,35 +2118,6 @@ hook useCallback
 export SpecComplianceMatrix
 handler onChange
 handler onClick
-```
-
-### src/modules/todo/helpers.ts
-```
-export interface ProposalDetailItem  :178-189
-  partNumber: string  :179-179
-  description: string  :180-180
-  quantity: number  :181-181
-  purchaseCost?: number  :182-182
-  purchaseCostBase?: number  :185-185
-  unitSalePrice?: number  :186-186
-  totalSalePrice?: number  :187-187
-  marginPercentage?: number  :188-188
-export interface ProposalDetail  :191-200
-  price: string  :192-192
-  totalPrice: number  :193-193
-  totalCost: number  :194-194
-  items: ProposalDetailItem[]  :195-195
-  description: string  :196-196
-  terms: string  :197-197
-  version: number  :198-198
-  opportunityTitle: string  :199-199
-export const taskTargetTab = (t) =>  :57-66
-export const fmtCompletedAt = (d?) =>  :77-78
-export const daysUntil = (iso?) =>  :84-89
-export const fmtDueDate = (iso?) =>  :92-98
-export const getPriorityColor = (priority) =>  :106-113
-export const getPriorityLabel = (priority) =>  :116-121
-export const composedTitle = (newTask, taskAction, ctx) =>  :129-140
 ```
 
 ### src/modules/todo/PendingChainApprovals.tsx
@@ -2160,33 +2221,33 @@ export const activeTenantId = () =>  :6-7
 export const resetSessionExpiredNotice = () =>  :16-16
 ```
 
-### src/services/apiService.ts
+### src/types/auth.ts
 ```
-class ApiService  :26-900
-  setAuth(tenantId)  :27-29
-  async getSession() → Promise<  :32-32
-  async logout() → Promise<void>  :39-41
-  async login(email, password)  :43-45
-  async forgotPassword(email)  :47-49
-  async getSetupStatus() → Promise<  :52-52
-  async runSetup(payload) → Promise<  :57-57
-  async getCustomers()  :65-65
-  async createCustomer(data)  :66-66
-  async updateCustomer(id, data)  :67-67
-  async deleteCustomer(id)  :68-68
-  async getContacts(customerId)  :69-69
-  async createContact(customerId, data)  :70-70
-  async updateContact(customerId, contactId, data)  :71-71
-  async deleteContact(customerId, contactId)  :72-72
-  async getOpportunities()  :75-75
-  async createOpportunity(data)  :76-76
-  async updateOpportunity(id, data)  :77-77
-  async deleteOpportunity(id)  :78-78
-  async checkInOpportunityProgress(id, data)  :79-79
-  async getOpportunityProgressLog(id)  :80-80
-  async saveBoMItems(oppId, items, opts?)  :81-81
-  async saveCostItems(oppId, items)  :82-82
-  async saveCostAnalysis(oppId, data)  :83-83
+export interface User  :1-18
+  id: string  :2-2
+  name: string  :3-3
+  email: string  :4-4
+  phone?: string  :5-5
+  role: string  :6-6
+  permissions: string[]  :7-7
+  unitId?: string  :8-8
+  status: 'ACTIVE' | 'INACTIVE'  :9-9
+  tenantId?: string  :10-10
+  delegateToUserId?: string | null  :11-11
+  delegateUntil?: string | null  :12-12
+  dashboardLayout?: string | null  :13-13
+  costRate?: number | null  :15-15
+  costRateUnit?: string | null  :16-16
+  costCurrency?: string | null  :17-17
+export interface Permission  :19-24
+  id: string  :20-20
+  name: string  :21-21
+  code: string  :22-22
+  description: string  :23-23
+export interface Unit  :25-31
+  id: string  :26-26
+  name: string  :27-27
+  description?: string  :28-28
 ```
 
 ### src/types/crm.ts
@@ -2276,35 +2337,6 @@ export interface BoMItem  :11-32
   source?: string  :26-26
 ```
 
-### src/types/productTaxonomy.ts
-```
-export interface Brand  :5-12
-  id: string  :6-6
-  tenantId: string  :7-7
-  name: string  :8-8
-  isActive: boolean  :9-9
-  createdAt: string  :10-10
-  updatedAt: string  :11-11
-export interface ProductCategory  :14-21
-  id: string  :15-15
-  tenantId: string  :16-16
-  name: string  :17-17
-  isActive: boolean  :18-18
-  createdAt: string  :19-19
-  updatedAt: string  :20-20
-export interface BrandSource  :23-32
-  id: string  :24-24
-  tenantId: string  :25-25
-  brandId: string  :26-26
-  name: string  :27-27
-  notes?: string | null  :28-28
-  isActive: boolean  :29-29
-  createdAt: string  :30-30
-  updatedAt: string  :31-31
-export interface WorkSpecialty  :37-44
-  id: string  :38-38
-```
-
 ### src/types/profitability.ts
 ```
 export interface ProfitEvent  :6-19
@@ -2332,35 +2364,6 @@ export interface ProfitPeriodRow  :26-40
   plannedCashIn: number  :32-32
   actualCashIn: number  :33-33
   eacCost: number  :34-34
-```
-
-### src/types/project.ts
-```
-export interface ProjectMilestone  :9-34
-  id: string  :10-10
-  projectId: string  :11-11
-  title: string  :12-12
-  description?: string | null  :13-13
-  milestoneType: MilestoneType  :14-14
-  status: MilestoneStatus  :15-15
-  progress: number  :16-16
-  assignedToId?: string | null  :17-17
-  assignedToName?: string | null  :18-18
-  plannedStart?: string | null  :19-19
-  plannedEnd?: string | null  :20-20
-  actualStart?: string | null  :21-21
-  actualEnd?: string | null  :22-22
-  budgetAmount?: number | null  :23-23
-  actualCost?: number | null  :24-24
-  currency: string  :25-25
-  isParallel: boolean  :26-26
-  requiresApproval: boolean  :27-27
-  approvedById?: string | null  :28-28
-  approvedAt?: string | null  :29-29
-  order: number  :30-30
-  notes?: string | null  :31-31
-  createdAt: string  :32-32
-  updatedAt: string  :33-33
 ```
 
 ### src/types/reports.ts
@@ -2552,11 +2555,15 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 ```
 
 
-> **Not everything is here.** 223 file(s) omitted, 1 collapsed to anchors to stay under the 21684-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 223 file(s) omitted to stay under the 21685-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@8738b4c)
+## recent changes (main@de17622)
 ```
+src/modules/professional-services/MaterialRequestsPanel.tsx +MaterialRequestsPanel
+src/modules/professional-services/WeeklyPlanView.tsx +mondayOf  +WeeklyPlanView
+src/modules/ProfessionalServicesModule.tsx    +ProfessionalServicesModule
+src/services/apiService.ts                    ~ApiService
 src/modules/DmoModule.tsx                     ~CatalogForm
 src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 backend/src/services/activityLogArchiveScheduler.ts ~tick  ~startActivityLogArchiveScheduler
@@ -2568,4 +2575,4 @@ backend/src/services/requestContext.ts        +resolveRequestId  +runWithRequest
 backend/src/services/updateNotifier.ts        ~tick  ~startUpdateNotifier
 ```
 
-<!-- Updated: 2026-10-11T13:46:44.301Z -->
+<!-- Updated: 2026-10-11T17:43:21.941Z -->

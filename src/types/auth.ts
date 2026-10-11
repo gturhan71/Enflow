@@ -11,6 +11,10 @@ export interface User {
   delegateToUserId?: string | null;
   delegateUntil?: string | null;
   dashboardLayout?: string | null;
+  // Profesyonel Hizmetler — teknisyen maliyeti (yalnız GM/OPERATIONS_MGR görür).
+  costRate?: number | null;
+  costRateUnit?: string | null;
+  costCurrency?: string | null;
 }
 export interface Permission {
   id: string;

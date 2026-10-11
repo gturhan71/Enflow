@@ -121,10 +121,19 @@ export const UserManagement = ({
     const unitId = (formData.get('unitId') as string) || null;
     const previousRole = editingUser.role;
     const targetId = editingUser.id;
+    const costRateRaw = formData.get('costRate') as string;
+    const costRateUnit = (formData.get('costRateUnit') as string) || null;
+    const costCurrency = (formData.get('costCurrency') as string) || null;
 
     setEditSaving(true);
     try {
-      const updated = await apiService.updateUser(targetId, { role, unitId: unitId || undefined });
+      const updated = await apiService.updateUser(targetId, {
+        role, unitId: unitId || undefined,
+        ...(editingUser.role === 'PS_TECH' && {
+          costRate: costRateRaw ? Number(costRateRaw) : null,
+          costRateUnit, costCurrency,
+        }),
+      });
       if (editingUser.role === 'PS_TECH') {
         await apiService.setUserWorkSpecialties(targetId, specialtyIds).catch(() => {});
       }
@@ -474,6 +483,23 @@ export const UserManagement = ({
                   <option value="">Birim (Opsiyonel)</option>
                   {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
+                {editingUser.role === 'PS_TECH' && (
+                  <div>
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Maliyet (yalnız GM + Profesyonel Hizmetler Müdürü görür)</label>
+                    <div className="flex gap-2">
+                      <input name="costRate" type="number" min="0" step="0.01" defaultValue={editingUser.costRate ?? ''} placeholder="Ücret" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm" />
+                      <select name="costRateUnit" defaultValue={editingUser.costRateUnit || 'HOURLY'} className="w-28 px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm">
+                        <option value="HOURLY">Saatlik</option>
+                        <option value="DAILY">Günlük</option>
+                      </select>
+                      <select name="costCurrency" defaultValue={editingUser.costCurrency || 'TRY'} className="w-24 px-2 py-2 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-indigo-500 text-sm">
+                        <option value="TRY">TRY</option>
+                        <option value="USD">USD</option>
+                        <option value="EUR">EUR</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
                 {editingUser.role === 'PS_TECH' && (
                   <div>
                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Uzmanlık Alanları</label>
