@@ -420,6 +420,61 @@ export const apiMatrix: ApiCase[] = [
     path: "/api/dmo/alarms",
     expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
   },
+
+  // --- Profesyonel Hizmetler (Faz 1-5, 2026-10-11) -----------------------
+  // workOrders.ts router.use() TÜM metotlara requireRole(['GENERAL_MANAGER',
+  // 'OPERATIONS_MGR','PROJECT_MGR','PS_TECH']) uygular → GET listesi PS_TECH'e
+  // de açık (yalnız kendi işlerini filtreli görür). POST/DELETE ise handler
+  // içinde AYRICA isManager() (yalnız GM/OPERATIONS_MGR/PROJECT_MGR) kontrol
+  // eder — PS_TECH router kapısından geçse bile mutasyonlarda 403 alır.
+  {
+    name: "İş emri listesi",
+    method: "GET",
+    path: "/api/work-orders",
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, operations_mgr: "allow", project_mgr: "allow", ps_tech: "allow" },
+  },
+  {
+    name: "Yeni iş emri oluştur",
+    method: "POST",
+    path: "/api/work-orders",
+    body: { title: "RBAC Test İş Emri" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, operations_mgr: "allow", project_mgr: "allow" },
+  },
+  {
+    name: "İş emri sil",
+    method: "DELETE",
+    path: `/api/work-orders/${T1_IDS.dummyUserId}`,
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, operations_mgr: "allow", project_mgr: "allow" },
+  },
+  // workSpecialties.ts: GET gate'siz (tenantMiddleware) → NA. POST editRoles=['GENERAL_MANAGER'] → yalnız GM.
+  {
+    name: "Uzmanlık alanı listesi",
+    method: "GET",
+    path: "/api/work-specialties",
+    expect: { general_manager: "allow", presales_eng: "allow", sales_rep: "allow", ...NA },
+  },
+  {
+    name: "Yeni uzmanlık alanı oluştur",
+    method: "POST",
+    path: "/api/work-specialties",
+    body: { name: "RBAC Test Uzmanlık" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND },
+  },
+  // serviceWorkPlans.ts router.use() gate: GM+OPERATIONS_MGR+PROJECT_MGR (PS_TECH YOK) — haftalık
+  // sevk planı yönetici katmanı, teknisyen kendi iş emrini zaten /work-orders'tan görür.
+  {
+    name: "Haftalık sevk planı listesi",
+    method: "GET",
+    path: "/api/service-work-plans",
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, operations_mgr: "allow", project_mgr: "allow" },
+  },
+  {
+    name: "Yeni haftalık sevk planı oluştur",
+    method: "POST",
+    path: "/api/service-work-plans",
+    body: { weekOf: "2026-01-05" },
+    expect: { general_manager: "allow", presales_eng: "deny", sales_rep: "deny", ...ND, operations_mgr: "allow", project_mgr: "allow" },
+  },
 ];
 
 // --- Tenant İzolasyonu (IDOR) ------------------------------------------------

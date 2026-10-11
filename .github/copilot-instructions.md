@@ -2559,7 +2559,7 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 > **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21742-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@499699e)
+## recent changes (main@86a5ad0)
 ```
 src/modules/professional-services/MaterialRequestsPanel.tsx +MaterialRequestsPanel
 src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
@@ -2571,4 +2571,4 @@ src/modules/DmoModule.tsx                     ~CatalogForm
 src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 ```
 
-<!-- Updated: 2026-10-11T19:06:20.164Z -->
+<!-- Updated: 2026-10-11T19:10:58.226Z -->
