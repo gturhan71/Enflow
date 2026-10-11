@@ -31,6 +31,7 @@ src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
 src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../types, ../services/apiService
 src/hooks/useEnflowQueries.ts ← @tanstack/react-query, services/apiService
+src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
 src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
@@ -45,7 +46,6 @@ src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react
 src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
 src/hooks/useBoM.ts ← react, services/apiService, contexts/UnsavedChangesContext, types
 src/layout/Header.tsx ← react, lucide-react, motion, lib/utils, contexts/AuthContext
-src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/lib/guaranteeText.ts ← services/apiClient
 src/modules/ActivityLogModule.tsx ← react, lucide-react, services/apiService, lib/agentProvenance, types
 src/modules/BackupModule.tsx ← react, lucide-react, services/apiService, types, services/apiClient
@@ -1146,6 +1146,18 @@ export const useVisitReportSettings = (tenantId) =>  :168-172
 export const useVisitScoreboard = (tenantId, weekStart, enabled) =>  :175-182
 ```
 
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+handler onSubmit
+handler onChange
+```
+
 ### src/modules/professional-services/MaterialRequestsPanel.tsx
 ```
 component MaterialRequestsPanel
@@ -1462,18 +1474,6 @@ handler onAccess
 handler onClick
 handler onChange
 handler onKeyDown
-```
-
-### src/layout/Sidebar.tsx
-```
-hook useUnsavedChanges
-hook useAuth
-hook useState
-hook useEffect
-export Sidebar
-handler onClick
-handler onSubmit
-handler onChange
 ```
 
 ### src/lib/guaranteeText.ts
@@ -2559,7 +2559,7 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 > **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21742-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@9c149bc)
+## recent changes (main@499699e)
 ```
 src/modules/professional-services/MaterialRequestsPanel.tsx +MaterialRequestsPanel
 src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
@@ -2571,4 +2571,4 @@ src/modules/DmoModule.tsx                     ~CatalogForm
 src/modules/ServiceTicketsModule.tsx          ~ServiceTicketsModule
 ```
 
-<!-- Updated: 2026-10-11T18:40:25.998Z -->
+<!-- Updated: 2026-10-11T19:06:20.164Z -->
