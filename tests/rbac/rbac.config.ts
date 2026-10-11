@@ -698,6 +698,15 @@ export const uiMatrix: UiCase[] = [
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "visible", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden", ps_tech: "hidden" },
   },
   {
+    // WORK_ORDERS_VIEW: yalnız OPERATIONS_MGR + PS_TECH (roleDefaultPermissions.ts) —
+    // PROJECT_MGR apiMatrix'te /work-orders'a erişebilir (requireRole gate'inde var)
+    // ama bu bir UI izni DEĞİL, dolayısıyla menüde project_mgr hidden kalır (kasıtlı:
+    // backend erişimi UI izninden daha geniş olabilir, bkz. diğer modüllerdeki örnekler).
+    name: "Profesyonel Hizmetler menüsü",
+    sidebarText: "Profesyonel Hizmetler",
+    expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "hidden", sales_support: "hidden", finance_mgr: "hidden", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "visible", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "hidden", ps_tech: "visible" },
+  },
+  {
     name: "Finans menüsü",
     sidebarText: "Finans",
     expect: { general_manager: "visible", presales_eng: "hidden", sales_rep: "hidden", sales_mgr: "visible", sales_support: "hidden", finance_mgr: "visible", igpd_mgr: "hidden", ksu_mgr: "hidden", project_mgr: "hidden", legal_mgr: "hidden", procurement_mgr: "hidden", isab_mgr: "hidden", admin: "hidden", presales_mgr: "hidden", technical_spec: "hidden", operations_mgr: "hidden", hr_mgr: "hidden", auditor: "hidden", kgd_mgr: "hidden", backup_admin: "visible", ps_tech: "hidden" },
