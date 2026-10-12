@@ -56,6 +56,10 @@ const INDIRECT: Record<string, IndirectSpec> = {
   DmoOrderItem: { fkField: 'orderId', parentModel: 'DmoOrder' },
   ProjectUnitParticipation: { fkField: 'projectId', parentModel: 'Project' },
   PurchaseQuoteItem: { fkField: 'purchaseQuoteId', parentModel: 'PurchaseQuote', parentFk: 'purchaseRequestId', grandparentModel: 'PurchaseRequest' },
+  // Profesyonel Hizmetler Faz 1 (2026-10-11) eklendiğinde bu haritaya hiç
+  // işlenmemişti — kendi tenantId'si yok (izolasyon userId/specialtyId
+  // üzerinden zaten tenant-scoped, bkz. schema.prisma), userId → User üzerinden.
+  UserWorkSpecialty: { fkField: 'userId', parentModel: 'User' },
 };
 
 const BYPASS = `current_setting('app.bypass_rls', true) = 'on'`;
