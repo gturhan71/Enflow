@@ -43,6 +43,14 @@ export const workOrderService = {
     return apiClient.fetchWithAuth(`/work-orders/${id}/start`, { method: 'POST' });
   },
 
+  async waitForPart(id: string, note?: string) {
+    return apiClient.fetchWithAuth(`/work-orders/${id}/wait-for-part`, { method: 'POST', body: JSON.stringify({ note }) });
+  },
+
+  async reopenWorkOrder(id: string, reason: string) {
+    return apiClient.fetchWithAuth(`/work-orders/${id}/reopen`, { method: 'POST', body: JSON.stringify({ reason }) });
+  },
+
   async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) {
     return apiClient.fetchWithAuth(`/work-orders/${id}/complete`, { method: 'POST', body: JSON.stringify(data) });
   },

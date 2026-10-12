@@ -381,9 +381,9 @@ reading the same files costs thousands. `:425-425` means line 425: read that ran
 src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
-src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
+backend/src/services/workOrderReminders.ts ← prismaClient
 src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
 src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../lib/utils, ../types
 src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
@@ -432,6 +432,7 @@ src/modules/PresalesModule.tsx ← react, @tanstack/react-query, lucide-react, m
 src/modules/procurement/PRDetailDrawer.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
 src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
+src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
 src/modules/project-mgmt/CostForm.tsx ← react, lucide-react, motion, ../types, constants
@@ -488,7 +489,6 @@ backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← fs, path, prismaClient, schedulerLock, tenantContext
 backend/src/services/uploadsGuard.ts ← express, @prisma/client, prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/services/workOrderReminders.ts ← prismaClient
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/core.test.mjs ← core
@@ -543,6 +543,11 @@ pg@^8.22.0
 ```
 
 ## backend
+
+### backend/src/services/workOrderReminders.ts
+```
+export async function sweepWorkOrderSla(tenantId) → Promise<void>  :12-52
+```
 
 ### backend/src/utils/businessDays.ts
 ```
@@ -1216,11 +1221,6 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/services/workOrderReminders.ts
-```
-export async function sweepWorkOrderSla(tenantId) → Promise<void>  :12-52
-```
-
 ## governance
 
 ### governance/FINDINGS.md
@@ -1455,18 +1455,6 @@ hook useEffect
 export UtilizationReport
 ```
 
-### src/modules/professional-services/WeeklyPlanView.tsx
-```
-component WeeklyPlanView
-props Props
-hook useState
-hook useCallback
-hook useEffect
-export WeeklyPlanView
-handler onChange
-handler onClick
-```
-
 ### src/modules/ProfessionalServicesModule.tsx
 ```
 component ProfessionalServicesModule
@@ -1485,7 +1473,7 @@ handler onSubmit
 
 ### src/services/apiService.ts
 ```
-class ApiService  :26-905
+class ApiService  :26-908
   setAuth(tenantId)  :27-29
   async getSession() → Promise<  :32-32
   async logout() → Promise<void>  :39-41
@@ -1510,35 +1498,6 @@ class ApiService  :26-905
   async saveBoMItems(oppId, items, opts?)  :81-81
   async saveCostItems(oppId, items)  :82-82
   async saveCostAnalysis(oppId, data)  :83-83
-```
-
-### src/types/auth.ts
-```
-export interface User  :1-18
-  id: string  :2-2
-  name: string  :3-3
-  email: string  :4-4
-  phone?: string  :5-5
-  role: string  :6-6
-  permissions: string[]  :7-7
-  unitId?: string  :8-8
-  status: 'ACTIVE' | 'INACTIVE'  :9-9
-  tenantId?: string  :10-10
-  delegateToUserId?: string | null  :11-11
-  delegateUntil?: string | null  :12-12
-  dashboardLayout?: string | null  :13-13
-  costRate?: number | null  :15-15
-  costRateUnit?: string | null  :16-16
-  costCurrency?: string | null  :17-17
-export interface Permission  :19-24
-  id: string  :20-20
-  name: string  :21-21
-  code: string  :22-22
-  description: string  :23-23
-export interface Unit  :25-31
-  id: string  :26-26
-  name: string  :27-27
-  description?: string  :28-28
 ```
 
 ### src/types/project.ts
@@ -2230,6 +2189,18 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/professional-services/WeeklyPlanView.tsx
+```
+component WeeklyPlanView
+props Props
+hook useState
+hook useCallback
+hook useEffect
+export WeeklyPlanView
+handler onChange
+handler onClick
+```
+
 ### src/modules/profitability/DmoChannelTab.tsx
 ```
 component DmoChannelTab
@@ -2573,6 +2544,35 @@ export const activeTenantId = () =>  :6-7
 export const resetSessionExpiredNotice = () =>  :16-16
 ```
 
+### src/types/auth.ts
+```
+export interface User  :1-18
+  id: string  :2-2
+  name: string  :3-3
+  email: string  :4-4
+  phone?: string  :5-5
+  role: string  :6-6
+  permissions: string[]  :7-7
+  unitId?: string  :8-8
+  status: 'ACTIVE' | 'INACTIVE'  :9-9
+  tenantId?: string  :10-10
+  delegateToUserId?: string | null  :11-11
+  delegateUntil?: string | null  :12-12
+  dashboardLayout?: string | null  :13-13
+  costRate?: number | null  :15-15
+  costRateUnit?: string | null  :16-16
+  costCurrency?: string | null  :17-17
+export interface Permission  :19-24
+  id: string  :20-20
+  name: string  :21-21
+  code: string  :22-22
+  description: string  :23-23
+export interface Unit  :25-31
+  id: string  :26-26
+  name: string  :27-27
+  description?: string  :28-28
+```
+
 ### src/types/crm.ts
 ```
 export interface Opportunity  :4-41
@@ -2910,11 +2910,11 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 > **Not everything is here.** 223 file(s) omitted to stay under the 21757-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@34d60c2)
+## recent changes (main@aa1205e)
 ```
 src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
-src/modules/professional-services/WeeklyPlanView.tsx ~mondayOf  ~WeeklyPlanView
-src/modules/ProfessionalServicesModule.tsx    +tarih  ~ProfessionalServicesModule
+src/modules/ProfessionalServicesModule.tsx    ~ProfessionalServicesModule
 src/services/apiService.ts                    ~ApiService
+backend/src/services/workOrderReminders.ts    +sweepWorkOrderSla
 backend/src/utils/businessDays.ts             +countBusinessDaysInRange  ~computeSlaDueDate
 ```

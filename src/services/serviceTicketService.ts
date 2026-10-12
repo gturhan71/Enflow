@@ -36,5 +36,10 @@ export const serviceTicketService = {
     return apiClient.fetchWithAuth(`/service-tickets/${id}`, {
       method: 'DELETE'
     });
-  }
+  },
+
+  // ServiceTicket → WorkOrder köprüsü. İdempotent — zaten açılmışsa var olanı döner.
+  async dispatchServiceTicket(id: string): Promise<{ workOrder: { id: string }; alreadyExisted: boolean }> {
+    return apiClient.fetchWithAuth(`/service-tickets/${id}/dispatch`, { method: 'POST' });
+  },
 };

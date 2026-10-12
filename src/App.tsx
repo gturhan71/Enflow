@@ -351,7 +351,7 @@ const TenantAppInner = ({
 
       case 'procurement': return <ProcurementModule projects={projects} units={units} initialItemId={navItemId} />;
       case 'project-mgmt': return <ProjectManagementModule users={systemUsers} units={units} customers={customers.map(c => ({ id: c.id, name: c.name }))} setActiveTab={setActiveTab} initialItemId={navItemId} />;
-      case 'service-tickets': return <ServiceTicketsModule projects={projects} />;
+      case 'service-tickets': return <ServiceTicketsModule projects={projects} onNavigate={navigate} />;
       case 'professional-services': return <ProfessionalServicesModule projects={projects} customers={customers.map(c => ({ id: c.id, name: c.name }))} onNavigate={navigate} initialItemId={navItemId} />;
       case 'visit-plan': return <VisitPlanModule customers={customers.map(c => ({ id: c.id, name: c.name }))} opportunities={opportunities.map(o => ({ id: o.id, title: o.title }))} projects={projects.map(p => ({ id: p.id, name: p.name }))} />;
       case 'todo': return <TodoModule tasks={tasks} setTasks={setTasks} projects={projects} opportunities={opportunities} contracts={contracts} units={units} users={systemUsers} proposals={proposals} setProposals={setProposals} onNavigate={navigate} />;

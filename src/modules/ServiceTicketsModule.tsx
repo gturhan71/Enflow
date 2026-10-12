@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Wrench, Plus, X, RefreshCw, AlertTriangle, CheckCircle2, Loader2,
+  Wrench, Plus, X, RefreshCw, AlertTriangle, CheckCircle2, Loader2, HardHat,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -28,9 +28,10 @@ const OPEN_STATUSES: ServiceTicketStatus[] = ['OPEN', 'IN_PROGRESS', 'WAITING_PA
 
 interface Props {
   projects: Project[];
+  onNavigate?: (tab: string, itemId?: string | null) => void;
 }
 
-export function ServiceTicketsModule({ projects }: Props) {
+export function ServiceTicketsModule({ projects, onNavigate }: Props) {
   const [tickets, setTickets] = useState<ServiceTicket[]>([]);
   const [loading, setLoading] = useState(false);
   const [statusFilter, setStatusFilter] = useState('');
@@ -41,6 +42,7 @@ export function ServiceTicketsModule({ projects }: Props) {
   const [resolving, setResolving] = useState(false);
   const [costAmount, setCostAmount] = useState('');
   const [costCurrency, setCostCurrency] = useState('TRY');
+  const [dispatching, setDispatching] = useState(false);
 
   const [form, setForm] = useState({
     projectId: '', title: '', description: '', category: 'FAULT' as ServiceTicketCategory,
@@ -114,6 +116,24 @@ export function ServiceTicketsModule({ projects }: Props) {
   };
 
   const isOverdue = (t: ServiceTicket) => !!t.dueAt && OPEN_STATUSES.includes(t.status) && new Date(t.dueAt).getTime() < Date.now();
+
+  // ServiceTicket (müşteri arıza bildirimi) → WorkOrder (teknisyen iş emri)
+  // köprüsü — önceden bu iki sistem hiç buluşmuyordu. İdempotent: aynı talepten
+  // zaten bir iş emri açıldıysa yenisini oluşturmaz, Profesyonel Hizmetler'de
+  // ilgili iş emrine deep-link ile götürür.
+  const handleDispatch = async () => {
+    if (!detailTicket || !onNavigate) return;
+    setDispatching(true);
+    try {
+      const { workOrder } = await apiService.dispatchServiceTicket(detailTicket.id);
+      setDetailTicket(null);
+      onNavigate('professional-services', workOrder.id);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Teknisyen sevkiyatı başarısız.');
+    } finally {
+      setDispatching(false);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6 h-full overflow-y-auto pb-24">
@@ -272,6 +292,11 @@ export function ServiceTicketsModule({ projects }: Props) {
               )}
               {OPEN_STATUSES.includes(detailTicket.status) ? (
                 <div className="pt-2 space-y-2">
+                  {onNavigate && (
+                    <button onClick={handleDispatch} disabled={dispatching} className="btn-secondary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                      {dispatching ? <Loader2 size={14} className="animate-spin" /> : <HardHat size={14} />} Teknisyen Sevk Et
+                    </button>
+                  )}
                   <textarea placeholder="Çözüm notu (opsiyonel)" rows={3} value={resolutionNotes} onChange={e => setResolutionNotes(e.target.value)} className="input-glass w-full resize-none" />
                   <div className="flex gap-2">
                     <input type="number" min="0" step="0.01" placeholder="Maliyet (opsiyonel — yedek parça/işçilik)" value={costAmount} onChange={e => setCostAmount(e.target.value)} className="input-glass flex-1" />

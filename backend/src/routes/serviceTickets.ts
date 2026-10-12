@@ -3,10 +3,21 @@ import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { sweepServiceTicketSla } from '../services/serviceTicketReminders';
+import { nextDocumentNumber } from '../services/documentNumberService';
 
 const router: Router = Router();
 const ROLES = requireRole(['GENERAL_MANAGER', 'PROJECT_MGR', 'OPERATIONS_MGR']);
 router.use(tenantMiddleware, ROLES);
+
+// ServiceTicket (müşteri arıza bildirimi/intake) → WorkOrder (teknisyen sahaya
+// giden yürütme kaydı) bağlantısı. Önceden bu köprü hiç yoktu — WorkOrder.
+// serviceTicketId alanı API düzeyinde duruyordu ama hiçbir UI eylemi set
+// etmiyordu, iki sistem fiilen hiç buluşmuyordu. ServiceTicket.status ile
+// WorkOrder.status arasında bilinçli olarak otomatik senkron YOK (manuel,
+// bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md) — yalnızca ilk açılış köprülenir.
+const CATEGORY_TO_WORK_ORDER_TYPE: Record<string, string> = {
+  FAULT: 'REPAIR', SPARE_PART: 'OTHER', MAINTENANCE: 'MAINTENANCE', OTHER: 'OTHER',
+};
 
 // Çözüm maliyeti (yedek parça/işçilik) girildiyse, projenin maliyet kalemlerine
 // idempotent olarak işle (T5 satınalma→proje deseninin aynısı — purchaseRequests.ts).
@@ -151,6 +162,42 @@ router.post('/:id/resolve', asyncHandler(async (req: Request, res: Response) => 
   }
   await logActivity({ tenantId, userId: req.userId, action: 'STATUS_RESOLVED', entityType: 'SERVICE_TICKET', entityId: id, details: { title: ticket.title, costAmount: costAmount ?? null } });
   res.json(ticket);
+}));
+
+router.post('/:id/dispatch', asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const tenantId = req.tenantId;
+  const ticket = await prisma.serviceTicket.findFirst({
+    where: { id, tenantId },
+    include: { project: { select: { customerName: true } } },
+  });
+  if (!ticket) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
+
+  // İdempotent — bu talepten zaten bir iş emri açıldıysa yenisini açmak yerine
+  // var olanı döndür (tekrar tıklanırsa mükerrer iş emri oluşmasın).
+  const existing = await prisma.workOrder.findFirst({ where: { tenantId, serviceTicketId: id } });
+  if (existing) {
+    return res.json({ workOrder: existing, alreadyExisted: true });
+  }
+
+  const workOrderNo = await nextDocumentNumber(tenantId, 'ISE').catch(() => null);
+  const workOrder = await prisma.workOrder.create({
+    data: {
+      tenantId,
+      workOrderNo,
+      status: 'PENDING_SCHEDULE',
+      type: CATEGORY_TO_WORK_ORDER_TYPE[ticket.category] || 'OTHER',
+      title: ticket.title,
+      description: ticket.description,
+      priority: ticket.priority,
+      projectId: ticket.projectId,
+      customerName: ticket.project?.customerName || null,
+      serviceTicketId: ticket.id,
+      unitId: ticket.unitId,
+    },
+  });
+  await logActivity({ tenantId, userId: req.userId, action: 'DISPATCH_WORK_ORDER', entityType: 'SERVICE_TICKET', entityId: id, details: { workOrderId: workOrder.id, workOrderNo } });
+  res.status(201).json({ workOrder, alreadyExisted: false });
 }));
 
 router.delete('/:id', asyncHandler(async (req: Request, res: Response) => {

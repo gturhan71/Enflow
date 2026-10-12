@@ -320,6 +320,11 @@ router.post('/', asyncHandler(async (req: Request, res: Response) => {
     data: {
       tenantId: req.tenantId,
       workOrderNo,
+      // Her status geçişi diğer uç noktalarda (schedule→SCHEDULED, start→IN_PROGRESS,
+      // complete→COMPLETED) açıkça yazılıyor; şema varsayılanı (DRAFT) yerine burada
+      // da açıkça yazıyoruz — oluşturulan iş emri daima sevkiyat bekliyor demektir,
+      // ayrıca doldurulacak bir "taslak" aşaması yok (eski ölü PENDING_SCHEDULE durumu).
+      status: 'PENDING_SCHEDULE',
       type: type || 'INSTALLATION',
       title: title.trim(),
       description: description || null,
@@ -463,6 +468,30 @@ router.post('/:id/start', asyncHandler(async (req: Request, res: Response) => {
   res.json(order);
 }));
 
+// Sahadaki teknisyenin "parça bekliyor"ya kendi geçebilmesi — önceden bu
+// durum yalnız genel PUT (yönetici-only) ile ayarlanabiliyordu; teknisyen
+// bunu kendi işaretleyemiyor, yöneticiye haber verip elle değiştirmesini
+// beklemek zorundaydı. Not bilgi amaçlı — ayrı bir alan açılmadı, ActivityLog
+// detayına yazılır.
+router.post('/:id/wait-for-part', asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const { note } = req.body as { note?: string };
+  const record = await prisma.workOrder.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!record) return res.status(404).json({ error: 'İş emri bulunamadı.' });
+  if (!technicianOwnsOrManages(req, record)) return res.status(403).json({ error: 'Bu iş emrini güncelleme yetkiniz yok.' });
+  if (record.status !== 'IN_PROGRESS') {
+    return res.status(400).json({ error: 'Yalnızca sahada devam eden bir iş emri parça bekliyor olarak işaretlenebilir.' });
+  }
+
+  const order = await prisma.workOrder.update({ where: { id }, data: { status: 'WAITING_PART' }, include: INCLUDE });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_WAITING_PART', entityType: 'WORK_ORDER', entityId: id, details: { title: order.title, note: note || null } });
+  await notifyOperationsManagers(req.tenantId, id, {
+    title: 'İş emri parça bekliyor',
+    message: `"${order.title}" iş emri sahada parça/malzeme bekliyor.${note ? ` Not: ${note}` : ''}`,
+  }, req.userId);
+  res.json(order);
+}));
+
 router.post(
   '/:id/signoff-upload',
   signoffUpload.single('file'),
@@ -513,6 +542,53 @@ router.post('/:id/complete', asyncHandler(async (req: Request, res: Response) =>
     include: INCLUDE,
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_COMPLETED', entityType: 'WORK_ORDER', entityId: id, details: { title: order.title } });
+  res.json(order);
+}));
+
+// Yeniden açma — önceden COMPLETED/CLOSED bir iş emri hiçbir şekilde geri
+// döndürülemiyordu (aynı arıza tekrarlarsa yeni bir iş emri açmaktan başka
+// yol yoktu, izlenebilirlik kaybı). Yalnız yönetici, gerekçe zorunlu. Kapanış
+// kanıtı/tamamlama alanları sıfırlanır — "kapanış kanıtı zorunlu" ilkesi
+// yeniden tamamlanırken de geçerli olsun diye eski dosya/not sessizce
+// yeniden kullanılmaz. SLA hedefi (dueAt) korunur ama escalatedAt sıfırlanır
+// ki hâlâ/yeniden aşılmışsa sweep tekrar eskale edebilsin.
+router.post('/:id/reopen', asyncHandler(async (req: Request, res: Response) => {
+  if (!isManager(req)) return res.status(403).json({ error: 'Yeniden açma yetkiniz yok.' });
+  const id = String(req.params.id);
+  const { reason } = req.body as { reason?: string };
+  if (!reason || !reason.trim()) return res.status(400).json({ error: 'Yeniden açma gerekçesi zorunludur.' });
+
+  const record = await prisma.workOrder.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!record) return res.status(404).json({ error: 'İş emri bulunamadı.' });
+  if (!['COMPLETED', 'CLOSED'].includes(record.status)) {
+    return res.status(400).json({ error: 'Yalnızca tamamlanmış/kapanmış bir iş emri yeniden açılabilir.' });
+  }
+
+  const order = await prisma.workOrder.update({
+    where: { id },
+    data: {
+      status: 'IN_PROGRESS',
+      actualStartAt: new Date(),
+      actualEndAt: null,
+      escalatedAt: null,
+      completionNotes: null,
+      customerSignOffAt: null,
+      customerSignOffName: null,
+      customerSignOffFileUrl: null,
+    },
+    include: INCLUDE,
+  });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'STATUS_REOPENED', entityType: 'WORK_ORDER', entityId: id, details: { title: order.title, reason: reason.trim() } });
+  if (order.assignedTechnicianId && order.assignedTechnicianId !== req.userId) {
+    await prisma.notification.create({
+      data: {
+        tenantId: req.tenantId, userId: order.assignedTechnicianId, type: 'WARNING',
+        title: 'İş emri yeniden açıldı',
+        message: `"${order.title}" iş emri yeniden açıldı: ${reason.trim()}`,
+        relatedModule: 'professional-services', relatedItemId: order.id,
+      },
+    }).catch(() => {});
+  }
   res.json(order);
 }));
 

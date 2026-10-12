@@ -144,6 +144,12 @@ export const WORK_ORDER_TYPE_LABEL: Record<WorkOrderType, string> = {
 export const WORK_ORDER_PRIORITY_LABEL: Record<WorkOrderPriority, string> = {
   LOW: 'Düşük', NORMAL: 'Normal', HIGH: 'Yüksek', URGENT: 'Acil',
 };
+// Önceliğe bağlı varsayılan "tamamlanma hedefi" (saat) — sevkiyat formunda
+// yalnız ÖNERİ olarak otomatik doldurulur, zorunlu değil, elle değiştirilebilir/
+// boşaltılabilir (dueAt opsiyonel kalmaya devam eder). Kullanıcı kararı (2026-10-12).
+export const WORK_ORDER_SLA_DEFAULT_HOURS: Record<WorkOrderPriority, number> = {
+  URGENT: 4, HIGH: 8, NORMAL: 24, LOW: 72,
+};
 export const WORK_ORDER_STATUS_LABEL: Record<WorkOrderStatus, string> = {
   DRAFT: 'Taslak', PENDING_SCHEDULE: 'Sevk Bekliyor', SCHEDULED: 'Planlandı', IN_PROGRESS: 'Sahada',
   WAITING_PART: 'Parça Bekliyor', COMPLETED: 'Tamamlandı', CLOSED: 'Kapandı', CANCELLED: 'İptal',

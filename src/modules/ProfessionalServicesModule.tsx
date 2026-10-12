@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, CalendarClock, ShoppingCart, Kanban, CalendarDays, List, Gauge,
+  HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, PauseCircle, RotateCcw, CalendarClock, ShoppingCart, Kanban, CalendarDays, List, Gauge,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -10,7 +10,7 @@ import { UtilizationReport } from './professional-services/UtilizationReport';
 import { MaterialRequestsPanel } from './professional-services/MaterialRequestsPanel';
 import {
   Project, WorkOrder, WorkOrderType, WorkOrderPriority, WorkOrderStatus,
-  WORK_ORDER_TYPE_LABEL, WORK_ORDER_PRIORITY_LABEL, WORK_ORDER_STATUS_LABEL,
+  WORK_ORDER_TYPE_LABEL, WORK_ORDER_PRIORITY_LABEL, WORK_ORDER_STATUS_LABEL, WORK_ORDER_SLA_DEFAULT_HOURS,
   WorkSpecialty, WorkOrderSummary, WorkOrderTechnician,
 } from '../types';
 
@@ -91,9 +91,13 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
 
   const applyDetail = (o: WorkOrder) => {
     setDetailOrder(o);
+    // Hiç sevk edilmemiş (henüz slaHours/dueAt girilmemiş) bir iş emrinde,
+    // önceliğe göre varsayılan hedef saat ÖNERİ olarak otomatik doldurulur —
+    // zorunlu değil, yönetici değiştirebilir/boşaltabilir.
+    const suggestedSlaHours = !o.slaHours && !o.dueAt ? String(WORK_ORDER_SLA_DEFAULT_HOURS[o.priority]) : '';
     setScheduleForm({
       assignedTechnicianId: o.assignedTechnicianId || '', scheduledDate: o.scheduledDate ? o.scheduledDate.slice(0, 10) : '',
-      slaHours: o.slaHours ? String(o.slaHours) : '', dueAt: o.dueAt ? o.dueAt.slice(0, 10) : '',
+      slaHours: o.slaHours ? String(o.slaHours) : suggestedSlaHours, dueAt: o.dueAt ? o.dueAt.slice(0, 10) : '',
     });
     setCompleteForm({ completionNotes: o.completionNotes || '', customerSignOffName: o.customerSignOffName || '', costAmount: o.costAmount ? String(o.costAmount) : '', costCurrency: o.costCurrency || 'TRY' });
   };
@@ -162,6 +166,37 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
     }
   };
 
+  const handleWaitForPart = async () => {
+    if (!detailOrder) return;
+    const note = window.prompt('Parça/malzeme bekleme notu (opsiyonel):') || undefined;
+    setSaving(true);
+    try {
+      const updated = await apiService.waitForPartWorkOrder(detailOrder.id, note) as WorkOrder;
+      setDetailOrder(updated);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'İşaretleme başarısız.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleReopen = async () => {
+    if (!detailOrder) return;
+    const reason = window.prompt('Yeniden açma gerekçesi (zorunlu):');
+    if (!reason || !reason.trim()) return;
+    setSaving(true);
+    try {
+      const updated = await apiService.reopenWorkOrder(detailOrder.id, reason.trim()) as WorkOrder;
+      setDetailOrder(updated);
+      load();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Yeniden açma başarısız.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleFileUpload = async (file: File) => {
     if (!detailOrder) return;
     setUploadingFile(true);
@@ -197,6 +232,8 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
 
   const canStart = (o: WorkOrder) => (isManager || o.assignedTechnicianId === currentUser?.id) && ['SCHEDULED', 'WAITING_PART'].includes(o.status);
   const canUploadAndComplete = (o: WorkOrder) => (isManager || o.assignedTechnicianId === currentUser?.id) && o.status === 'IN_PROGRESS';
+  const canMarkWaitingPart = (o: WorkOrder) => (isManager || o.assignedTechnicianId === currentUser?.id) && o.status === 'IN_PROGRESS';
+  const canReopen = (o: WorkOrder) => isManager && ['COMPLETED', 'CLOSED'].includes(o.status);
   const canSchedule = (o: WorkOrder) => isManager && !['COMPLETED', 'CLOSED', 'CANCELLED'].includes(o.status);
   const canManageMaterials = (o: WorkOrder) => isManager || o.assignedTechnicianId === currentUser?.id;
 
@@ -437,7 +474,12 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                   <input type="date" value={scheduleForm.scheduledDate} onChange={e => setScheduleForm(f => ({ ...f, scheduledDate: e.target.value }))} className="input-glass w-full text-sm" />
 
                   <div className="pt-1 border-t border-slate-200/60 space-y-1.5">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">SLA — Tamamlanma Hedefi</p>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                      SLA — Tamamlanma Hedefi
+                      {!detailOrder.slaHours && !detailOrder.dueAt && (
+                        <span className="normal-case font-bold text-slate-400 tracking-normal"> · önceliğe göre önerildi, değiştirebilirsiniz</span>
+                      )}
+                    </p>
                     <div className="flex gap-2">
                       <input type="number" min="1" placeholder="Süre (saat)" value={scheduleForm.slaHours}
                         onChange={e => setScheduleForm(f => ({ ...f, slaHours: e.target.value, dueAt: e.target.value ? '' : f.dueAt }))}
@@ -476,6 +518,12 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
               {canStart(detailOrder) && (
                 <button onClick={handleStart} disabled={saving} className="btn-primary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <PlayCircle size={14} />} İşe Başla
+                </button>
+              )}
+
+              {canMarkWaitingPart(detailOrder) && (
+                <button onClick={handleWaitForPart} disabled={saving} className="btn-secondary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <PauseCircle size={14} />} Parça Bekliyor Olarak İşaretle
                 </button>
               )}
 
@@ -526,6 +574,12 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                     <a href={detailOrder.customerSignOffFileUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 font-bold underline">Kapanış kanıtını görüntüle</a>
                   )}
                 </>
+              )}
+
+              {canReopen(detailOrder) && (
+                <button onClick={handleReopen} disabled={saving} className="btn-secondary w-full text-sm flex items-center justify-center gap-2 disabled:opacity-50">
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />} Yeniden Aç
+                </button>
               )}
             </div>
           </div>
