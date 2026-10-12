@@ -1,8 +1,5 @@
 import type { ReactNode } from 'react';
-import {
-  Clock, Activity, CheckCircle2, AlertTriangle, Ban, Target, Package, Truck, Wrench,
-  Code2, CheckSquare, ShieldCheck, Receipt, Banknote, Flag,
-} from 'lucide-react';
+import { Clock, Activity, CheckCircle2, AlertTriangle, Ban } from 'lucide-react';
 import { ProjectType, ProjectStatus, MilestoneStatus, CostCategory } from '../../types';
 
 export const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
@@ -27,19 +24,6 @@ export const MS_STATUS_CONFIG: Record<MilestoneStatus, { label: string; color: s
   COMPLETED:   { label: 'Tamamlandı',  color: 'text-green-500',  icon: <CheckCircle2 size={14} /> },
   BLOCKED:     { label: 'Engellendi',  color: 'text-red-500',    icon: <AlertTriangle size={14} /> },
   CANCELLED:   { label: 'İptal',       color: 'text-slate-400',  icon: <Ban size={14} /> },
-};
-export const MS_TYPE_ICON: Record<string, ReactNode> = {
-  PLANNING:     <Target size={14} />,
-  PROCUREMENT:  <Package size={14} />,
-  SHIPMENT:     <Truck size={14} />,
-  INSTALLATION: <Wrench size={14} />,
-  DEVELOPMENT:  <Code2 size={14} />,
-  TESTING:      <CheckSquare size={14} />,
-  ACCEPTANCE:   <ShieldCheck size={14} />,
-  WARRANTY:     <ShieldCheck size={14} />,
-  INVOICING:    <Receipt size={14} />,
-  COLLECTION:   <Banknote size={14} />,
-  CUSTOM:       <Flag size={14} />,
 };
 export const COST_CAT_LABEL: Record<CostCategory, string> = {
   PROCUREMENT: 'Satınalma', TRAVEL: 'Seyahat/Lojistik',

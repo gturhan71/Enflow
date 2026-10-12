@@ -437,6 +437,7 @@ src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
+src/modules/project-mgmt/constants.tsx ← react, lucide-react, ../types
 src/modules/project-mgmt/CostForm.tsx ← react, lucide-react, motion, ../types, constants
 src/modules/project-mgmt/helpers.ts ← ../lib/format, ../types, constants, ../lib/html
 src/modules/project-mgmt/KanbanView.tsx ← lucide-react, ../types, constants, helpers, MarginBadge
@@ -479,7 +480,6 @@ backend/src/services/documentNumberService.ts ← prismaClient
 backend/src/services/periodic.ts ← utils/logger, metrics
 backend/src/services/personnelTransferService.ts ← prismaClient
 backend/src/services/processEngine.ts ← @prisma/client, prismaClient, activityLog, approvalSlaEscalation, utils/businessDays
-backend/src/services/profitabilityRollup.ts ← profitabilityLedger
 backend/src/services/profitabilityService.ts ← prismaClient, profitabilityLedger, profitabilityRollup, financingEffect, profitabilityCashflow
 backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilityService
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
@@ -748,6 +748,11 @@ export const requireRole = (allowed) =>  :82-90
 export const requireEntitlement = (pluginKey) =>  :116-123
 ```
 
+### backend/src/planCatalog.ts
+```
+export type PlanId  :5-5
+```
+
 ### backend/src/prismaClient.ts
 ```
 export type ManagedTx  :112-112
@@ -857,6 +862,17 @@ export interface BootstrapResult  :52-57
   user: { id: string  :55-55
   subscription: { plan: string  :56-56
 export async function bootstrapTenant(input) → Promise<BootstrapResult>  :59-139
+```
+
+### backend/src/services/contractWorkflowState.ts
+```
+export interface ContractAnalysisExtract  :69-69
+  projectName: string | null  :69-69
+export interface ContractWorkflowFallback  :70-70
+  tenderName: string | null  :70-70
+export type TransitionCheckResult  :33-33
+export function checkStatusTransition(currentStatus, nextStatus, role, cancelReason?,) → TransitionCheckResult  :44-67  # Bir durum geçişinin izinli olup olmadığını kontrol eder — sı
+export function buildAutoTitle(extracted, fallback) → string  :77-86  # AI analizinden çıkarılan proje adı/İKN + mevcut workflow bil
 ```
 
 ### backend/src/services/corporateDocumentReminders.ts
@@ -988,35 +1004,6 @@ export interface AdvanceProcessResult  :740-744
   advancedToOrder: number | null  :742-742
   actionsInvoked: string[]  :743-743
 export class ProcessNotConfiguredError  :28-33
-```
-
-### backend/src/services/profitabilityRollup.ts
-```
-export interface RollupOpts  :16-23
-  grain: Grain  :17-17
-  asOf: Date  :18-18
-  fxRates?: Record<string, number>  :19-19
-  reportCurrency?: string  :20-20
-  projectNames?: Record<string, string>  :22-22
-export interface CurrencyBreak  :25-28
-  plannedRevenue: number  :26-26
-  actualRevenue: number  :27-27
-export interface PeriodRow  :30-48
-  periodKey: string  :31-31
-  label: string  :32-32
-  currency: string  :33-33
-  plannedRevenue: number  :35-35
-  actualRevenue: number  :36-36
-  plannedCashIn: number  :38-38
-  actualCashIn: number  :39-39
-  eacCost: number  :41-41
-  varianceMarginPct: number  :42-42
-  eventCount: number  :44-44
-  byCurrency: Record<string, CurrencyBreak>  :45-45
-  fxAssumptions: Record<string, number>  :46-46
-  fxWarnings: string[]  :47-47
-export type Grain  :14-14
-export function periodKeyOf(date, grain) → string  :52-59
 ```
 
 ### backend/src/services/profitabilityService.ts
@@ -1213,11 +1200,6 @@ export interface ApplyTemplateResult  :152-156
   createdProcesses: string[]  :154-154
   skippedProcesses: string[]  :155-155
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
-```
-
-### backend/src/utils/entityTypeTab.ts
-```
-export function entityTypeToTab  :25-27
 ```
 
 ## governance
@@ -2244,6 +2226,19 @@ handler onTab
 handler onChange
 ```
 
+### src/modules/project-mgmt/constants.tsx
+```
+export PROJECT_TYPE_LABEL
+export PROJECT_TYPE_COLOR
+export STATUS_CONFIG
+export MS_STATUS_CONFIG
+export COST_CAT_LABEL
+export COST_CAT_COLOR
+export ProjectHandoverDoc
+export HANDOVER_STATUS_BADGE
+export HANDOVER_STATUS_LABEL
+```
+
 ### src/modules/project-mgmt/CostForm.tsx
 ```
 props CostFormProps
@@ -2909,10 +2904,10 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 ```
 
 
-> **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21852-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 221 file(s) omitted to stay under the 21848-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@fa80e41)
+## recent changes (main@65f4328)
 ```
 src/modules/professional-services/UtilizationReport.tsx ~UtilizationReport
 src/modules/professional-services/WeeklyPlanView.tsx ~WeeklyPlanView

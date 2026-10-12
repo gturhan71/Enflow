@@ -109,4 +109,16 @@ describe('contractWorkflowState — buildAutoTitle', () => {
     const t = buildAutoTitle({ projectName: 'Proje X', tenderNo: null }, { tenderName: null, tenderNo: null, title: 'T' });
     expect(t).toBe('Proje X');
   });
+
+  it('does not duplicate the İKN suffix when tenderName is empty and the fallback title already carries it', () => {
+    // POST / route'u tenderName girilmemişse composedTitle'ı "{title} — İKN: {tenderNo}" olarak
+    // üretip wf.title'a yazıyor; wf.tenderName null kalıyor. Analyze'da namePart bu title'a
+    // düşer — iknPart'ın ikinci kez eklenmediğini doğrular (regresyon: eski hatalı davranış
+    // "Taslak — İKN: 2026/001 — İKN: 2026/001" üretiyordu).
+    const t = buildAutoTitle(
+      { projectName: null, tenderNo: null },
+      { tenderName: null, tenderNo: '2026/001', title: 'Taslak — İKN: 2026/001' },
+    );
+    expect(t).toBe('Taslak — İKN: 2026/001');
+  });
 });

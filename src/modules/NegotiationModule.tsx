@@ -135,7 +135,6 @@ const NegotiationModule = ({
   const [ourStatus, setOurStatus] = useState<'ACTIVE' | 'WITHDRAWN' | 'ELIMINATED'>('ACTIVE');
   const [auctionLog, setAuctionLog] = useState<{ round: number; text: string; type: 'info' | 'bid' | 'alert' | 'success' }[]>([]);
   const [auctionWinner, setAuctionWinner] = useState<{ name: string; price: number; isUs: boolean } | null>(null);
-  const [roundCalculated, setRoundCalculated] = useState<boolean>(false);
 
   // States for manual reverse auction inputs
   const [manualBids, setManualBids] = useState<Record<string, string>>({});
@@ -311,7 +310,6 @@ const NegotiationModule = ({
     setAuctionRound(1);
     setCurrentMinDecrement(initialDecrement);
     setAuctionState('BIDDING');
-    setRoundCalculated(false);
     setAuctionWinner(null);
     setManualBids({});
     setWithdrawals({});

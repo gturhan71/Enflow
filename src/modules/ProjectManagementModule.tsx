@@ -233,7 +233,7 @@ const ProjectManagementModule: FC<ProjectManagementModuleProps> = ({ users = [],
             />
           )}
 
-          <RiskPanel riskProjects={riskProjects} onSelect={setSelectedProject} />
+          <RiskPanel riskProjects={riskProjects} onSelect={toggleSelectProject} />
         </div>
       </div>
 

@@ -73,7 +73,6 @@ const CRMModule = ({
   // içeriği editöre yüklensin diye — kaydedince yine de (mevcut versiyonlama mantığıyla
   // tutarlı) yeni bir versiyon olarak kaydedilir, seçilen kayıt üzerine yazılmaz.
   const [editingProposalId, setEditingProposalId] = useState<string | null>(null);
-  const [showOpportunitySelector, setShowOpportunitySelector] = useState(false);
   const [showHandOffModal, setShowHandOffModal] = useState(false);
   const [handOffTarget, setHandOffTarget] = useState<Opportunity | null>(null);
   const [checkInTarget, setCheckInTarget] = useState<Opportunity | null>(null);
@@ -191,19 +190,6 @@ const CRMModule = ({
     title: '', value: 0, currency: 'TRY', probability: 50, customerId: '', description: '', status: 'NEW',
     procurementMethod: 'OPEN', targetBidDate: '', expectedCloseDate: ''
   });
-
-  const handleRevertApproval = async (oppId: string) => {
-    if (!window.confirm('Onayı geri alıp revizyon aşamasına geçmek istediğinize emin misiniz?')) return;
-    setLoading(true);
-    try {
-      await apiService.revertOpportunityApproval(oppId);
-      setOpportunities(prev => prev.map(o => o.id === oppId ? { ...o, technicalStatus: 'PENDING' } : o));
-    } catch (err) {
-      alert(err instanceof Error ? err.message : 'İşlem başarısız.');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSaveCustomer = async (e: FormEvent) => {
     e.preventDefault();

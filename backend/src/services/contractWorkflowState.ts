@@ -79,5 +79,8 @@ export function buildAutoTitle(extracted: ContractAnalysisExtract, fallback: Con
   const iknPart = extracted.tenderNo
     ? `İKN: ${extracted.tenderNo}`
     : (fallback.tenderNo ? `İKN: ${fallback.tenderNo}` : null);
+  // namePart `fallback.title`'a düşmüşse (tenderName boş) ve o title zaten aynı İKN'yi
+  // içeriyorsa (ilk oluşturmada composedTitle'a eklenmiş), iknPart'ı tekrar ekleme.
+  if (iknPart && namePart.includes(iknPart)) return namePart;
   return [namePart, iknPart].filter(Boolean).join(' — ');
 }

@@ -64,6 +64,28 @@ router.delete('/cleanup', tenantMiddleware, GM, asyncHandler(async (req: Request
     })
   ).map((o) => o.id);
 
+  // Opportunity'ye zorunlu (Restrict) FK ile bağlı kayıtlar — opportunity.deleteMany
+  // bunlardan ÖNCE çalışırsa FK ihlali verir (schema'da bu ilişkiler cascade değil).
+  const rbacOpportunityIds = (
+    await prisma.opportunity.findMany({
+      where: { tenantId: tid, title: { startsWith: 'RBAC Test' } },
+      select: { id: true },
+    })
+  ).map((o) => o.id);
+  if (rbacOpportunityIds.length) {
+    await Promise.all([
+      prisma.boMItem.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.boMLineQuote.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.costItem.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.costAnalysisVersion.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.opportunityProgressLog.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.proposal.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.workflowLog.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.bomHandoff.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+      prisma.collectionInstallment.deleteMany({ where: { opportunityId: { in: rbacOpportunityIds } } }),
+    ]);
+  }
+
   const [
     users, opportunities, contractWorkflows, units,
     dmoOrderItems, dmoOrders, dmoAgreements, dmoCatalogItems,
