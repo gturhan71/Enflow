@@ -13,7 +13,7 @@ import { checkLimit, incrementUsage } from '../usageService';
 
 const ALLOWED_EXT = new Set([
   '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-  '.txt', '.csv', '.rtf', '.odt', '.ods',
+  '.txt', '.log', '.csv', '.rtf', '.odt', '.ods',
   '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp', '.tif', '.tiff',
   '.zip',
 ]);

@@ -1,13 +1,20 @@
 import { Router, Request, Response } from 'express';
+import path from 'path';
+import fs from 'fs';
 import { prisma } from '../prismaClient';
 import { asyncHandler, tenantMiddleware, requireRole } from '../middleware';
 import { logActivity } from '../services/activityLog';
 import { sweepServiceTicketSla } from '../services/serviceTicketReminders';
 import { nextDocumentNumber } from '../services/documentNumberService';
+import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
+import { slugify, getUploadDir } from '../utils/fileUpload';
 
 const router: Router = Router();
 const ROLES = requireRole(['GENERAL_MANAGER', 'PROJECT_MGR', 'OPERATIONS_MGR']);
 router.use(tenantMiddleware, ROLES);
+
+const SERVICE_TICKET_UPLOADS_ROOT = path.join(__dirname, '../../uploads/service-tickets');
+const ticketAttachmentUpload = documentUpload(20);
 
 // ServiceTicket (müşteri arıza bildirimi/intake) → WorkOrder (teknisyen sahaya
 // giden yürütme kaydı) bağlantısı. Önceden bu köprü hiç yoktu — WorkOrder.
@@ -56,10 +63,55 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   const ticket = await prisma.serviceTicket.findFirst({
     where: { id: String(req.params.id), tenantId: req.tenantId },
-    include: { project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true },
+    include: {
+      project: { select: { id: true, name: true, code: true, customerName: true } }, brand: true, productCategory: true,
+      attachments: { orderBy: { createdAt: 'desc' } },
+    },
   });
   if (!ticket) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
   res.json(ticket);
+}));
+
+// Arıza açılırken müşteriden alınan log dosyası/ekran görüntüsü/geri bildirim —
+// teknisyene sevk edildiğinde WorkOrder detayında (serviceTicketId üzerinden
+// canlı join ile, kopyalanmadan) görünür. Bkz. routes/workOrders.ts sourceTicketContext.
+router.post(
+  '/:id/attachments',
+  ticketAttachmentUpload.single('file'),
+  enforceStorageLimit(),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
+    const ticket = await prisma.serviceTicket.findFirst({ where: { id, tenantId: req.tenantId } });
+    if (!ticket) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
+
+    const { description } = req.body as { description?: string };
+    const folder = slugify(ticket.title || ticket.id);
+    const uploadDir = getUploadDir(SERVICE_TICKET_UPLOADS_ROOT, folder);
+    const ext = path.extname(req.file.originalname);
+    const safeName = `${id.slice(-8)}_${Date.now()}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+    fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
+    const fileUrl = `/uploads/service-tickets/${folder}/${safeName}`;
+
+    const attachment = await prisma.serviceTicketAttachment.create({
+      data: {
+        tenantId: req.tenantId, serviceTicketId: id, fileUrl, fileName: req.file.originalname,
+        description: description || null, uploadedById: req.userId,
+      },
+    });
+    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'SERVICE_TICKET_ATTACHMENT', entityId: attachment.id, details: { serviceTicketId: id, fileName: attachment.fileName } });
+    res.status(201).json(attachment);
+  }),
+);
+
+router.delete('/:id/attachments/:attId', asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const attId = String(req.params.attId);
+  const attachment = await prisma.serviceTicketAttachment.findFirst({ where: { id: attId, serviceTicketId: id, tenantId: req.tenantId } });
+  if (!attachment) return res.status(404).json({ error: 'Ek bulunamadı.' });
+  await prisma.serviceTicketAttachment.delete({ where: { id: attId } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'SERVICE_TICKET_ATTACHMENT', entityId: attId, details: { serviceTicketId: id } });
+  res.json({ message: 'Ek silindi.' });
 }));
 
 router.post('/', asyncHandler(async (req: Request, res: Response) => {
@@ -169,7 +221,7 @@ router.post('/:id/dispatch', asyncHandler(async (req: Request, res: Response) =>
   const tenantId = req.tenantId;
   const ticket = await prisma.serviceTicket.findFirst({
     where: { id, tenantId },
-    include: { project: { select: { customerName: true } } },
+    include: { project: { select: { customerId: true, customerName: true } } },
   });
   if (!ticket) return res.status(404).json({ error: 'Servis talebi bulunamadı.' });
 
@@ -191,6 +243,7 @@ router.post('/:id/dispatch', asyncHandler(async (req: Request, res: Response) =>
       description: ticket.description,
       priority: ticket.priority,
       projectId: ticket.projectId,
+      customerId: ticket.project?.customerId || null,
       customerName: ticket.project?.customerName || null,
       serviceTicketId: ticket.id,
       unitId: ticket.unitId,

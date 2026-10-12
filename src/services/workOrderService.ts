@@ -1,5 +1,5 @@
 import { apiClient, authFetch } from './apiClient';
-import { WorkOrder, WorkOrderTechnician, UtilizationReportData } from '../types';
+import { WorkOrder, WorkOrderAttachment, WorkOrderTechnician, UtilizationReportData } from '../types';
 
 export const workOrderService = {
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) {
@@ -69,6 +69,22 @@ export const workOrderService = {
 
   async deleteWorkOrder(id: string) {
     return apiClient.fetchWithAuth(`/work-orders/${id}`, { method: 'DELETE' });
+  },
+
+  // Bağlam dosyaları (log, ekran görüntüsü, saha fotoğrafı) — FormData, authFetch.
+  async uploadAttachment(workOrderId: string, file: File, description?: string): Promise<WorkOrderAttachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (description) formData.append('description', description);
+    const res = await authFetch(`/api/work-orders/${workOrderId}/attachments`, { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+  async deleteAttachment(workOrderId: string, attachmentId: string) {
+    return apiClient.fetchWithAuth(`/work-orders/${workOrderId}/attachments/${attachmentId}`, { method: 'DELETE' });
   },
 
   // --- Faz 3: Malzeme/Hizmet Talepleri ---

@@ -1,5 +1,5 @@
-import { apiClient } from './apiClient';
-import { ServiceTicket } from '../types';
+import { apiClient, authFetch } from './apiClient';
+import { ServiceTicket, ServiceTicketAttachment } from '../types';
 
 export const serviceTicketService = {
   async getServiceTickets(filters?: { status?: string; projectId?: string; priority?: string }) {
@@ -9,6 +9,10 @@ export const serviceTicketService = {
     if (filters?.priority) params.set('priority', filters.priority);
     const qs = params.toString();
     return apiClient.fetchWithAuth(`/service-tickets${qs ? `?${qs}` : ''}`);
+  },
+
+  async getServiceTicket(id: string) {
+    return apiClient.fetchWithAuth(`/service-tickets/${id}`);
   },
 
   async createServiceTicket(data: Partial<ServiceTicket>) {
@@ -41,5 +45,21 @@ export const serviceTicketService = {
   // ServiceTicket → WorkOrder köprüsü. İdempotent — zaten açılmışsa var olanı döner.
   async dispatchServiceTicket(id: string): Promise<{ workOrder: { id: string }; alreadyExisted: boolean }> {
     return apiClient.fetchWithAuth(`/service-tickets/${id}/dispatch`, { method: 'POST' });
+  },
+
+  // Arıza açılırken müşteriden alınan log/ekran görüntüsü/geri bildirim — FormData, authFetch.
+  async uploadAttachment(ticketId: string, file: File, description?: string): Promise<ServiceTicketAttachment> {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (description) formData.append('description', description);
+    const res = await authFetch(`/api/service-tickets/${ticketId}/attachments`, { method: 'POST', body: formData });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error((err as { error?: string }).error || `HTTP ${res.status}`);
+    }
+    return res.json();
+  },
+  async deleteAttachment(ticketId: string, attachmentId: string) {
+    return apiClient.fetchWithAuth(`/service-tickets/${ticketId}/attachments/${attachmentId}`, { method: 'DELETE' });
   },
 };

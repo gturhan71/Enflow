@@ -278,11 +278,14 @@ class ApiService {
   async updateTask(id: string, data: Partial<TodoTask>) { return taskService.updateTask(id, data); }
   async deleteTask(id: string) { return taskService.deleteTask(id); }
   async getServiceTickets(filters?: { status?: string; projectId?: string; priority?: string }) { return serviceTicketService.getServiceTickets(filters); }
+  async getServiceTicket(id: string) { return serviceTicketService.getServiceTicket(id); }
   async createServiceTicket(data: Partial<ServiceTicket>) { return serviceTicketService.createServiceTicket(data); }
   async updateServiceTicket(id: string, data: Partial<ServiceTicket>) { return serviceTicketService.updateServiceTicket(id, data); }
   async resolveServiceTicket(id: string, resolutionNotes?: string, costAmount?: number, costCurrency?: string) { return serviceTicketService.resolveServiceTicket(id, resolutionNotes, costAmount, costCurrency); }
   async deleteServiceTicket(id: string) { return serviceTicketService.deleteServiceTicket(id); }
   async dispatchServiceTicket(id: string) { return serviceTicketService.dispatchServiceTicket(id); }
+  async uploadServiceTicketAttachment(id: string, file: File, description?: string) { return serviceTicketService.uploadAttachment(id, file, description); }
+  async deleteServiceTicketAttachment(id: string, attachmentId: string) { return serviceTicketService.deleteAttachment(id, attachmentId); }
 
   // --- PROFESYONEL HİZMETLER: İş Emri (WorkOrder) ---
   async getWorkOrders(filters?: { status?: string; unitId?: string; assignedTechnicianId?: string; type?: string; customerId?: string; projectId?: string }) { return workOrderService.getWorkOrders(filters); }
@@ -299,6 +302,8 @@ class ApiService {
   async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) { return workOrderService.completeWorkOrder(id, data); }
   async uploadWorkOrderSignOff(id: string, file: File) { return workOrderService.uploadSignOff(id, file); }
   async deleteWorkOrder(id: string) { return workOrderService.deleteWorkOrder(id); }
+  async uploadWorkOrderAttachment(id: string, file: File, description?: string) { return workOrderService.uploadAttachment(id, file, description); }
+  async deleteWorkOrderAttachment(id: string, attachmentId: string) { return workOrderService.deleteAttachment(id, attachmentId); }
   async createMaterialRequest(workOrderId: string, data: Parameters<typeof workOrderService.createMaterialRequest>[1]) { return workOrderService.createMaterialRequest(workOrderId, data); }
   async updateMaterialRequest(workOrderId: string, matId: string, data: Parameters<typeof workOrderService.updateMaterialRequest>[2]) { return workOrderService.updateMaterialRequest(workOrderId, matId, data); }
   async approveMaterialRequest(workOrderId: string, matId: string) { return workOrderService.approveMaterialRequest(workOrderId, matId); }

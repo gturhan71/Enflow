@@ -27,13 +27,13 @@ reading the same files costs thousands. `:425-425` means line 425: read that ran
 
 ## deps
 ```
+src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
 src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
-src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
 src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
+src/modules/ServiceTicketsModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/workOrderReminders.ts ← prismaClient
-src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
 src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../lib/utils, ../types
 src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
 src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../types, ../services/apiService
@@ -81,6 +81,7 @@ src/modules/PresalesModule.tsx ← react, @tanstack/react-query, lucide-react, m
 src/modules/procurement/PRDetailDrawer.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
 src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
+src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
 src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
@@ -93,7 +94,6 @@ src/modules/reporting/BottleneckPanel.tsx ← lucide-react, ../types, ../constan
 src/modules/reporting/ConsolidationView.tsx ← helpers
 src/modules/reporting/helpers.ts ← ../constants, ../types
 src/modules/SalesSupport.tsx ← react, lucide-react, motion, services/apiService, contexts/AuthContext
-src/modules/ServiceTicketsModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/SettingsModule.tsx ← react, @tanstack/react-query, lucide-react, types, IntegrationWizard
 src/modules/SetupWizard.tsx ← react, lucide-react, services/apiService, types
 src/modules/SpecAnalysis.tsx ← react, lucide-react, motion, jspdf, jspdf-autotable
@@ -133,11 +133,13 @@ backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilitySer
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← fs, os, path, crypto, @prisma/client
 backend/src/services/session.ts ← express, jsonwebtoken
+backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← fs, path, prismaClient, schedulerLock, tenantContext
 backend/src/services/uploadsGuard.ts ← express, @prisma/client, prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
+backend/src/utils/secureUpload.ts ← multer, path, express, usageService
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/core.test.mjs ← core
@@ -198,13 +200,6 @@ pg@^8.22.0
 export async function sweepWorkOrderSla(tenantId) → Promise<void>  :12-52
 ```
 
-### backend/src/utils/businessDays.ts
-```
-export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
-export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
-export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan
-```
-
 ### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
 ```
 TABLE ProfitabilitySnapshot
@@ -255,6 +250,14 @@ INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
 ```
 TABLE WorkOrderMaterialRequest
 INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
+```
+
+### backend/prisma/migrations/20261012185248_add_service_attachments/migration.sql
+```
+TABLE ServiceTicketAttachment
+TABLE WorkOrderAttachment
+INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
+INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -313,6 +316,14 @@ INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
 ```
 TABLE WorkOrderMaterialRequest
 INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
+```
+
+### backend/prisma/migrations-postgres/20261012185248_add_service_attachments/migration.sql
+```
+TABLE ServiceTicketAttachment
+TABLE WorkOrderAttachment
+INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
+INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
 ```
 
 ### backend/prisma/migrations-postgres/migration_lock.toml
@@ -616,35 +627,6 @@ export interface AdvanceProcessResult  :740-744
 export class ProcessNotConfiguredError  :28-33
 ```
 
-### backend/src/services/profitabilityLedger.ts
-```
-export interface ProfitEvent  :17-30
-  date: Date  :18-18
-  amount: number  :19-19
-  currency: string  :20-20
-  direction: ProfitDirection  :21-21
-  basis: ProfitBasis  :22-22
-  source: ProfitSource  :23-23
-  category: string  :24-24
-  projectId: string | null  :25-25
-  opportunityId: string | null  :26-26
-  ref: string  :27-27
-  confidence: 'FIRM' | 'ESTIMATED'  :28-28
-  label: string  :29-29
-export interface LedgerProject  :34-46
-  id: string  :35-35
-  name: string  :36-36
-  totalValue: number  :37-37
-  contractCurrency: string  :38-38
-  progress: number  :39-39
-  startDate: Date | null  :40-40
-  plannedEndDate: Date | null  :41-41
-  createdAt: Date  :42-42
-  opportunityId: string | null  :43-43
-  applyOverhead: boolean  :44-44
-  overheadAmount: number  :45-45
-```
-
 ### backend/src/services/profitabilityRollup.ts
 ```
 export interface RollupOpts  :16-23
@@ -774,6 +756,11 @@ export function clearSessionCookie(req, res) → void  :109-111
 export const isWebClient = (req) =>  :114-114  # Tarayıcı arayüzü mü
 ```
 
+### backend/src/services/slaEscalation.ts
+```
+export async function sweepSlaEscalations  :14-69
+```
+
 ### backend/src/services/specAnalysis.ts
 ```
 export interface AnalyzedDoc  :11-18
@@ -868,6 +855,19 @@ export interface ApplyTemplateResult  :152-156
   createdProcesses: string[]  :154-154
   skippedProcesses: string[]  :155-155
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
+```
+
+### backend/src/utils/businessDays.ts
+```
+export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
+export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
+export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan
+```
+
+### backend/src/utils/secureUpload.ts
+```
+export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
+export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
 ```
 
 ## governance
@@ -1072,6 +1072,28 @@ code-fence plain
 
 ## src
 
+### src/App.tsx
+```
+hook useState
+hook useRef
+hook useEffect
+hook useOpportunities
+hook useCustomers
+hook useProjects
+hook useContracts
+hook useTasks
+hook useUnits
+hook useUsers
+hook useDocuments
+hook useProposals
+export App
+handler onApproveProposal
+handler onNavigate
+handler onLogout
+handler onComplete
+handler onLogin
+```
+
 ### src/components/settings/UserManagement.tsx
 ```
 props UserManagementProps
@@ -1095,15 +1117,6 @@ handler onSubmit
 handler onChange
 ```
 
-### src/modules/professional-services/UtilizationReport.tsx
-```
-component UtilizationReport
-hook useState
-hook useCallback
-hook useEffect
-export UtilizationReport
-```
-
 ### src/modules/ProfessionalServicesModule.tsx
 ```
 component ProfessionalServicesModule
@@ -1120,9 +1133,26 @@ handler onChange
 handler onSubmit
 ```
 
+### src/modules/ServiceTicketsModule.tsx
+```
+component ServiceTicketsModule
+props Props
+hook useState
+hook useRef
+hook useAuth
+hook useBrands
+hook useProductCategories
+hook useCallback
+hook useEffect
+export ServiceTicketsModule
+handler onClick
+handler onChange
+handler onSubmit
+```
+
 ### src/services/apiService.ts
 ```
-class ApiService  :26-908
+class ApiService  :26-913
   setAuth(tenantId)  :27-29
   async getSession() → Promise<  :32-32
   async logout() → Promise<void>  :39-41
@@ -1176,28 +1206,6 @@ export interface ProjectMilestone  :9-34
   notes?: string | null  :31-31
   createdAt: string  :32-32
   updatedAt: string  :33-33
-```
-
-### src/App.tsx
-```
-hook useState
-hook useRef
-hook useEffect
-hook useOpportunities
-hook useCustomers
-hook useProjects
-hook useContracts
-hook useTasks
-hook useUnits
-hook useUsers
-hook useDocuments
-hook useProposals
-export App
-handler onApproveProposal
-handler onNavigate
-handler onLogout
-handler onComplete
-handler onLogin
 ```
 
 ### src/components/settings/ProductTaxonomyManagement.tsx
@@ -1838,6 +1846,15 @@ handler onChange
 handler onClick
 ```
 
+### src/modules/professional-services/UtilizationReport.tsx
+```
+component UtilizationReport
+hook useState
+hook useCallback
+hook useEffect
+export UtilizationReport
+```
+
 ### src/modules/professional-services/WeeklyPlanView.tsx
 ```
 component WeeklyPlanView
@@ -1999,22 +2016,6 @@ handler onSelectTender
 handler onChange
 handler onClick
 handler onKeyDown
-```
-
-### src/modules/ServiceTicketsModule.tsx
-```
-component ServiceTicketsModule
-props Props
-hook useState
-hook useAuth
-hook useBrands
-hook useProductCategories
-hook useCallback
-hook useEffect
-export ServiceTicketsModule
-handler onClick
-handler onChange
-handler onSubmit
 ```
 
 ### src/modules/SettingsModule.tsx
@@ -2556,16 +2557,15 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 ```
 
 
-> **Not everything is here.** 223 file(s) omitted to stay under the 21757-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21846-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@aa1205e)
+## recent changes (main@60f43d1)
 ```
-src/modules/professional-services/UtilizationReport.tsx +monthKeyOf  +monthLabelOf  +UtilizationReport
-src/modules/ProfessionalServicesModule.tsx    ~ProfessionalServicesModule
+src/modules/ProfessionalServicesModule.tsx    +saat  ~ProfessionalServicesModule
+src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule  ~ServiceTicketsModule
 src/services/apiService.ts                    ~ApiService
 backend/src/services/workOrderReminders.ts    +sweepWorkOrderSla
-backend/src/utils/businessDays.ts             +countBusinessDaysInRange  ~computeSlaDueDate
 ```
 
-<!-- Updated: 2026-10-12T18:42:15.187Z -->
+<!-- Updated: 2026-10-12T19:01:17.159Z -->

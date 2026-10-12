@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, PauseCircle, RotateCcw, CalendarClock, ShoppingCart, Kanban, CalendarDays, List, Gauge,
+  Paperclip, Trash2, Phone, Mail, Ticket,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -56,6 +57,8 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
 
   const [form, setForm] = useState({
     type: 'INSTALLATION' as WorkOrderType, title: '', description: '', priority: 'NORMAL' as WorkOrderPriority,
@@ -208,6 +211,33 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
       alert(err instanceof Error ? err.message : 'Dosya yüklenemedi.');
     } finally {
       setUploadingFile(false);
+    }
+  };
+
+  // Bağlam dosyaları (log, ekran görüntüsü, saha fotoğrafı) — kapanış kanıtından
+  // farklı, serbest sayıda/opsiyonel; teknisyenin işi doğru yapabilmesi için.
+  const handleAttachmentUpload = async (file: File) => {
+    if (!detailOrder) return;
+    setUploadingAttachment(true);
+    try {
+      await apiService.uploadWorkOrderAttachment(detailOrder.id, file);
+      const full = await apiService.getWorkOrder(detailOrder.id) as WorkOrder;
+      setDetailOrder(full);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Dosya yüklenemedi.');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleAttachmentDelete = async (attachmentId: string) => {
+    if (!detailOrder) return;
+    try {
+      await apiService.deleteWorkOrderAttachment(detailOrder.id, attachmentId);
+      const full = await apiService.getWorkOrder(detailOrder.id) as WorkOrder;
+      setDetailOrder(full);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ek silinemedi.');
     }
   };
 
@@ -419,6 +449,61 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                 )}
               </div>
               {detailOrder.description && <p className="text-sm text-slate-600">{detailOrder.description}</p>}
+
+              {detailOrder.sourceTicket && (
+                <div className="p-3 bg-indigo-50/60 border border-indigo-200 rounded-xl space-y-1.5">
+                  <p className="text-[10px] font-black text-indigo-700 uppercase tracking-widest flex items-center gap-1"><Ticket size={12} /> Kaynak Servis Talebi — müşteri bildirimi</p>
+                  {detailOrder.sourceTicket.reportedByName && (
+                    <p className="text-xs text-slate-700"><strong>Bildiren:</strong> {detailOrder.sourceTicket.reportedByName}</p>
+                  )}
+                  {detailOrder.sourceTicket.reportedByContact && (
+                    <div className="flex items-center gap-3 text-xs text-slate-600">
+                      {detailOrder.sourceTicket.reportedByContact.phone && <span className="flex items-center gap-1"><Phone size={11} /> {detailOrder.sourceTicket.reportedByContact.phone}</span>}
+                      {detailOrder.sourceTicket.reportedByContact.email && <span className="flex items-center gap-1"><Mail size={11} /> {detailOrder.sourceTicket.reportedByContact.email}</span>}
+                    </div>
+                  )}
+                  {(detailOrder.sourceTicket.brand || detailOrder.sourceTicket.productCategory) && (
+                    <div className="flex gap-1">
+                      {detailOrder.sourceTicket.brand && <span className="text-[9px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded-full">{detailOrder.sourceTicket.brand.name}</span>}
+                      {detailOrder.sourceTicket.productCategory && <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded-full">{detailOrder.sourceTicket.productCategory.name}</span>}
+                    </div>
+                  )}
+                  {detailOrder.sourceTicket.description && detailOrder.sourceTicket.description !== detailOrder.description && (
+                    <p className="text-xs text-slate-500 italic">"{detailOrder.sourceTicket.description}"</p>
+                  )}
+                  {!!detailOrder.sourceTicket.attachments?.length && (
+                    <ul className="space-y-1 pt-1 border-t border-indigo-200/60">
+                      {detailOrder.sourceTicket.attachments.map(a => (
+                        <li key={a.id}>
+                          <a href={a.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 font-bold underline flex items-center gap-1"><Paperclip size={11} /> {a.description || a.fileName}</a>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Paperclip size={12} /> Bağlam Dosyaları — log / foto / saha notu</p>
+                  <input ref={attachmentInputRef} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachmentUpload(f); e.target.value = ''; }} />
+                  <button onClick={() => attachmentInputRef.current?.click()} disabled={uploadingAttachment} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                    {uploadingAttachment ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Ekle
+                  </button>
+                </div>
+                {!detailOrder.attachments?.length ? (
+                  <p className="text-[11px] text-slate-400">Henüz ek yok.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {detailOrder.attachments.map(a => (
+                      <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
+                        <a href={a.fileUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline truncate">{a.description || a.fileName}</a>
+                        <button onClick={() => handleAttachmentDelete(a.id)} className="text-slate-300 hover:text-red-500 shrink-0"><Trash2 size={13} /></button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
 
               {(detailOrder.estimatedLaborCost != null || detailOrder.estimatedMaterialCost != null) && (
                 <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">

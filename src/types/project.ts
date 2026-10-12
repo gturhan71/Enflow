@@ -101,6 +101,18 @@ export const SERVICE_TICKET_PRIORITY_LABEL: Record<ServiceTicketPriority, string
 export const SERVICE_TICKET_STATUS_LABEL: Record<ServiceTicketStatus, string> = {
   OPEN: 'Açık', IN_PROGRESS: 'İşlemde', WAITING_PART: 'Parça Bekliyor', RESOLVED: 'Çözüldü', CLOSED: 'Kapandı',
 };
+// Arıza açılırken müşteriden alınan log dosyası/ekran görüntüsü/geri bildirim —
+// teknisyene sevk edildiğinde WorkOrder.sourceTicket üzerinden canlı görünür.
+export interface ServiceTicketAttachment {
+  id: string;
+  serviceTicketId: string;
+  fileUrl: string;
+  fileName: string;
+  description?: string | null;
+  uploadedById?: string | null;
+  uploadedByName?: string | null;
+  createdAt?: string;
+}
 export interface ServiceTicket {
   id: string;
   tenantId?: string;
@@ -127,6 +139,7 @@ export interface ServiceTicket {
   brand?: { id: string; name: string } | null;
   productCategoryId?: string | null;
   productCategory?: { id: string; name: string } | null;
+  attachments?: ServiceTicketAttachment[]; // yalnız GET /service-tickets/:id detayında dolu
   createdAt?: string;
   updatedAt?: string;
 }
@@ -199,8 +212,36 @@ export interface WorkOrder {
   costCurrency?: string | null;
   servicePlanId?: string | null; // Faz 2 — ServiceWorkPlan'a opsiyonel bağlanma
   materialRequests?: WorkOrderMaterialRequest[]; // Faz 3 — yalnız GET /work-orders/:id detayında dolu
+  attachments?: WorkOrderAttachment[]; // bağlam dosyaları — yalnız GET /work-orders/:id detayında dolu
+  sourceTicket?: WorkOrderSourceTicket | null; // ServiceTicket'tan sevk edildiyse canlı bağlam — yalnız GET /work-orders/:id detayında dolu
   createdAt?: string;
   updatedAt?: string;
+}
+// Teknisyenin işi doğru yapabilmesi için gereken bağlam dosyaları (log,
+// ekran görüntüsü, saha fotoğrafı) — kapanış kanıtından (customerSignOffFileUrl,
+// tek/zorunlu) farklı, serbest sayıda/opsiyonel destekleyici belge.
+export interface WorkOrderAttachment {
+  id: string;
+  workOrderId: string;
+  fileUrl: string;
+  fileName: string;
+  description?: string | null;
+  uploadedById?: string | null;
+  uploadedByName?: string | null;
+  createdAt?: string;
+}
+// Bu iş emri bir ServiceTicket'tan sevk edildiyse, o talebin güncel hâli —
+// kim bildirdi/nasıl ulaşılır, hangi marka-ürün, hangi dosyalar eklenmiş.
+export interface WorkOrderSourceTicket {
+  id: string;
+  title: string;
+  description?: string | null;
+  reportedByName?: string | null;
+  reportedByContactId?: string | null;
+  reportedByContact?: { name: string; phone: string | null; email: string | null } | null;
+  brand?: { id: string; name: string } | null;
+  productCategory?: { id: string; name: string } | null;
+  attachments: ServiceTicketAttachment[];
 }
 // Profesyonel Hizmetler — Faz 3: dış kaynak malzeme/hizmet talebi. PurchaseRequest'in
 // 9 statülü tam onay zincirinin KASITLI DIŞINDA, hafif/tek-adımlı (yalnız birim

@@ -24,6 +24,7 @@ const isManager = (req: Request) => MANAGER_ROLES.has(req.userRole || '');
 
 const WORK_ORDER_UPLOADS_ROOT = path.join(__dirname, '../../uploads/work-orders');
 const signoffUpload = documentUpload(20);
+const contextUpload = documentUpload(20);
 
 const INCLUDE = {
   customer: { select: { id: true, name: true } },
@@ -116,6 +117,33 @@ async function notifyOperationsManagers(tenantId: string, workOrderId: string, n
 function technicianOwnsOrManages(req: Request, workOrder: { assignedTechnicianId: string | null }): boolean {
   if (isManager(req)) return true;
   return !!workOrder.assignedTechnicianId && workOrder.assignedTechnicianId === req.userId;
+}
+
+// Teknisyenin işi tam ve eksiksiz yapabilmesi için gereken bağlam — bu iş emri
+// bir ServiceTicket'tan sevk edildiyse (dispatch), kim bildirdi/nasıl ulaşılır/
+// hangi marka-ürün/müşterinin o anda eklediği dosyalar neler — CANLI join ile
+// döner, dispatch anında KOPYALANMAZ (tek doğruluk kaynağı ServiceTicket kalır,
+// sonradan düzeltilirse WorkOrder ekranı da güncel görür).
+async function sourceTicketContext(tenantId: string, serviceTicketId: string | null) {
+  if (!serviceTicketId) return null;
+  const ticket = await prisma.serviceTicket.findFirst({
+    where: { id: serviceTicketId, tenantId },
+    select: {
+      id: true, title: true, description: true, reportedByName: true, reportedByContactId: true,
+      brand: { select: { id: true, name: true } },
+      productCategory: { select: { id: true, name: true } },
+      attachments: { orderBy: { createdAt: 'desc' } },
+    },
+  });
+  if (!ticket) return null;
+  let reportedByContact: { name: string; phone: string | null; email: string | null } | null = null;
+  if (ticket.reportedByContactId) {
+    reportedByContact = await prisma.contact.findFirst({
+      where: { id: ticket.reportedByContactId, tenantId },
+      select: { name: true, phone: true, email: true },
+    });
+  }
+  return { ...ticket, reportedByContact };
 }
 
 router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
@@ -284,11 +312,18 @@ router.get('/:id', asyncHandler(async (req: Request, res: Response) => {
   // (technicianCostRate) yalnız GM/OPERATIONS_MGR'a döner, PROJECT_MGR yalnız toplamı görür.
   const costs = isManager(req) ? await estimatedCosts(req.tenantId, order) : null;
   const { technicianCostRate, technicianCostRateUnit, ...publicCosts } = costs || {};
+  const sourceTicket = await sourceTicketContext(req.tenantId, order.serviceTicketId);
+  const attachments = await prisma.workOrderAttachment.findMany({
+    where: { tenantId: req.tenantId, workOrderId: order.id },
+    orderBy: { createdAt: 'desc' },
+  });
   res.json({
     ...order,
     openPurchaseRequestCount: openPrCount,
     materialRequests,
     contractDeliverySla: contractSla,
+    sourceTicket,
+    attachments,
     ...(costs ? publicCosts : {}),
     ...(costs && canSeeCost(req) ? { technicianCostRate, technicianCostRateUnit } : {}),
   });
@@ -515,6 +550,54 @@ router.post(
     res.json(order);
   }),
 );
+
+// Bağlam dosyaları (log, ekran görüntüsü, saha fotoğrafı, müşteri geri bildirim
+// belgesi) — kapanış kanıtından (customerSignOffFileUrl, tek ve zorunlu) FARKLI:
+// bunlar serbest sayıda, opsiyonel, iş emrinin yürütülmesi sırasında herhangi
+// bir an eklenebilir. Yönetici veya atanan teknisyen ekleyebilir.
+router.post(
+  '/:id/attachments',
+  contextUpload.single('file'),
+  enforceStorageLimit(),
+  asyncHandler(async (req: Request, res: Response) => {
+    const id = String(req.params.id);
+    if (!req.file) return res.status(400).json({ error: 'Dosya gönderilmedi.' });
+
+    const record = await prisma.workOrder.findFirst({ where: { id, tenantId: req.tenantId } });
+    if (!record) return res.status(404).json({ error: 'İş emri bulunamadı.' });
+    if (!technicianOwnsOrManages(req, record)) return res.status(403).json({ error: 'Bu iş emrine dosya ekleme yetkiniz yok.' });
+
+    const { description, uploadedByName } = req.body as { description?: string; uploadedByName?: string };
+    const folder = slugify(record.workOrderNo || record.title || record.id);
+    const uploadDir = getUploadDir(WORK_ORDER_UPLOADS_ROOT, folder);
+    const ext = path.extname(req.file.originalname);
+    const safeName = `ctx_${id.slice(-8)}_${Date.now()}_${slugify(path.basename(req.file.originalname, ext))}${ext}`;
+    fs.writeFileSync(path.join(uploadDir, safeName), req.file.buffer);
+    const fileUrl = `/uploads/work-orders/${folder}/${safeName}`;
+
+    const attachment = await prisma.workOrderAttachment.create({
+      data: {
+        tenantId: req.tenantId, workOrderId: id, fileUrl, fileName: req.file.originalname,
+        description: description || null, uploadedById: req.userId, uploadedByName: uploadedByName || null,
+      },
+    });
+    await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'CREATE', entityType: 'WORK_ORDER_ATTACHMENT', entityId: attachment.id, details: { workOrderId: id, fileName: attachment.fileName } });
+    res.status(201).json(attachment);
+  }),
+);
+
+router.delete('/:id/attachments/:attId', asyncHandler(async (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const attId = String(req.params.attId);
+  const record = await prisma.workOrder.findFirst({ where: { id, tenantId: req.tenantId } });
+  if (!record) return res.status(404).json({ error: 'İş emri bulunamadı.' });
+  const attachment = await prisma.workOrderAttachment.findFirst({ where: { id: attId, workOrderId: id, tenantId: req.tenantId } });
+  if (!attachment) return res.status(404).json({ error: 'Ek bulunamadı.' });
+  if (!isManager(req) && attachment.uploadedById !== req.userId) return res.status(403).json({ error: 'Bu eki silme yetkiniz yok.' });
+  await prisma.workOrderAttachment.delete({ where: { id: attId } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'DELETE', entityType: 'WORK_ORDER_ATTACHMENT', entityId: attId, details: { workOrderId: id } });
+  res.json({ message: 'Ek silindi.' });
+}));
 
 router.post('/:id/complete', asyncHandler(async (req: Request, res: Response) => {
   const id = String(req.params.id);

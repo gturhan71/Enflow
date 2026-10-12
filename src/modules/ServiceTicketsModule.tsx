@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
-  Wrench, Plus, X, RefreshCw, AlertTriangle, CheckCircle2, Loader2, HardHat,
+  Wrench, Plus, X, RefreshCw, AlertTriangle, CheckCircle2, Loader2, HardHat, Paperclip, Upload, Trash2,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -43,6 +43,8 @@ export function ServiceTicketsModule({ projects, onNavigate }: Props) {
   const [costAmount, setCostAmount] = useState('');
   const [costCurrency, setCostCurrency] = useState('TRY');
   const [dispatching, setDispatching] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
 
   const [form, setForm] = useState({
     projectId: '', title: '', description: '', category: 'FAULT' as ServiceTicketCategory,
@@ -135,6 +137,33 @@ export function ServiceTicketsModule({ projects, onNavigate }: Props) {
     }
   };
 
+  // Arıza açılırken müşteriden alınan log/ekran görüntüsü/geri bildirim —
+  // teknisyene sevk edildiğinde WorkOrder ekranında bu liste canlı görünür.
+  const handleAttachmentUpload = async (file: File) => {
+    if (!detailTicket) return;
+    setUploadingAttachment(true);
+    try {
+      await apiService.uploadServiceTicketAttachment(detailTicket.id, file);
+      const full = await apiService.getServiceTicket(detailTicket.id) as ServiceTicket;
+      setDetailTicket(full);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Dosya yüklenemedi.');
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
+
+  const handleAttachmentDelete = async (attachmentId: string) => {
+    if (!detailTicket) return;
+    try {
+      await apiService.deleteServiceTicketAttachment(detailTicket.id, attachmentId);
+      const full = await apiService.getServiceTicket(detailTicket.id) as ServiceTicket;
+      setDetailTicket(full);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Ek silinemedi.');
+    }
+  };
+
   return (
     <div className="p-6 space-y-6 h-full overflow-y-auto pb-24">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -184,7 +213,11 @@ export function ServiceTicketsModule({ projects, onNavigate }: Props) {
               <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400">Servis talebi bulunamadı.</td></tr>
             )}
             {tickets.map(t => (
-              <tr key={t.id} onClick={() => { setDetailTicket(t); setResolutionNotes(t.resolutionNotes || ''); setCostAmount(t.costAmount ? String(t.costAmount) : ''); setCostCurrency(t.costCurrency || 'TRY'); }} className="hover:bg-slate-50 cursor-pointer transition-colors">
+              <tr key={t.id} onClick={() => {
+                setDetailTicket(t); setResolutionNotes(t.resolutionNotes || ''); setCostAmount(t.costAmount ? String(t.costAmount) : ''); setCostCurrency(t.costCurrency || 'TRY');
+                // Liste satırı hafif (attachments yok) — detay açılırken tam kayıt çekilir.
+                apiService.getServiceTicket(t.id).then((full) => setDetailTicket(full as ServiceTicket)).catch(() => {});
+              }} className="hover:bg-slate-50 cursor-pointer transition-colors">
                 <td className="px-4 py-3">
                   <div className="font-bold text-slate-800">{t.title}</div>
                   {t.reportedByName && <div className="text-xs text-slate-400">{t.reportedByName}</div>}
@@ -287,9 +320,34 @@ export function ServiceTicketsModule({ projects, onNavigate }: Props) {
                 {detailTicket.productCategory && <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-full">{detailTicket.productCategory.name}</span>}
               </div>
               {detailTicket.description && <p className="text-sm text-slate-600">{detailTicket.description}</p>}
+              {detailTicket.reportedByName && (
+                <p className="text-xs text-slate-500"><strong>Bildiren:</strong> {detailTicket.reportedByName}</p>
+              )}
               {detailTicket.dueAt && (
                 <p className="text-xs text-slate-400">SLA: {new Date(detailTicket.dueAt).toLocaleString('tr-TR')} {isOverdue(detailTicket) && <span className="text-red-600 font-black">— AŞILDI</span>}</p>
               )}
+
+              <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><Paperclip size={12} /> Ekler — log / ekran görüntüsü / geri bildirim</p>
+                  <input ref={attachmentInputRef} type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleAttachmentUpload(f); e.target.value = ''; }} />
+                  <button onClick={() => attachmentInputRef.current?.click()} disabled={uploadingAttachment} className="text-xs font-bold text-indigo-600 hover:text-indigo-700 flex items-center gap-1 disabled:opacity-50">
+                    {uploadingAttachment ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />} Ekle
+                  </button>
+                </div>
+                {!detailTicket.attachments?.length ? (
+                  <p className="text-[11px] text-slate-400">Henüz ek yok.</p>
+                ) : (
+                  <ul className="space-y-1">
+                    {detailTicket.attachments.map(a => (
+                      <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
+                        <a href={a.fileUrl} target="_blank" rel="noreferrer" className="text-indigo-600 font-bold underline truncate">{a.description || a.fileName}</a>
+                        <button onClick={() => handleAttachmentDelete(a.id)} className="text-slate-300 hover:text-red-500 shrink-0"><Trash2 size={13} /></button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
               {OPEN_STATUSES.includes(detailTicket.status) ? (
                 <div className="pt-2 space-y-2">
                   {onNavigate && (

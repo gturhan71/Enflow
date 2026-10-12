@@ -75,6 +75,8 @@ model Tenant {
   workSpecialties         WorkSpecialty[]
   serviceWorkPlans        ServiceWorkPlan[]
   workOrderMaterialRequests WorkOrderMaterialRequest[]
+  serviceTicketAttachments ServiceTicketAttachment[]
+  workOrderAttachments    WorkOrderAttachment[]
 }
 
 enum SubscriptionPlan {
@@ -563,9 +565,30 @@ model ServiceTicket {
   createdAt           DateTime         @default(now())
   updatedAt           DateTime         @updatedAt
   workOrders          WorkOrder[]
+  attachments         ServiceTicketAttachment[]
 
   @@index([tenantId, status])
   @@index([tenantId, projectId])
+}
+
+// Arıza açılırken müşteriden alınan log dosyası/ekran görüntüsü/geri bildirim
+// belgesi — teknisyene sevk edildiğinde eksiksiz bağlam taşınabilsin diye.
+// Kopyalanmaz: WorkOrder detayı, bağlı ServiceTicket varsa bu listeyi canlı
+// (join ile) gösterir — tek doğruluk kaynağı burası kalır.
+model ServiceTicketAttachment {
+  id              String        @id @default(cuid())
+  tenantId        String
+  tenant          Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  serviceTicketId String
+  serviceTicket   ServiceTicket @relation(fields: [serviceTicketId], references: [id], onDelete: Cascade)
+  fileUrl         String
+  fileName        String
+  description     String? // örn. "Müşteriden alınan log", "Hata ekran görüntüsü"
+  uploadedById    String?
+  uploadedByName  String?
+  createdAt       DateTime      @default(now())
+
+  @@index([tenantId, serviceTicketId])
 }
 
 // Profesyonel Hizmetler (post-sales) — kurulum/arıza/bakım için teknisyen
@@ -617,12 +640,34 @@ model WorkOrder {
   costAmount             Float? // işçilik + malzeme toplamı (elle girilir — materyal talebi tutarları otomatik toplanmaz, bkz. WorkOrderMaterialRequest)
   costCurrency           String?
   materialRequests       WorkOrderMaterialRequest[]
+  attachments            WorkOrderAttachment[]
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
 
   @@index([tenantId, status])
   @@index([tenantId, assignedTechnicianId])
   @@index([tenantId, projectId])
+}
+
+// Teknisyenin işi doğru yapabilmesi için gereken bağlam dosyaları — arıza
+// fotoğrafı, saha notu, müşteriden alınan ek log/ekran görüntüsü (ServiceTicket'tan
+// farklı olarak bunlar iş emrinin kendi yürütme sürecinde eklenir). Kapanış
+// kanıtı (customerSignOffFileUrl) ile KARIŞTIRILMAZ — o tek, zorunlu bir alan;
+// bu ise serbest sayıda, opsiyonel destekleyici belge listesidir.
+model WorkOrderAttachment {
+  id             String    @id @default(cuid())
+  tenantId       String
+  tenant         Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrderId    String
+  workOrder      WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  fileUrl        String
+  fileName       String
+  description    String?
+  uploadedById   String?
+  uploadedByName String?
+  createdAt      DateTime  @default(now())
+
+  @@index([tenantId, workOrderId])
 }
 
 // Profesyonel Hizmetler — Faz 3: iş emrinin yürütülmesi için dış kaynaktan
