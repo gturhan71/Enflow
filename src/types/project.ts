@@ -208,6 +208,7 @@ export interface WorkOrder {
   customerSignOffAt?: string | null;
   customerSignOffName?: string | null;
   customerSignOffFileUrl?: string | null;
+  customerSatisfactionScore?: number | null; // CSAT — opsiyonel, 1-5, yalnız /complete'te girilir
   costAmount?: number | null;
   costCurrency?: string | null;
   servicePlanId?: string | null; // Faz 2 — ServiceWorkPlan'a opsiyonel bağlanma
@@ -275,14 +276,18 @@ export interface WorkOrderSummary {
   open: number;
   completed: number;
   avgResolutionDays: number | null;
+  avgSatisfaction: number | null; // CSAT ortalaması (1-5)
+  satisfactionCount: number;
   byTechnician: { userId: string; name: string; open: number; completed: number }[];
 }
-// Sevkiyat için teknisyen listesi — uzmanlık + (yalnız GM/OPERATIONS_MGR'a) maliyet.
+// Sevkiyat için teknisyen listesi — uzmanlık + güncel açık iş sayısı (kapasite-
+// farkındalıklı dispatch, sert kısıt değil) + (yalnız GM/OPERATIONS_MGR'a) maliyet.
 export interface WorkOrderTechnician {
   id: string;
   name: string;
   unitId?: string | null;
   specialties: { id: string; name: string }[];
+  openCount: number;
   costRate?: number | null;
   costRateUnit?: string | null;
   costCurrency?: string | null;

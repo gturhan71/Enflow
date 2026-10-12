@@ -637,6 +637,7 @@ model WorkOrder {
   customerSignOffAt      DateTime?
   customerSignOffName    String?
   customerSignOffFileUrl String? // ZORUNLU — COMPLETED'a geçiş bu alan doluymadan reddedilir (bkz. routes/workOrders.ts)
+  customerSatisfactionScore Int? // CSAT — opsiyonel, 1-5, yalnız /complete'te girilir
   costAmount             Float? // işçilik + malzeme toplamı (elle girilir — materyal talebi tutarları otomatik toplanmaz, bkz. WorkOrderMaterialRequest)
   costCurrency           String?
   materialRequests       WorkOrderMaterialRequest[]

@@ -27,8 +27,8 @@ export function computeSlaDueDate(slaBusinessDays?: number | null, from: Date = 
   return addBusinessDays(from, slaBusinessDays);
 }
 
-/** [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan gün sayısı — Faz 5
- * Ekip Utilizasyonu kapasite hesabı için (resmi tatil listesi yok, bilinçli basitleştirme). */
+/** [start,end] (ikisi de dahil) aralığındaki hafta sonu/resmi tatil olmayan gün
+ * sayısı — Faz 5 Ekip Utilizasyonu kapasite hesabı için. */
 export function countBusinessDaysInRange(start: Date, end: Date, holidays: string[] = []): number {
   const holidaySet = new Set(holidays);
   let count = 0;

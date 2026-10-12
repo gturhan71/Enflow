@@ -28,14 +28,15 @@ reading the same files costs thousands. `:425-425` means line 425: read that ran
 ## deps
 ```
 src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
-src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/ServiceTicketsModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
 backend/src/services/workOrderReminders.ts ← prismaClient
+backend/src/utils/secureUpload.ts ← multer, path, express, usageService
 src/components/settings/ProductTaxonomyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../lib/utils, ../types
 src/components/settings/TenantSettings.tsx ← react, lucide-react, ../lib/utils, ../types, ../services/apiService
+src/components/settings/UserManagement.tsx ← react, lucide-react, motion, ../types, ../constants
 src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-query, lucide-react, ../types, ../services/apiService
 src/hooks/useBoM.ts ← react, services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← @tanstack/react-query, services/apiService
@@ -133,13 +134,11 @@ backend/src/services/profitabilitySnapshot.ts ← prismaClient, profitabilitySer
 backend/src/services/profitabilitySnapshotScheduler.ts ← prismaClient, profitabilitySnapshot, schedulerLock, tenantContext, periodic
 backend/src/services/restoreService.ts ← fs, os, path, crypto, @prisma/client
 backend/src/services/session.ts ← express, jsonwebtoken
-backend/src/services/slaEscalation.ts ← prismaClient, utils/entityTypeTab
 backend/src/services/specAnalysis.ts ← aiClient
 backend/src/services/unitReportingService.ts ← prismaClient
 backend/src/services/updateNotifier.ts ← fs, path, prismaClient, schedulerLock, tenantContext
 backend/src/services/uploadsGuard.ts ← express, @prisma/client, prismaClient, utils/logger
 backend/src/services/workflowTemplate.ts ← prismaClient, activityLog, bootstrapTenant
-backend/src/utils/secureUpload.ts ← multer, path, express, usageService
 upgrade-tool/cli.mjs ← core
 upgrade-tool/core.mjs ← install/lib/service
 upgrade-tool/core.test.mjs ← core
@@ -195,9 +194,31 @@ pg@^8.22.0
 
 ## backend
 
+### backend/prisma/migrations/20261012185248_add_service_attachments/migration.sql
+```
+TABLE ServiceTicketAttachment
+TABLE WorkOrderAttachment
+INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
+INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
+```
+
+### backend/prisma/migrations-postgres/20261012185248_add_service_attachments/migration.sql
+```
+TABLE ServiceTicketAttachment
+TABLE WorkOrderAttachment
+INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
+INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
+```
+
 ### backend/src/services/workOrderReminders.ts
 ```
 export async function sweepWorkOrderSla(tenantId) → Promise<void>  :12-52
+```
+
+### backend/src/utils/secureUpload.ts
+```
+export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
+export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
 ```
 
 ### backend/prisma/migrations/20260828090314_add_profitability_snapshot/migration.sql
@@ -250,14 +271,6 @@ INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
 ```
 TABLE WorkOrderMaterialRequest
 INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
-```
-
-### backend/prisma/migrations/20261012185248_add_service_attachments/migration.sql
-```
-TABLE ServiceTicketAttachment
-TABLE WorkOrderAttachment
-INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
-INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
 ```
 
 ### backend/prisma/migrations/migration_lock.toml
@@ -316,14 +329,6 @@ INDEX ServiceWorkPlan_tenantId_weekOf_idx ON ServiceWorkPlan
 ```
 TABLE WorkOrderMaterialRequest
 INDEX WorkOrderMaterialRequest_tenantId_workOrderId_idx ON WorkOrderMaterialRequest
-```
-
-### backend/prisma/migrations-postgres/20261012185248_add_service_attachments/migration.sql
-```
-TABLE ServiceTicketAttachment
-TABLE WorkOrderAttachment
-INDEX ServiceTicketAttachment_tenantId_serviceTicketId_idx ON ServiceTicketAttachment
-INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
 ```
 
 ### backend/prisma/migrations-postgres/migration_lock.toml
@@ -756,11 +761,6 @@ export function clearSessionCookie(req, res) → void  :109-111
 export const isWebClient = (req) =>  :114-114  # Tarayıcı arayüzü mü
 ```
 
-### backend/src/services/slaEscalation.ts
-```
-export async function sweepSlaEscalations  :14-69
-```
-
 ### backend/src/services/specAnalysis.ts
 ```
 export interface AnalyzedDoc  :11-18
@@ -861,13 +861,12 @@ export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → P
 ```
 export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
 export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
-export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu olmayan
+export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu/resmi t
 ```
 
-### backend/src/utils/secureUpload.ts
+### backend/src/utils/entityTypeTab.ts
 ```
-export function documentUpload(maxMb = 50)  :48-54  # Bellek-tabanlı, tür-doğrulamalı yükleme
-export function enforceStorageLimit()  :62-73  # multer'dan SONRA, route handler'dan ÖNCE — yüklenen dosyayı 
+export function entityTypeToTab  :25-27
 ```
 
 ## governance
@@ -1094,17 +1093,6 @@ handler onComplete
 handler onLogin
 ```
 
-### src/components/settings/UserManagement.tsx
-```
-props UserManagementProps
-hook useState
-hook useWorkSpecialties
-hook useEffect
-export UserManagement
-handler onSubmit
-handler onConfirm
-```
-
 ### src/layout/Sidebar.tsx
 ```
 hook useUnsavedChanges
@@ -1152,7 +1140,7 @@ handler onSubmit
 
 ### src/services/apiService.ts
 ```
-class ApiService  :26-913
+class ApiService  :26-915
   setAuth(tenantId)  :27-29
   async getSession() → Promise<  :32-32
   async logout() → Promise<void>  :39-41
@@ -1230,6 +1218,17 @@ hook useCallback
 export TenantSettings
 handler onChange
 handler onClick
+```
+
+### src/components/settings/UserManagement.tsx
+```
+props UserManagementProps
+hook useState
+hook useWorkSpecialties
+hook useEffect
+export UserManagement
+handler onSubmit
+handler onConfirm
 ```
 
 ### src/components/settings/WorkSpecialtyManagement.tsx
@@ -1853,6 +1852,8 @@ hook useState
 hook useCallback
 hook useEffect
 export UtilizationReport
+handler onChange
+handler onClick
 ```
 
 ### src/modules/professional-services/WeeklyPlanView.tsx
@@ -2557,10 +2558,10 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 ```
 
 
-> **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21846-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
+> **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21852-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@60f43d1)
+## recent changes (main@765841b)
 ```
 src/modules/ProfessionalServicesModule.tsx    +saat  ~ProfessionalServicesModule
 src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule  ~ServiceTicketsModule
@@ -2568,4 +2569,4 @@ src/services/apiService.ts                    ~ApiService
 backend/src/services/workOrderReminders.ts    +sweepWorkOrderSla
 ```
 
-<!-- Updated: 2026-10-12T19:01:17.159Z -->
+<!-- Updated: 2026-10-12T19:13:26.205Z -->

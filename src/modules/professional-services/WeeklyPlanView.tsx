@@ -166,7 +166,7 @@ export function WeeklyPlanView({ technicians, preparedByName }: Props) {
                 </div>
                 <select value={rowForm[wo.id]?.assignedTechnicianId || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], assignedTechnicianId: e.target.value } }))} className="input-glass text-xs w-40">
                   <option value="">Teknisyen</option>
-                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name}{t.costRate != null ? ` — ${t.costRate}${t.costCurrency || ''}/${t.costRateUnit === 'DAILY' ? 'gün' : 'saat'}` : ''}</option>)}
+                  {technicians.map(t => <option key={t.id} value={t.id}>{t.name} ({t.openCount} açık iş){t.costRate != null ? ` — ${t.costRate}${t.costCurrency || ''}/${t.costRateUnit === 'DAILY' ? 'gün' : 'saat'}` : ''}</option>)}
                 </select>
                 <input type="date" value={rowForm[wo.id]?.scheduledDate || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], scheduledDate: e.target.value } }))} className="input-glass text-xs w-36" />
                 <input type="number" min="1" placeholder="SLA (saat)" value={rowForm[wo.id]?.slaHours || ''} onChange={e => setRowForm(f => ({ ...f, [wo.id]: { ...f[wo.id], slaHours: e.target.value } }))} className="input-glass text-xs w-24" />

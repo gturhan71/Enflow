@@ -23,6 +23,14 @@ export const workOrderService = {
     return apiClient.fetchWithAuth(`/work-orders/utilization${month ? `?month=${month}` : ''}`);
   },
 
+  // Tenant-bazlı resmi tatil listesi — SLA/utilizasyon kapasite hesabına girer.
+  async getHolidays(): Promise<{ holidays: string[] }> {
+    return apiClient.fetchWithAuth('/work-orders/holidays');
+  },
+  async updateHolidays(holidays: string[]): Promise<{ holidays: string[] }> {
+    return apiClient.fetchWithAuth('/work-orders/holidays', { method: 'PUT', body: JSON.stringify({ holidays }) });
+  },
+
   async getWorkOrder(id: string) {
     return apiClient.fetchWithAuth(`/work-orders/${id}`);
   },
@@ -51,7 +59,7 @@ export const workOrderService = {
     return apiClient.fetchWithAuth(`/work-orders/${id}/reopen`, { method: 'POST', body: JSON.stringify({ reason }) });
   },
 
-  async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) {
+  async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string; satisfactionScore?: number }) {
     return apiClient.fetchWithAuth(`/work-orders/${id}/complete`, { method: 'POST', body: JSON.stringify(data) });
   },
 

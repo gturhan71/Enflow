@@ -119,6 +119,18 @@ function technicianOwnsOrManages(req: Request, workOrder: { assignedTechnicianId
   return !!workOrder.assignedTechnicianId && workOrder.assignedTechnicianId === req.userId;
 }
 
+// Tenant-bazlı resmi tatil listesi — SLA/utilizasyon kapasite hesabına
+// (countBusinessDaysInRange) girer. moduleSettings.professionalServices.holidays
+// altında saklanır (finance.ts interestRates ile aynı desen — yeni bir model
+// açılmaz). Her tenant kendi listesini yönetir, varsayılan boş.
+async function getHolidays(tenantId: string): Promise<string[]> {
+  const tenant = await prisma.tenant.findFirst({ where: { id: tenantId }, select: { moduleSettings: true } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  const ps = (ms.professionalServices as { holidays?: string[] }) || {};
+  return Array.isArray(ps.holidays) ? ps.holidays : [];
+}
+
 // Teknisyenin işi tam ve eksiksiz yapabilmesi için gereken bağlam — bu iş emri
 // bir ServiceTicket'tan sevk edildiyse (dispatch), kim bildirdi/nasıl ulaşılır/
 // hangi marka-ürün/müşterinin o anda eklediği dosyalar neler — CANLI join ile
@@ -149,7 +161,7 @@ async function sourceTicketContext(tenantId: string, serviceTicketId: string | n
 router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (!isManager(req)) where.assignedTechnicianId = req.userId;
-  const orders = await prisma.workOrder.findMany({ where, select: { status: true, assignedTechnicianId: true, assignedTechnician: { select: { name: true } }, createdAt: true, actualEndAt: true } });
+  const orders = await prisma.workOrder.findMany({ where, select: { status: true, assignedTechnicianId: true, assignedTechnician: { select: { name: true } }, createdAt: true, actualEndAt: true, customerSatisfactionScore: true } });
 
   const openStatuses = new Set(['DRAFT', 'PENDING_SCHEDULE', 'SCHEDULED', 'IN_PROGRESS', 'WAITING_PART']);
   const byTechnician = new Map<string, { name: string; open: number; completed: number }>();
@@ -157,6 +169,8 @@ router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
   let completed = 0;
   let totalResolutionDays = 0;
   let resolvedCount = 0;
+  let totalSatisfaction = 0;
+  let satisfactionCount = 0;
   for (const o of orders) {
     if (openStatuses.has(o.status)) open++;
     if (o.status === 'COMPLETED' || o.status === 'CLOSED') {
@@ -165,6 +179,10 @@ router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
         totalResolutionDays += (o.actualEndAt.getTime() - o.createdAt.getTime()) / 86_400_000;
         resolvedCount++;
       }
+    }
+    if (o.customerSatisfactionScore != null) {
+      totalSatisfaction += o.customerSatisfactionScore;
+      satisfactionCount++;
     }
     if (o.assignedTechnicianId) {
       const key = o.assignedTechnicianId;
@@ -179,6 +197,8 @@ router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
     open,
     completed,
     avgResolutionDays: resolvedCount ? Math.round((totalResolutionDays / resolvedCount) * 10) / 10 : null,
+    avgSatisfaction: satisfactionCount ? Math.round((totalSatisfaction / satisfactionCount) * 10) / 10 : null,
+    satisfactionCount,
     byTechnician: [...byTechnician.entries()].map(([userId, v]) => ({ userId, ...v })),
   });
 }));
@@ -209,6 +229,10 @@ router.get('/', asyncHandler(async (req: Request, res: Response) => {
 // maliyet görerek karar) ihtiyacını karşılar. /users/lookup (herkese açık,
 // yalnız id/name) KASITLI olarak kullanılmadı — maliyet burada yalnız
 // GM/OPERATIONS_MGR'a döner, /users/lookup'a eklense tüm roller görürdü.
+// Kapasite-farkındalıklı dispatch — sert bir kısıt değil (uzmanlık eşleşmesi
+// gibi yalnız öneri/filtre), birim yöneticisinin sevkiyat sırasında "zaten
+// yüklü bir teknisyene mi atıyorum" sorusuna cevap verebilmesi için her
+// teknisyenin GÜNCEL açık iş sayısı da listeye eklenir.
 router.get('/technicians', asyncHandler(async (req: Request, res: Response) => {
   if (!isManager(req)) return res.status(403).json({ error: 'Teknisyen listesini görme yetkiniz yok.' });
   const technicians = await prisma.user.findMany({
@@ -221,11 +245,19 @@ router.get('/technicians', asyncHandler(async (req: Request, res: Response) => {
     orderBy: { name: 'asc' },
   });
   const showCost = canSeeCost(req);
+  const openStatuses: string[] = ['DRAFT', 'PENDING_SCHEDULE', 'SCHEDULED', 'IN_PROGRESS', 'WAITING_PART'];
+  const openCounts = await prisma.workOrder.groupBy({
+    by: ['assignedTechnicianId'],
+    where: { tenantId: req.tenantId, status: { in: openStatuses }, assignedTechnicianId: { not: null } },
+    _count: { _all: true },
+  });
+  const openCountByTech = new Map(openCounts.map((c) => [c.assignedTechnicianId as string, c._count._all]));
   res.json(technicians.map((t) => ({
     id: t.id,
     name: t.name,
     unitId: t.unitId,
     specialties: t.workSpecialties.map((s) => s.specialty),
+    openCount: openCountByTech.get(t.id) || 0,
     ...(showCost ? { costRate: t.costRate, costRateUnit: t.costRateUnit, costCurrency: t.costCurrency } : {}),
   })));
 }));
@@ -234,6 +266,27 @@ router.get('/technicians', asyncHandler(async (req: Request, res: Response) => {
 // resmi tatil listesi YOK — bilinçli basitleştirme) × 8 saat; içinde bulunulan
 // ay için kapasite bugüne kadar PRORATE edilir (ayın tamamı değil), geçmiş
 // aylar için tam ay. Maliyet yalnız GM/OPERATIONS_MGR'a döner (Faz 4 ile aynı kural).
+// Resmi tatil listesi — GET herkese (manager) açık salt-okunur, PUT yalnız yönetici.
+router.get('/holidays', asyncHandler(async (req: Request, res: Response) => {
+  if (!isManager(req)) return res.status(403).json({ error: 'Bu ayarı görme yetkiniz yok.' });
+  res.json({ holidays: await getHolidays(req.tenantId) });
+}));
+
+router.put('/holidays', asyncHandler(async (req: Request, res: Response) => {
+  if (!isManager(req)) return res.status(403).json({ error: 'Bu ayarı değiştirme yetkiniz yok.' });
+  const { holidays } = req.body as { holidays?: string[] };
+  const cleaned = Array.isArray(holidays)
+    ? [...new Set(holidays.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d)))].sort()
+    : [];
+  const tenant = await prisma.tenant.findFirst({ where: { id: req.tenantId }, select: { moduleSettings: true } });
+  let ms: Record<string, unknown> = {};
+  try { ms = JSON.parse(tenant?.moduleSettings || '{}'); } catch { ms = {}; }
+  ms.professionalServices = { ...(ms.professionalServices as Record<string, unknown> || {}), holidays: cleaned };
+  await prisma.tenant.update({ where: { id: req.tenantId }, data: { moduleSettings: JSON.stringify(ms) } });
+  await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'HOLIDAYS_UPDATED', entityType: 'TENANT', entityId: req.tenantId, details: { count: cleaned.length } });
+  res.json({ holidays: cleaned });
+}));
+
 router.get('/utilization', asyncHandler(async (req: Request, res: Response) => {
   if (!isManager(req)) return res.status(403).json({ error: 'Bu raporu görme yetkiniz yok.' });
   const monthParam = String(req.query.month || '');
@@ -246,7 +299,8 @@ router.get('/utilization', asyncHandler(async (req: Request, res: Response) => {
   const lastDayOfMonth = new Date(year, monthIdx + 1, 0);
   const isCurrentOrFuture = lastDayOfMonth.getTime() >= new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() && periodStart.getTime() <= now.getTime();
   const periodEnd = isCurrentOrFuture && lastDayOfMonth > now ? now : lastDayOfMonth;
-  const capacityDays = periodEnd >= periodStart ? countBusinessDaysInRange(periodStart, periodEnd) : 0;
+  const holidays = await getHolidays(req.tenantId);
+  const capacityDays = periodEnd >= periodStart ? countBusinessDaysInRange(periodStart, periodEnd, holidays) : 0;
   const capacityHours = capacityDays * 8;
 
   const openStatuses = ['DRAFT', 'PENDING_SCHEDULE', 'SCHEDULED', 'IN_PROGRESS', 'WAITING_PART'];
@@ -608,8 +662,11 @@ router.post('/:id/complete', asyncHandler(async (req: Request, res: Response) =>
     return res.status(400).json({ error: 'Kapanış için önce müşteri imza/kapanış kanıtı (dosya) yüklenmelidir.' });
   }
 
-  const { completionNotes, customerSignOffName, costAmount, costCurrency } = req.body as
-    { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string };
+  const { completionNotes, customerSignOffName, costAmount, costCurrency, satisfactionScore } = req.body as
+    { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string; satisfactionScore?: number };
+  if (satisfactionScore != null && (!Number.isInteger(satisfactionScore) || satisfactionScore < 1 || satisfactionScore > 5)) {
+    return res.status(400).json({ error: 'Memnuniyet puanı 1-5 arasında bir tam sayı olmalıdır.' });
+  }
 
   const order = await prisma.workOrder.update({
     where: { id },
@@ -621,6 +678,7 @@ router.post('/:id/complete', asyncHandler(async (req: Request, res: Response) =>
       customerSignOffAt: record.customerSignOffAt || new Date(),
       ...(costAmount != null && { costAmount: Number(costAmount) }),
       ...(costCurrency !== undefined && { costCurrency }),
+      ...(satisfactionScore != null && { customerSatisfactionScore: satisfactionScore }),
     },
     include: INCLUDE,
   });
@@ -658,6 +716,7 @@ router.post('/:id/reopen', asyncHandler(async (req: Request, res: Response) => {
       customerSignOffAt: null,
       customerSignOffName: null,
       customerSignOffFileUrl: null,
+      customerSatisfactionScore: null,
     },
     include: INCLUDE,
   });

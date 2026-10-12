@@ -292,6 +292,8 @@ class ApiService {
   async getWorkOrderSummary() { return workOrderService.getWorkOrderSummary(); }
   async getTechnicians() { return workOrderService.getTechnicians(); }
   async getWorkOrderUtilization(month?: string) { return workOrderService.getUtilization(month); }
+  async getWorkOrderHolidays() { return workOrderService.getHolidays(); }
+  async updateWorkOrderHolidays(holidays: string[]) { return workOrderService.updateHolidays(holidays); }
   async getWorkOrder(id: string) { return workOrderService.getWorkOrder(id); }
   async createWorkOrder(data: Partial<import('../types').WorkOrder>) { return workOrderService.createWorkOrder(data); }
   async updateWorkOrder(id: string, data: Partial<import('../types').WorkOrder>) { return workOrderService.updateWorkOrder(id, data); }
@@ -299,7 +301,7 @@ class ApiService {
   async startWorkOrder(id: string) { return workOrderService.startWorkOrder(id); }
   async waitForPartWorkOrder(id: string, note?: string) { return workOrderService.waitForPart(id, note); }
   async reopenWorkOrder(id: string, reason: string) { return workOrderService.reopenWorkOrder(id, reason); }
-  async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string }) { return workOrderService.completeWorkOrder(id, data); }
+  async completeWorkOrder(id: string, data: { completionNotes?: string; customerSignOffName?: string; costAmount?: number; costCurrency?: string; satisfactionScore?: number }) { return workOrderService.completeWorkOrder(id, data); }
   async uploadWorkOrderSignOff(id: string, file: File) { return workOrderService.uploadSignOff(id, file); }
   async deleteWorkOrder(id: string) { return workOrderService.deleteWorkOrder(id); }
   async uploadWorkOrderAttachment(id: string, file: File, description?: string) { return workOrderService.uploadAttachment(id, file, description); }

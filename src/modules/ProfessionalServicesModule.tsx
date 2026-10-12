@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   HardHat, Plus, X, RefreshCw, Loader2, CheckCircle2, Upload, PlayCircle, PauseCircle, RotateCcw, CalendarClock, ShoppingCart, Kanban, CalendarDays, List, Gauge,
-  Paperclip, Trash2, Phone, Mail, Ticket,
+  Paperclip, Trash2, Phone, Mail, Ticket, Star,
 } from 'lucide-react';
 import { apiService } from '../services/apiService';
 import { useAuth } from '../contexts/AuthContext';
@@ -65,7 +65,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
     customerId: '', projectId: '', requiredSpecialtyId: '',
   });
   const [scheduleForm, setScheduleForm] = useState({ assignedTechnicianId: '', scheduledDate: '', slaHours: '', dueAt: '' });
-  const [completeForm, setCompleteForm] = useState({ completionNotes: '', customerSignOffName: '', costAmount: '', costCurrency: 'TRY' });
+  const [completeForm, setCompleteForm] = useState({ completionNotes: '', customerSignOffName: '', costAmount: '', costCurrency: 'TRY', satisfactionScore: 0 });
 
   const resetForm = () => setForm({ type: 'INSTALLATION', title: '', description: '', priority: 'NORMAL', customerId: '', projectId: '', requiredSpecialtyId: '' });
 
@@ -102,7 +102,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
       assignedTechnicianId: o.assignedTechnicianId || '', scheduledDate: o.scheduledDate ? o.scheduledDate.slice(0, 10) : '',
       slaHours: o.slaHours ? String(o.slaHours) : suggestedSlaHours, dueAt: o.dueAt ? o.dueAt.slice(0, 10) : '',
     });
-    setCompleteForm({ completionNotes: o.completionNotes || '', customerSignOffName: o.customerSignOffName || '', costAmount: o.costAmount ? String(o.costAmount) : '', costCurrency: o.costCurrency || 'TRY' });
+    setCompleteForm({ completionNotes: o.completionNotes || '', customerSignOffName: o.customerSignOffName || '', costAmount: o.costAmount ? String(o.costAmount) : '', costCurrency: o.costCurrency || 'TRY', satisfactionScore: 0 });
   };
 
   const openDetail = (o: WorkOrder) => {
@@ -250,6 +250,7 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
         customerSignOffName: completeForm.customerSignOffName || undefined,
         costAmount: completeForm.costAmount ? Number(completeForm.costAmount) : undefined,
         costCurrency: completeForm.costAmount ? completeForm.costCurrency : undefined,
+        satisfactionScore: completeForm.satisfactionScore || undefined,
       }) as WorkOrder;
       setDetailOrder(updated);
       load();
@@ -553,7 +554,8 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                     {technicians.map(t => {
                       const specNames = t.specialties.map(s => s.name).join(', ');
                       const costLabel = t.costRate != null ? ` — ${t.costRate}${t.costCurrency || ''}/${t.costRateUnit === 'DAILY' ? 'gün' : 'saat'}` : '';
-                      return <option key={t.id} value={t.id}>{t.name}{specNames ? ` — ${specNames}` : ''}{costLabel}</option>;
+                      const loadLabel = ` (${t.openCount} açık iş)`;
+                      return <option key={t.id} value={t.id}>{t.name}{specNames ? ` — ${specNames}` : ''}{loadLabel}{costLabel}</option>;
                     })}
                   </select>
                   <input type="date" value={scheduleForm.scheduledDate} onChange={e => setScheduleForm(f => ({ ...f, scheduledDate: e.target.value }))} className="input-glass w-full text-sm" />
@@ -628,6 +630,16 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                   )}
                   <textarea placeholder="Tamamlama notu" rows={2} value={completeForm.completionNotes} onChange={e => setCompleteForm(f => ({ ...f, completionNotes: e.target.value }))} className="input-glass w-full resize-none text-sm" />
                   <input type="text" placeholder="Müşteri adı (imza sahibi)" value={completeForm.customerSignOffName} onChange={e => setCompleteForm(f => ({ ...f, customerSignOffName: e.target.value }))} className="input-glass w-full text-sm" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Memnuniyet (opsiyonel)</span>
+                    <div className="flex items-center gap-0.5">
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <button key={n} type="button" onClick={() => setCompleteForm(f => ({ ...f, satisfactionScore: f.satisfactionScore === n ? 0 : n }))} title={`${n}/5`}>
+                          <Star size={16} className={n <= completeForm.satisfactionScore ? 'fill-amber-400 text-amber-400' : 'text-slate-300'} />
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="flex gap-2">
                     <input type="number" min="0" step="0.01" placeholder="Maliyet (opsiyonel)" value={completeForm.costAmount} onChange={e => setCompleteForm(f => ({ ...f, costAmount: e.target.value }))} className="input-glass flex-1 text-sm" />
                     <select value={completeForm.costCurrency} onChange={e => setCompleteForm(f => ({ ...f, costCurrency: e.target.value }))} className="input-glass w-24 text-sm">
@@ -657,6 +669,14 @@ export function ProfessionalServicesModule({ projects, customers, onNavigate, in
                   )}
                   {detailOrder.customerSignOffFileUrl && (
                     <a href={detailOrder.customerSignOffFileUrl} target="_blank" rel="noreferrer" className="text-xs text-indigo-600 font-bold underline">Kapanış kanıtını görüntüle</a>
+                  )}
+                  {detailOrder.customerSatisfactionScore != null && (
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Memnuniyet:</span>
+                      {[1, 2, 3, 4, 5].map(n => (
+                        <Star key={n} size={13} className={n <= detailOrder.customerSatisfactionScore! ? 'fill-amber-400 text-amber-400' : 'text-slate-300'} />
+                      ))}
+                    </div>
                   )}
                 </>
               )}
