@@ -247,3 +247,26 @@ Bu değişiklik yeni bir model+alt-sistem (katman) eklediği için **mimari değ
 ## Açık Sorular
 
 Yoktur — üçü de 2026-10-11'de çözüldü (bkz. Kullanıcı Kararları madde 5–7 ve Veri Modeli bölümü).
+
+## Faz 6 — ITSM Sertleştirmesi (2026-10-12)
+
+Faz 1-5 canlıya alındıktan sonra ITIL/ITSM bakış açısıyla bir gözden geçirme yapıldı (bkz. bu oturumun sohbet geçmişi — ayrı bir bulgular dosyası açılmadı). Bulunan 9 maddeden **8'i aynı gün kapatıldı**, biri kullanıcı kararıyla kapsam dışı bırakıldı:
+
+- **SLA eskalasyonu** — `workOrderReminders.ts` (yeni, `ServiceTicket`/`TodoTask` ile aynı desen) + `WorkOrder.escalatedAt`. SLA'sı aşılan iş emri artık hem atanan teknisyene hem `OPERATIONS_MGR`'a bildirim üretiyor (önceden tamamen sessizdi).
+- **Sevkiyat bildirimi** — `/schedule` artık atanan teknisyene bildirim gönderiyor (önceden hiç göndermiyordu).
+- **Kapanış kanıtı bypass'ı kapatıldı** — genel `PUT /:id` artık `status=CLOSED` için de `customerSignOffFileUrl` şartını uyguluyor (önceden `/complete`'i hiç çağırmadan doğrudan `CLOSED`'a geçilebiliyordu).
+- **ServiceTicket↔WorkOrder köprüsü** — yeni `POST /service-tickets/:id/dispatch` (idempotent) + "Teknisyen Sevk Et" butonu. Kategori→tip eşlemesi, proje/müşteri/öncelik otomatik kopyalanıyor; durum senkronu kasıtlı olarak hâlâ manuel.
+- **Önceliğe bağlı SLA önerisi** — ACİL 4sa/YÜKSEK 8sa/NORMAL 24sa/DÜŞÜK 72sa, sevkiyat formunda otomatik önerilir (zorunlu değil). Ayrı bir "yanıt süresi" hedefi **kasıtlı olarak eklenmedi** (kullanıcı kararı: tek hedef yeterli, mevcut sistemin ölçeğinde yanıt/çözüm ayrımı gereksiz karmaşıklık).
+- **Teknisyen kendi "parça bekliyor"ya geçebiliyor** — `POST /:id/wait-for-part` (önceden yalnız yönetici PUT'u ile mümkündü).
+- **Yeniden açma (reopen)** — `POST /:id/reopen`, gerekçe zorunlu, kapanış kanıtı/CSAT/tamamlama alanları sıfırlanır, `escalatedAt` sıfırlanır (SLA sweep'i tekrar eskale edebilsin).
+- **Ölü `PENDING_SCHEDULE` durumu** artık gerçekten kullanılıyor (yeni iş emirleri `DRAFT` yerine bununla açılıyor).
+- **Bağlam dosyaları + kaynak talep kartı** — yeni `ServiceTicketAttachment`/`WorkOrderAttachment` modelleri (migration `add_service_attachments`). Arıza açılırken müşteriden alınan log (`.log` uzantısı artık beyaz listede)/ekran görüntüsü `ServiceTicket`'a yüklenir; teknisyene sevk edildiğinde `WorkOrder.sourceTicket` üzerinden CANLI (kopyalanmadan) görünür — bildiren kişi adı+telefon/e-posta (Contact join), marka/ürün grubu, ekler. Teknisyen kendi saha fotoğrafı/notunu ayrı "Bağlam Dosyaları" listesine ekleyebilir.
+- **Resmi tatil takvimi** — tenant-bazlı liste (`moduleSettings.professionalServices.holidays`, `finance.ts` `interestRates` ile aynı desen, yeni model yok), Ekip Utilizasyonu kapasite hesabına (`countBusinessDaysInRange`) giriyor.
+- **CSAT** — `WorkOrder.customerSatisfactionScore` (migration `add_work_order_csat`), `/complete`'te opsiyonel 1-5 puan, özet raporunda ortalama.
+- **Kapasite-farkındalıklı dispatch** — `/technicians` artık her teknisyenin güncel açık iş sayısını (`openCount`) da döner, sevkiyat dropdown'ında "(N açık iş)" görünür (sert kısıt değil, uzmanlık önerisiyle aynı felsefe).
+
+Hepsi curl + tarayıcıda uçtan uca doğrulandı. **Sürüm artırılmadı** — yeni modeller/alanlar eklendiği için teknik olarak mimari değişiklik sınıfına girer, ama Faz 1-5'teki bekleyen versiyon kararıyla birleştirilip tek seferde kullanıcıya sorulacak.
+
+### Kapsam dışı bırakılan — gelecekte AYRI/OPSİYONEL bir modül olarak değerlendirilecek
+
+ITSM gözden geçirmesinde bulunan şu maddeler **kasıtlı olarak bu çekirdek modülün dışında tutuldu**: CMDB/varlık bağlantısı, bilgi tabanı/standart prosedür şablonu, müşteri self-servis portalı (çok kanallı giriş), Problem/Change Management. Kullanıcı kararı (2026-10-12): bu detay seviyesi her tenant için gerekli değil — Profesyonel Hizmetler'in çekirdek akışı (iş emri + sevkiyat + kapanış kanıtı + SLA + bağlam) basit/hafif kalsın, bu dört madde **ayrı bir eklenti/modül** olarak, talep gelirse ayrıca planlanıp eklensin. Bu plana yeni bir "Faz 7" açılmadı çünkü kapsamı/önceliği henüz belirsiz — ihtiyaç netleştiğinde yeni bir plan dokümanı (`docs/PROFESYONEL_HIZMETLER_GENISLETME_PLAN.md` benzeri) ile ayrıca ele alınmalı.

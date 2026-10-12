@@ -121,7 +121,7 @@ Tüm modeller `tenantId` ile izole. (Tam sayım: `grep -c '^model' backend/prism
 | `contract` | `ContractModule` | Eski sözleşme modülü |
 | `project-mgmt` | `ProjectManagementModule` | Tam proje yaşam döngüsü — milestone, maliyet, karlılık, devir paketi |
 | `procurement` | `ProcurementModule` | Satınalma talebi → tedarikçi → PO → teslimat → fatura (9 statü) |
-| `professional-services` | `ProfessionalServicesModule` | **Profesyonel Hizmetler** (post-sales, Faz 1 — 2026-10-11) — ticket-bazlı iş emri (`WorkOrder`): kurulum/arıza/bakım, birim yöneticisi (OPERATIONS_MGR = "Profesyonel Hizmetler Müdürü") sevkiyatı + yeni `PS_TECH` (teknisyen, yalnız kendi işini görür/yürütür) rolü, tenant-bazlı uzmanlık taksonomisi (`WorkSpecialty`/Ayarlar→Uzmanlık Alanları), kapanış **dosya-kanıtı zorunlu** (COMPLETED öncesi `customerSignOffFileUrl`). "Operasyon" birimi artık `DEFAULT_UNITS`'te. **Proje↔İş Emri çift yönlü görünürlük:** `ProjectDetail.tsx`'te "Profesyonel Hizmetler" sekmesi (o projeye bağlı iş emirleri) + iş emri detayında bağlı projenin özeti/ilerlemesi ve açık satınalma talebi sayısı (Proje Yönetimi/Satınalma'ya kısa link) — `OPERATIONS_MGR`'ın zaten sahip olduğu `PROJECT_MGMT_VIEW`+`PROCUREMENT_VIEW` erişimini bağlamsallaştırır, yeni izin açmaz. **Faz 2 (2026-10-11, aynı gün):** `ServiceWorkPlan` (haftalık teknisyen dağıtım planı, `VisitPlan` paterni) + `WorkOrder.servicePlanId` gerçek FK — `WeeklyPlanView.tsx` ("Liste"/"Haftalık Takvim" anahtarı): hafta gezinme, plansız iş emrini plana ekle/çıkar, satır-bazlı teknisyen+tarih sevkiyatı. **Faz 3 (aynı gün):** `WorkOrderMaterialRequest` — dış kaynak malzeme/hizmet mini-onay akışı, `PurchaseRequest`'in 9 statülü zincirinin KASITLI DIŞINDA (REQUESTED→APPROVED→ORDERED→RECEIVED, yalnız birim yöneticisi onayı); `MaterialRequestsPanel.tsx` iş emri detayında. **Faz 4 (aynı gün):** SLA (`WorkOrder.slaHours`/`dueAt` — sevk ederken girilir, proje bağlı işte sözleşmenin `deliveryDueDate`'i salt-okunur "Sözleşmeden Kopyala" önerisi) + teknisyen maliyeti (`User.costRate`/`costRateUnit`, yalnız GM+OPERATIONS_MGR görür — yeni `GET /work-orders/technicians` ucu, `/users/lookup`'a KASITLI eklenmedi) + bilgi amaçlı işçilik/malzeme maliyet tahmini (`estimatedLaborCost`/`estimatedMaterialCost`/`estimatedTotalCost` — `costAmount`'a otomatik YAZILMAZ, yalnız görüntülenir). **Faz 5 (aynı gün):** Ekip Utilizasyonu — `GET /work-orders/utilization?month=` (aylık, bugüne kadar prorate kapasite = iş günü×8 saat) + `UtilizationReport.tsx` (3. görünüm sekmesi: bar grafik + tablo — açık/tamamlanan iş, çalışma saati, %doluluk, SLA performansı, [GM/OPERATIONS_MGR] maliyet). 5 fazın tamamı canlı + uçtan uca doğrulandı. Tek kaynak: `docs/PROFESYONEL_HIZMETLER_PLAN.md` |
+| `professional-services` | `ProfessionalServicesModule` | **Profesyonel Hizmetler** (post-sales, Faz 1 — 2026-10-11) — ticket-bazlı iş emri (`WorkOrder`): kurulum/arıza/bakım, birim yöneticisi (OPERATIONS_MGR = "Profesyonel Hizmetler Müdürü") sevkiyatı + yeni `PS_TECH` (teknisyen, yalnız kendi işini görür/yürütür) rolü, tenant-bazlı uzmanlık taksonomisi (`WorkSpecialty`/Ayarlar→Uzmanlık Alanları), kapanış **dosya-kanıtı zorunlu** (COMPLETED öncesi `customerSignOffFileUrl`). "Operasyon" birimi artık `DEFAULT_UNITS`'te. **Proje↔İş Emri çift yönlü görünürlük:** `ProjectDetail.tsx`'te "Profesyonel Hizmetler" sekmesi (o projeye bağlı iş emirleri) + iş emri detayında bağlı projenin özeti/ilerlemesi ve açık satınalma talebi sayısı (Proje Yönetimi/Satınalma'ya kısa link) — `OPERATIONS_MGR`'ın zaten sahip olduğu `PROJECT_MGMT_VIEW`+`PROCUREMENT_VIEW` erişimini bağlamsallaştırır, yeni izin açmaz. **Faz 2 (2026-10-11, aynı gün):** `ServiceWorkPlan` (haftalık teknisyen dağıtım planı, `VisitPlan` paterni) + `WorkOrder.servicePlanId` gerçek FK — `WeeklyPlanView.tsx` ("Liste"/"Haftalık Takvim" anahtarı): hafta gezinme, plansız iş emrini plana ekle/çıkar, satır-bazlı teknisyen+tarih sevkiyatı. **Faz 3 (aynı gün):** `WorkOrderMaterialRequest` — dış kaynak malzeme/hizmet mini-onay akışı, `PurchaseRequest`'in 9 statülü zincirinin KASITLI DIŞINDA (REQUESTED→APPROVED→ORDERED→RECEIVED, yalnız birim yöneticisi onayı); `MaterialRequestsPanel.tsx` iş emri detayında. **Faz 4 (aynı gün):** SLA (`WorkOrder.slaHours`/`dueAt` — sevk ederken girilir, proje bağlı işte sözleşmenin `deliveryDueDate`'i salt-okunur "Sözleşmeden Kopyala" önerisi) + teknisyen maliyeti (`User.costRate`/`costRateUnit`, yalnız GM+OPERATIONS_MGR görür — yeni `GET /work-orders/technicians` ucu, `/users/lookup`'a KASITLI eklenmedi) + bilgi amaçlı işçilik/malzeme maliyet tahmini (`estimatedLaborCost`/`estimatedMaterialCost`/`estimatedTotalCost` — `costAmount`'a otomatik YAZILMAZ, yalnız görüntülenir). **Faz 5 (aynı gün):** Ekip Utilizasyonu — `GET /work-orders/utilization?month=` (aylık, bugüne kadar prorate kapasite = iş günü×8 saat) + `UtilizationReport.tsx` (3. görünüm sekmesi: bar grafik + tablo — açık/tamamlanan iş, çalışma saati, %doluluk, SLA performansı, [GM/OPERATIONS_MGR] maliyet). 5 fazın tamamı canlı + uçtan uca doğrulandı. **Faz 6 — ITSM Sertleştirmesi (2026-10-12):** ITIL bakış açısıyla gözden geçirme sonrası 9 bulgudan 8'i kapatıldı — SLA eskalasyon bildirimi (`workOrderReminders.ts`), sevkiyat bildirimi, kapanış-kanıtı bypass fix'i, `ServiceTicket→WorkOrder` "Teknisyen Sevk Et" köprüsü (idempotent `/dispatch`), önceliğe bağlı SLA önerisi, teknisyenin kendi "parça bekliyor"ya geçebilmesi, reopen akışı, bağlam dosyaları (`ServiceTicketAttachment`/`WorkOrderAttachment` + `WorkOrder.sourceTicket` canlı join), resmi tatil takvimi, CSAT (`WorkOrder.customerSatisfactionScore`), kapasite-farkındalıklı dispatch (`/technicians.openCount`). **Kullanıcı kararı:** CMDB/varlık bağlantısı, bilgi tabanı, müşteri self-servis portalı, Problem/Change Management bu çekirdek modülün KAPSAMI DIŞINDA bırakıldı — bu detay her tenant için gerekli değil, talep gelirse ayrı bir eklenti/modül olarak ayrıca planlanacak. Sürüm artırılmadı (Faz 1-5'teki bekleyen versiyon kararıyla birleştirilecek). Tek kaynak: `docs/PROFESYONEL_HIZMETLER_PLAN.md` |
 | `sales-support` | `SalesSupport` | **İhale/İSAB** — Tender CRUD + uygunluk checklist + teminat (backend destekli) |
 | `finance` | `FinanceModule` | Fatura/tahsilat/teminat/maliyet onayı/özet (FINANCE_VIEW) |
 | `profitability` | `ProfitabilityModule` | **Kârlılık** — zamana duyarlı proje/aylık/çeyreklik/yıllık kârlılık; planlanan (öngörü) + gerçekleşen paralel, tahakkuk + nakit esası paralel, as-of tarihli, EAC. Faz A–E: canlı plan + `/api/profitability/{ledger,summary,cashflow,treasury,instruments,snapshots,plan-drift,dmo}` + `POST /snapshot` (tarihli-defter `profitabilityLedger.ts` → `bucketBy` `profitabilityRollup.ts`; nakit pozisyonu + faiz-bazlı hazine `profitabilityCashflow.ts`; aylık plan-drift `ProfitabilitySnapshot` + `profitabilitySnapshot.ts` + cron `profitabilitySnapshotScheduler.ts`; finansal enstrüman senaryoları `profitabilityInstruments.ts` — faktoring/vadeli mevduat/forward FX, gösterge deltalar). Nakit pozisyonu grafiği + hazine paneli + plan-drift tablosu + enstrüman senaryo kartları. **Faz E:** DMO kanalı (`profitabilityDmo.ts` + `GET /dmo`, `requireEntitlement('DMO_MODULE')`) — `DmoOrder` snapshot'larını döneme kovalar (ciro/risturn/komisyon/net kâr/kârsız sayısı), **proje kümülatifine karışmaz**; modülde "Projeler | DMO Kanalı" üst sekmesi, DMO sekmesi yalnız lisanslıysa görünür (`DmoChannelTab.tsx`). Yeni `PROFITABILITY_VIEW` izni (GM/FINANCE_MGR/SALES_MGR/PROJECT_MGR/BACKUP_ADMIN). Tek kaynak: `docs/KARLILIK_ANALIZI_PLAN.md` |
@@ -379,7 +379,8 @@ reading the same files costs thousands. `:425-425` means line 425: read that ran
 ## deps
 ```
 src/App.tsx ← react, motion, lucide-react, @tanstack/react-query, sonner
-src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
+src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
+src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/ProfessionalServicesModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/modules/ServiceTicketsModule.tsx ← react, lucide-react, services/apiService, contexts/AuthContext, hooks/useEnflowQueries
 src/services/apiService.ts ← apiClient, crmService, projectService, taskService, serviceTicketService
@@ -392,6 +393,7 @@ src/components/settings/WorkSpecialtyManagement.tsx ← react, @tanstack/react-q
 src/hooks/useBoM.ts ← react, services/apiService, contexts/UnsavedChangesContext, types
 src/hooks/useEnflowQueries.ts ← @tanstack/react-query, services/apiService
 src/layout/Header.tsx ← react, lucide-react, motion, lib/utils, contexts/AuthContext
+src/layout/Sidebar.tsx ← react, lucide-react, motion, lib/utils, contexts/UnsavedChangesContext
 src/lib/guaranteeText.ts ← services/apiClient
 src/modules/ActivityLogModule.tsx ← react, lucide-react, services/apiService, lib/agentProvenance, types
 src/modules/BackupModule.tsx ← react, lucide-react, services/apiService, types, services/apiClient
@@ -433,8 +435,6 @@ src/modules/PresalesModule.tsx ← react, @tanstack/react-query, lucide-react, m
 src/modules/procurement/PRDetailDrawer.tsx ← react, lucide-react, motion, ../services/apiService, ../lib/format
 src/modules/ProcurementModule.tsx ← react, @tanstack/react-query, lucide-react, motion, services/apiService
 src/modules/professional-services/MaterialRequestsPanel.tsx ← react, lucide-react, ../services/apiService, ../types
-src/modules/professional-services/UtilizationReport.tsx ← react, lucide-react, recharts, ../services/apiService, ../types
-src/modules/professional-services/WeeklyPlanView.tsx ← react, lucide-react, ../services/apiService, ../types
 src/modules/profitability/DmoChannelTab.tsx ← react, recharts, ../services/apiService, ../lib/format, project-mgmt/MarginBadge
 src/modules/ProfitabilityModule.tsx ← react, recharts, services/apiService, lib/format, project-mgmt/MarginBadge
 src/modules/project-mgmt/CostForm.tsx ← react, lucide-react, motion, ../types, constants
@@ -564,6 +564,13 @@ INDEX WorkOrderAttachment_tenantId_workOrderId_idx ON WorkOrderAttachment
 ### backend/src/services/workOrderReminders.ts
 ```
 export async function sweepWorkOrderSla(tenantId) → Promise<void>  :12-52
+```
+
+### backend/src/utils/businessDays.ts
+```
+export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
+export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
+export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu/resmi t
 ```
 
 ### backend/src/utils/secureUpload.ts
@@ -1208,13 +1215,6 @@ export interface ApplyTemplateResult  :152-156
 export async function applyDefaultWorkflowTemplate(tenantId, actorUserId?) → Promise<ApplyTemplateResult>  :164-222  # Şablonu bir tenant'a uygular: (1) eksik varsayılan birimleri
 ```
 
-### backend/src/utils/businessDays.ts
-```
-export function addBusinessDays(start, days, holidays = []) → Date  :5-22  # Cumartesi(6) / Pazar(0) hariç — opsiyonel resmi tatil listes
-export function computeSlaDueDate(slaBusinessDays?, from = new Date()) → Date | null  :25-28  # TodoTask oluştururken slaBusinessDays verilmişse dueDate'i o
-export function countBusinessDaysInRange(start, end, holidays = []) → number  :32-46  # [start,end] (ikisi de dahil) aralığındaki hafta sonu/resmi t
-```
-
 ### backend/src/utils/entityTypeTab.ts
 ```
 export function entityTypeToTab  :25-27
@@ -1444,16 +1444,27 @@ handler onComplete
 handler onLogin
 ```
 
-### src/layout/Sidebar.tsx
+### src/modules/professional-services/UtilizationReport.tsx
 ```
-hook useUnsavedChanges
-hook useAuth
+component UtilizationReport
 hook useState
+hook useCallback
 hook useEffect
-export Sidebar
-handler onClick
-handler onSubmit
+export UtilizationReport
 handler onChange
+handler onClick
+```
+
+### src/modules/professional-services/WeeklyPlanView.tsx
+```
+component WeeklyPlanView
+props Props
+hook useState
+hook useCallback
+hook useEffect
+export WeeklyPlanView
+handler onChange
+handler onClick
 ```
 
 ### src/modules/ProfessionalServicesModule.tsx
@@ -1671,6 +1682,18 @@ handler onAccess
 handler onClick
 handler onChange
 handler onKeyDown
+```
+
+### src/layout/Sidebar.tsx
+```
+hook useUnsavedChanges
+hook useAuth
+hook useState
+hook useEffect
+export Sidebar
+handler onClick
+handler onSubmit
+handler onChange
 ```
 
 ### src/lib/guaranteeText.ts
@@ -2192,29 +2215,6 @@ component MaterialRequestsPanel
 props Props
 hook useState
 export MaterialRequestsPanel
-handler onChange
-handler onClick
-```
-
-### src/modules/professional-services/UtilizationReport.tsx
-```
-component UtilizationReport
-hook useState
-hook useCallback
-hook useEffect
-export UtilizationReport
-handler onChange
-handler onClick
-```
-
-### src/modules/professional-services/WeeklyPlanView.tsx
-```
-component WeeklyPlanView
-props Props
-hook useState
-hook useCallback
-hook useEffect
-export WeeklyPlanView
 handler onChange
 handler onClick
 ```
@@ -2912,10 +2912,13 @@ async function scenario({ files, restartCommand, healthStatus = 200 })  :65-78
 > **Not everything is here.** 222 file(s) omitted, 1 collapsed to anchors to stay under the 21852-token budget (tests and configs go first). The retrieval index still has them all — run `sigmap ask "<question>"` to pull in anything missing.
 
 <!-- sigmap:volatile -->
-## recent changes (main@765841b)
+## recent changes (main@34788aa)
 ```
+src/modules/professional-services/UtilizationReport.tsx ~UtilizationReport
+src/modules/professional-services/WeeklyPlanView.tsx ~WeeklyPlanView
 src/modules/ProfessionalServicesModule.tsx    +saat  ~ProfessionalServicesModule
 src/modules/ServiceTicketsModule.tsx          +ServiceTicketsModule  ~ServiceTicketsModule
 src/services/apiService.ts                    ~ApiService
 backend/src/services/workOrderReminders.ts    +sweepWorkOrderSla
+backend/src/utils/businessDays.ts             ~computeSlaDueDate  ~countBusinessDaysInRange
 ```
