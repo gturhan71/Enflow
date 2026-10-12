@@ -12,6 +12,7 @@ import { nextDocumentNumber } from '../services/documentNumberService';
 import { documentUpload, enforceStorageLimit } from '../utils/secureUpload';
 import { slugify, getUploadDir } from '../utils/fileUpload';
 import { countBusinessDaysInRange } from '../utils/businessDays';
+import { sweepWorkOrderSla } from '../services/workOrderReminders';
 
 const router: Router = Router();
 router.use(tenantMiddleware, requireRole(['GENERAL_MANAGER', 'OPERATIONS_MGR', 'PROJECT_MGR', 'PS_TECH']));
@@ -155,6 +156,7 @@ router.get('/summary/all', asyncHandler(async (req: Request, res: Response) => {
 }));
 
 router.get('/', asyncHandler(async (req: Request, res: Response) => {
+  await sweepWorkOrderSla(req.tenantId); // SLA aşımı eskalasyonu (non-throwing)
   const { status, unitId, assignedTechnicianId, type, customerId, projectId } = req.query as Record<string, string | undefined>;
   const where: Record<string, unknown> = { tenantId: req.tenantId };
   if (status) where.status = status;
@@ -355,6 +357,11 @@ router.put('/:id', asyncHandler(async (req: Request, res: Response) => {
 
   // COMPLETED'a bu uçtan geçiş YASAK — kapanış kanıtı zorunluluğu /:id/complete'te uygulanır.
   if (status === 'COMPLETED') return res.status(400).json({ error: 'Kapanış için /complete uç noktasını kullanın (kanıt dosyası zorunlu).' });
+  // CLOSED için de aynı kanıt şartı — bu olmasaydı /complete'i hiç çağırmadan
+  // doğrudan CLOSED'a geçilip kapanış kanıtı zorunluluğu atlatılabilirdi.
+  if (status === 'CLOSED' && !record.customerSignOffFileUrl) {
+    return res.status(400).json({ error: 'Kapanış için önce müşteri imza/kapanış kanıtı (dosya) yüklenmelidir.' });
+  }
 
   if (servicePlanId) {
     const owns = await prisma.serviceWorkPlan.findFirst({ where: { id: servicePlanId as string, tenantId: req.tenantId }, select: { id: true } });
@@ -422,6 +429,19 @@ router.post('/:id/schedule', asyncHandler(async (req: Request, res: Response) =>
     include: INCLUDE,
   });
   await logActivity({ tenantId: req.tenantId, userId: req.userId, action: 'SCHEDULE', entityType: 'WORK_ORDER', entityId: id, details: { assignedTechnicianId, scheduledDate, dueAt: resolvedDueAt } });
+  // Atanan teknisyene sevkiyat bildirimi — önceden bu uç nokta hiç bildirim
+  // üretmiyordu, teknisyen kendisine iş atandığını ancak listeye bakarak
+  // öğreniyordu. Sevk eden kişi kendisiyse atlanır (zaten biliyor).
+  if (assignedTechnicianId !== req.userId) {
+    await prisma.notification.create({
+      data: {
+        tenantId: req.tenantId, userId: assignedTechnicianId, type: 'INFO',
+        title: 'Size yeni bir iş emri sevk edildi',
+        message: `"${order.title}" iş emri ${new Date(scheduledDate).toLocaleDateString('tr-TR')} tarihi için size atandı.`,
+        relatedModule: 'professional-services', relatedItemId: order.id,
+      },
+    }).catch(() => {});
+  }
   res.json(order);
 }));
 

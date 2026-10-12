@@ -605,6 +605,7 @@ model WorkOrder {
   // tek kaynak her zaman bu alan (dueAt). Bkz. docs/PROFESYONEL_HIZMETLER_PLAN.md.
   slaHours               Int? // süre-bazlı giriş yapıldıysa (saat) — dueAt'ten otomatik hesaplanır
   dueAt                  DateTime?
+  escalatedAt            DateTime? // SLA aşımı bildirimi bir kez gitti mi (idempotent) — bkz. workOrderReminders.ts
   actualStartAt          DateTime?
   actualEndAt            DateTime?
   servicePlanId          String? // opsiyonel — ServiceWorkPlan'a bağlıysa (Faz 2, haftalık dağıtım)
