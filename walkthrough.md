@@ -1346,7 +1346,7 @@ Boş birim koltuğunu dolduran sanal vekiller: birimin işini hazırlar (determi
 
 > 📚 **Amaç:** Bu bölüm, ilerde hazırlanacak **statik "enflow-wiki" how-to sayfasının** kaynak referansıdır. Yazılımı *hiç bilmeyen* birine baştan sona anlatacak şekilde, sade dille yazılmıştır. Wiki sayfası yapıldığında bu bölüm doğrudan ona kılavuzluk edecektir.
 >
-> Ölçek (2026-09-14): **79 veri modeli · 36 ekran modülü · 42 API alanı · 70+ servis · 8 sanal agent · 20+ rol · 8 katman (0–7).** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi + DMO Kataloğu + Garanti & Servis + işletme maliyeti dağıtımı + satış fiyatlandırma motoru + uygulama-içi Yardım modülü + zamana duyarlı Kârlılık & Nakit/Hazine analizi + tenant verisi alan-bazlı şifreleme + sözleşmeye bağlı teslim süresi/cezai şart takibi + Talep & Geri Bildirim.)
+> Ölçek (2026-10-13): **86 veri modeli · 37 ekran modülü · 42 API alanı · 76 servis · 8 sanal agent · 21 rol · 8 katman (0–7).** (Faz 0–9 + sağlayıcıdan-bağımsız YZ entegrasyonu + Yedekleme/Backup Admin + yönetişim sertleştirme (SoD/onay matrisi/Finance Engine) + çapraz-platform kurulum paketi + DMO Kataloğu + Garanti & Servis + **Profesyonel Hizmetler** (ticket-bazlı iş emri/teknisyen sevkiyatı — ITSM-lite) + işletme maliyeti dağıtımı + satış fiyatlandırma motoru + uygulama-içi Yardım modülü + zamana duyarlı Kârlılık & Nakit/Hazine analizi + tenant verisi alan-bazlı şifreleme + sözleşmeye bağlı teslim süresi/cezai şart takibi + Talep & Geri Bildirim.)
 
 ### 27.1 Enflow nedir? (tek paragraf)
 
@@ -1380,8 +1380,12 @@ Enflow, bir işin **müşteri ilgisinden** (fırsat) başlayıp **teklif → sö
 [Satınalma]       Talep → tedarikçi teklifi → PO → teslimat → fatura (9 statü)
      │
      ▼
-[Garanti & Servis] Teslim sonrası servis talebi/arıza kaydı → çözüm → kapanış
-     │
+[Garanti & Servis] Teslim sonrası servis talebi/arıza kaydı (ServiceTicket) açılır
+     │            → "Teknisyen Sevk Et" ile Profesyonel Hizmetlere köprülenir
+     ▼
+[Profesyonel      Kurulum/arıza/bakım iş emri (WorkOrder): birim yöneticisi teknisyen
+ Hizmetler]       sevk eder (uzmanlık/kapasite-farkında) → SLA takibi → kapanış
+     │            **dosya-kanıtı zorunlu** (müşteri imza/onayı olmadan tamamlanamaz)
      ▼
 [Finans]          Faturalama, tahsilat (kısmi), teminat mektupları, maliyet onayı,
                   kur farkı (FX) mahsubu
@@ -1399,6 +1403,7 @@ Bu hattın **üstünde** çalışan kesişen bileşenler: **Onay Swimlane** (Fin
 | **1 · Kimlik & Yetki (RBAC)** | User, Unit → UserManagement / UnitManagement / PermissionSettings → `/auth`, `/users`, `/units` |
 | **2 · Akış motoru** | Workflow, WorkflowStep, WorkflowLog, TodoTask, ApprovalChain, ApprovalStage, Notification, ActivityLog → WorkflowBuilder / TodoModule + `workflowService` → `/workflows`, `/tasks`, `/approval-chains`, `/notifications` |
 | **3 · Domain birimleri** | VisitPlan/Visit/DailyReport · Customer/Contact/Opportunity · BoMItem/CostItem · Proposal · Tender/TenderChecklistItem · Contract/ContractWorkflow/Doc · Project/Milestone/CostItem/HandoverDoc · Vendor/PurchaseRequest/Item/Quote/DeliveryRecord · Invoice/Payment/GuaranteeLetter/FxAdjustment · LegalCase · ServiceTicket → ilgili modüller (+ Garanti & Servis) → `/visits`,`/customers`,`/opportunities`,`/proposals`,`/tenders`,`/contracts`,`/contract-workflows`,`/projects`,`/purchase-requests`,`/vendors`,`/finance`,`/legal`,`/service-tickets` |
+| **3b · Profesyonel Hizmetler** | WorkOrder (SLA/teknisyen maliyeti/müşteri CSAT) · WorkSpecialty/UserWorkSpecialty (tenant-bazlı uzmanlık taksonomisi) · ServiceWorkPlan (haftalık teknisyen dağıtım planı) · WorkOrderMaterialRequest (dış kaynak malzeme mini-onayı, 9 statülü satınalma zincirinin KASITLI dışında) · ServiceTicketAttachment/WorkOrderAttachment → ProfessionalServicesModule (Liste/Haftalık Takvim/Ekip Utilizasyonu) → `/work-orders`,`/work-specialties`,`/service-work-plans` |
 | **4 · Yönetişim & Belge** | DocumentCodingProfile/CategoryCode/Sequence · LessonsLearned/RiskOpportunity/CorporateMetric/ExternalDocumentRegister · CorporateDocument/ArchiveItem · UnitReport → CorporateGovernance / Documents / Archive / ManagementReporting → `/document-coding`,`/corporate-governance`,`/documents`,`/archive`,`/reports` |
 | **5 · YZ / Sanal Agent** | PluginEntitlement, AgentRun → VirtualAgentsTestModule + SpecAnalysis / SpecComplianceMatrix (Şartname↔Ürün specsheet uygunluk matrisi + xlsx, yalnız YZ anahtarı varsa) / ContractWorkflow (istenilen YZ — tenant-yapılandırmalı, `aiClient`; modül-bazlı YZ kapısı, key yoksa Entegrasyonlar'a yönlendirir) → `/plugins`, `/presales/spec-extract`, `/presales/spec-compliance`, `/tenants/ai-settings` |
 | **6 · Entegrasyon & Admin** | IntegrationWizard (YZ/Nextcloud/Exchange/WhatsApp), SecurityTestModule → nextcloud/exchange/whatsapp servisleri → `/sync`, `/admin/security-test` |
@@ -1416,7 +1421,7 @@ Süreç-yönetiminin kalbi bu katmandır; domain birimlerini birbirine bağlar:
 
 ### 27.5 Roller & birimler
 
-GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Yönetimi), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)**. Toplam **20 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
+GENERAL_MANAGER (superuser), SALES_MANAGER, PRESALES, PROCUREMENT, LEGAL_MGR, PROJECT_MANAGER, ADMIN + kurumsal onay rolleri: FINANCE_MGR, IGPD_MGR (İş Geliştirme), KGD_MGR (Kalite Yönetimi), KSU_MGR (Kontrat & Sözleşme), ISAB_MGR (İhale Birimi) + **BACKUP_ADMIN (Yedek Yöneticisi — tüm akışa salt-okunur dahil; yalnız yedek/restore yazabilir)** + **OPERATIONS_MGR (Profesyonel Hizmetler Müdürü — teknisyen sevkiyatı) / PS_TECH (teknisyen — yalnız kendi iş emrini görür/yürütür)**. Toplam **21 rol**. İzinler kullanıcının `permissions` JSON'undan gelir; GM her şeyi görür.
 
 > **Görev Ayrılığı (SoD):** Bir kaydı oluşturan onu onaylayamaz (aynı insan iki rolde olsa bile) — onay/restore gibi kritik aksiyonlarda zorlanır. **Onay matrisi (DoA):** tenant tutar eşiği tanımlarsa onay rolleri tutara göre seçilir (opt-in). **Optimistic locking:** eşzamanlı onay/red yarışı 409 ile engellenir.
 
@@ -1434,7 +1439,8 @@ Sidebar'daki her modül: ne yapar, kim kullanır.
 | Sözleşme Yönetimi | Evrak hazırlık → imza onayı (KSU→GM) → SIGNED → Proje + Satınalmaya devir; teslim süresi + cezai şart takibi (alt-kırılımlı takvim) | KSU + Yönetim |
 | Proje Yönetimi | Otomatik proje + milestone şablonu; karlılık (overhead dahil); 11 zorunlu devir evrakı; teslim milestone'u tamamlanınca ilgili birimlere teyit bildirimi | Proje |
 | Satın Alma | BoM + referans alış fiyatı ile 9 statülü satınalma (talep→PO→teslimat→fatura) | Satın Alma |
-| Garanti & Servis | Teslim-sonrası servis/arıza talebi kaydı → çözüm → kapanış; projeyle ilişkili | Proje / Teknik Servis |
+| Garanti & Servis | Teslim-sonrası servis/arıza talebi kaydı (ServiceTicket) → çözüm → kapanış; projeyle ilişkili; "Teknisyen Sevk Et" ile Profesyonel Hizmetlere köprülenir | Proje / Teknik Servis |
+| Profesyonel Hizmetler | Ticket-bazlı iş emri (WorkOrder): kurulum/arıza/bakım → birim yöneticisi uzmanlık+kapasite-farkında teknisyen sevk eder; haftalık dağıtım planı (Liste/Haftalık Takvim); SLA takibi (öncelik-bazlı öneri + eskalasyon bildirimi) + teknisyen maliyeti (yalnız GM/Müdür görür) + CSAT; kapanış **dosya-kanıtı zorunlu** (müşteri imza/onayı); dış malzeme için 9 statülü satınalma zincirinin dışında mini-onay akışı; Ekip Utilizasyonu raporu | Operasyon Müdürü / Teknisyen |
 | Finans | Fatura/tahsilat/maliyet onayı; teminat; taksitli tahsilat + finansman etkisi; kur farkı mahsubu | Finans |
 | DMO Kataloğu | Devlet malzeme ofisi tipi sipariş + kur/risturn/komisyon kârlılık motoru (paralel kanal) | Satış / Finans (lisanslı) |
 | Kârlılık | Zamana duyarlı plan↔gerçek kârlılık (proje/aylık/çeyreklik/yıllık) + konsolide nakit pozisyonu + hazine katkısı + finansal enstrüman senaryoları (faktoring/vadeli mevduat/forward FX) + aylık plan-drift snapshot'ı; salt-okunur, mutasyon yapmaz | GM / Finans / Proje / Satış Müdürü |
@@ -1479,4 +1485,4 @@ Statik **enflow-wiki** (`wiki/index.html`) bu bölümden **otomatik üretilir** 
 
 ---
 
-*Bu belge Enflow v2.5.0 sürümüne aittir (güncellendi: 2026-09-14). Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = enflow-wiki kaynağı; statik wiki `wiki/index.html` bu bölümden üretilir.*
+*Bu belge Enflow v2.5.0 sürümüne aittir (güncellendi: 2026-10-13). Modül güncellemeleri için [CLAUDE.md](./CLAUDE.md) ve proje memory dosyalarını inceleyin. §27 = enflow-wiki kaynağı; statik wiki `wiki/index.html` bu bölümden üretilir.*
